@@ -279,6 +279,39 @@ export function useContentAssets(content: StoreContent | undefined): {
 }
 
 /**
+ * Firma un puñado de referencias sueltas del bucket de branding.
+ *
+ * La diferencia con `useContentAssets` es de dónde vienen: aquélla recorre un
+ * árbol de bloques del CMS, y ésta recibe una lista ya hecha —las fotos de las
+ * campañas vigentes, por ejemplo—.
+ *
+ * **Deja pasar las URL absolutas sin tocarlas.** El campo admite las dos cosas:
+ * una ruta del bucket privado o un `https://` externo, que es lo que permite el
+ * contrato §4.3 para el branding automático. Lo que NO se puede es servir el
+ * `https://` externo y esperar que se vea: la CSP del despliegue solo admite
+ * imágenes del propio dominio y del proyecto de Supabase, así que una foto
+ * alojada fuera se bloquea en el navegador aunque la fila la traiga. Por eso
+ * esto solo firma rutas: lo demás no es cosa suya.
+ */
+export function useSignedStoreAssets(refs: readonly (string | null)[]): Record<string, string> {
+  const rutas = [
+    ...new Set(
+      refs.filter((ref): ref is string => typeof ref === 'string' && !/^https?:\/\//i.test(ref)),
+    ),
+  ].sort()
+
+  const { data } = useQuery({
+    queryKey: ['storefront', 'store-assets', rutas] as const,
+    queryFn: () => signStoreAssetPaths(rutas),
+    enabled: rutas.length > 0,
+    staleTime: 30 * 60 * 1000,
+    retry: false,
+  })
+
+  return data ?? {}
+}
+
+/**
  * Búsqueda del catálogo con rebote y CANCELACIÓN.
  *
  * La cancelación no es una optimización: sin ella, la respuesta de una consulta

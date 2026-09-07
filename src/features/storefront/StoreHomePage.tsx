@@ -31,6 +31,7 @@ import {
   OFERTAS_QUERY,
   useCatalogPages,
   useContentAssets,
+  useSignedStoreAssets,
   usePrefetchProduct,
   usePublicCategories,
   useSignedThumbnails,
@@ -286,6 +287,11 @@ export function StoreHomePage() {
     blocks.map((block) => block.campaign?.id).filter((id): id is string => Boolean(id)),
   )
   const promosVigentes = (promotions.data ?? []).filter((promo) => !anunciadas.has(promo.id))
+
+  // La foto de una campaña vive en el mismo bucket privado que el logo y el
+  // hero, asi que necesita firma igual. Va en su propio lote porque las
+  // promociones no cuelgan del contenido del CMS: son otra consulta.
+  const assetsPromos = useSignedStoreAssets(promosVigentes.map((promo) => promo.imageUrl))
   const first = pages[0]
   const total = first?.total ?? 0
   const brandFacets = first?.facets.brands ?? []
@@ -546,6 +552,7 @@ export function StoreHomePage() {
           promotions={promosVigentes}
           storeSlug={storeSlug}
           currency={store.currency}
+          assets={assetsPromos}
         />
       )}
 

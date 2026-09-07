@@ -32,10 +32,20 @@ export function PromoCarousel({
   promotions,
   storeSlug,
   currency,
+  assets = {},
 }: {
   promotions: readonly StorePromotion[]
   storeSlug: string
   currency: string
+  /**
+   * Rutas de `store-assets` ya firmadas, como las que recibe el contenido
+   * del CMS.
+   *
+   * Firmar AQUI seria mas corto y esta descartado: este componente no pide
+   * datos, los pinta. La pagina ya firma un lote para el CMS y este entra
+   * en el mismo, que ademas evita dos peticiones para el mismo bucket.
+   */
+  assets?: Record<string, string>
 }) {
   const { t } = useI18n()
   const [actual, setActual] = useState(0)
@@ -161,7 +171,12 @@ export function PromoCarousel({
                   { position: 'absolute', inset: 0, visibility: 'hidden', pointerEvents: 'none' }
             }
           >
-            <PromoSlide promo={item} storeSlug={storeSlug} currency={currency} />
+            <PromoSlide
+              promo={item}
+              storeSlug={storeSlug}
+              currency={currency}
+              imageSrc={fuenteDe(item.imageUrl, assets)}
+            />
           </Box>
         ))}
       </Box>
@@ -199,14 +214,30 @@ export function PromoCarousel({
  * Una oferta, con la misma anatomía que la tarjeta de campaña del CMS:
  * **cuánto** (el medallón), **de qué** (nombre y frase) y **hasta cuándo**.
  */
+/**
+ * De la referencia guardada a algo que un `<img>` pueda cargar.
+ *
+ * Una ruta del bucket solo sirve firmada, y la firma llega despues que la
+ * fila: hasta que llega se devuelve `null` y no la ruta en crudo, porque una
+ * ruta en el `src` es una peticion segura al dominio de la tienda que siempre
+ * termina en 404.
+ */
+function fuenteDe(referencia: string | null, firmadas: Record<string, string>) {
+  if (!referencia) return null
+  if (/^https?:\/\//i.test(referencia)) return referencia
+  return firmadas[referencia] ?? null
+}
+
 function PromoSlide({
   promo,
   storeSlug,
   currency,
+  imageSrc,
 }: {
   promo: StorePromotion
   storeSlug: string
   currency: string
+  imageSrc: string | null
 }) {
   const { t, locale } = useI18n()
   const badge = offerBadge(promo, t, locale, currency)
@@ -270,10 +301,10 @@ function PromoSlide({
             bgcolor: 'var(--sf-media-bg)',
           }}
         >
-          {promo.imageUrl ? (
+          {imageSrc ? (
             <Box
               component="img"
-              src={promo.imageUrl}
+              src={imageSrc}
               alt=""
               aria-hidden
               loading="lazy"
@@ -309,7 +340,7 @@ function PromoSlide({
               Es el mismo distintivo que llevan las tarjetas de producto
               rebajado: el comprador ya sabe leerlo, y colocarlo encima de la
               imagen ahorra la tercera columna que dejaba el hueco del medio. */}
-          {promo.imageUrl && badge ? (
+          {imageSrc && badge ? (
             <Box
               sx={{
                 position: 'absolute',
