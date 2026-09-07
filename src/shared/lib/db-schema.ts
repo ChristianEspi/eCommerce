@@ -508,6 +508,11 @@ export const CATALOG_PRODUCT_FUNCTION = 'catalog-product'
 // `checkout`, que es la misma operación con clave de idempotencia delante.
 export const CREATE_ORDER_FUNCTION = 'create-order'
 export const CHECKOUT_FUNCTION = 'checkout'
+/**
+ * Asistente de compra de la vitrina. Devuelve texto e IDENTIFICADORES; el
+ * precio, el stock y la foto los resuelve la vitrina contra el catálogo.
+ */
+export const SHOPPING_ASSISTANT_FUNCTION = 'shopping-assistant'
 export const UPDATE_ORDER_STATUS_FUNCTION = 'update-order-status'
 export const PLATFORM_CONTEXT_FUNCTION = 'platform-context'
 // P12: la puerta por la que un operador logístico dice dónde va el paquete. No

@@ -1,3 +1,4 @@
+import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded'
 import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded'
 import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded'
 import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded'
@@ -8,12 +9,13 @@ import {
   Box,
   Button,
   Container,
+  Fab,
   Link as MuiLink,
   Stack,
   Toolbar,
   Typography,
 } from '@mui/material'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link, Outlet, useLocation, useParams } from 'react-router-dom'
 import { ErrorBoundary } from '@/app/ErrorBoundary'
 import { useSessionContext } from '@/features/auth/session-context'
@@ -29,6 +31,7 @@ import { notFoundMeta } from './seo'
 import { initials } from './branding'
 import { StoreCategoryNav } from './components/StoreCategoryNav'
 import { StoreQuickSearch } from './components/StoreQuickSearch'
+import { AssistantDrawer } from './components/AssistantDrawer'
 import { CartDrawer } from './cart/CartDrawer'
 import { CartProvider } from './cart/CartProvider'
 import { useCart } from './cart/cart-context'
@@ -79,6 +82,10 @@ export function StorefrontLayout() {
   const { t, locale } = useI18n()
   const { pathname } = useLocation()
   const { data: store, isPending, isError, error, refetch } = usePublicStore(storeSlug)
+
+  // Antes de cualquier retorno temprano: el orden de los hooks no puede
+  // depender de si la tienda cargo.
+  const [asistenteAbierto, setAsistenteAbierto] = useState(false)
   // La sesión no cambia NADA de lo que se ve del catálogo —la vitrina se lee
   // siempre con el cliente anónimo— pero sí decide de quién es el carrito: con
   // sesión, el del comprador; sin ella, el del token del navegador.
@@ -117,6 +124,7 @@ export function StorefrontLayout() {
   }
 
   const context: StorefrontOutlet = { storeSlug: storeSlug as string, store }
+
 
   return (
     // El acento de la vitrina es el `accent_color` del tenant, no el de casa.
@@ -200,6 +208,34 @@ export function StorefrontLayout() {
           />
 
           <CartDrawer storeSlug={storeSlug as string} />
+
+      {/* El asistente flota sobre la tienda y no dentro de ninguna pagina:
+          se pregunta desde donde se este, y en la ficha de un producto es
+          justo donde mas sentido tiene preguntar por alternativas.
+
+          Se coloca POR ENCIMA de «volver arriba», que ocupa la misma esquina
+          en la portada. Apilados y no superpuestos: dos botones peleandose el
+          mismo pixel es un boton que no se puede pulsar. */}
+      <Fab
+        color="primary"
+        aria-label={t('store.assistant.open')}
+        onClick={() => setAsistenteAbierto(true)}
+        sx={{
+          position: 'fixed',
+          right: { xs: 16, md: 24 },
+          bottom: { xs: 76, md: 88 },
+          zIndex: 4,
+        }}
+      >
+        <AutoAwesomeRoundedIcon />
+      </Fab>
+
+      <AssistantDrawer
+        open={asistenteAbierto}
+        onClose={() => setAsistenteAbierto(false)}
+        storeSlug={storeSlug as string}
+        storeId={store.store_id}
+      />
         </Box>
       </CartProvider>
     </AppearanceProvider>
