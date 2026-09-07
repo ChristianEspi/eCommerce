@@ -70,6 +70,46 @@ import { privateMeta } from './seo'
  *    manda ni un céntimo— y la pantalla ofrece confirmar con el precio nuevo,
  *    que reintenta con la misma clave y `accept_price_changes`.
  */
+/**
+ * Un paso del checkout.
+ *
+ * El formulario era una columna de diez campos sin una sola division: se lee
+ * como un tramite largo y no como tres decisiones cortas, y esa sensacion es
+ * la que hace abandonar. No es un stepper —partir la pagina en pantallas
+ * anadiria navegacion, estado y una forma nueva de perder lo escrito—: es la
+ * misma pagina de siempre, numerada, que da sentido de avance sin tocar el
+ * flujo ni la validacion.
+ *
+ * El numero va `aria-hidden`: el titulo ya encabeza la seccion, y leer
+ * «uno Contacto» no anade nada.
+ */
+function Paso({ numero, titulo }: { numero: number; titulo: string }) {
+  return (
+    <Stack direction="row" sx={{ alignItems: 'center', gap: 1.25, mb: 2 }}>
+      <Box
+        aria-hidden
+        sx={{
+          width: 26,
+          height: 26,
+          flexShrink: 0,
+          borderRadius: '999px',
+          display: 'grid',
+          placeItems: 'center',
+          bgcolor: 'var(--accent-soft)',
+          color: 'var(--accent-deep)',
+          fontSize: 13,
+          fontWeight: 800,
+        }}
+      >
+        {numero}
+      </Box>
+      <Typography component="h2" sx={{ fontSize: TS.cardTitle, fontWeight: 800 }}>
+        {titulo}
+      </Typography>
+    </Stack>
+  )
+}
+
 export function StoreCheckoutPage() {
   const { t, locale } = useI18n()
   const navigate = useNavigate()
@@ -384,10 +424,19 @@ export function StoreCheckoutPage() {
           alignItems: 'start',
         }}
       >
-        <Card sx={{ p: { xs: 2, md: 3 } }}>
-          <Typography component="h2" sx={{ fontSize: TS.cardTitle, fontWeight: 800, mb: 2 }}>
-            {t('store.checkout.contact')}
-          </Typography>
+        {/* Los tokens de la vitrina y no los del backoffice: el comprador
+            viene de una tienda con esquinas redondeadas y sombra suave, y
+            aterrizar en un formulario plano se lee como haber salido del
+            sitio justo cuando va a pagar. */}
+        <Card
+          sx={{
+            p: { xs: 2, md: 3 },
+            borderRadius: 'var(--sf-radius)',
+            border: '1px solid var(--sf-line)',
+            boxShadow: 'var(--sf-shadow)',
+          }}
+        >
+          <Paso numero={1} titulo={t('store.checkout.contact')} />
 
           <Stack sx={{ gap: 2 }}>
             <TextField
@@ -431,6 +480,9 @@ export function StoreCheckoutPage() {
                 {...register('customerPhone')}
               />
             </Stack>
+            <Divider sx={{ mt: 1 }} />
+            <Paso numero={2} titulo={t('store.checkout.step.delivery')} />
+
             <TextField
               label={t('store.checkout.address')}
               autoComplete="street-address"
@@ -516,6 +568,7 @@ export function StoreCheckoutPage() {
             />
 
             <Divider />
+            <Paso numero={3} titulo={t('store.checkout.payment')} />
 
             {/* El pago va DESPUES de la entrega y antes del boton: es la
                 ultima decision de la compra, y ponerlo arriba obliga a
@@ -536,7 +589,14 @@ export function StoreCheckoutPage() {
           </Stack>
         </Card>
 
-        <Card sx={{ p: { xs: 2, md: 2.5 } }}>
+        <Card
+          sx={{
+            p: { xs: 2, md: 2.5 },
+            borderRadius: 'var(--sf-radius)',
+            border: '1px solid var(--sf-line)',
+            boxShadow: 'var(--sf-shadow)',
+          }}
+        >
           <Typography component="h2" sx={{ fontSize: TS.cardTitle, fontWeight: 800, mb: 1.5 }}>
             {t('store.cart.summary')}
           </Typography>

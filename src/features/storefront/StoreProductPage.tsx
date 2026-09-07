@@ -1,3 +1,6 @@
+import InventoryRoundedIcon from '@mui/icons-material/Inventory2Rounded'
+import LocalShippingRoundedIcon from '@mui/icons-material/LocalShippingRounded'
+import LockRoundedIcon from '@mui/icons-material/LockRounded'
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded'
 import ShoppingCartRoundedIcon from '@mui/icons-material/ShoppingCartRounded'
 import {
@@ -246,7 +249,25 @@ export function StoreProductPage() {
                 {t('store.product.priceFrom')}
               </Typography>
             )}
-            <Typography sx={{ fontSize: 24, fontWeight: 800 }}>
+            {/* Mas grande que el h1, y a proposito.
+
+                El nombre y el precio competian a 26 y 24 px: en una ficha de
+                producto el ojo busca UNA cosa primero, y no es como se llama.
+                Quien llega aqui ya sabe que producto esta mirando —hizo clic
+                en el— y lo que viene a averiguar es cuanto cuesta.
+
+                `tabular-nums` para que el importe no baile al cambiar de
+                variante: con cifras de ancho distinto, elegir otra talla mueve
+                el precio de sitio y parece que cambio mas de lo que cambio. */}
+            <Typography
+              sx={{
+                fontSize: { xs: 28, md: 34 },
+                fontWeight: 900,
+                letterSpacing: '-0.02em',
+                lineHeight: 1.1,
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
               {formatMoney(
                 Number(hasVariants ? (item.price_from ?? item.price) : item.price),
                 item.currency,
@@ -288,6 +309,33 @@ export function StoreProductPage() {
             variants={hasVariants ? (variants.data ?? []) : []}
             variantsPending={hasVariants && variants.isPending}
           />
+
+          {/* Las tres dudas que frenan un «anadir al carrito», justo donde se
+              frena: al lado del boton. La franja de servicios ya las contaba,
+              pero vive al final de la portada, a media docena de pantallas de
+              distancia del unico momento en que importan.
+
+              Son afirmaciones sobre lo que la plataforma SI hace —entrega
+              calculada al comprar, pago por medios de la tienda, stock real
+              del almacen—: nada de politicas de devolucion que no existan. */}
+          <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 1.5, pt: 0.5 }}>
+            {([
+              ['store.product.trust.delivery', LocalShippingRoundedIcon],
+              ['store.product.trust.payment', LockRoundedIcon],
+              ['store.product.trust.stock', InventoryRoundedIcon],
+            ] as const).map(([clave, Icono]) => (
+              <Stack
+                key={clave}
+                direction="row"
+                sx={{ alignItems: 'center', gap: 0.625 }}
+              >
+                <Icono aria-hidden sx={{ fontSize: 16, color: 'var(--accent-deep)' }} />
+                <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>
+                  {t(clave)}
+                </Typography>
+              </Stack>
+            ))}
+          </Stack>
 
         </Stack>
         </Card>
