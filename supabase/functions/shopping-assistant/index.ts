@@ -64,18 +64,42 @@ const MODELO = Deno.env.get('EBIM_AI_MODEL') ?? 'claude-haiku-4-5-20251001'
  */
 function interpretar(mensaje: string): { query: string; filters: Record<string, unknown> } {
   const filters: Record<string, unknown> = {}
+  let resto = mensaje
+
+  /**
+   * Cada filtro se lleva SU FRASE al salir.
+   *
+   * Es el detalle que hace que esto funcione. El índice de texto exige que casen
+   * todos los términos, así que dejar dentro las palabras que ya se
+   * convirtieron en filtro —«con stock», «por menos de 60»— es pedirle al
+   * catálogo un producto que se llame «vitaminas con stock». Devuelve cero, y
+   * el fallo no se ve: la búsqueda ha funcionado perfectamente sobre una
+   * pregunta imposible.
+   */
+  function extraer(patron: RegExp): RegExpMatchArray | null {
+    const encontrado = resto.match(patron)
+    if (encontrado) resto = resto.replace(patron, ' ')
+    return encontrado
+  }
 
   // «menos de 60», «hasta S/ 60», «bajo 60 soles».
-  const tope = mensaje.match(/(?:menos de|hasta|bajo|máximo|maximo|max\.?)\s*(?:s\/\.?\s*)?(\d+)/i)
+  const tope = extraer(
+    /(?:por\s+)?(?:menos de|hasta|bajo|máximo|maximo|max\.?)\s*(?:s\/\.?\s*)?(\d+)(?:\s*soles?)?/i,
+  )
   if (tope?.[1]) filters.price_max = tope[1]
 
-  if (/\bcon stock\b|\bdisponible/i.test(mensaje)) filters.availability = 'in_stock'
-  if (/\boferta|rebaj|descuent|promoci/i.test(mensaje)) filters.discounted = true
+  if (extraer(/\b(?:con\s+stock|disponibles?|en\s+stock)\b/i)) filters.availability = 'in_stock'
+  if (extraer(/\b(?:en\s+)?(?:oferta|ofertas|rebajad\w*|descuento|promoci\w*)\b/i)) {
+    filters.discounted = true
+  }
 
-  // Las palabras que solo sirven para dirigirse a alguien no ayudan a buscar y
-  // ensucian el ranking del índice de texto.
-  const query = mensaje
-    .replace(/\b(hola|busco|necesito|quiero|muéstrame|muestrame|recomiéndame|recomiendame|dame|por favor)\b/gi, ' ')
+  // Lo que solo sirve para dirigirse a alguien no ayuda a buscar y, peor, tiene
+  // que casar igual que el nombre del producto.
+  const query = resto
+    .replace(
+      /\b(hola|busco|buscando|necesito|quiero|quisiera|muéstrame|muestrame|recomiéndame|recomiendame|dame|algo|alguna|alguno|para|un|una|unos|unas|de|del|la|el|los|las|mi|me|por favor)\b/gi,
+      ' ',
+    )
     .replace(/\s+/g, ' ')
     .trim()
 
@@ -196,17 +220,40 @@ const handler = serveJson(
     // `anonClient`: el catálogo público se lee como cualquier visitante. La RPC
     // es `security definer` y ya fuerza tienda activa y productos publicados;
     // usar `service_role` aquí sería darle a un buscador permisos de escritura.
-    const { data, error } = await anonClient(trace).rpc('catalog_search_for_slug', {
-      p_store_slug: storeSlug,
-      p_query: query,
-      p_filters: filters,
-      p_sort: 'relevance',
-      p_limit: CANDIDATOS,
-      p_offset: 0,
-    })
-    if (error) throw fromDatabaseError(error)
+    const cliente = anonClient(trace)
 
-    const items = (data?.items ?? []) as Candidato[]
+    async function buscar(termino: string) {
+      const { data, error } = await cliente.rpc('catalog_search_for_slug', {
+        p_store_slug: storeSlug,
+        p_query: termino,
+        p_filters: filters,
+        p_sort: 'relevance',
+        p_limit: CANDIDATOS,
+        p_offset: 0,
+      })
+      if (error) throw fromDatabaseError(error)
+      return (data?.items ?? []) as Candidato[]
+    }
+
+    let items = await buscar(query)
+
+    /**
+     * Segundo intento con la palabra más larga.
+     *
+     * El índice exige que casen TODOS los términos, así que una frase de tres
+     * palabras falla entera si sobra una. Limpiar la frase cubre lo previsible
+     * —«con stock», «por menos de»— y esto cubre lo demás: de «pastillas para el
+     * dolor de cabeza» rescata «pastillas», que es peor recomendación que la
+     * ideal y muchísimo mejor que un panel vacío.
+     *
+     * La palabra más larga y no la primera: en castellano el sustantivo que
+     * importa casi nunca abre la frase, pero sí suele ser el término largo.
+     */
+    if (items.length === 0) {
+      const palabras = query.split(' ').filter((p) => p.length > 3)
+      const principal = palabras.sort((a, b) => b.length - a.length)[0]
+      if (principal && principal !== query) items = await buscar(principal)
+    }
     const candidatos = items.map((item) => ({
       product_id: item.product_id,
       name: item.name,

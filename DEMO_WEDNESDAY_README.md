@@ -49,11 +49,24 @@ a ciegas delante del cliente rompe el ritmo.
 
 ### El asistente de compra
 
-Botón flotante abajo a la derecha, en cualquier página de la tienda. Prueba con:
+Botón flotante abajo a la derecha, en cualquier página de la tienda. **Función
+desplegada y probada contra el catálogo real** (versión 2).
 
-- «Protector solar por menos de S/ 60»
-- «Algo para un botiquín de viaje»
-- «Vitaminas con stock»
+Las tres sugerencias del panel están verificadas de punta a punta contra la
+tienda de demo:
+
+| Pregunta | Productos |
+|---|---|
+| «Protector solar por menos de S/ 100» | 3 |
+| «Crema para la piel» | 8 |
+| «Vitaminas con stock» | 8 |
+
+**Sin `EBIM_AI_API_KEY` responde en modo búsqueda**, que es lo que verás hoy:
+sin frase de recomendación, pero con los productos correctos. Una pregunta por
+CONCEPTO —«algo para un botiquín de viaje»— devolverá vacío en este modo: no
+hay ningún producto que se llame así, y relacionar el concepto con gasas y
+alcohol es justo lo que aporta el modelo. **No la uses en la demo hasta que haya
+clave.**
 
 ---
 
@@ -115,13 +128,7 @@ No hay E2E configurado en el repositorio; no se inventó ninguno.
 
 ### Bloqueantes si la demo es sobre QAS
 
-1. **La función del asistente no está desplegada.** El código está en el
-   repositorio pero el asistente no responderá en QAS hasta que se ejecute
-   `supabase functions deploy shopping-assistant`. **No se desplegó porque el
-   repositorio exige orden explícita del operador.** En local con `supabase
-   functions serve` funciona.
-
-2. **Rutas profundas dan 404 en QAS.** Falta la reescritura de SPA en Amplify.
+1. **Rutas profundas dan 404 en QAS.** Falta la reescritura de SPA en Amplify.
    Navegando por la aplicación todo va bien; **recargar con F5 saca un 404**. Es
    configuración de AWS, fuera del repositorio.
 

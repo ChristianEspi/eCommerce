@@ -73,10 +73,34 @@ los resultados del buscador. La tienda nunca depende de que la IA funcione.
 Golden path validado y gates en verde: **features congeladas**. A partir de
 aquí, solo correcciones que afecten a la demo.
 
+## Despliegue
+
+`shopping-assistant` **desplegada** (versión 2) por orden del operador y probada
+contra el catálogo real. Se declara con `verify_jwt = true` en `config.toml`, al
+revés que `create-order`: la vitrina siempre adjunta la clave publicable, así que
+exigir un JWT no le cuesta nada al comprador y sí a quien pase sin ella. Importa
+más aquí que en el resto porque **es el único borde del repositorio donde una
+petición suelta puede gastar cuota de un proveedor de IA**.
+
+### Un fallo que solo apareció al probarla desplegada
+
+La primera versión devolvía **cero productos siempre**. La causa no era la
+búsqueda: era que `interpretar()` extraía el filtro y **no quitaba la frase que
+lo había producido**. El índice de texto exige que casen todos los términos, así
+que «vitaminas con stock» le pedía al catálogo un producto llamado literalmente
+así. Cero resultados, y el fallo invisible: la búsqueda funcionaba
+perfectamente sobre una pregunta imposible.
+
+Corregido en dos frentes: cada filtro se lleva su frase al salir, y si la
+consulta limpia no devuelve nada se reintenta con la palabra más larga —de
+«pastillas para el dolor de cabeza» rescata «pastillas», peor recomendación que
+la ideal y muchísimo mejor que un panel vacío—.
+
+Los tests unitarios no lo habrían cogido: prueban el contrato de datos, y esto
+era el encaje real con el índice de texto del catálogo.
+
 ## Lo que queda en manos del operador
 
-1. `supabase functions deploy shopping-assistant` — sin esto el asistente no
-   responde en QAS. No se desplegó: el repositorio exige orden explícita.
-2. Reescritura de SPA en Amplify — recargar con F5 da 404 en QAS.
-3. `EBIM_AI_API_KEY` en los secretos de Supabase si se quiere IA real en vez de
+1. Reescritura de SPA en Amplify — recargar con F5 da 404 en QAS.
+2. `EBIM_AI_API_KEY` en los secretos de Supabase si se quiere IA real en vez de
    modo búsqueda.

@@ -47,3 +47,12 @@ verify_jwt = true
 
 [functions.update-order-status]
 verify_jwt = true
+
+# El asistente lo llama un comprador ANONIMO, igual que `create-order`, pero
+# aqui la verificacion se deja PUESTA a proposito: la vitrina siempre adjunta la
+# clave publicable, asi que exigir un JWT no le cuesta nada al comprador y le
+# cuesta la entrada a quien pase por la puerta sin ella. Importa mas que en el
+# resto porque cada llamada puede gastar cuota de un proveedor de IA: es el
+# unico borde del repositorio donde una peticion suelta cuesta dinero.
+[functions.shopping-assistant]
+verify_jwt = true
