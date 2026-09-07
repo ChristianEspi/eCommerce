@@ -89,6 +89,42 @@ describe('el asistente de compra', () => {
     expect(resultado.products).toHaveLength(2)
   })
 
+  it('distingue una coincidencia real de un simple parecido', async () => {
+    // El catálogo no tiene pañales y devuelve vecinos lexicos —«vaginales»— en
+    // modo difuso. La pantalla necesita saberlo para enmarcarlos como parecido
+    // y no como respuesta: es la diferencia entre contestar e inventar.
+    invoke.mockResolvedValue({
+      data: {
+        data: { mode: 'search', match: 'fuzzy', query: 'pañales', reply: null, product_ids: [P1] },
+      },
+      error: null,
+    })
+    fetchPorIds.mockResolvedValue([producto(P1, 'Ovulos')])
+
+    const resultado = await askAssistant({
+      storeSlug: 'miquimica',
+      storeId: STORE,
+      message: 'pañales',
+    })
+
+    expect(resultado.match).toBe('fuzzy')
+    expect(resultado.query).toBe('pañales')
+  })
+
+  it('una respuesta sin `match` se trata como coincidencia real', async () => {
+    // Compatibilidad con una respuesta anterior al despliegue: sin el campo, el
+    // comportamiento es el de siempre y la pantalla no inventa una advertencia.
+    invoke.mockResolvedValue({
+      data: { data: { mode: 'ai', reply: 'Mira esto.', product_ids: [P1] } },
+      error: null,
+    })
+    fetchPorIds.mockResolvedValue([producto(P1, 'Vitamina')])
+
+    const resultado = await askAssistant({ storeSlug: 'miquimica', storeId: STORE, message: 'algo' })
+
+    expect(resultado.match).toBe('fts')
+  })
+
   it('un fallo del asistente no devuelve datos a medias', async () => {
     invoke.mockResolvedValue({ data: null, error: { message: 'boom' } })
 

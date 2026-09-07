@@ -2825,6 +2825,8 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.assistant.failed': 'I could not check right now. Try again or use the search box.',
     'store.assistant.empty': 'I found nothing matching. Try different words.',
     'store.assistant.searchMode': 'Catalogue search results.',
+    'store.assistant.fuzzy':
+      'I could not find “{term}” in this shop. This is the closest match:',
     'store.assistant.example.1': 'Sunscreen under S/ 100',
     'store.assistant.example.2': 'Skin cream',
     'store.assistant.example.3': 'Vitamins in stock',

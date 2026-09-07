@@ -155,10 +155,24 @@ export function AssistantDrawer({
               {asistente.data.reply && (
                 <Typography sx={{ fontSize: TS.body }}>{asistente.data.reply}</Typography>
               )}
-              {asistente.data.mode === 'search' && (
+              {/* Un parecido no se presenta como una respuesta.
+
+                  Cuando el buscador cae a `fuzzy` no encontró lo que se pidió:
+                  devolvió lo más cercano por letras. Enmarcarlo —«no encontré X,
+                  esto es lo más parecido»— convierte un resultado desconcertante
+                  en uno útil, porque lo primero que aprende quien pregunta es
+                  que la tienda no tiene eso. Sin el marco, un catálogo sin
+                  pañales contesta con óvulos vaginales y parece roto. */}
+              {asistente.data.match === 'fuzzy' ? (
                 <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>
-                  {t('store.assistant.searchMode')}
+                  {t('store.assistant.fuzzy').replace('{term}', asistente.data.query)}
                 </Typography>
+              ) : (
+                asistente.data.mode === 'search' && (
+                  <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>
+                    {t('store.assistant.searchMode')}
+                  </Typography>
+                )
               )}
 
               {productos.length === 0 ? (

@@ -38,6 +38,20 @@ import type { PublicProduct } from './types'
 
 export const assistantAnswerSchema = z.object({
   mode: z.enum(['ai', 'search']),
+  /**
+   * CÓMO se encontró, que no es lo mismo que si se encontró.
+   *
+   * `fuzzy` quiere decir que no hubo coincidencia de texto y el catálogo
+   * devolvió lo más parecido por letras. Sin esta distinción la pantalla
+   * presentaba óvulos vaginales como respuesta a «pañales» —vecinos léxicos— con
+   * el mismo aplomo que una coincidencia real. La diferencia entre responder e
+   * inventar cabe en este campo.
+   *
+   * Opcional para no romper una respuesta anterior al despliegue.
+   */
+  match: z.string().default('fts'),
+  /** Lo que de verdad se buscó, ya limpio de muletillas. La pantalla lo cita. */
+  query: z.string().default(''),
   reply: z.string().nullable().default(null),
   product_ids: z.array(z.string().uuid()).default([]),
 })

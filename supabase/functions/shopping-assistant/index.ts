@@ -222,6 +222,23 @@ const handler = serveJson(
     // usar `service_role` aquí sería darle a un buscador permisos de escritura.
     const cliente = anonClient(trace)
 
+    /**
+     * `mode` del buscador, y no es un detalle interno.
+     *
+     * `fuzzy` significa que NO hubo coincidencia de texto y el catálogo devolvió
+     * lo mas parecido por trigramas. Para una caja de búsqueda es lo correcto
+     * —quien teclea «shampu» quiere sus champús— pero para un ASISTENTE es la
+     * diferencia entre responder y inventar: preguntando «pañales» a un catálogo
+     * que no tiene pañales, «vaginales» sale como vecino lexico y presentarlo
+     * como recomendacion es peor que decir que no hay.
+     *
+     * No se filtra por puntuacion porque la puntuacion no separa los casos: el
+     * acierto de «vitamnas» puntua 2.03 y el disparate de «pañales» 2.25. Lo que
+     * se hace es DECIRLO, y que la pantalla enmarque el resultado como lo que
+     * es: un parecido, no una respuesta.
+     */
+    let match = 'empty'
+
     async function buscar(termino: string) {
       const { data, error } = await cliente.rpc('catalog_search_for_slug', {
         p_store_slug: storeSlug,
@@ -232,6 +249,7 @@ const handler = serveJson(
         p_offset: 0,
       })
       if (error) throw fromDatabaseError(error)
+      match = typeof data?.mode === 'string' ? data.mode : 'empty'
       return (data?.items ?? []) as Candidato[]
     }
 
@@ -273,6 +291,10 @@ const handler = serveJson(
           // `search` no es un error: es el modo en el que esto funciona sin
           // proveedor de IA, y la vitrina lo pinta igual de bien.
           mode: sugerido ? 'ai' : 'search',
+          /** Cómo se encontró: `fts` es coincidencia real, `fuzzy` es parecido. */
+          match,
+          /** Lo que de verdad se buscó, ya limpio. La pantalla lo cita. */
+          query,
           reply: sugerido?.reply ?? null,
           // SOLO identificadores. El precio, el stock y la foto los resuelve la
           // vitrina contra el catálogo.
