@@ -17,7 +17,9 @@ import { EmptyState } from '@/shared/ui/states'
 import { TS } from '@/theme/tokens'
 import { useCart } from './cart/cart-context'
 import { DeliveryPicker } from './components/DeliveryPicker'
+import { PaymentPicker } from './components/PaymentPicker'
 import { useDeliveryOptions } from './delivery'
+import { defaultPaymentCode, usePaymentMethods } from './payment'
 import {
   CheckoutError,
   checkoutSchema,
@@ -141,6 +143,7 @@ export function StoreCheckoutPage() {
       country: '',
       deliveryMethodCode: '',
       pickupPointId: '',
+      paymentMethodCode: '',
     },
   })
 
@@ -174,6 +177,25 @@ export function StoreCheckoutPage() {
     enabled: cart.lines.length > 0,
   })
   const deliveryOptions = delivery.data?.options ?? []
+
+  /**
+   * Los medios de pago de la tienda (P09-SaaS).
+   *
+   * No dependen de la direccion ni del carrito —una tienda cobra igual en
+   * Lima que en Arequipa—, asi que se piden una vez y no se recotizan al
+   * teclear, al reves que la entrega.
+   */
+  const payment = usePaymentMethods(store.store_id)
+  const paymentMethods = useMemo(() => payment.data ?? [], [payment.data])
+
+  // Se marca solo cuando la eleccion es inequivoca: con un unico medio,
+  // obligar a pulsarlo es un clic que no decide nada. Con dos o mas se deja en
+  // blanco, porque «pagar con lo que salia puesto» es una reclamacion.
+  useEffect(() => {
+    if (paymentMethods.length === 0) return
+    const porDefecto = defaultPaymentCode(paymentMethods)
+    if (porDefecto) setValue('paymentMethodCode', porDefecto)
+  }, [paymentMethods, setValue])
   const selectedDelivery =
     deliveryOptions.find((option) => option.code === (watched.deliveryMethodCode ?? '')) ?? null
   const shippingAmount =
@@ -197,7 +219,7 @@ export function StoreCheckoutPage() {
         authenticated,
       })
     },
-    onSuccess: (order) => {
+    onSuccess: (order, variables) => {
       // El intento se cierra y el carrito se vacía SOLO cuando el servidor
       // confirmó el pedido. Si se vaciara al enviar, un error de red dejaría al
       // comprador sin carrito y sin pedido.
@@ -208,7 +230,14 @@ export function StoreCheckoutPage() {
       const permalink = order.access_token
         ? `/s/${storeSlug}/order/${order.order_number}?t=${order.access_token}`
         : `/s/${storeSlug}/order/${order.order_number}`
-      navigate(permalink, { replace: true, state: { order } })
+      // El medio elegido viaja en el estado de navegacion y no en la URL: es
+      // una preferencia del comprador, no parte de la direccion del pedido.
+      // Al volver por el enlace permanente no estara, y la confirmacion
+      // simplemente no pinta ese bloque — el pedido ya se explica solo.
+      navigate(permalink, {
+        replace: true,
+        state: { order, paymentMethodCode: variables.values.paymentMethodCode ?? '' },
+      })
     },
     onError: (error) => {
       const checkoutError = error instanceof CheckoutError ? error : null
@@ -317,6 +346,12 @@ export function StoreCheckoutPage() {
       }
       if (selectedDelivery?.strategy === 'pickup' && !values.pickupPointId) {
         setErrorKey('store.checkout.error.delivery.pickup')
+        return
+      }
+      // Misma regla que la entrega: se exige elegir solo cuando hay algo que
+      // elegir. Una tienda sin medios configurados sigue vendiendo.
+      if (paymentMethods.length > 0 && !values.paymentMethodCode) {
+        setErrorKey('store.checkout.error.payment.method')
         return
       }
 
@@ -477,6 +512,20 @@ export function StoreCheckoutPage() {
               }}
               selectedPickupPointId={watched.pickupPointId ?? ''}
               onSelectPickupPoint={(id) => setValue('pickupPointId', id)}
+              error={null}
+            />
+
+            <Divider />
+
+            {/* El pago va DESPUES de la entrega y antes del boton: es la
+                ultima decision de la compra, y ponerlo arriba obliga a
+                elegir como se paga algo cuyo total todavia no se conoce. */}
+            <PaymentPicker
+              methods={paymentMethods}
+              loading={payment.isLoading}
+              failed={payment.isError}
+              selectedCode={watched.paymentMethodCode ?? ''}
+              onSelect={(code) => setValue('paymentMethodCode', code)}
               error={null}
             />
             {deliveryOptions.length > 0 && (

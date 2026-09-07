@@ -968,3 +968,114 @@ describe('entrega en el checkout (P12)', () => {
     expect(body.delivery).toBeNull()
   })
 })
+
+/**
+ * Los medios de pago de la tienda, tal y como los devuelve la vista publica:
+ * codigo, familia, nombre, orden e instrucciones. Ni proveedor ni configuracion
+ * — esas columnas no salen de la base, y el test lo comprueba abajo.
+ */
+const MEDIOS_PAGO = [
+  {
+    payment_method_id: 'dddd1111-1111-4111-8111-111111111111',
+    store_id: STORE,
+    code: 'yape',
+    kind: 'wallet',
+    display_name: 'Yape',
+    position: 10,
+    instructions: 'Yapea al 999 888 777 a nombre de Casa Nordica.',
+  },
+  {
+    payment_method_id: 'dddd2222-2222-4222-8222-222222222222',
+    store_id: STORE,
+    code: 'transferencia',
+    kind: 'bank_transfer',
+    display_name: 'Transferencia bancaria',
+    position: 20,
+    instructions: 'Cuenta BCP 191-0000-1-11',
+  },
+]
+
+function backendConPago(
+  options: { onCheckout?: (body: Record<string, unknown>) => unknown } = {},
+) {
+  const fake = backendConEntrega(options)
+  fake.state.tables.public_payment_methods = MEDIOS_PAGO
+  return fake
+}
+
+/** Contacto + entrega elegida: el punto justo antes de decidir como se paga. */
+async function llegarAlPago(user: ReturnType<typeof userEvent.setup>) {
+  await rellenarContacto(user)
+  await user.click(await screen.findByRole('radio', { name: /Envío estándar/ }))
+}
+
+describe('medio de pago en el checkout (P09)', () => {
+  it('lo que viaja es el CODIGO del medio, sin proveedor ni configuracion', async () => {
+    const user = userEvent.setup()
+    const fake = backendConPago()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(fake, '/s/casa-nordica/checkout')
+
+    await llegarAlPago(user)
+    await user.click(await screen.findByRole('radio', { name: /Transferencia bancaria/ }))
+    await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
+
+    await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
+    const body = fake.state.invocations[0]?.body as Record<string, unknown>
+
+    expect(body.payment_method_code).toBe('transferencia')
+    // La misma regla que el resto del cuerpo: ni tenant, ni importes, ni nada
+    // que huela a credencial de pasarela.
+    for (const clave of todasLasClaves(body)) {
+      expect(CLAVES_PROHIBIDAS).not.toContain(clave)
+    }
+    expect(todasLasClaves(body)).not.toContain('provider_code')
+    expect(todasLasClaves(body)).not.toContain('capture_mode')
+  })
+
+  it('no deja comprar sin elegir como pagar', async () => {
+    const user = userEvent.setup()
+    const fake = backendConPago()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(fake, '/s/casa-nordica/checkout')
+
+    await llegarAlPago(user)
+    await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
+
+    // Con dos medios no hay preseleccion posible: se pide elegir y NO se llama
+    // al servidor para que conteste algo que ya se sabia.
+    expect(
+      await screen.findByText('Elige cómo quieres pagar tu pedido.'),
+    ).toBeInTheDocument()
+    expect(fake.state.invocations).toHaveLength(0)
+  })
+
+  it('las instrucciones salen ANTES de pedir, no solo en la confirmacion', async () => {
+    const user = userEvent.setup()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(backendConPago(), '/s/casa-nordica/checkout')
+
+    await llegarAlPago(user)
+    await user.click(await screen.findByRole('radio', { name: /Yape/ }))
+
+    // Que hay que hacer para pagar es lo unico accionable de un medio como
+    // Yape: decidirlo a ciegas y descubrirlo despues es como se abandona.
+    expect(await screen.findByText(/Yapea al 999 888 777/)).toBeInTheDocument()
+  })
+
+  it('sin medios configurados el checkout funciona EXACTAMENTE como antes de P09', async () => {
+    const user = userEvent.setup()
+    // `backendConEntrega()` sin la vista: la tienda no tiene medios de pago.
+    const fake = backendConEntrega()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(fake, '/s/casa-nordica/checkout')
+
+    await llegarAlPago(user)
+    await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
+
+    await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
+    const body = fake.state.invocations[0]?.body as Record<string, unknown>
+    // Ni la clave viaja: un `null` seria «no eligio», y aqui no se pregunto.
+    expect(Object.keys(body)).not.toContain('payment_method_code')
+  })
+})

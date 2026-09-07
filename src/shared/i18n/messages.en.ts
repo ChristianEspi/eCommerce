@@ -2816,7 +2816,13 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.checkout.region': 'Region or state',
     'store.checkout.postalCode': 'Postcode',
     'store.checkout.country': 'Country',
+    'store.payment.title': 'How do you want to pay',
+    'store.payment.none': 'This shop arranges payment separately.',
+    'store.payment.instructions': 'What to do to pay',
+    'store.checkout.payment': 'Payment',
+    'store.order.payment': 'Payment method',
     'store.checkout.error.delivery.method': 'Choose how you want to receive your order.',
+    'store.checkout.error.payment.method': 'Choose how you want to pay for your order.',
     'store.checkout.error.delivery.pickup': 'Choose where you will pick up your order.',
 // --- P13-SaaS · analytics, audit and operations --------------------------
     'nav.analytics': 'Analytics',

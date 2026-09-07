@@ -2826,7 +2826,13 @@ export const es = {
     'store.checkout.region': 'Región o departamento',
     'store.checkout.postalCode': 'Código postal',
     'store.checkout.country': 'País',
+    'store.payment.title': 'Cómo quieres pagar',
+    'store.payment.none': 'Esta tienda acuerda el pago por separado.',
+    'store.payment.instructions': 'Qué hacer para pagar',
+    'store.checkout.payment': 'Pago',
+    'store.order.payment': 'Medio de pago',
     'store.checkout.error.delivery.method': 'Elige cómo quieres recibir tu pedido.',
+    'store.checkout.error.payment.method': 'Elige cómo quieres pagar tu pedido.',
     'store.checkout.error.delivery.pickup': 'Elige dónde vas a recoger tu pedido.',
 // --- P13-SaaS · analítica, auditoría y operación -------------------------
     'nav.analytics': 'Analítica',

@@ -10,6 +10,7 @@ import { R, TS } from '@/theme/tokens'
 import { fetchOrderByToken } from './api'
 import { orderResultSchema, type OrderResult } from './checkout'
 import { useStorefront } from './hooks'
+import { usePaymentMethods } from './payment'
 import { privateMeta } from './seo'
 
 /**
@@ -52,6 +53,22 @@ export function StoreOrderPage() {
     (location.state as { order?: unknown } | null)?.order,
   )
   const fromState: OrderResult | null = parsed.success ? parsed.data : null
+
+  /**
+   * El medio con el que se acaba de pagar (P09-SaaS).
+   *
+   * Se resuelve contra la lista real de la tienda y no contra un texto que
+   * viajara en el estado: lo unico que se arrastra desde el checkout es el
+   * CODIGO, y el nombre y las instrucciones salen de la misma vista publica que
+   * pinto el selector. Asi no hay dos versiones del mismo texto viviendo en
+   * sitios distintos.
+   */
+  const codigoPago = (location.state as { paymentMethodCode?: unknown } | null)?.paymentMethodCode
+  const metodosPago = usePaymentMethods(store.store_id)
+  const medioElegido =
+    typeof codigoPago === 'string' && codigoPago
+      ? ((metodosPago.data ?? []).find((metodo) => metodo.code === codigoPago) ?? null)
+      : null
 
   // Solo se consulta si NO hay estado de navegación: venir de comprar no debe
   // costar una petición más.
@@ -197,6 +214,36 @@ export function StoreOrderPage() {
             currency={order.currency}
             strong
           />
+        </Card>
+      )}
+
+      {/* P09 · con que se paga, y que hay que hacer para pagarlo.
+
+          Las instrucciones son lo UNICO accionable de una confirmacion cuando
+          el medio es transferencia o Yape: sin ellas el comprador tiene un
+          numero de pedido y ninguna forma de completarlo. Por eso se repiten
+          aqui aunque ya salieran en el checkout — este es el sitio al que se
+          vuelve. */}
+      {medioElegido && (
+        <Card sx={{ p: { xs: 2, md: 3 } }}>
+          <Typography component="h2" sx={{ fontSize: TS.cardTitle, fontWeight: 800, mb: 1 }}>
+            {t('store.order.payment')}
+          </Typography>
+          <Typography sx={{ fontSize: TS.body, fontWeight: 700 }}>
+            {medioElegido.display_name}
+          </Typography>
+          {medioElegido.instructions && (
+            <Box
+              sx={{
+                mt: 1,
+                fontSize: TS.body,
+                color: 'var(--muted)',
+                whiteSpace: 'pre-wrap',
+              }}
+            >
+              {medioElegido.instructions}
+            </Box>
+          )}
         </Card>
       )}
 

@@ -84,6 +84,19 @@ export const checkoutSchema = z.object({
   deliveryMethodCode: z.string().trim().max(40).optional(),
   pickupPointId: z.string().uuid().optional().or(z.literal('')),
   /**
+   * CÓMO quiere pagarlo (P09-SaaS). Un código del comercio, nada más.
+   *
+   * Opcional en el esquema porque el borde también lo trata como opcional: una
+   * tienda sin `payment_methods` configurados sigue vendiendo, y exigirlo aquí
+   * rompería el checkout mínimo que funciona desde P06. Cuando la tienda SÍ
+   * tiene medios, la pantalla lo exige antes de enviar.
+   *
+   * No viaja ni el importe ni el proveedor: que el código corresponda a un medio
+   * vivo de esta tienda lo decide `payment_intent_open`, que es quien tiene la
+   * fila delante.
+   */
+  paymentMethodCode: z.string().trim().max(40).optional(),
+  /**
    * El cupón que el comprador teclea (P10-SaaS).
    *
    * **Un solo campo, no cinco.** El motor admite hasta cinco códigos por
@@ -404,6 +417,14 @@ export async function startCheckout(input: StartCheckoutInput): Promise<OrderRes
             pickup_point_id: input.pickupPointId ? input.pickupPointId : null,
           }
         : null,
+      // P09. El medio elegido, por código. Se omite cuando no hay elección —una
+      // tienda sin medios configurados—: el borde lo trata como opcional y el
+      // pedido nace sin intento de pago, que es lo que hacía hasta ahora.
+      //
+      // No entra en el `request_hash` del servidor a propósito: el medio es CÓMO
+      // se paga, no QUÉ se compra, y si entrara, quien ve rechazada su tarjeta no
+      // podría reintentar con transferencia sin que se leyera como otra compra.
+      ...(input.paymentMethodCode ? { payment_method_code: input.paymentMethodCode } : {}),
       items,
       accept_price_changes: input.acceptPriceChanges === true,
       // P10. La lista viaja vacía cuando no se tecleó nada: un `[]` es «no hay
