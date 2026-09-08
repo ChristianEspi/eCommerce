@@ -255,6 +255,7 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.checkout.signInTitle': 'Sign in to buy',
     'store.checkout.signInBody': 'This store asks for an account to complete the order. Your cart stays as it is.',
     'store.checkout.signIn': 'Sign in',
+    'store.signIn': 'Sign in',
     'settings.section.checkout': 'Checkout',
     'settings.section.checkoutHelp': 'Who can complete an order in your store.',
     'settings.checkoutRequiresAccount': 'Require an account to buy',

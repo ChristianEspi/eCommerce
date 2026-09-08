@@ -227,6 +227,34 @@ describe('el precio del acuerdo en la ficha', () => {
   })
 })
 
+/**
+ * Sin sesion no habia por donde entrar.
+ *
+ * El comprador de empresa abria la tienda, veia el precio de catalogo y no tenia
+ * ningun sitio donde identificarse: el unico `/login` vivia en la portada de la
+ * plataforma, fuera de la vitrina. Su precio de convenio, su cuenta y sus
+ * pedidos existian y eran inalcanzables desde la unica pantalla donde importan.
+ */
+describe('la vitrina deja entrar', () => {
+  it('sin sesion, la cabecera ofrece «Entrar» y vuelve a donde estabas', async () => {
+    render(backend(), '/s/casa-nordica/product/silla-roble')
+
+    const entrar = await screen.findByRole('link', { name: 'Entrar' })
+    expect(entrar).toHaveAttribute('href', '/login')
+    // Y no la puerta del backoffice: quien entra desde una ficha quiere ESA
+    // ficha con su precio.
+    expect(screen.queryByRole('link', { name: 'Tu cuenta' })).not.toBeInTheDocument()
+  })
+
+  it('con sesion, la misma casilla lleva a su cuenta y no ofrece entrar', async () => {
+    const sesion = makeSession()
+    render(backend({ session: sesion }), '/s/casa-nordica/product/silla-roble', sesion)
+
+    expect(await screen.findByRole('link', { name: 'Tu cuenta' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Entrar' })).not.toBeInTheDocument()
+  })
+})
+
 describe('el panel del carrito dice lo mismo que la pagina', () => {
   it('cotiza en vez de sumar los precios de escaparate', async () => {
     const user = userEvent.setup()

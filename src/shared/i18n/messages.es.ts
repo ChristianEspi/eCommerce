@@ -259,6 +259,7 @@ export const es = {
     'store.checkout.signInTitle': 'Inicia sesión para comprar',
     'store.checkout.signInBody': 'Esta tienda pide una cuenta para completar el pedido. Tu carrito se queda como está.',
     'store.checkout.signIn': 'Iniciar sesión',
+    'store.signIn': 'Entrar',
     'settings.section.checkout': 'Compra',
     'settings.section.checkoutHelp': 'Quién puede completar un pedido en tu tienda.',
     'settings.checkoutRequiresAccount': 'Exigir cuenta para comprar',

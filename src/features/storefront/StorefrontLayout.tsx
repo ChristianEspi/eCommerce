@@ -2,6 +2,7 @@ import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded'
 import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded'
 import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded'
 import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded'
+import LoginRoundedIcon from '@mui/icons-material/LoginRounded'
 import PersonRoundedIcon from '@mui/icons-material/PersonRounded'
 import ShoppingCartRoundedIcon from '@mui/icons-material/ShoppingCartRounded'
 import {
@@ -550,6 +551,7 @@ function HeaderAction({
   badge = 0,
   tone,
   to,
+  state,
   onClick,
   iconOnly = false,
 }: {
@@ -559,6 +561,8 @@ function HeaderAction({
   tone: keyof typeof ACTION_TONES
   /** Enlace o botón: uno de los dos, nunca los dos. */
   to?: string
+  /** Estado de navegación del enlace, para volver a donde se estaba. */
+  state?: unknown
   onClick?: () => void
   /** Sin texto ni en escritorio: para lo que es utilidad y no destino. */
   iconOnly?: boolean
@@ -567,7 +571,7 @@ function HeaderAction({
 
   return (
     <Button
-      {...(to ? { component: Link, to } : { onClick })}
+      {...(to ? { component: Link, to, state } : { onClick })}
       aria-label={badge > 0 ? `${label} (${badge})` : label}
       sx={{
         flexShrink: 0,
@@ -678,16 +682,49 @@ function FavoritesButton({ storeSlug, storeId }: { storeSlug: string; storeId: s
   )
 }
 
+/**
+ * La misma casilla de la barra dice dos cosas según haya sesión o no: «Tu
+ * cuenta» cuando la hay, «Entrar» cuando no.
+ *
+ * Sin sesión no había NADA. Un comprador de empresa abría la tienda, veía el
+ * precio de catálogo y no tenía por dónde identificarse: el único `/login` de
+ * la aplicación estaba en la portada de la plataforma, fuera de la vitrina. Su
+ * precio de convenio, su cuenta y sus pedidos existían y eran inalcanzables
+ * desde la única pantalla donde importan.
+ *
+ * **Vuelve a donde estaba.** El destino es la ruta actual y no la portada de la
+ * tienda: quien pulsa «Entrar» desde una ficha quiere ver ESA ficha con su
+ * precio, y mandarlo al backoffice —o al inicio— después de pedirle la sesión
+ * es perderlo. Misma convención que ya usa el checkout de la tienda que exige
+ * cuenta (`state.from`).
+ */
 function AccountButton({ storeSlug }: { storeSlug: string }) {
   const { t } = useI18n()
   const { status } = useSessionContext()
-  if (status !== 'authenticated') return null
+  const location = useLocation()
+
+  if (status === 'authenticated') {
+    return (
+      <HeaderAction
+        to={`/s/${storeSlug}/account`}
+        icon={<PersonRoundedIcon />}
+        label={t('account.title')}
+        tone="account"
+      />
+    )
+  }
+
+  // Mientras se resuelve la sesión no se pinta ninguno de los dos: enseñar
+  // «Entrar» a quien ya tiene sesión, aunque sea medio segundo, es decirle que
+  // no está dentro.
+  if (status !== 'anonymous') return null
 
   return (
     <HeaderAction
-      to={`/s/${storeSlug}/account`}
-      icon={<PersonRoundedIcon />}
-      label={t('account.title')}
+      to="/login"
+      state={{ from: `${location.pathname}${location.search}` }}
+      icon={<LoginRoundedIcon />}
+      label={t('store.signIn')}
       tone="account"
     />
   )
