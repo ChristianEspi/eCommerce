@@ -62,6 +62,28 @@ los resultados del buscador. La tienda nunca depende de que la IA funcione.
 
 ---
 
+## Golden path ejecutado de verdad
+
+No con dobles: contra la función de borde desplegada, creando el pedido real
+**`EC-20260908-00015`**. Ocho comprobaciones en verde, incluida la que cierra el
+criterio P0 del encargo: **el medio de pago queda trazado** (`payment_intents`
+con estado `open` y método `transferencia`). También verificado que reenviar la
+misma compra devuelve el mismo pedido con `replay=true`.
+
+La transición administrativa se probó y **fue rechazada como debe**
+(`SIN_PERMISO: hace falta rol de pedidos sobre este tenant`): la autorización
+funciona, y ejecutarla exige sesión de backoffice. Detalle y evidencia en
+`DEMO_WEDNESDAY_README.md`.
+
+Dato para el guion: la máquina de estados admite `pending → paid | cancelled`.
+**No existe «confirmado»**; pulsar ese CTA daría un error de transición.
+
+## Lo que quedó sin validar
+
+Sin navegador en este entorno: **móvil y escritorio**, **consola y red**, e **IA
+con proveedor** (no hay clave; solo está validado el fallback). No se dan por
+buenos.
+
 ## Gates finales (salida real)
 
 `typecheck` ✅ · `lint` ✅ · `vitest run` ✅ **154 archivos / 2922 tests** ·

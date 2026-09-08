@@ -44,6 +44,11 @@ Vitrina: `/s/miquimica` · Backoffice: `/app/orders`
 | 8 | `/app/orders` | El pedido recién hecho, con su estado |
 | 9 | Abrir el pedido | Estado, pago, fulfillment, aprobación y timeline; transición desde ahí |
 
+**La transición que funciona desde un pedido nuevo es `pendiente → pagado`.** La
+máquina de estados solo admite `paid` o `cancelled` desde `pending`; no existe
+«confirmado». Pulsar el CTA equivocado delante del cliente da un error de
+transición no permitida.
+
 **Apunta el número de pedido en el paso 7**: el paso 8 depende de él y buscarlo
 a ciegas delante del cliente rompe el ritmo.
 
@@ -122,6 +127,32 @@ precio pasa a ser lo primero que se ve y hay reaseguro pegado al botón.
 
 No hay E2E configurado en el repositorio; no se inventó ninguno.
 
+### Golden path ejecutado de verdad contra el proyecto
+
+No con dobles: llamando a la función de borde desplegada y creando un pedido
+real. Pedido resultante **`EC-20260908-00015`**, marcado como
+`VALIDACION PREFLIGHT` para distinguirlo de los de demo.
+
+| # | Comprobación | Resultado |
+|---|---|---|
+| 1 | Producto publicado con precio y stock | ✅ Ablnivelan Solución Oral |
+| 2 | Método de entrega disponible | ✅ Envío estándar |
+| 3 | Medio de pago en la vista pública | ✅ Transferencia bancaria |
+| 4 | El checkout crea el pedido | ✅ `EC-20260908-00015` · PEN 314.22 |
+| 5 | **El medio de pago queda trazado** | ✅ intento `open` · método `transferencia` |
+| 6 | Reenviar la misma compra no duplica | ✅ mismo pedido, `replay=true` |
+| 7 | Visible en administración | ✅ `pending` / `pending` / `unfulfilled` |
+| 8 | El pedido tiene bitácora | ✅ 2 entradas |
+
+El punto 5 es el criterio P0 del encargo —«el medio de pago queda correctamente
+capturado/trazado»— y esta es su evidencia.
+
+**La transición administrativa se probó y fue rechazada como debe**:
+`SIN_PERMISO: hace falta rol de pedidos sobre este tenant`. La autorización
+funciona; ejecutarla exige una sesión con rol de backoffice, que es justo lo que
+harás en la demo. La lógica de transición está cubierta por los 66 tests de
+administración de pedidos.
+
 ---
 
 ## 6 · Problemas conocidos
@@ -131,6 +162,27 @@ No hay E2E configurado en el repositorio; no se inventó ninguno.
 1. **Rutas profundas dan 404 en QAS.** Falta la reescritura de SPA en Amplify.
    Navegando por la aplicación todo va bien; **recargar con F5 saca un 404**. Es
    configuración de AWS, fuera del repositorio.
+
+### Lo que NO pude validar, y por qué
+
+Este entorno no tiene navegador, así que tres puntos del prompt de validación
+quedan sin comprobar. No los doy por buenos:
+
+| Punto | Estado |
+|---|---|
+| Móvil y escritorio | **Sin verificar.** El diseño es responsive por construcción, pero nadie lo ha mirado |
+| Consola y red sin errores severos | **Sin revisar** |
+| IA **con** proveedor | **Sin probar**: no existe la clave. Solo está validado el fallback |
+
+Los tres se cierran recorriendo el guion del apartado 3 con las herramientas de
+desarrollo abiertas. Es media hora y conviene hacerla antes del miércoles.
+
+### El pedido de validación
+
+`EC-20260908-00015`, a nombre de **VALIDACION PREFLIGHT**, es un pedido real que
+creé para validar el flujo. Aparecerá en la lista de administración. Puedes
+dejarlo —demuestra que el flujo funciona— o borrarlo; no lo hice yo porque
+borrar pedidos es destructivo y esa es tu decisión.
 
 ### No bloqueantes
 
