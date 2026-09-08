@@ -186,6 +186,17 @@ export function OrderDrawer({
     (current.status === 'pending' || current.status === 'paid')
 
   /**
+   * La venta ya está cerrada: lo único que queda es deshacerla.
+   *
+   * Desde `fulfilled` los tres ejes solo ofrecen marcha atrás —`refunded` en el
+   * comercial, `refunded`/`partially_refunded` en el pago, `returned` en la
+   * entrega—. No es un caso raro: es la mitad de la vida de un pedido, y llamar
+   * a eso «Cambiar de estado» hace que el operador abra el desplegable para
+   * averiguar si todavía puede avanzarlo.
+   */
+  const postVenta = current.status === 'fulfilled'
+
+  /**
    * Cerrar el ciclo comercial, que son DOS tramos y no uno.
    *
    * `pending → fulfilled` no existe: la máquina obliga a pasar por `paid`. Se
@@ -447,8 +458,18 @@ export function OrderDrawer({
 
   const operation = (
     <Stack spacing={3} divider={<Divider flexItem />}>
-      <Section title={t('orders.transition')}>
+      <Section title={t(postVenta ? 'orders.transitionAfter' : 'orders.transition')}>
         <Stack spacing={1.5}>
+          {/* Con la venta cerrada, «Cambiar de estado» sugiere que el pedido
+              todavía puede avanzar. No puede: desde «Entregado» los tres ejes
+              solo ofrecen marcha atrás —reembolsar, reembolsar en parte,
+              devolver—. El bloque se llama por lo que de verdad hace, y lo dice
+              antes de que alguien abra el desplegable a ver qué hay. */}
+          {postVenta && (
+            <Typography sx={{ fontSize: 12, color: 'var(--muted)' }}>
+              {t('orders.transitionAfterHelp')}
+            </Typography>
+          )}
           {/* Cobrado, entregado… y el ciclo comercial sigue en «pendiente».
               Los cuatro ejes son independientes a propósito, pero eso deja un
               hueco real: nadie mueve el comercial y el pedido se queda años

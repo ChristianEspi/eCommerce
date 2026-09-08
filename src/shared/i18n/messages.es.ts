@@ -920,6 +920,8 @@ export const es = {
     'orders.axis.fulfillment': 'Entrega',
     'orders.axis.approval': 'Aprobación',
     'orders.transition': 'Cambiar de estado',
+    'orders.transitionAfter': 'Devoluciones y reembolsos',
+    'orders.transitionAfterHelp': 'La venta está cerrada. Lo único que queda es deshacerla, entera o en parte.',
     'orders.closeHint': 'Este pedido está cobrado y entregado. Solo falta cerrarlo.',
     'orders.closeNow': 'Cerrar pedido',
     'orders.payment.pending': 'Sin cobrar',
@@ -964,7 +966,7 @@ export const es = {
     'orders.tags': 'Etiquetas',
     'orders.tags.empty': 'Sin etiquetas',
     'orders.tags.add': 'Nueva etiqueta',
-    'orders.tags.help': 'Minúsculas, sin espacios. Sirven para filtrar y priorizar.',
+    'orders.tags.help': 'Minúsculas, sin espacios. Marcan el pedido para tu equipo: se ven aquí, todavía no filtran el listado.',
     'orders.notes': 'Notas internas',
     'orders.notes.help':
       'Solo las ve tu equipo. La instrucción que escribió el comprador se conserva aparte.',

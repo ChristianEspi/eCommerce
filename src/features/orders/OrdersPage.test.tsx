@@ -30,6 +30,7 @@ const { OrdersPage } = await import('./OrdersPage')
 const ORDER_1 = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'
 const ORDER_2 = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2'
 const ORDER_3 = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3'
+const ORDER_4 = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4'
 const ITEM_1 = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1'
 const EVENT_1 = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1'
 const EVENT_2 = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2'
@@ -104,6 +105,17 @@ function backend(role: 'admin' | 'viewer' = 'admin'): FakeSupabase {
           payment_status: 'paid',
           grand_total: '99.00',
           placed_at: OLD,
+        }),
+        // Un pedido que ya se vendio del todo: cobrado, entregado y cerrado.
+        // Desde aqui los tres ejes solo ofrecen marcha atras.
+        orderRow({
+          id: ORDER_4,
+          order_number: 'MI-000004',
+          customer_name: 'Dora Cerrada',
+          customer_email: 'dora@cerrada.test',
+          status: 'fulfilled',
+          payment_status: 'paid',
+          fulfillment_status: 'fulfilled',
         }),
         // Pedido B2B esperando la firma de su empresa: es lo que llena la
         // pestaña «Por aprobar» y lo que bloquea las transiciones.
@@ -291,8 +303,8 @@ describe('OrdersPage — listado', () => {
     await screen.findByText('MI-000001')
     // El paginador dice el tramo y el total del FILTRO, no de la pagina.
     const pager = screen.getByTestId('pager-summary')
-    expect(pager.textContent).toContain('1–3')
-    expect(pager.textContent).toContain('3')
+    expect(pager.textContent).toContain('1–4')
+    expect(pager.textContent).toContain('4')
   })
 })
 
@@ -347,6 +359,50 @@ describe('OrdersPage — detalle en panel lateral', () => {
 
     const options = (await screen.findAllByRole('option')).map((node) => node.textContent)
     expect(options).toEqual(['Pagado', 'Cancelado'])
+  })
+
+  /**
+   * Con la venta cerrada, el bloque se llama por lo que hace.
+   *
+   * «Cambiar de estado» sugiere que el pedido todavia puede avanzar, y no
+   * puede: desde `fulfilled` los tres ejes solo ofrecen reembolsar y devolver.
+   * El operador abria el desplegable para averiguar si quedaba algo.
+   */
+  it('un pedido ya vendido llama al bloque «Devoluciones y reembolsos»', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    const drawer = await openDrawer(user, 'MI-000004', 'Operación')
+    expect(within(drawer).getByText('Devoluciones y reembolsos')).toBeInTheDocument()
+    expect(within(drawer).queryByText('Cambiar de estado')).not.toBeInTheDocument()
+
+    // Y lo que ofrece es, en efecto, solo marcha atras.
+    await user.click(within(drawer).getByRole('combobox', { name: /Nuevo estado/i }))
+    const opciones = (await screen.findAllByRole('option')).map((n) => n.textContent)
+    expect(opciones).toEqual(['Reembolsado'])
+  })
+
+  it('un pedido todavia abierto sigue diciendo «Cambiar de estado»', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    const drawer = await openDrawer(user, 'MI-000001', 'Operación')
+    expect(within(drawer).getByText('Cambiar de estado')).toBeInTheDocument()
+  })
+
+  /**
+   * Las etiquetas no filtran nada, y el texto ya no dice que si.
+   *
+   * Prometia «Sirven para filtrar y priorizar» mientras el buscador del listado
+   * miraba numero, nombre y correo, sin columna, sin filtro y sin salir en el
+   * CSV. Una ayuda que promete de mas se descubre el dia que alguien la usa.
+   */
+  it('la ayuda de las etiquetas no promete un filtro que no existe', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    const drawer = await openDrawer(user, 'MI-000001', 'Operación')
+    expect(within(drawer).getByText(/todavía no filtran el listado/)).toBeInTheDocument()
   })
 
   it('cambiar de eje cambia el menu de destinos', async () => {

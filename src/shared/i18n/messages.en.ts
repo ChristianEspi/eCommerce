@@ -911,6 +911,8 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'orders.axis.fulfillment': 'Fulfillment',
     'orders.axis.approval': 'Approval',
     'orders.transition': 'Change status',
+    'orders.transitionAfter': 'Returns and refunds',
+    'orders.transitionAfterHelp': 'The sale is closed. All that is left is undoing it, in full or in part.',
     'orders.closeHint': 'This order is paid and delivered. It only needs closing.',
     'orders.closeNow': 'Close order',
     'orders.payment.pending': 'Unpaid',
@@ -955,7 +957,7 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'orders.tags': 'Tags',
     'orders.tags.empty': 'No tags yet',
     'orders.tags.add': 'New tag',
-    'orders.tags.help': 'Lowercase, no spaces. Used to filter and to triage.',
+    'orders.tags.help': 'Lowercase, no spaces. They flag the order for your team: visible here, they do not filter the list yet.',
     'orders.notes': 'Internal notes',
     'orders.notes.help':
       'Only your team sees these. The instruction the buyer wrote is kept separately.',
