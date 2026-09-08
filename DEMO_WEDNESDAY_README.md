@@ -124,8 +124,23 @@ precio pasa a ser lo primero que se ve y hay reaseguro pegado al botón.
 | `npx vitest run supabase/tests` (DB/RLS) | ✅ **68 archivos · 1813 tests** |
 | `node scripts/secret-scan.mjs` | ✅ sin hallazgos |
 | `npm run build` | ✅ |
+| `npx playwright test` | ✅ **14 pruebas** · escritorio y móvil |
 
-No hay E2E configurado en el repositorio; no se inventó ninguno.
+### E2E en navegador real
+
+```bash
+npx playwright test                      # escritorio + móvil
+npx playwright test --project=movil      # solo móvil
+npx playwright test --ui                 # para depurar
+```
+
+Corre contra el catálogo de verdad: levanta el servidor de desarrollo solo y
+recorre portada → buscador → ficha → añadir → carrito → checkout en tres pasos →
+medio de pago → instrucciones, más el asistente. **Cada prueba falla si la página
+deja un error en consola.**
+
+Encontró un fallo real a la primera pasada: **en móvil no había buscador**. Ya
+está arreglado.
 
 ### Golden path ejecutado de verdad contra el proyecto
 
@@ -165,17 +180,10 @@ administración de pedidos.
 
 ### Lo que NO pude validar, y por qué
 
-Este entorno no tiene navegador, así que tres puntos del prompt de validación
-quedan sin comprobar. No los doy por buenos:
+**IA con proveedor**: no existe `EBIM_AI_API_KEY`, así que solo está validado el
+fallback en modo búsqueda. No lo doy por bueno.
 
-| Punto | Estado |
-|---|---|
-| Móvil y escritorio | **Sin verificar.** El diseño es responsive por construcción, pero nadie lo ha mirado |
-| Consola y red sin errores severos | **Sin revisar** |
-| IA **con** proveedor | **Sin probar**: no existe la clave. Solo está validado el fallback |
-
-Los tres se cierran recorriendo el guion del apartado 3 con las herramientas de
-desarrollo abiertas. Es media hora y conviene hacerla antes del miércoles.
+Móvil, escritorio y consola **ya están cubiertos** por la suite E2E (ver abajo).
 
 ### El pedido de validación
 

@@ -14,6 +14,7 @@ import {
   Stack,
   Toolbar,
   Typography,
+  useMediaQuery,
 } from '@mui/material'
 import { useState, type ReactNode } from 'react'
 import { Link, Outlet, useLocation, useParams } from 'react-router-dom'
@@ -254,6 +255,19 @@ function Shell({ children }: { children: ReactNode }) {
 }
 
 function StoreHeader({ store, storeSlug }: { store: PublicStore; storeSlug: string }) {
+  /**
+   * El buscador se MUEVE, no se duplica.
+   *
+   * La primera versión lo pintaba dos veces y escondía uno con CSS. A la vista
+   * funciona; en el árbol de accesibilidad deja DOS `role="search"`, y un lector
+   * de pantalla anuncia dos buscadores donde hay uno. `display: none` quita el
+   * elemento de la pantalla, no del documento — la prueba de landmarks lo cantó
+   * de inmediato, que es exactamente para lo que está.
+   *
+   * Con la consulta de medios se renderiza UNO, en el sitio que le toca.
+   */
+  const enMovil = useMediaQuery('(max-width:899.95px)')
+
   return (
     <Box
       component="header"
@@ -325,9 +339,11 @@ function StoreHeader({ store, storeSlug }: { store: PublicStore; storeSlug: stri
               esta en TODAS las pantallas de la tienda, no solo en la portada.
               Se oculta en movil, donde la barra no da para el logo, el menu,
               la cuenta, el carrito Y una caja de texto. */}
-          <Box sx={{ display: { xs: 'none', md: 'flex' }, flex: 1, minWidth: 0, mx: 1 }}>
-            <StoreQuickSearch storeSlug={storeSlug} />
-          </Box>
+          {!enMovil && (
+            <Box sx={{ display: 'flex', flex: 1, minWidth: 0, mx: 1 }}>
+              <StoreQuickSearch storeSlug={storeSlug} />
+            </Box>
+          )}
 
           {/* Las paginas del CMS —quienes somos, envios, terminos— NO viven
               aqui. La cabecera de una tienda tiene tres trabajos: buscar,
@@ -339,6 +355,22 @@ function StoreHeader({ store, storeSlug }: { store: PublicStore; storeSlug: stri
           <AccountButton storeSlug={storeSlug} />
           <CartButton />
         </Toolbar>
+
+        {/* En móvil, el buscador baja a su propia fila.
+
+            Antes no estaba en ninguna: se ocultaba por debajo de `md` y no lo
+            sustituía nada, así que quien llegaba por teléfono no tenía forma de
+            buscar en un catálogo de 570 productos — le quedaba recorrer las
+            familias una por una. La cabecera declara tres trabajos y cumplía
+            dos.
+
+            En fila propia y no dentro de la barra porque a 360 px no cabe junto
+            al logo y el carrito sin dejar los tres apretados. */}
+        {enMovil && (
+          <Box sx={{ pb: 1 }}>
+            <StoreQuickSearch storeSlug={storeSlug} />
+          </Box>
+        )}
       </Container>
 
       {/* Las familias, bajo la barra y en TODAS las pantallas de la tienda.

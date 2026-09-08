@@ -21,3 +21,8 @@ claude_b2b_upgrade/
 claude_visual_ecommerce_opus/
 claude-overnight/
 claude-saas-opus/
+
+# Playwright
+test-results/
+playwright-report/
+

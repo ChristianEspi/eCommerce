@@ -78,11 +78,43 @@ funciona, y ejecutarla exige sesión de backoffice. Detalle y evidencia en
 Dato para el guion: la máquina de estados admite `pending → paid | cancelled`.
 **No existe «confirmado»**; pulsar ese CTA daría un error de transición.
 
-## Lo que quedó sin validar
+## E2E en navegador real — cerrado
 
-Sin navegador en este entorno: **móvil y escritorio**, **consola y red**, e **IA
-con proveedor** (no hay clave; solo está validado el fallback). No se dan por
-buenos.
+`playwright.config.ts` + `e2e/`. **14 pruebas, escritorio y móvil**, contra el
+catálogo de verdad. Cierra tres puntos del prompt 07 que estaban abiertos:
+
+- **Consola y red**: cada prueba escucha `console.error` y `pageerror` desde el
+  primer píxel y **falla si algo queda ahí**. Revisar la consola deja de ser algo
+  que alguien recuerda hacer.
+- **Móvil y escritorio**: los mismos siete recorridos en `Desktop Chrome` y
+  `Pixel 5`.
+- **Golden path en navegador**: portada → buscador → ficha → añadir → carrito →
+  checkout en tres pasos → medio de pago → instrucciones.
+
+Se llaman `*.e2e.ts` a propósito: Vitest no declara `include` y usa el patrón por
+defecto (`.test.` / `.spec.`), así que con cualquiera de esos nombres habría
+intentado ejecutarlos en jsdom y 2924 tests verdes se habrían puesto rojos. Con
+otra extensión los dos corredores se ignoran sin tocar la configuración del que
+ya funcionaba.
+
+### Lo que encontró a la primera pasada
+
+**En móvil no había buscador.** La caja de texto se ocultaba por debajo de `md` y
+no la sustituía nada: quien llegaba por teléfono no tenía forma de buscar en un
+catálogo de 570 productos — le quedaba recorrer las familias una por una. La
+propia cabecera declara en un comentario que tiene tres trabajos —buscar, entrar
+y ver el carrito— y cumplía dos.
+
+Y el primer arreglo estuvo mal: pinté el buscador dos veces y escondí uno con
+CSS. `display: none` lo quita de la pantalla, no del documento, así que dejaba
+**dos landmarks `role="search"`** y un lector de pantalla anunciaría dos
+buscadores donde hay uno. Lo cantó la prueba de landmarks que ya existía. Ahora
+se renderiza uno solo, con consulta de medios, en el sitio que le toca.
+
+## Lo que sigue sin validar
+
+**IA con proveedor**: no existe la clave, así que solo está validado el
+fallback. No se da por bueno.
 
 ## Gates finales (salida real)
 

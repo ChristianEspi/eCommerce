@@ -31,4 +31,16 @@ export default tseslint.config(
       globals: { Deno: 'readonly' },
     },
   },
+  {
+    // E2E (Playwright): aquí no hay React.
+    //
+    // El corredor pasa un `use()` a cada fixture —así es como entrega el recurso
+    // y espera a que la prueba termine— y la regla de hooks lo lee como si fuera
+    // el `use` de React llamado fuera de un componente. Es un choque de nombres,
+    // no un patrón peligroso: en esta carpeta no se renderiza nada.
+    files: ['e2e/**/*.ts'],
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
+    },
+  },
 )
