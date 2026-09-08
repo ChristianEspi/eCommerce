@@ -267,9 +267,20 @@ export function createDbPorts(options: DbPortOptions): CheckoutPorts {
       }
     },
 
+    /**
+     * Con el cliente del LLAMANTE y no con `service`.
+     *
+     * Desde P19 el precio del acuerdo sale de la SESION dentro de
+     * `ebim.build_quote`. Con `service` no hay sesion de la que salga, asi que
+     * el pipeline cotizaria a precio de catalogo mientras el carrito guarda el
+     * de convenio: el comprador B2B veria «el precio cambio» en cada compra, y
+     * hacia arriba. Estas tres funciones son publicas —las llama el navegador
+     * a diario— y ninguna de las dos primeras lleva limitador, asi que no hay
+     * nada que `service` estuviera sorteando.
+     */
     async resolvePrices(storeSlug: string, items: readonly OrderItemInput[]): Promise<Quote> {
       return toQuote(
-        await service('price_quote_for_slug', {
+        await caller('price_quote_for_slug', {
           p_store_slug: storeSlug,
           p_items: itemPayload(items),
         }),
@@ -278,7 +289,7 @@ export function createDbPorts(options: DbPortOptions): CheckoutPorts {
 
     async resolvePriceDrift(storeSlug: string, cartToken: string): Promise<PriceDrift> {
       const raw = record(
-        await service('cart_price_drift', { p_store_slug: storeSlug, p_token: cartToken }),
+        await caller('cart_price_drift', { p_store_slug: storeSlug, p_token: cartToken }),
       )
       const changed = Array.isArray(raw.changed) ? raw.changed : []
       return {
@@ -311,7 +322,7 @@ export function createDbPorts(options: DbPortOptions): CheckoutPorts {
      */
     async resolvePromotions(input): Promise<PromotionResult> {
       const raw = record(
-        await service('promotion_quote_for_slug', {
+        await caller('promotion_quote_for_slug', {
           p_store_slug: input.context.storeSlug,
           p_items: itemPayload(input.items),
           p_coupon_codes: input.couponCodes.length > 0 ? input.couponCodes : null,

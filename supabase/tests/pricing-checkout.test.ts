@@ -20,6 +20,11 @@ type Row = Record<string, unknown>
 
 let db: PGlite
 
+const COMPRADOR_ACTIVO = 'aa000000-0000-4000-8000-0000000000b1'
+const COMPRADOR_INVITADO = 'aa000000-0000-4000-8000-0000000000b2'
+const COMPRADOR_REVOCADO = 'aa000000-0000-4000-8000-0000000000b3'
+const FORASTERO = 'aa000000-0000-4000-8000-0000000000b9'
+
 const STORE_A_SLUG = 'tienda-a'
 const STORE_B_SLUG = 'tienda-b'
 const PRICING = 'ecommerce.pricing.lists'
@@ -34,6 +39,8 @@ let camisetaAzul: string
 let uomUnit: string
 let uomBox: string
 let segmentoMayorista: string
+let clienteAcme: string
+let cuentaAcme: string
 
 async function sql(query: string, params: unknown[] = []): Promise<Row[]> {
   return (await db.query<Row>(query, params)).rows
@@ -73,6 +80,28 @@ async function quotePublic(items: ItemInput[], slug = STORE_A_SLUG): Promise<Row
     ]),
   )
   return rows[0]?.result as Row
+}
+
+/**
+ * La MISMA llamada publica, pero firmada por alguien.
+ *
+ * Se le pasa solo el `sub`: es lo unico que la vitrina puede aportar y lo unico
+ * que `ebim.pricing_actor` mira. Que el segmento no viaje por ningun lado es la
+ * propiedad, no un detalle de la fixtura.
+ */
+async function quoteConSesion(userId: string, items: ItemInput[]): Promise<Row> {
+  const rows = await asRole(db, 'authenticated', { sub: userId } as never, () =>
+    sql(`select public.price_quote_for_slug($1, $2::jsonb) as result`, [
+      STORE_A_SLUG,
+      JSON.stringify(items),
+    ]),
+  )
+  return rows[0]?.result as Row
+}
+
+/** El unitario de la primera linea, en texto: el centimo importa. */
+function unitario(quote: Row): string {
+  return String((((quote.lines as Row[]) ?? [])[0] ?? {}).unit_price)
 }
 
 async function createList(input: {
@@ -209,6 +238,34 @@ beforeAll(async () => {
     `insert into public.customer_segments (organization_id, company_id, code, name)
      values ($1, $2, 'mayorista', 'Mayorista') returning id`,
     [TENANT_A.organizationId, TENANT_A.companyId],
+  )
+
+  // Un cliente del segmento mayorista, su cuenta corporativa y tres personas:
+  // una activa, una invitada y una revocada. Las tres hacen falta — el precio
+  // del acuerdo NO puede depender de haber sido invitado ni sobrevivir a que te
+  // echen.
+  clienteAcme = await id(
+    `insert into public.customers
+       (organization_id, company_id, kind, code, name, email, segment_id)
+     values ($1, $2, 'company', 'CLI-ACME', 'Acme', 'compras@acme.test', $3) returning id`,
+    [TENANT_A.organizationId, TENANT_A.companyId, segmentoMayorista],
+  )
+  cuentaAcme = await id(
+    `insert into public.business_accounts
+       (organization_id, company_id, customer_id, code, name)
+     values ($1, $2, $3, 'ACME', 'Acme') returning id`,
+    [TENANT_A.organizationId, TENANT_A.companyId, clienteAcme],
+  )
+  await svc(
+    `insert into public.business_account_users
+       (organization_id, company_id, business_account_id, user_id, email, role, status)
+     values ($1, $2, $3, $4, 'compras@acme.test',  'buyer',  'active'),
+            ($1, $2, $3, $5, 'nuevo@acme.test',    'buyer',  'invited'),
+            ($1, $2, $3, $6, 'exempleado@acme.test','buyer', 'revoked')`,
+    [
+      TENANT_A.organizationId, TENANT_A.companyId, cuentaAcme,
+      COMPRADOR_ACTIVO, COMPRADOR_INVITADO, COMPRADOR_REVOCADO,
+    ],
   )
 }, 180_000)
 
@@ -712,5 +769,90 @@ describe('la vitrina publica muestra el precio resuelto', () => {
     )
     expect(message).toMatch(/permission denied/i)
     expect(lista).toBeTruthy()
+  })
+})
+
+/**
+ * P19 · El precio del acuerdo llega a la vitrina.
+ *
+ * Habia cuatro listas, 1682 precios y siete cuentas con su segmento bien puesto,
+ * y el comprador con sesion veia el precio de catalogo: TODA ruta publica
+ * cotizaba con segmento y cliente nulos. El motor nunca estuvo roto — no se le
+ * decia a quien le estaba cotizando.
+ *
+ * Lo que estos tests defienden no es solo que el precio baje. Es que baje SOLO
+ * para quien tiene derecho: la identidad sale del JWT y la funcion publica no
+ * tiene ni un parametro donde escribir otra.
+ */
+describe('el precio del acuerdo llega a quien lo firmo', () => {
+  beforeEach(async () => {
+    const lista = await createList({ code: 'mayorista', scope: 'segment', target: segmentoMayorista })
+    await addItem({ list: lista, product: jabon, price: '7.00' })
+  })
+
+  it('el visitante anonimo ve el precio de catalogo', async () => {
+    const quote = await quotePublic([{ product_id: jabon, quantity: 1 }])
+    expect(unitario(quote)).toBe('10.00')
+  })
+
+  it('el comprador de la empresa ve el suyo, sin declararlo en ningun sitio', async () => {
+    const quote = await quoteConSesion(COMPRADOR_ACTIVO, [{ product_id: jabon, quantity: 1 }])
+    expect(unitario(quote)).toBe('7.00')
+  })
+
+  it('invitado todavia no es cliente: sigue viendo el de catalogo', async () => {
+    const quote = await quoteConSesion(COMPRADOR_INVITADO, [{ product_id: jabon, quantity: 1 }])
+    expect(unitario(quote)).toBe('10.00')
+  })
+
+  it('revocado deja de serlo el mismo dia', async () => {
+    const quote = await quoteConSesion(COMPRADOR_REVOCADO, [{ product_id: jabon, quantity: 1 }])
+    expect(unitario(quote)).toBe('10.00')
+  })
+
+  it('un usuario sin vinculo no hereda el precio de nadie', async () => {
+    const quote = await quoteConSesion(FORASTERO, [{ product_id: jabon, quantity: 1 }])
+    expect(unitario(quote)).toBe('10.00')
+  })
+
+  /**
+   * La propiedad estructural, y la razon por la que esto no se puede falsificar:
+   * la funcion publica recibe DOS argumentos —tienda e items— y ninguno es una
+   * identidad. No hay que confiar en que nadie valide un parametro porque no hay
+   * parametro. Si manana alguien anade uno, este test lo para.
+   */
+  it('la funcion publica no tiene donde recibir una identidad', async () => {
+    const [row] = await svc(
+      `select pg_get_function_identity_arguments(p.oid) as args
+         from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.proname = 'price_quote_for_slug'`,
+    )
+    expect(String(row?.args)).toBe('p_store_slug text, p_items jsonb')
+  })
+
+  /**
+   * Y lo que de verdad se factura.
+   *
+   * `create_order` ya resolvia la ficha del cliente desde la cuenta y aun asi
+   * pedia el precio con `null, null`. Enseñar convenio y cobrar catalogo es la
+   * peor clase de fallo, porque se descubre en la factura.
+   */
+  it('el pedido cobra el precio del acuerdo, no el de catalogo', async () => {
+    const rows = await svc(
+      `select public.create_order(
+          $1, 'compras@acme.test', $2::jsonb, 'Acme', '+51 999 111 222',
+          '{"address": "Av. Primavera 120"}'::jsonb, null, null,
+          'storefront', $3) as result`,
+      [storeA, JSON.stringify([{ product_id: jabon, quantity: 1 }]), cuentaAcme],
+    )
+    const pedido = rows[0]?.result as Row
+    const lineas = (pedido.items ?? pedido.lines) as Row[]
+    expect(String(lineas[0]?.unit_price)).toBe('7.00')
+  })
+
+  it('sin cuenta corporativa, el mismo pedido cobra el de catalogo', async () => {
+    const pedido = await checkout([{ product_id: jabon, quantity: 1 }])
+    const lineas = (pedido.items ?? pedido.lines) as Row[]
+    expect(String(lineas[0]?.unit_price)).toBe('10.00')
   })
 })
