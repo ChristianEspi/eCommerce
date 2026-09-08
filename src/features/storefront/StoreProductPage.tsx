@@ -8,6 +8,7 @@ import {
   Button,
   Card,
   Chip,
+  CircularProgress,
   MenuItem,
   Stack,
   TextField,
@@ -25,7 +26,7 @@ import { StorefrontNotFoundError } from './api'
 import { ProductPageSkeleton } from './components/ProductPageSkeleton'
 import { notFoundMeta, productMeta } from './seo'
 import { track } from './analytics'
-import { useCart } from './cart/cart-context'
+import { useAddToCart } from './cart/useAddToCart'
 import { ProductGallery } from './components/ProductGallery'
 import { ProductGrid } from './components/ProductGrid'
 import { QuantityStepper } from './components/QuantityStepper'
@@ -478,7 +479,7 @@ function AddToCart({
 }) {
   const { t, locale } = useI18n()
   const { storeSlug } = useStorefront()
-  const { add } = useCart()
+  const { agregar, pending } = useAddToCart()
   const [quantity, setQuantity] = useState(1)
   const [variantId, setVariantId] = useState('')
 
@@ -544,10 +545,12 @@ function AddToCart({
 
         <Button
           variant="contained"
-          startIcon={<ShoppingCartRoundedIcon />}
-          disabled={!canBuy}
+          startIcon={
+            pending ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartRoundedIcon />
+          }
+          disabled={!canBuy || pending}
           onClick={() => {
-            add(product, quantity, selected)
+            void agregar(product, quantity, selected)
             // `add_to_cart` es el ÚNICO de los tres hechos de vitrina que
             // corresponde a una decisión y no a una visita, y por eso se emite
             // aquí y no en el carrito: el carrito se reescribe entero al

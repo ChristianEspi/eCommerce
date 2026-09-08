@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { fetchPublicAvailability } from '@/features/inventory/api'
 import type { PublicProduct, PublicVariant } from '../types'
 import {
   addToCart,
@@ -198,8 +199,62 @@ export function CartProvider({
     return () => clearTimeout(handle)
   }, [cart, cartToken, synced, storeSlug, storeId, authenticated])
 
+  /**
+   * Añadir al carrito, PREGUNTANDO antes.
+   *
+   * ## Por qué hay que preguntar
+   *
+   * La vitrina sabe «hay» o «no hay» —`public_products.in_stock`— y nunca
+   * cuántos, que es deliberado: publicar la existencia exacta se la regala a
+   * cualquiera que mire la tienda. El precio de esa decisión era que se podían
+   * meter diez unidades de algo que tenía tres y descubrirlo en el ÚLTIMO paso
+   * del checkout, al apartar el stock, con los datos ya escritos.
+   *
+   * `availability_for_slug` resuelve las dos cosas a la vez: responde a la
+   * pregunta que se le hace —«¿puedo llevar diez?»— sin decir cuántos quedan.
+   *
+   * ## Se pregunta por el TOTAL de la línea
+   *
+   * Tres en el carrito más una nueva son cuatro, y es el cuatro lo que hay que
+   * validar. Preguntar solo por lo que se añade dejaría pasar exactamente el
+   * caso que esto viene a impedir.
+   *
+   * ## Y si la pregunta falla, se añade igual
+   *
+   * Es una comprobación de cortesía, no la autoridad: quien decide es la reserva
+   * de stock del checkout, con la fila bloqueada. Bloquear una venta porque una
+   * consulta consultiva no contestó sería cambiar un mal final por uno peor.
+   */
   const add = useCallback(
-    (product: PublicProduct, quantity = 1, variant: PublicVariant | null = null) => {
+    async (
+      product: PublicProduct,
+      quantity = 1,
+      variant: PublicVariant | null = null,
+    ): Promise<boolean> => {
+      const enCarrito =
+        cart.lines.find(
+          (line) =>
+            line.product_id === product.product_id &&
+            (line.variant_id ?? null) === (variant?.variant_id ?? null),
+        )?.quantity ?? 0
+
+      try {
+        const [fila] = await fetchPublicAvailability({
+          storeSlug,
+          items: [
+            {
+              product_id: product.product_id,
+              variant_id: variant?.variant_id ?? null,
+              quantity: enCarrito + quantity,
+            },
+          ],
+        })
+        // `unknown` es «no lo sé» —un ERP que no contestó— y no «no hay».
+        if (fila && !fila.unknown && !fila.in_stock) return false
+      } catch (error) {
+        console.error('[carrito] no se pudo comprobar la existencia', error)
+      }
+
       setCart((current) => {
         try {
           return addToCart(current, product, quantity, variant)
@@ -214,9 +269,9 @@ export function CartProvider({
           throw error
         }
       })
-      setOpen(true)
+      return true
     },
-    [],
+    [cart.lines, storeSlug],
   )
 
   const setQuantity = useCallback(

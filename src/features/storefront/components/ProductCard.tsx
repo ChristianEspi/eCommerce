@@ -2,13 +2,22 @@ import FavoriteBorderRoundedIcon from '@mui/icons-material/FavoriteBorderRounded
 import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded'
 import ShoppingCartRoundedIcon from '@mui/icons-material/ShoppingCartRounded'
 import TuneRoundedIcon from '@mui/icons-material/TuneRounded'
-import { Box, Button, Card, IconButton, Stack, Tooltip, Typography } from '@mui/material'
+import {
+  Box,
+  Button,
+  Card,
+  CircularProgress,
+  IconButton,
+  Stack,
+  Tooltip,
+  Typography,
+} from '@mui/material'
 import { Link } from 'react-router-dom'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { formatMoney } from '@/shared/lib/format'
 import { TS } from '@/theme/tokens'
 import { track } from '../analytics'
-import { useCart } from '../cart/cart-context'
+import { useAddToCart } from '../cart/useAddToCart'
 import { discountPercent, type PublicProduct } from '../types'
 import { ProductMedia } from './ProductMedia'
 
@@ -102,7 +111,7 @@ export function ProductCard({
   compact?: boolean
 }) {
   const { t, locale } = useI18n()
-  const { add } = useCart()
+  const { agregar, pending } = useAddToCart()
   const discount = discountPercent(product)
   const available = product.in_stock !== false
   const hasVariants = product.kind === 'variant'
@@ -359,14 +368,22 @@ export function ProductCard({
         fullWidth
         variant={available ? 'contained' : 'outlined'}
         size="small"
-        disabled={!available}
-        startIcon={hasVariants ? <TuneRoundedIcon /> : <ShoppingCartRoundedIcon />}
+        disabled={!available || pending}
+        startIcon={
+          hasVariants ? (
+            <TuneRoundedIcon />
+          ) : pending ? (
+            <CircularProgress size={14} color="inherit" />
+          ) : (
+            <ShoppingCartRoundedIcon />
+          )
+        }
         onClick={() => {
           if (hasVariants) {
             onQuickView?.(product.slug)
             return
           }
-          add(product, 1, null)
+          void agregar(product, 1, null)
           // Se cuenta aquí igual que en la ficha: `add_to_cart` es una decisión,
           // y si solo se contara desde la ficha, el embudo perdería a todo el
           // que compra desde la rejilla.

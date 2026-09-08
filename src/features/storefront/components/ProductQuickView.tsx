@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   Chip,
+  CircularProgress,
   Dialog,
   DialogContent,
   Skeleton,
@@ -19,7 +20,7 @@ import { AppBreadcrumbs } from '@/shared/ui/AppBreadcrumbs'
 import { ErrorState } from '@/shared/ui/states'
 import { R, TS } from '@/theme/tokens'
 import { track } from '../analytics'
-import { useCart } from '../cart/cart-context'
+import { useAddToCart } from '../cart/useAddToCart'
 import { useGallery, usePublicProduct } from '../hooks'
 import { discountPercent } from '../types'
 import { ProductGallery } from './ProductGallery'
@@ -59,7 +60,7 @@ export function ProductQuickView({
   onClose: () => void
 }) {
   const { t, locale } = useI18n()
-  const { add } = useCart()
+  const { agregar, pending } = useAddToCart()
   const [quantity, setQuantity] = useState(1)
 
   const product = usePublicProduct(storeId, slug ?? undefined)
@@ -273,10 +274,16 @@ export function ProductQuickView({
                         />
                         <Button
                           variant="contained"
-                          startIcon={<ShoppingCartRoundedIcon />}
-                          disabled={!available}
+                          startIcon={
+                            pending ? (
+                              <CircularProgress size={14} color="inherit" />
+                            ) : (
+                              <ShoppingCartRoundedIcon />
+                            )
+                          }
+                          disabled={!available || pending}
                           onClick={() => {
-                            add(item, quantity, null)
+                            void agregar(item, quantity, null)
                             track(storeSlug, {
                               type: 'add_to_cart',
                               product_id: item.product_id,

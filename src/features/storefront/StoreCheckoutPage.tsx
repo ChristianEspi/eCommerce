@@ -3,7 +3,19 @@ import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded'
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded'
 import LockRoundedIcon from '@mui/icons-material/LockRounded'
 import ShoppingCartRoundedIcon from '@mui/icons-material/ShoppingCartRounded'
-import { Alert, AlertTitle, Box, Button, Card, Chip, Divider, Stack, TextField, Typography } from '@mui/material'
+import {
+  Alert,
+  AlertTitle,
+  Box,
+  Button,
+  Card,
+  Chip,
+  CircularProgress,
+  Divider,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material'
 import { useMutation } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
@@ -812,7 +824,17 @@ export function StoreCheckoutPage() {
                 variant="contained"
                 disabled={mutation.isPending}
                 onClick={() => void submit(false)()}
-                startIcon={<LockRoundedIcon />}
+                /* Un botón gris con otro texto no se lee como «está pasando
+                   algo»: se lee como «se rompió». El giro es lo que distingue
+                   una espera de un bloqueo, y aquí la espera puede durar lo que
+                   tarde la pasarela. */
+                startIcon={
+                  mutation.isPending ? (
+                    <CircularProgress size={16} color="inherit" />
+                  ) : (
+                    <LockRoundedIcon />
+                  )
+                }
               >
                 {mutation.isPending ? t('store.checkout.sending') : t('store.checkout.submit')}
               </Button>

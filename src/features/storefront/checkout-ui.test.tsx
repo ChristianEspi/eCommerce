@@ -313,20 +313,76 @@ describe('cuándo se abre el carrito de servidor', () => {
 })
 
 describe('de la ficha al carrito', () => {
-  it('agregar abre el panel con lo que se acaba de meter', async () => {
+  /**
+   * Agregar NO abre el panel.
+   *
+   * Lo abría, y era la única confirmación que había. Salía cara: interrumpe
+   * justo a quien está metiendo varias cosas —el que más vale— y le obliga a
+   * cerrarlo para seguir. La confirmación pasa a ser un aviso efímero y el
+   * contador de la cabecera, que ya subía solo.
+   */
+  /**
+   * Preguntar ANTES de meterlo, que es lo que faltaba.
+   *
+   * La vitrina sabe «hay» o «no hay» —nunca cuántos, y es deliberado— así que se
+   * podían meter diez unidades de algo que tenía menos y descubrirlo en el
+   * ÚLTIMO paso del checkout, al apartar el stock, con los datos ya escritos.
+   * `availability_for_slug` responde a la pregunta que se le hace sin decir
+   * cuántos quedan.
+   */
+  it('no deja meter mas unidades de las que hay, y lo dice al momento', async () => {
+    const user = userEvent.setup()
+    const fake = backend()
+    fake.state.rpc.availability_for_slug = () => [
+      {
+        product_id: P_SILLA,
+        variant_id: null,
+        quantity: '1',
+        unknown: false,
+        source: 'warehouse',
+        in_stock: false,
+      },
+    ]
+    renderStorefront(fake, '/s/casa-nordica/product/silla-roble')
+
+    await user.click(await screen.findByRole('button', { name: 'Agregar al carrito' }))
+
+    expect(await screen.findByText('No quedan tantas unidades. Prueba con menos.')).toBeInTheDocument()
+    // Y no entra: el carrito sigue vacío.
+    expect(localStorage.getItem(`ebim.ecommerce.cart.v1:${STORE}`)).toBeNull()
+  })
+
+  /**
+   * Si la pregunta no se puede hacer, se añade igual.
+   *
+   * Es una comprobación de cortesía, no la autoridad: quien decide es la reserva
+   * del checkout, con la fila bloqueada. Bloquear una venta porque una consulta
+   * consultiva no contestó cambia un mal final por uno peor.
+   */
+  it('si la comprobacion falla, la compra sigue', async () => {
+    const user = userEvent.setup()
+    const fake = backend()
+    fake.state.rpc.availability_for_slug = () => {
+      throw new Error('red caida')
+    }
+    renderStorefront(fake, '/s/casa-nordica/product/silla-roble')
+
+    await user.click(await screen.findByRole('button', { name: 'Agregar al carrito' }))
+
+    expect(await screen.findByText('Añadido al carrito')).toBeInTheDocument()
+  })
+
+  it('agregar deja seguir comprando: ni panel, ni interrupción', async () => {
     const user = userEvent.setup()
     renderStorefront(backend(), '/s/casa-nordica/product/silla-roble')
 
     await user.click(await screen.findByRole('button', { name: 'Agregar al carrito' }))
 
-    // El panel se abre solo: el comprador ve lo que metió sin dejar la ficha.
-    expect(await screen.findByRole('heading', { name: /Carrito/ })).toBeInTheDocument()
-    expect(screen.getByText('Subtotal')).toBeInTheDocument()
-    expect(screen.getAllByText('Silla de roble').length).toBeGreaterThan(1)
-    expect(screen.getByRole('link', { name: 'Ver el carrito' })).toHaveAttribute(
-      'href',
-      '/s/casa-nordica/cart',
-    )
+    expect(await screen.findByText('Añadido al carrito')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /^Carrito$/ })).not.toBeInTheDocument()
+
+    // Lo que sí cambia, y es lo que confirma que se guardó: el contador.
+    expect(await screen.findByRole('button', { name: /Carrito \(1\)/ })).toBeInTheDocument()
   })
 
   it('la cantidad elegida en la ficha es la que entra al carrito', async () => {

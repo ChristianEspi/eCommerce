@@ -974,9 +974,9 @@ describe('ficha de un producto con variantes', () => {
     await screen.findByLabelText('Elige una opción')
     await user.click(await screen.findByRole('button', { name: /Agregar al carrito/ }))
 
-    // El panel se abre solo al añadir. El nombre de la variante va en su propia
-    // línea: es lo que distingue dos líneas del mismo producto en el carrito.
-    expect(await screen.findByRole('heading', { name: /Carrito/ })).toBeInTheDocument()
+    // El nombre de la variante va en su propia línea: es lo que distingue dos
+    // líneas del mismo producto en el carrito. Se comprueba sobre lo GUARDADO y
+    // no sobre el panel, que desde P19 ya no se abre al añadir.
     await waitFor(() => {
       const guardado = localStorage.getItem(`ebim.ecommerce.cart.v1:${STORE}`)
       expect(guardado).toContain(V_ROJA)

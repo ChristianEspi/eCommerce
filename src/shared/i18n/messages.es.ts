@@ -208,6 +208,8 @@ export const es = {
     'store.cart.increase': 'Sumar una unidad',
     'store.cart.decrease': 'Restar una unidad',
     'store.cart.remove': 'Quitar del carrito',
+    'store.cart.added': 'Añadido al carrito',
+    'store.cart.notEnough': 'No quedan tantas unidades. Prueba con menos.',
     'store.cart.subtotal': 'Subtotal',
     'store.cart.summary': 'Resumen',
     'store.cart.taxNote':

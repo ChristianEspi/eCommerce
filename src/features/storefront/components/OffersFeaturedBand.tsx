@@ -8,7 +8,7 @@ import { useI18n } from '@/shared/i18n/i18n-context'
 import { formatMoney } from '@/shared/lib/format'
 import { TS } from '@/theme/tokens'
 import { track } from '../analytics'
-import { useCart } from '../cart/cart-context'
+import { useAddToCart } from '../cart/useAddToCart'
 import { discountPercent, type PublicProduct } from '../types'
 import { ProductCard } from './ProductCard'
 import { ProductMedia } from './ProductMedia'
@@ -164,7 +164,7 @@ function OfferCard({
   imageUrl: string | null
 }) {
   const { t, locale } = useI18n()
-  const { add } = useCart()
+  const { agregar, pending } = useAddToCart()
   const descuento = discountPercent(product)
   const disponible = product.in_stock !== false
 
@@ -243,10 +243,10 @@ function OfferCard({
 
         <IconButton
           size="small"
-          disabled={!disponible}
+          disabled={!disponible || pending}
           aria-label={t('store.product.addToCart')}
           onClick={() => {
-            add(product, 1, null)
+            void agregar(product, 1, null)
             track(storeSlug, { type: 'add_to_cart', product_id: product.product_id, quantity: 1 })
           }}
           sx={{

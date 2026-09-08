@@ -205,6 +205,8 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.cart.increase': 'Add one unit',
     'store.cart.decrease': 'Remove one unit',
     'store.cart.remove': 'Remove from cart',
+    'store.cart.added': 'Added to the cart',
+    'store.cart.notEnough': 'There are not that many left. Try fewer.',
     'store.cart.subtotal': 'Subtotal',
     'store.cart.summary': 'Summary',
     'store.cart.taxNote':

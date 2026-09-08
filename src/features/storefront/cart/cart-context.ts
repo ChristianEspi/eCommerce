@@ -36,8 +36,17 @@ export interface CartApi {
    * `variant` es opcional y `null` para el producto simple. La identidad de una
    * línea es producto MÁS variante desde P03: sin ella, la talla M y la L
    * acabarían en la misma línea.
+   *
+   * Devuelve una promesa porque desde P19 PREGUNTA antes de añadir: la vitrina
+   * solo sabe «hay» o «no hay», nunca cuántos, así que sin preguntar se podían
+   * meter diez unidades de algo que tenía tres y no enterarse hasta el último
+   * paso del checkout. Resuelve a `false` cuando el servidor dice que no.
    */
-  add: (product: PublicProduct, quantity?: number, variant?: PublicVariant | null) => void
+  add: (
+    product: PublicProduct,
+    quantity?: number,
+    variant?: PublicVariant | null,
+  ) => Promise<boolean>
   setQuantity: (productId: string, quantity: number, variantId?: string | null) => void
   remove: (productId: string, variantId?: string | null) => void
   clear: () => void
