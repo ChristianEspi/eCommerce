@@ -25,4 +25,13 @@ claude-saas-opus/
 # Playwright
 test-results/
 playwright-report/
+# Capturas e instantaneas que deja el navegador de la sesion al verificar en
+# vivo: son de un momento concreto y no dicen nada fuera de el.
+.playwright-mcp/
+
+# Guiones de trabajo del operador para la demo, no producto.
+EBIM_eCommerce_Demo_VSCode_Prompts/
+
+# Salida del servidor de desarrollo.
+vite-dev.log
 

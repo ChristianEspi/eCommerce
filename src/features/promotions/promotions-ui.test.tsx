@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '@/test/render'
@@ -52,6 +52,7 @@ const COUPON_PROMO_ID = '88888888-8888-4888-8888-888888888802'
 const COUPON_ID = '88888888-8888-4888-8888-888888888803'
 const CARD_ID = '88888888-8888-4888-8888-888888888804'
 const EVENT_ID = '88888888-8888-4888-8888-888888888805'
+const PRODUCT_ID = '88888888-8888-4888-8888-888888888806'
 
 const PROMOS = ['ecommerce.promotions']
 
@@ -130,6 +131,9 @@ function backend(options: { entitlements?: string[]; role?: string } = {}): Fake
       ],
       promotion_overview: [CAMPAIGN, COUPON_CAMPAIGN],
       promotions: [CAMPAIGN, COUPON_CAMPAIGN],
+      products: [
+        { id: PRODUCT_ID, store_id: STORE_A, name: 'Alitraq Polvo Oral', sku: 'QS-565341', kind: 'simple' },
+      ],
       promotion_scopes: [],
       promotion_tiers: [],
       promotion_audiences: [],
@@ -344,6 +348,43 @@ describe('Campañas — el alta', () => {
     expect(guardada?.value_percent).toBe('20')
     // Nace en BORRADOR: encenderla es una decisión aparte.
     expect(guardada?.status).toBe('draft')
+  })
+
+  /**
+   * El alcance se ELIGE de una lista, no se teclea.
+   *
+   * `promotion_scopes` guarda uuids —`product_id`, `category_id`, `brand_id`— y
+   * el campo era un texto libre llamado «Identificador». Quien escribia el SKU,
+   * que es el identificador que la gente conoce, recibia «No pudimos completar
+   * la operacion»: Postgres rechazaba `QS-565341` como uuid antes de mirar nada.
+   *
+   * Un campo que solo acepta un valor que no esta a la vista en ninguna pantalla
+   * no se puede rellenar bien, asi que lo que se defiende aqui es que el uuid
+   * viaje por debajo mientras la persona busca por nombre.
+   */
+  it('el alcance se busca por nombre y lo que se guarda es el uuid', async () => {
+    const fake = backend()
+    renderPromotions(fake)
+    await screen.findByText('Rebajas de verano')
+
+    const usuario = userEvent.setup()
+    await usuario.click(screen.getByText('Rebajas de verano'))
+    const panel = within(await screen.findByRole('dialog'))
+
+    await usuario.click(panel.getByRole('combobox', { name: 'Alcance' }))
+    await usuario.click(await screen.findByRole('option', { name: 'Producto' }))
+
+    // Se teclea el NOMBRE, que es por donde se busca de verdad.
+    await usuario.type(panel.getByRole('combobox', { name: /Busca y elige/ }), 'alitraq')
+    await usuario.click(await screen.findByRole('option', { name: /Alitraq/ }))
+    await usuario.click(panel.getByRole('button', { name: 'Añadir' }))
+
+    await waitFor(() => expect(fake.state.tables.promotion_scopes?.length).toBe(1))
+    const guardado = fake.state.tables.promotion_scopes?.[0]
+    expect(guardado?.product_id).toBe(PRODUCT_ID)
+    // Y NO el SKU, que es lo que se tecleaba antes y lo que rompia la consulta.
+    expect(guardado?.product_id).not.toBe('QS-565341')
+    expect(guardado?.scope_kind).toBe('product')
   })
 
   it('un porcentaje inválido se detiene en el cliente y no llega a la base', async () => {

@@ -3,6 +3,12 @@ import { buildTextSearchFilter } from '@/shared/lib/search'
 import { tryGetSupabaseClient } from '@/shared/lib/supabase'
 import { PromotionsError, promotionsErrorFromDb } from './errors'
 import {
+  BRANDS_TABLE,
+  CATEGORIES_TABLE,
+  PRODUCTS_TABLE,
+  PRODUCT_VARIANTS_TABLE,
+} from '@/shared/lib/db-schema'
+import {
   COUPONS_TABLE,
   GIFT_CARD_ADJUST_RPC,
   GIFT_CARD_CANCEL_RPC,
@@ -192,6 +198,76 @@ export async function deletePromotion(id: string): Promise<void> {
 // ---------------------------------------------------------------------------
 // Alcance y escalas
 // ---------------------------------------------------------------------------
+
+/**
+ * A qué se puede apuntar un alcance, buscándolo por su nombre.
+ *
+ * El campo era un `Identificador` de texto libre, y lo que la tabla guarda son
+ * `product_id`, `category_id` y `brand_id`: **uuids**. Teclear el SKU —que es lo
+ * que cualquiera hace, porque es el identificador que la gente conoce— mandaba
+ * `QS-000004` a una columna uuid y Postgres lo rechazaba antes de mirar nada,
+ * así que la pantalla contestaba «No pudimos completar la operación» a algo que
+ * nunca iba a poder completarse.
+ *
+ * El uuid no se teclea: se elige. Se busca por nombre o código y el identificador
+ * viaja por debajo, que es lo que ya hacen Precios y el simulador.
+ */
+export interface ScopeCandidate {
+  id: string
+  name: string
+  code: string | null
+}
+
+export async function searchScopeTargets(input: {
+  storeId: string | null
+  kind: ScopeKind
+  term: string
+}): Promise<ScopeCandidate[]> {
+  if (!input.storeId || input.kind === 'all') return []
+
+  const tabla =
+    input.kind === 'category'
+      ? CATEGORIES_TABLE
+      : input.kind === 'brand'
+        ? BRANDS_TABLE
+        : PRODUCTS_TABLE
+  // Las marcas y las categorías no tienen SKU; el producto sí, y es por donde se
+  // busca la mitad de las veces.
+  const campos = tabla === PRODUCTS_TABLE ? ['name', 'sku'] : ['name', 'slug']
+
+  let query = client()
+    .from(tabla)
+    .select(tabla === PRODUCTS_TABLE ? 'id, name, sku' : 'id, name, slug')
+    .eq('store_id', input.storeId)
+    .order('name')
+    .limit(20)
+
+  const filtro = buildTextSearchFilter(input.term, campos)
+  if (filtro) query = query.or(filtro)
+
+  const { data, error } = await query
+  if (error) throw promotionsErrorFromDb(error)
+
+  return (data ?? []).map((fila) => {
+    const row = fila as { id: string; name: string; sku?: string | null; slug?: string | null }
+    return { id: row.id, name: row.name, code: row.sku ?? row.slug ?? null }
+  })
+}
+
+/** Las variantes de un producto ya elegido: el segundo paso del alcance `variant`. */
+export async function fetchScopeVariants(productId: string | null): Promise<ScopeCandidate[]> {
+  if (!productId) return []
+  const { data, error } = await client()
+    .from(PRODUCT_VARIANTS_TABLE)
+    .select('id, name, sku')
+    .eq('product_id', productId)
+    .order('position')
+  if (error) throw promotionsErrorFromDb(error)
+  return (data ?? []).map((fila) => {
+    const row = fila as { id: string; name: string; sku: string | null }
+    return { id: row.id, name: row.name, code: row.sku }
+  })
+}
 
 export async function fetchScopes(promotionId: string | null): Promise<PromotionScope[]> {
   if (!promotionId) return []

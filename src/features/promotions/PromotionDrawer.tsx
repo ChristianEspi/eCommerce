@@ -1,6 +1,7 @@
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded'
 import {
   Alert,
+  Box,
   Button,
   Chip,
   Divider,
@@ -17,6 +18,8 @@ import { StoreAssetField } from '@/features/admin/settings/StoreAssetField'
 import { useAssetUrls } from '@/features/admin/settings/useStoreSettings'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
+import { useDebouncedValue } from '@/shared/lib/useDebouncedValue'
+import { EntityPicker, type PickerOption } from '@/shared/ui/EntityPicker'
 import { FormDrawer } from '@/shared/ui/FormDrawer'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { PromotionsError } from './errors'
@@ -26,6 +29,8 @@ import {
   useRemoveScope,
   useRemoveTier,
   useSavePromotion,
+  useScopeTargets,
+  useScopeVariants,
   useScopes,
   useTiers,
 } from './hooks'
@@ -162,6 +167,17 @@ export function PromotionDrawer({
   const [scopeKind, setScopeKind] = useState<ScopeKind>('all')
   const [scopeTarget, setScopeTarget] = useState('')
   const [scopeVariant, setScopeVariant] = useState('')
+  /** Lo escrito en el buscador y lo elegido: el uuid viaja en `scopeTarget`. */
+  const [targetTerm, setTargetTerm] = useState('')
+  const [targetPicked, setTargetPicked] = useState<PickerOption | null>(null)
+  const targetDebounced = useDebouncedValue(targetTerm, 300)
+  const targets = useScopeTargets(scope?.storeId ?? null, scopeKind, targetDebounced)
+  const targetOptions: PickerOption[] = (targets.data ?? []).map((fila) => ({
+    id: fila.id,
+    primary: fila.name,
+    secondary: fila.code,
+  }))
+  const variantes = useScopeVariants(scopeKind === 'variant' ? (scopeTarget || null) : null)
   const [scopeQuantity, setScopeQuantity] = useState('')
   const [scopeExclusion, setScopeExclusion] = useState(false)
   const [scopeDescendants, setScopeDescendants] = useState(false)
@@ -218,6 +234,8 @@ export function PromotionDrawer({
       setScopeVariant('')
       setScopeQuantity('')
       setScopeDescendants(false)
+      setTargetPicked(null)
+      setTargetTerm('')
       notify(t('promotions.scope.added'), 'success')
     } catch (error) {
       const key: MessageKey =
@@ -582,7 +600,15 @@ export function PromotionDrawer({
                 size="small"
                 label={t('promotions.field.scope')}
                 value={scopeKind}
-                onChange={(event) => setScopeKind(event.target.value as ScopeKind)}
+                onChange={(event) => {
+                  // Un producto elegido no vale como categoría: al cambiar de
+                  // tipo, lo elegido deja de tener sentido y se suelta.
+                  setScopeKind(event.target.value as ScopeKind)
+                  setScopeTarget('')
+                  setScopeVariant('')
+                  setTargetPicked(null)
+                  setTargetTerm('')
+                }}
                 sx={{ minWidth: 160 }}
               >
                 {SCOPE_KINDS.map((kind) => (
@@ -591,24 +617,53 @@ export function PromotionDrawer({
                   </MenuItem>
                 ))}
               </TextField>
+              {/* Se ELIGE, no se teclea.
+                  La tabla guarda uuids —`product_id`, `category_id`,
+                  `brand_id`— y aquí había un campo de texto libre llamado
+                  «Identificador». Quien escribía el SKU, que es el
+                  identificador que la gente conoce, recibía «No pudimos
+                  completar la operación»: Postgres rechazaba `QS-000004` como
+                  uuid antes de mirar nada más. Un campo que solo acepta un
+                  valor que no está a la vista en ninguna pantalla no se puede
+                  rellenar bien. */}
               {scopeKind !== 'all' && (
-                <TextField
-                  size="small"
-                  label={t('promotions.field.target')}
-                  value={scopeTarget}
-                  onChange={(event) => setScopeTarget(event.target.value)}
-                  helperText={t('promotions.hint.target')}
-                  fullWidth
-                />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <EntityPicker
+                    label={t('promotions.field.target')}
+                    placeholder={t('promotions.hint.target')}
+                    term={targetTerm}
+                    onTermChange={setTargetTerm}
+                    options={targetOptions}
+                    value={targetPicked}
+                    onPick={(option) => {
+                      setTargetPicked(option)
+                      setScopeTarget(option.id)
+                      // Al cambiar de producto, la variante elegida ya no es suya.
+                      setScopeVariant('')
+                    }}
+                    loading={targets.isFetching}
+                    minChars={2}
+                  />
+                </Box>
               )}
               {scopeKind === 'variant' && (
                 <TextField
+                  select
                   size="small"
                   label={t('promotions.field.variant')}
                   value={scopeVariant}
                   onChange={(event) => setScopeVariant(event.target.value)}
-                  fullWidth
-                />
+                  disabled={scopeTarget === ''}
+                  helperText={scopeTarget === '' ? t('promotions.hint.variantFirst') : undefined}
+                  sx={{ minWidth: 180 }}
+                >
+                  {(variantes.data ?? []).map((variante) => (
+                    <MenuItem key={variante.id} value={variante.id}>
+                      {variante.name}
+                      {variante.code ? ` · ${variante.code}` : ''}
+                    </MenuItem>
+                  ))}
+                </TextField>
               )}
               {promotion.kind === 'bundle' && (
                 <TextField

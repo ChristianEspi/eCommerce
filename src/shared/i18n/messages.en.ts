@@ -2037,7 +2037,7 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'promotions.field.stackGroup': 'Exclusive group',
     'promotions.field.exclusive': 'Exclusive campaign',
     'promotions.field.requiresCoupon': 'Requires a coupon',
-    'promotions.field.target': 'Identifier',
+    'promotions.field.target': 'Search and pick',
     'promotions.field.variant': 'Variant',
     'promotions.field.requiredQuantity': 'Units',
     'promotions.field.exclusion': 'Exclude',
@@ -2133,7 +2133,8 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'promotions.hint.exclusive': 'If it applies, no other campaign does.',
     'promotions.hint.requiresCoupon':
       'Without the typed code, this campaign does not exist for the buyer.',
-    'promotions.hint.target': 'Identifier of the product, category or brand.',
+    'promotions.hint.target': 'Type the name or the code',
+    'promotions.hint.variantFirst': 'Pick the product first',
     'promotions.hint.campaign': 'Only campaigns that require a coupon.',
     'promotions.hint.couponCode': 'Stored uppercase, without dashes or spaces.',
     'promotions.hint.couponPeriod': 'Intersected with the campaign validity: it never extends it.',

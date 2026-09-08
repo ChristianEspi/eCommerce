@@ -14,7 +14,9 @@ import {
   fetchGiftCards,
   fetchPromotionEvents,
   fetchPromotions,
+  fetchScopeVariants,
   fetchScopes,
+  searchScopeTargets,
   fetchTiers,
   issueGiftCard,
   removeScope,
@@ -27,7 +29,7 @@ import {
   type PromotionScopeIds,
   type ScopeInput,
 } from './api'
-import type { PromotionFormValues } from './types'
+import type { PromotionFormValues, ScopeKind } from './types'
 
 /**
  * Estado de promociones en el cliente.
@@ -106,6 +108,23 @@ export function useScopes(promotionId: string | null) {
     queryKey: scopesKey(promotionId),
     queryFn: () => fetchScopes(promotionId),
     enabled: promotionId !== null,
+  })
+}
+
+/** Candidatos para el alcance: productos, categorías o marcas, según el tipo. */
+export function useScopeTargets(storeId: string | null, kind: ScopeKind, term: string) {
+  return useQuery({
+    queryKey: [...PROMOTIONS_KEY, 'scope-targets', storeId, kind, term] as const,
+    queryFn: () => searchScopeTargets({ storeId, kind, term }),
+    enabled: Boolean(storeId) && kind !== 'all',
+  })
+}
+
+export function useScopeVariants(productId: string | null) {
+  return useQuery({
+    queryKey: [...PROMOTIONS_KEY, 'scope-variants', productId] as const,
+    queryFn: () => fetchScopeVariants(productId),
+    enabled: productId !== null,
   })
 }
 

@@ -2048,7 +2048,7 @@ export const es = {
     'promotions.field.stackGroup': 'Grupo excluyente',
     'promotions.field.exclusive': 'Campaña exclusiva',
     'promotions.field.requiresCoupon': 'Necesita cupón',
-    'promotions.field.target': 'Identificador',
+    'promotions.field.target': 'Busca y elige',
     'promotions.field.variant': 'Variante',
     'promotions.field.requiredQuantity': 'Unidades',
     'promotions.field.exclusion': 'Excluir',
@@ -2145,7 +2145,8 @@ export const es = {
     'promotions.hint.exclusive': 'Si se aplica, ninguna otra campaña lo hace.',
     'promotions.hint.requiresCoupon':
       'Sin el código tecleado, esta campaña no existe para el comprador.',
-    'promotions.hint.target': 'Identificador del producto, la categoría o la marca.',
+    'promotions.hint.target': 'Escribe el nombre o el código',
+    'promotions.hint.variantFirst': 'Elige antes el producto',
     'promotions.hint.campaign': 'Solo campañas que exigen cupón.',
     'promotions.hint.couponCode': 'Se guarda en mayúsculas y sin guiones ni espacios.',
     'promotions.hint.couponPeriod': 'Se cruza con la vigencia de la campaña: nunca la alarga.',
