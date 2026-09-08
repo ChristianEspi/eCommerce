@@ -255,6 +255,18 @@ export function pickRelated(
 export const trackedOrderSchema = z.object({
   order_number: z.string().min(1),
   status: z.string().min(1),
+  /**
+   * Cómo va el cobro. `order_by_token` ya lo devolvía y el esquema lo tiraba.
+   *
+   * Mientras ningún medio cobraba en el acto, daba igual: todo pedido nacía
+   * pendiente y la confirmación podía decirlo sin preguntar. Con una pasarela
+   * que captura al confirmar, no leerlo significa enseñar «pendiente de pago»
+   * sobre una compra ya cobrada — que es peor que no decir nada.
+   *
+   * `.default('pending')` y no obligatorio: una respuesta anterior al
+   * despliegue no lo trae y tiene que seguir pintándose.
+   */
+  payment_status: z.string().default('pending'),
   currency: z.string().length(3),
   placed_at: z.string(),
   customer_name: z.string().nullable(),

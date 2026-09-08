@@ -2838,6 +2838,8 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.payment.instructions': 'What to do to pay',
     'store.checkout.step.delivery': 'Delivery',
     'store.checkout.payment': 'Payment',
+    'store.order.paid': 'Paid',
+    'store.order.bodyPaid': 'We received your payment. The shop will contact you to arrange delivery.',
     'store.order.payment': 'Payment method',
     'store.checkout.error.delivery.method': 'Choose how you want to receive your order.',
     'store.checkout.error.payment.method': 'Choose how you want to pay for your order.',

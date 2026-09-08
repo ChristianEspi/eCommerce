@@ -2848,6 +2848,8 @@ export const es = {
     'store.payment.instructions': 'Qué hacer para pagar',
     'store.checkout.step.delivery': 'Entrega',
     'store.checkout.payment': 'Pago',
+    'store.order.paid': 'Pagado',
+    'store.order.bodyPaid': 'Recibimos tu pago. La tienda te contactará para coordinar la entrega.',
     'store.order.payment': 'Medio de pago',
     'store.checkout.error.delivery.method': 'Elige cómo quieres recibir tu pedido.',
     'store.checkout.error.payment.method': 'Elige cómo quieres pagar tu pedido.',

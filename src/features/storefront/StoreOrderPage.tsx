@@ -119,6 +119,19 @@ export function StoreOrderPage() {
         }
       : null)
 
+  /**
+   * ¿Está pagado?
+   *
+   * Sale del PEDIDO y no de haber elegido tarjeta: elegirla no es haberla
+   * cobrado —el banco puede decir que no— y confundir las dos cosas es cómo una
+   * pantalla acaba dando por buena una compra que no lo está.
+   *
+   * `paid` es el único estado que cuenta. `authorized` es dinero retenido y aún
+   * sin cobrar, y llamarle «pagado» adelanta un hecho que todavía puede no
+   * ocurrir.
+   */
+  const yaPagado = (fromState?.payment_status ?? tracked.data?.payment_status) === 'paid'
+
   return (
     <Stack sx={{ gap: 2, maxWidth: 720, mx: 'auto' }}>
       <Card sx={{ p: { xs: 2.5, md: 4 }, textAlign: 'center' }}>
@@ -143,7 +156,7 @@ export function StoreOrderPage() {
           {t('store.order.title')}
         </Typography>
         <Typography sx={{ color: 'var(--muted)', mt: 0.75 }}>
-          {t('store.order.body')}
+          {yaPagado ? t('store.order.bodyPaid') : t('store.order.body')}
         </Typography>
 
         <Typography sx={{ mt: 2, fontSize: TS.label, color: 'var(--muted)', fontWeight: 700 }}>
@@ -153,10 +166,22 @@ export function StoreOrderPage() {
           {order?.order_number ?? orderNumber}
         </Typography>
 
+        {/* El sello dice lo que dice la FILA, no lo que solía pasar.
+
+            Estaba escrito a fuego en «pendiente de pago», y durante mucho tiempo
+            fue verdad: sin pasarela, ningún pedido salía del checkout cobrado.
+            Desde que una tarjeta puede capturar en el acto, ese texto fijo
+            convierte una compra pagada en una que parece deber dinero — y eso no
+            se descubre revisando código, se descubre delante de un cliente. */}
         <Chip
-          label={t('store.order.pending')}
+          label={yaPagado ? t('store.order.paid') : t('store.order.pending')}
           size="small"
-          sx={{ mt: 1.5, bgcolor: 'var(--amber-soft)', color: 'var(--text)', fontWeight: 700 }}
+          sx={{
+            mt: 1.5,
+            bgcolor: yaPagado ? 'var(--accent-soft)' : 'var(--amber-soft)',
+            color: yaPagado ? 'var(--accent-deep)' : 'var(--text)',
+            fontWeight: 700,
+          }}
         />
       </Card>
 
