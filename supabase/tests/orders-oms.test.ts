@@ -511,6 +511,121 @@ describe('los ejes de estado y sus maquinas', () => {
     expect(servido?.fulfilled_at).not.toBeNull()
   })
 
+  /**
+   * El sentido que faltaba: el ciclo comercial sigue al dinero.
+   *
+   * La propagacion era de un solo sentido —`status` empujaba a los otros dos y
+   * nadie empujaba a `status`—, y como el ciclo solo se mueve a mano y nadie lo
+   * mueve, un pedido cobrado con tarjeta se quedaba en «pendiente» para siempre.
+   * En la tienda de demostracion eran siete de treinta.
+   */
+  it('cobrar un pedido pendiente lo pasa a pagado, sin tocar la entrega', async () => {
+    const pedido = await place(TENANT_A, [{ product_id: productA, quantity: 1 }])
+    const orderId = String(pedido.order_id)
+
+    // Como cobra la pasarela: escribiendo SOLO el eje del dinero.
+    await svc(`update public.orders set payment_status = 'paid' where id = $1`, [orderId])
+
+    const [fila] = await svc(
+      `select status, payment_status, fulfillment_status from public.orders where id = $1`,
+      [orderId],
+    )
+    expect(fila?.status).toBe('paid')
+    expect(fila?.payment_status).toBe('paid')
+    // La mercancia no se ha movido: ese eje es de otro.
+    expect(fila?.fulfillment_status).toBe('unfulfilled')
+  })
+
+  it('el cambio queda en la linea de tiempo, no solo en la fila', async () => {
+    const pedido = await place(TENANT_A, [{ product_id: productA, quantity: 1 }])
+    const orderId = String(pedido.order_id)
+    await svc(`update public.orders set payment_status = 'paid' where id = $1`, [orderId])
+
+    // `order_events` es la linea de tiempo que se ve en pantalla. Un estado que
+    // cambia solo y no deja rastro es peor que uno que no cambia.
+    const eventos = await svc(
+      `select from_value, to_value from public.order_events
+        where order_id = $1 and axis::text = 'order_status' and from_value is not null`,
+      [orderId],
+    )
+    expect(eventos.map((e) => `${e.from_value}->${e.to_value}`)).toContain('pending->paid')
+  })
+
+  /**
+   * `authorized` es dinero retenido y todavia sin cobrar.
+   *
+   * Llamar «pagado» a un pedido por una retencion adelanta un hecho que aun
+   * puede no ocurrir, y es la misma linea que ya defiende el resto del dominio.
+   */
+  it('una retencion NO adelanta el ciclo comercial', async () => {
+    const pedido = await place(TENANT_A, [{ product_id: productA, quantity: 1 }])
+    const orderId = String(pedido.order_id)
+    await svc(`update public.orders set payment_status = 'authorized' where id = $1`, [orderId])
+
+    const [fila] = await svc(`select status from public.orders where id = $1`, [orderId])
+    expect(fila?.status).toBe('pending')
+  })
+
+  /**
+   * La trampa que casi se lleva el cobro por delante.
+   *
+   * `ebim.assert_order_axes` rechaza mover el ciclo de un pedido que espera
+   * firma, y `ebim.payment_sync_order` se traga la excepcion y devuelve `false`:
+   * un avance automatico ahi habria hecho que el pago se perdiera EN SILENCIO.
+   * Por eso el avance se abstiene cuando hay aprobacion pendiente.
+   */
+  it('con la aprobacion pendiente no toca el ciclo, y el cobro no revienta', async () => {
+    // Nace esperando firma: el umbral de la cuenta lo decide la base. No se
+    // puede pedir aprobación a posteriori —`not_required` es terminal— así que
+    // el pedido tiene que nacer así.
+    const pedido = await place(TENANT_A, [{ product_id: productB2B, quantity: 1 }], {
+      accountId: cuentaAcme,
+    })
+    const orderId = String(pedido.order_id)
+
+    // Lo único que la base deja mover con la firma pendiente.
+    await svc(`update public.orders set payment_status = 'failed' where id = $1`, [orderId])
+
+    const [fila] = await svc(
+      `select status, payment_status from public.orders where id = $1`,
+      [orderId],
+    )
+    expect(fila?.status).toBe('pending')
+    expect(fila?.payment_status).toBe('failed')
+
+    // Se cierra la firma antes de salir: la cola de aprobaciones es compartida
+    // y un pedido pendiente de este test aparecería en el de más abajo, que
+    // cuenta cuántas esperan. Un test que deja basura rompe a otro y el fallo
+    // sale donde no está la causa.
+    await asUser(
+      b2bClaims(APPROVER_ID, 'gerencia@acme.test'),
+      `select public.order_approval_decide($1, false, 'fin del test')`,
+      [orderId],
+    )
+  })
+
+  /**
+   * Solo se cubre el tramo que falta. Un pedido ya servido no retrocede a
+   * «pagado» porque alguien registre un reembolso parcial.
+   */
+  it('un pedido ya servido no lo mueve el eje del dinero', async () => {
+    const pedido = await place(TENANT_A, [{ product_id: productA, quantity: 1 }])
+    const orderId = String(pedido.order_id)
+    await asUser(ordersClaims(), `update public.orders set status = 'paid' where id = $1`, [
+      orderId,
+    ])
+    await asUser(ordersClaims(), `update public.orders set status = 'fulfilled' where id = $1`, [
+      orderId,
+    ])
+
+    await svc(`update public.orders set payment_status = 'partially_refunded' where id = $1`, [
+      orderId,
+    ])
+
+    const [fila] = await svc(`select status from public.orders where id = $1`, [orderId])
+    expect(fila?.status).toBe('fulfilled')
+  })
+
   it('cancelar un pedido YA cobrado no anula el cobro por su cuenta', async () => {
     const pedido = await place(TENANT_A, [{ product_id: productA, quantity: 1 }])
     const orderId = String(pedido.order_id)
