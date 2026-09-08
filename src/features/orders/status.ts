@@ -124,10 +124,69 @@ export function valueLabel(axis: string | null, value: string | null): MessageKe
   return value
 }
 
-/** Texto del titular de un evento que NO es un cambio de estado. */
+/**
+ * Texto del titular de un evento que NO es un cambio de estado.
+ *
+ * Los `fulfillment.*`, `shipment.*` y `return.*` los escribe
+ * `ebim.log_order_fact` sin `axis`, porque no mueven ninguno de los cuatro ejes
+ * del pedido. Sin ellos aquí caían todos en el mismo cajón —«Movimiento del
+ * pedido»—, que es la respuesta que no sirve: un pedido preparado, empaquetado
+ * y enviado se leía como tres líneas idénticas.
+ */
 export const EVENT_TYPE_LABEL: Record<string, MessageKey> = {
   'order.created': 'orders.history.created',
   'order.details_updated': 'orders.history.detailsUpdated',
   'order.approval_requested': 'orders.history.approvalRequested',
   'order.approval_decided': 'orders.history.approvalDecided',
+  'fulfillment.created': 'fulfillment.event.created',
+  'fulfillment.assigned': 'fulfillment.event.assigned',
+  'fulfillment.state_changed': 'fulfillment.event.stateChanged',
+  'fulfillment.delivered': 'fulfillment.event.delivered',
+  'shipment.opened': 'fulfillment.event.shipmentOpened',
+  'shipment.updated': 'fulfillment.event.shipmentUpdated',
+  'shipment.tracking': 'fulfillment.event.shipmentTracking',
+  'return.requested': 'orders.history.returnRequested',
+  'return.inspected': 'orders.history.returnInspected',
+  'return.completed': 'orders.history.returnCompleted',
+}
+
+/**
+ * De qué habla un hecho sin eje, para la pastilla de la línea de tiempo.
+ *
+ * Las filas con eje ya llevan la suya —Pedido, Pago, Entrega— y sin esto los
+ * hechos quedaban como las únicas líneas sin decir de qué parte del pedido
+ * hablan, mezcladas en el mismo hilo.
+ */
+export const EVENT_SCOPE_LABEL: Record<string, MessageKey> = {
+  'fulfillment.created': 'orders.axis.fulfillment',
+  'fulfillment.assigned': 'orders.axis.fulfillment',
+  'fulfillment.state_changed': 'orders.axis.fulfillment',
+  'fulfillment.delivered': 'orders.axis.fulfillment',
+  'shipment.opened': 'orders.axis.fulfillment',
+  'shipment.updated': 'orders.axis.fulfillment',
+  'shipment.tracking': 'orders.axis.fulfillment',
+  'return.requested': 'orders.history.returns',
+  'return.inspected': 'orders.history.returns',
+  'return.completed': 'orders.history.returns',
+}
+
+/**
+ * El destino de un hecho de logística, que NO está en `to_value`.
+ *
+ * Esa columna es de los ejes del pedido y `ebim.log_order_fact` la deja nula;
+ * el estado viaja en `payload`. Sin esto, cinco pasos seguidos de la entrega se
+ * leían como cinco «Cambio de estado» iguales.
+ */
+export function factMove(
+  eventType: string,
+  payload: Record<string, unknown>,
+): { from: MessageKey | null; to: MessageKey } | null {
+  if (eventType !== 'fulfillment.state_changed') return null
+  const to = payload.to
+  if (typeof to !== 'string') return null
+  const from = payload.from
+  return {
+    from: typeof from === 'string' ? (`fulfillment.state.${from}` as MessageKey) : null,
+    to: `fulfillment.state.${to}` as MessageKey,
+  }
 }

@@ -34,6 +34,7 @@ const ORDER_4 = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4'
 const ITEM_1 = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1'
 const EVENT_1 = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1'
 const EVENT_2 = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2'
+const EVENT_3 = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc3'
 const TAG_1 = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1'
 const REF_1 = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1'
 
@@ -176,6 +177,21 @@ function backend(role: 'admin' | 'viewer' = 'admin'): FakeSupabase {
           from_value: 'pending',
           to_value: 'paid',
           note: 'Depósito verificado',
+          source: 'backoffice',
+          actor_email: 'duenio@negocio.com',
+          created_at: TODAY,
+        },
+        // Un HECHO de logistica: no mueve ningun eje del pedido, asi que llega
+        // sin `axis` y con el movimiento dentro de `payload`.
+        {
+          id: EVENT_3,
+          order_id: ORDER_1,
+          event_type: 'fulfillment.state_changed',
+          axis: null,
+          from_value: null,
+          to_value: null,
+          note: null,
+          payload: { from: 'pending', to: 'picking' },
           source: 'backoffice',
           actor_email: 'duenio@negocio.com',
           created_at: TODAY,
@@ -333,11 +349,79 @@ describe('OrdersPage — detalle en panel lateral', () => {
     const drawer = await openDrawer(user, 'MI-000001', 'Historial')
 
     expect(within(drawer).getByText('Pedido recibido')).toBeInTheDocument()
-    expect(within(drawer).getByText('Desde la vitrina')).toBeInTheDocument()
+    // Fecha y autor comparten linea: son el pie del titular, no dos datos.
+    expect(within(drawer).getByText(/Desde la vitrina/)).toBeInTheDocument()
     // Un cambio del eje de PAGO, no del comercial: la pantalla lo etiqueta.
     expect(within(drawer).getByText('Sin cobrar → Cobrado')).toBeInTheDocument()
     expect(within(drawer).getByText('Pago')).toBeInTheDocument()
     expect(within(drawer).getByText('Depósito verificado')).toBeInTheDocument()
+  })
+
+  /**
+   * Un hecho de logistica NO es «Movimiento del pedido».
+   *
+   * `ebim.log_order_fact` los escribe sin `axis` —no mueven ninguno de los
+   * cuatro ejes— y con el estado dentro de `payload`. Sin leer ese payload, un
+   * pedido preparado, empaquetado y enviado eran tres lineas identicas que solo
+   * se distinguian por la hora.
+   */
+  it('un hecho de la entrega dice a que estado paso, no «movimiento»', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    const drawer = await openDrawer(user, 'MI-000001', 'Historial')
+
+    expect(within(drawer).getByText('Por preparar → Preparando')).toBeInTheDocument()
+    expect(within(drawer).queryByText('Movimiento del pedido')).not.toBeInTheDocument()
+    // Y dice de que parte del pedido habla, como las filas con eje.
+    expect(within(drawer).getAllByText('Entrega').length).toBeGreaterThan(0)
+  })
+
+  /**
+   * La direccion de lectura, DICHA.
+   *
+   * Cuatro bloques con una fecha cada uno no dicen hacia donde avanza el
+   * relato: hay que comparar horas para deducirlo. El orden es el bueno —un
+   * pedido se cuenta desde que nace— y lo que faltaba era declararlo y marcar
+   * cual es el final.
+   */
+  it('el historial declara hacia donde se lee y marca lo ultimo', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    const drawer = await openDrawer(user, 'MI-000001', 'Historial')
+
+    expect(
+      within(drawer).getByText('Se lee de arriba abajo: lo primero que pasó, arriba.'),
+    ).toBeInTheDocument()
+
+    // La marca es UNA y esta en el ultimo elemento de la lista.
+    const marcas = within(drawer).getAllByText('Lo último')
+    expect(marcas).toHaveLength(1)
+    const filas = within(drawer).getAllByRole('listitem')
+    expect(filas.at(-1)).toContainElement(marcas[0]!)
+  })
+
+  /**
+   * Lo irreversible, al final.
+   *
+   * «Cancelar pedido» estaba ARRIBA del todo: al abrir un pedido ya cobrado era
+   * el primer —y a veces unico— boton del panel, en rojo. El orden de la
+   * pantalla es el orden de la frecuencia, y lo que no se deshace va detras de
+   * todo lo demas.
+   */
+  it('cancelar queda por debajo del cambio de estado, no encima', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    const drawer = await openDrawer(user, 'MI-000001', 'Operación')
+
+    const aplicar = within(drawer).getByRole('button', { name: 'Actualizar estado' })
+    const cancelar = within(drawer).getByRole('button', { name: 'Cancelar pedido' })
+
+    // DOCUMENT_POSITION_FOLLOWING: cancelar viene DESPUES en el documento.
+    expect(aplicar.compareDocumentPosition(cancelar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(drawer).getByText('Sin vuelta atrás')).toBeInTheDocument()
   })
 
   it('el snapshot del cliente B2B enseña cuenta y documento fiscal', async () => {

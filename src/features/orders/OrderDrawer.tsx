@@ -27,7 +27,7 @@ import {
 import { useEffect, useState, type ReactNode } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
-import { formatDateTime, formatMoney } from '@/shared/lib/format'
+import { formatDate, formatDateTime, formatMoney, formatTime } from '@/shared/lib/format'
 import { isSafeExternalUrl } from '@/domain/href'
 import { FormDrawer } from '@/shared/ui/FormDrawer'
 import { useFeedback } from '@/shared/ui/feedback-context'
@@ -37,6 +37,7 @@ import {
   APPROVAL_COLOR,
   APPROVAL_LABEL,
   AXIS_LABEL,
+  EVENT_SCOPE_LABEL,
   EVENT_SOURCE_LABEL,
   EVENT_TYPE_LABEL,
   FULFILLMENT_COLOR,
@@ -46,6 +47,7 @@ import {
   SOURCE_LABEL,
   STATUS_COLOR,
   STATUS_LABEL,
+  factMove,
   valueLabel,
 } from './status'
 import { ORDER_AXES, nextForAxis, type Order, type OrderAxis } from './types'
@@ -70,15 +72,67 @@ function errorKeyOf(error: unknown): MessageKey {
   return error instanceof OrderError ? error.key : 'orders.error.generic'
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
     <Box component="section">
       <Typography
         component="h3"
-        sx={{ fontSize: 12, fontWeight: 800, letterSpacing: 0.6, color: 'var(--muted)', mb: 1 }}
+        sx={{ fontSize: 12, fontWeight: 800, letterSpacing: 0.6, color: 'var(--muted)', mb: hint ? 0.25 : 1 }}
       >
         {title}
       </Typography>
+      {hint && (
+        <Typography sx={{ fontSize: 12, color: 'var(--muted)', mb: 1.25 }}>{hint}</Typography>
+      )}
+      {children}
+    </Box>
+  )
+}
+
+/**
+ * Rótulo de un bloque DENTRO de una sección.
+ *
+ * El panel de estados era una pila plana: un atajo, dos desplegables, una nota y
+ * un botón, todos con el mismo peso visual y sin nada que dijera cuáles van
+ * juntos. Agrupar es lo que convierte esa lista en tres decisiones —lo de
+ * siempre, lo demás, lo irreversible— en vez de siete controles.
+ */
+function Bloque({
+  title,
+  hint,
+  tone = 'muted',
+  children,
+}: {
+  /**
+   * Sin título cuando el bloque va SOLO: el rótulo existe para separar de los
+   * de al lado, y «Cualquier otro cambio» sin nada delante nombra un contraste
+   * que no está en la pantalla.
+   */
+  title?: string
+  hint?: string
+  tone?: 'muted' | 'danger'
+  children: ReactNode
+}) {
+  return (
+    <Box>
+      {title && (
+        <Typography
+          component="h4"
+          sx={{
+            fontSize: 11,
+            fontWeight: 800,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            color: tone === 'danger' ? 'var(--red)' : 'var(--muted)',
+            mb: hint ? 0.25 : 1,
+          }}
+        >
+          {title}
+        </Typography>
+      )}
+      {hint && (
+        <Typography sx={{ fontSize: 12, color: 'var(--muted)', mb: 1.25 }}>{hint}</Typography>
+      )}
       {children}
     </Box>
   )
@@ -237,6 +291,17 @@ export function OrderDrawer({
   }
 
   /**
+   * Los atajos, separados por lo que cuesta deshacerlos.
+   *
+   * Mezclados en una fila, «Marcar como cobrado» y «Cancelar pedido» pesan lo
+   * mismo y están a un centímetro. Y cuando el pedido ya está cobrado el único
+   * atajo que queda es el rojo: el panel se abría con lo irreversible como
+   * primer botón de la pantalla.
+   */
+  const frecuentes = atajos.filter((atajo) => !atajo.destructive)
+  const peligrosos = atajos.filter((atajo) => atajo.destructive)
+
+  /**
    * Cerrar el ciclo comercial, que son DOS tramos y no uno.
    *
    * `pending → fulfilled` no existe: la máquina obliga a pasar por `paid`. Se
@@ -283,6 +348,12 @@ export function OrderDrawer({
   /** El valor ACTUAL del eje elegido, para poder enseñar de dónde sale. */
   const valorActual = currentOf[axis]
   const awaitingApproval = current.approval_status === 'pending'
+  /**
+   * «Cualquier otro cambio» solo tiene sentido si ARRIBA hay algo de lo que ser
+   * el otro. Sin la fila de atajos frecuentes, el cambio manual es la sección
+   * entera y su rótulo nombra un contraste que no está en la pantalla.
+   */
+  const hayAtajos = frecuentes.length > 0 && !awaitingApproval
 
   async function run(action: () => Promise<unknown>, toast: MessageKey, after?: () => void) {
     try {
@@ -500,18 +571,16 @@ export function OrderDrawer({
 
   const operation = (
     <Stack spacing={3} divider={<Divider flexItem />}>
-      <Section title={t(postVenta ? 'orders.transitionAfter' : 'orders.transition')}>
-        <Stack spacing={1.5}>
-          {/* Con la venta cerrada, «Cambiar de estado» sugiere que el pedido
-              todavía puede avanzar. No puede: desde «Entregado» los tres ejes
-              solo ofrecen marcha atrás —reembolsar, reembolsar en parte,
-              devolver—. El bloque se llama por lo que de verdad hace, y lo dice
-              antes de que alguien abra el desplegable a ver qué hay. */}
-          {postVenta && (
-            <Typography sx={{ fontSize: 12, color: 'var(--muted)' }}>
-              {t('orders.transitionAfterHelp')}
-            </Typography>
-          )}
+      {/* Con la venta cerrada, «Cambiar de estado» sugiere que el pedido todavía
+          puede avanzar. No puede: desde «Entregado» los tres ejes solo ofrecen
+          marcha atrás —reembolsar, reembolsar en parte, devolver—. La sección se
+          llama por lo que de verdad hace, y lo dice antes de que alguien abra el
+          desplegable a ver qué hay. */}
+      <Section
+        title={t(postVenta ? 'orders.transitionAfter' : 'orders.transition')}
+        hint={postVenta ? t('orders.transitionAfterHelp') : undefined}
+      >
+        <Stack spacing={2.5}>
           {/* Cobrado, entregado… y el ciclo comercial sigue en «pendiente».
               Los cuatro ejes son independientes a propósito, pero eso deja un
               hueco real: nadie mueve el comercial y el pedido se queda años
@@ -545,118 +614,174 @@ export function OrderDrawer({
               «eje Pago, estado Pagado», que es vocabulario de quien programó
               esto y no de quien lo usa. Estas son las dos transiciones que se
               piden a diario; el resto sigue una línea más abajo. */}
-          {canWrite && !awaitingApproval && atajos.length > 0 && (
-            <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap' }}>
-              {atajos.map((atajo) => (
-                <Button
-                  key={atajo.key}
-                  size="small"
-                  variant={atajo.primary ? 'contained' : 'outlined'}
-                  color={atajo.destructive ? 'error' : 'primary'}
-                  disabled={busy}
-                  onClick={() => {
-                    // Cancelar es TERMINAL: el pedido no vuelve a moverse. Un
-                    // clic sin preguntar, en un botón rojo pegado a otro verde y
-                    // en un panel por el que la gente curiosea, es la clase de
-                    // acción que se ejecuta sin querer y no se deshace.
-                    if (atajo.confirm) {
-                      setCancelReason('')
-                      setCancelOpen(true)
-                      return
+          {canWrite && !awaitingApproval && frecuentes.length > 0 && (
+            <Bloque title={t('orders.quick.title')}>
+              <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap' }}>
+                {frecuentes.map((atajo) => (
+                  <Button
+                    key={atajo.key}
+                    size="small"
+                    variant={atajo.primary ? 'contained' : 'outlined'}
+                    disabled={busy}
+                    onClick={() =>
+                      void run(
+                        () =>
+                          transition.mutateAsync({
+                            orderId: orderRef,
+                            axis: atajo.axis,
+                            to: atajo.to,
+                            reason: '',
+                          }),
+                        'orders.toast.updated',
+                      )
                     }
-                    void run(
-                      () =>
-                        transition.mutateAsync({
-                          orderId: orderRef,
-                          axis: atajo.axis,
-                          to: atajo.to,
-                          reason: '',
-                        }),
-                      'orders.toast.updated',
-                    )
-                  }}
-                >
-                  {t(atajo.key)}
-                </Button>
-              ))}
-            </Stack>
+                  >
+                    {t(atajo.key)}
+                  </Button>
+                ))}
+              </Stack>
+            </Bloque>
           )}
 
           {canWrite && (
-            <>
-              {/* De dónde SALE, no solo a dónde va.
-                  Elegir un destino sin ver el origen convierte «Nuevo estado»
-                  en una lista sin contexto: los valores cambian al cambiar de
-                  eje —cada uno tiene su vocabulario— y sin el punto de partida
-                  no hay forma de saber por qué. */}
-              <TextField
-                select
-                size="small"
-                label={t('orders.axis')}
-                value={axis}
-                onChange={(event) => setAxis(event.target.value as OrderAxis)}
-                helperText={`${t('orders.axisNow')}: ${t(valueLabel(axis, valorActual) as MessageKey)}`}
-              >
-                {ORDER_AXES.map((value) => (
-                  <MenuItem key={value} value={value}>
-                    {t(AXIS_LABEL[value])}
-                  </MenuItem>
-                ))}
-              </TextField>
-
-              {allowed.length === 0 ? (
-                <Alert severity="info">{t('orders.status.final')}</Alert>
-              ) : (
-                <>
+            <Bloque
+              title={hayAtajos ? t('orders.manual.title') : undefined}
+              hint={t('orders.manual.help')}
+            >
+              <Stack spacing={1.5}>
+                {/* Los dos desplegables son UNA frase —«mueve la Entrega a
+                    Empaquetado»— y en dos filas separadas no lo parecían: entre
+                    el primero y el segundo cabía la duda de si el de abajo
+                    dependía del de arriba. En fila, y con el estado actual
+                    debajo del primero, la dependencia se ve. */}
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={1.5}
+                  sx={{ '& > .MuiFormControl-root': { flex: 1, minWidth: 0 } }}
+                >
+                  {/* De dónde SALE, no solo a dónde va.
+                      Elegir un destino sin ver el origen convierte «Nuevo
+                      estado» en una lista sin contexto: los valores cambian al
+                      cambiar de eje —cada uno tiene su vocabulario— y sin el
+                      punto de partida no hay forma de saber por qué. */}
                   <TextField
                     select
                     size="small"
-                    label={t('orders.newStatus')}
-                    value={nextValue}
-                    onChange={(event) => setNextValue(event.target.value)}
+                    label={t('orders.axis')}
+                    value={axis}
+                    onChange={(event) => setAxis(event.target.value as OrderAxis)}
+                    helperText={`${t('orders.axisNow')}: ${t(valueLabel(axis, valorActual) as MessageKey)}`}
                   >
-                    {allowed.map((value) => (
+                    {ORDER_AXES.map((value) => (
                       <MenuItem key={value} value={value}>
-                        {t(valueLabel(axis, value) as MessageKey)}
+                        {t(AXIS_LABEL[value])}
                       </MenuItem>
                     ))}
                   </TextField>
-                  <TextField
-                    size="small"
-                    label={t('orders.note')}
-                    helperText={t('orders.noteHelp')}
-                    value={reason}
-                    onChange={(event) => setReason(event.target.value)}
-                    multiline
-                    minRows={2}
-                    inputProps={{ maxLength: 1000 }}
-                  />
-                  <Box>
+
+                  {allowed.length > 0 && (
+                    <TextField
+                      select
+                      size="small"
+                      label={t('orders.newStatus')}
+                      value={nextValue}
+                      onChange={(event) => setNextValue(event.target.value)}
+                      helperText={t('orders.newStatusHelp')}
+                    >
+                      {allowed.map((value) => (
+                        <MenuItem key={value} value={value}>
+                          {t(valueLabel(axis, value) as MessageKey)}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  )}
+                </Stack>
+
+                {allowed.length === 0 ? (
+                  <Alert severity="info">{t('orders.status.final')}</Alert>
+                ) : (
+                  <>
+                    <TextField
+                      size="small"
+                      label={t('orders.note')}
+                      helperText={t('orders.noteHelp')}
+                      value={reason}
+                      onChange={(event) => setReason(event.target.value)}
+                      multiline
+                      minRows={2}
+                      inputProps={{ maxLength: 1000 }}
+                    />
+                    <Box>
+                      <Button
+                        variant="contained"
+                        disabled={busy || nextValue === ''}
+                        onClick={() =>
+                          void run(
+                            () =>
+                              transition.mutateAsync({
+                                orderId: orderRef,
+                                axis,
+                                to: nextValue,
+                                reason,
+                              }),
+                            'orders.toast.updated',
+                            () => {
+                              setNextValue('')
+                              setReason('')
+                            },
+                          )
+                        }
+                      >
+                        {t('orders.applyStatus')}
+                      </Button>
+                    </Box>
+                  </>
+                )}
+              </Stack>
+            </Bloque>
+          )}
+
+          {/* Lo irreversible, al final y separado.
+              Estaba ARRIBA del todo: al abrir un pedido ya cobrado, el primer
+              —y a veces único— botón del panel era «Cancelar pedido» en rojo.
+              Lo que se hace todos los días va primero; lo que no se deshace, al
+              fondo, detrás de una línea y con su propio rótulo. */}
+          {canWrite && !awaitingApproval && peligrosos.length > 0 && (
+            <>
+              <Divider flexItem />
+              <Bloque title={t('orders.danger.title')} hint={t('orders.danger.help')} tone="danger">
+                <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap' }}>
+                  {peligrosos.map((atajo) => (
                     <Button
-                      variant="contained"
-                      disabled={busy || nextValue === ''}
-                      onClick={() =>
+                      key={atajo.key}
+                      size="small"
+                      variant="outlined"
+                      color="error"
+                      disabled={busy}
+                      onClick={() => {
+                        // Cancelar es TERMINAL: el pedido no vuelve a moverse.
+                        if (atajo.confirm) {
+                          setCancelReason('')
+                          setCancelOpen(true)
+                          return
+                        }
                         void run(
                           () =>
                             transition.mutateAsync({
                               orderId: orderRef,
-                              axis,
-                              to: nextValue,
-                              reason,
+                              axis: atajo.axis,
+                              to: atajo.to,
+                              reason: '',
                             }),
                           'orders.toast.updated',
-                          () => {
-                            setNextValue('')
-                            setReason('')
-                          },
                         )
-                      }
+                      }}
                     >
-                      {t('orders.applyStatus')}
+                      {t(atajo.key)}
                     </Button>
-                  </Box>
-                </>
-              )}
+                  ))}
+                </Stack>
+              </Bloque>
             </>
           )}
         </Stack>
@@ -899,41 +1024,109 @@ export function OrderDrawer({
     </Stack>
   )
 
+  /**
+   * La línea de tiempo, que ahora se lee en una dirección declarada.
+   *
+   * Venía ordenada de la más antigua a la más reciente y no lo decía en ninguna
+   * parte: cuatro bloques iguales con una fecha cada uno, y el lector tenía que
+   * comparar horas para deducir hacia dónde avanza el relato. Tres cosas lo
+   * resuelven sin cambiar el orden —que es el bueno, porque un pedido se cuenta
+   * desde que nace—:
+   *
+   *  1. **Se dice.** «Se lee de arriba abajo» encima de la lista.
+   *  2. **Se ve.** Un raíl vertical une los puntos: una secuencia, no cuatro
+   *     párrafos sueltos. El último punto va en acento y con su etiqueta.
+   *  3. **La fecha deja de repetirse.** Solo aparece cuando cambia el día; el
+   *     resto de filas llevan la hora. Tres «7 set. 2026» seguidos no informan
+   *     de nada y ocupan el sitio del titular.
+   */
   const history = (
-    <Section title={t('orders.history')}>
+    <Section title={t('orders.history')} hint={t('orders.history.order')}>
       {events.isPending && <LoadingState />}
       {events.isError && <ErrorState error={events.error} onRetry={() => void events.refetch()} />}
       {events.isSuccess && events.data.length === 0 && (
         <EmptyState title={t('orders.history.empty')} description={t('orders.history.emptyBody')} />
       )}
       {events.isSuccess && events.data.length > 0 && (
-        <Stack spacing={1.5} component="ol" sx={{ listStyle: 'none', p: 0, m: 0 }}>
-          {events.data.map((event) => {
-            const headline = event.axis
+        <Stack component="ol" sx={{ listStyle: 'none', p: 0, m: 0 }}>
+          {events.data.map((event, indice) => {
+            const ultimo = indice === events.data.length - 1
+            const previo = indice > 0 ? events.data[indice - 1] : null
+            const diaNuevo =
+              !previo || formatDate(previo.created_at, locale) !== formatDate(event.created_at, locale)
+
+            // El movimiento: de los ejes sale de las columnas; el de la entrega
+            // viaja en `payload` porque no es un eje del pedido.
+            const salto = factMove(event.event_type, event.payload ?? {})
+            const titular = event.axis
               ? `${event.from_value ? `${t(valueLabel(event.axis, event.from_value) as MessageKey)} → ` : ''}${t(valueLabel(event.axis, event.to_value) as MessageKey)}`
-              : t(EVENT_TYPE_LABEL[event.event_type] ?? 'orders.history.other')
+              : salto
+                ? `${salto.from ? `${t(salto.from)} → ` : ''}${t(salto.to)}`
+                : t(EVENT_TYPE_LABEL[event.event_type] ?? 'orders.history.other')
+            const ambito = event.axis
+              ? AXIS_LABEL_ANY[event.axis]
+              : EVENT_SCOPE_LABEL[event.event_type]
+
             return (
-              <Stack key={event.id} component="li" spacing={0.25}>
-                <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                  <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
-                    {event.event_type === 'order.created'
-                      ? t('orders.history.created')
-                      : headline}
-                  </Typography>
-                  {event.axis && (
-                    <StatusChip
-                      label={t(AXIS_LABEL_ANY[event.axis] ?? 'orders.axis')}
+              <Box
+                component="li"
+                key={event.id}
+                sx={{ display: 'grid', gridTemplateColumns: '14px 1fr', columnGap: 1.5 }}
+              >
+                {/* El raíl es decorativo: el orden ya lo lleva el `<ol>` y la
+                    fecha de cada fila. Un lector de pantalla no gana nada
+                    oyendo «punto, línea, punto». */}
+                <Box
+                  aria-hidden
+                  sx={{ position: 'relative', display: 'flex', justifyContent: 'center' }}
+                >
+                  {!ultimo && (
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        top: 14,
+                        bottom: 0,
+                        width: '2px',
+                        bgcolor: 'var(--border)',
+                      }}
                     />
                   )}
+                  <Box
+                    sx={{
+                      position: 'relative',
+                      mt: '5px',
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      border: '2px solid',
+                      bgcolor: ultimo ? 'var(--accent)' : 'var(--card)',
+                      borderColor: ultimo ? 'var(--accent)' : 'var(--border)',
+                    }}
+                  />
+                </Box>
+
+                <Stack spacing={0.25} sx={{ pb: ultimo ? 0 : 2 }}>
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.5 }}
+                  >
+                    <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
+                      {event.event_type === 'order.created' ? t('orders.history.created') : titular}
+                    </Typography>
+                    {ambito && <StatusChip label={t(ambito)} />}
+                    {ultimo && <StatusChip tone="success" label={t('orders.history.last')} />}
+                  </Stack>
                   <Typography sx={{ fontSize: 12, color: 'var(--muted)' }}>
-                    {formatDateTime(event.created_at, locale)}
+                    {diaNuevo
+                      ? formatDateTime(event.created_at, locale)
+                      : formatTime(event.created_at, locale)}
+                    {' · '}
+                    {event.actor_email ?? t(EVENT_SOURCE_LABEL[event.source])}
                   </Typography>
+                  {event.note && <Typography sx={{ fontSize: 13 }}>{event.note}</Typography>}
                 </Stack>
-                <Typography sx={{ fontSize: 12, color: 'var(--muted)' }}>
-                  {event.actor_email ?? t(EVENT_SOURCE_LABEL[event.source])}
-                </Typography>
-                {event.note && <Typography sx={{ fontSize: 13 }}>{event.note}</Typography>}
-              </Stack>
+              </Box>
             )
           })}
         </Stack>

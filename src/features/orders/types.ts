@@ -257,6 +257,10 @@ export const orderEventSchema = z.object({
   from_value: z.string().nullable().default(null),
   to_value: z.string().nullable().default(null),
   note: z.string().nullable().default(null),
+  // Los hechos de logística dejan `to_value` nulo —esa columna es de los ejes
+  // del pedido— y guardan el movimiento aquí. Sin leerlo, la línea de tiempo
+  // sabe que la entrega cambió de estado pero no a cuál.
+  payload: z.record(z.unknown()).nullable().default({}),
   source: z.enum(ORDER_EVENT_SOURCES).catch('system'),
   actor_email: z.string().nullable().default(null),
   created_at: z.string(),

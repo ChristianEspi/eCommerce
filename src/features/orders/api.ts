@@ -110,7 +110,7 @@ const ITEM_SELECT = [
 ].join(', ')
 
 const EVENT_SELECT =
-  'id, order_id, event_type, axis, from_value, to_value, note, source, actor_email, created_at'
+  'id, order_id, event_type, axis, from_value, to_value, note, payload, source, actor_email, created_at'
 
 const NOTE_SELECT = 'id, order_id, body, author_email, created_at'
 const TAG_SELECT = 'id, order_id, tag'
