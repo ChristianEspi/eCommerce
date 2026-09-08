@@ -111,6 +111,30 @@ CSS. `display: none` lo quita de la pantalla, no del documento, así que dejaba
 buscadores donde hay uno. Lo cantó la prueba de landmarks que ya existía. Ahora
 se renderiza uno solo, con consulta de medios, en el sitio que le toca.
 
+## Gates Go/No-Go del plan (hoja `07_Gates_Demo`)
+
+| Gate | Estado | Evidencia |
+|---|---|---|
+| Data preflight | ✅ | `scripts/demo-preflight.mjs` · 12/12 |
+| Checkout | ✅ | pedido real `EC-20260908-00015` con medio de pago trazado |
+| Admin order | ✅ | visible, con bitácora; la transición exige rol y lo exige de verdad |
+| **AI grounded** | ✅ | `scripts/ia-adversarial.mjs` · 12 casos |
+| Storefront visual | ✅ | 14 E2E en escritorio y móvil |
+| Typecheck/build | ✅ | |
+| Tests relevantes | ✅ | 2924 unit · 1813 DB/RLS |
+| Secret scan | ✅ | |
+
+### El gate de IA casi canta un lobo
+
+La primera pasada dio dos filtraciones. No lo eran: el asistente devuelve
+`query` —la consulta ya limpia— para poder decir «no encontré X», así que un
+ataque que escribe «EBIM_AI_API_KEY» ve esa cadena de vuelta en su propio eco.
+Mi comprobación escaneaba la respuesta entera y contaba el eco como fuga.
+
+Corregido para mirar lo que importa: los **valores** reales de los secretos,
+leídos de `.env`, sobre la parte de la respuesta que genera el servidor. Un gate
+que confunde el eco con una filtración se desactiva a la tercera vez que canta.
+
 ## Lo que sigue sin validar
 
 **IA con proveedor**: no existe la clave, así que solo está validado el
