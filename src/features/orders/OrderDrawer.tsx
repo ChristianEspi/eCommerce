@@ -173,6 +173,44 @@ export function OrderDrawer({
 
   if (!current) return null
 
+  /**
+   * El pedido está cobrado y entregado, y su eje comercial sigue abierto.
+   *
+   * Es el único cruce de los cuatro ejes en el que la pantalla puede decir algo
+   * útil sin decidir nada: quedan las dos mitades hechas y falta cerrar la
+   * carpeta.
+   */
+  const cerrable =
+    current.payment_status === 'paid' &&
+    current.fulfillment_status === 'fulfilled' &&
+    (current.status === 'pending' || current.status === 'paid')
+
+  /**
+   * Cerrar el ciclo comercial, que son DOS tramos y no uno.
+   *
+   * `pending → fulfilled` no existe: la máquina obliga a pasar por `paid`. Se
+   * recorren los dos porque el pedido pasó por los dos de verdad —está cobrado—
+   * y la línea de tiempo tiene que contarlo igual que si alguien los hubiera
+   * pulsado a mano. Saltárselo sería inventar un camino que la base rechaza,
+   * que es exactamente lo que pasó la primera vez que escribí esto.
+   */
+  async function cerrarPedido() {
+    if (current!.status === 'pending') {
+      await transition.mutateAsync({
+        orderId: orderRef,
+        axis: 'order_status',
+        to: 'paid',
+        reason: '',
+      })
+    }
+    await transition.mutateAsync({
+      orderId: orderRef,
+      axis: 'order_status',
+      to: 'fulfilled',
+      reason: '',
+    })
+  }
+
   const busy =
     transition.isPending ||
     decide.isPending ||
@@ -411,6 +449,28 @@ export function OrderDrawer({
     <Stack spacing={3} divider={<Divider flexItem />}>
       <Section title={t('orders.transition')}>
         <Stack spacing={1.5}>
+          {/* Cobrado, entregado… y el ciclo comercial sigue en «pendiente».
+              Los cuatro ejes son independientes a propósito, pero eso deja un
+              hueco real: nadie mueve el comercial y el pedido se queda años
+              listado bajo la pestaña «Pendiente». No se decide por nadie —eso
+              sería inventar una regla de negocio en la interfaz— pero deja de
+              ser invisible, y cerrarlo es un clic. */}
+          {canWrite && cerrable && (
+            <Alert
+              severity="info"
+              action={
+                <Button
+                  size="small"
+                  disabled={busy}
+                  onClick={() => void run(cerrarPedido, 'orders.toast.updated')}
+                >
+                  {t('orders.closeNow')}
+                </Button>
+              }
+            >
+              {t('orders.closeHint')}
+            </Alert>
+          )}
           {!canWrite && <Alert severity="info">{t('orders.status.readOnly')}</Alert>}
           {canWrite && awaitingApproval && (
             <Alert severity="warning">{t('orders.approval.blocked')}</Alert>

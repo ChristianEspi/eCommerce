@@ -341,7 +341,8 @@ export async function fetchWarehouses(): Promise<{ id: string; code: string; nam
 // ---------------------------------------------------------------------------
 
 const FULFILLMENT_SELECT =
-  'fulfillment_id, order_id, order_number, customer_email, order_status, fulfillment_status, ' +
+  'fulfillment_id, order_id, order_number, customer_email, order_status, payment_status, ' +
+  'fulfillment_status, ' +
   'sequence, method_code, method_name, strategy, provider_code, state, warehouse_id, ' +
   'warehouse_code, pickup_point_id, pickup_point_name, window_date, window_starts_at, ' +
   'window_ends_at, promised_from, promised_to, currency, shipping_cost, weight, address, ' +

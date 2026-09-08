@@ -14,6 +14,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useMemo, useState } from 'react'
+import { useOrderItems } from '@/features/orders/useOrders'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
@@ -37,6 +38,41 @@ import {
   newIdempotencyKey,
   type FulfillmentRow,
 } from './types'
+
+/**
+ * De la clave de un hecho a su nombre.
+ *
+ * La línea de tiempo pintaba `fact.event_type` en crudo: en pantalla se leía
+ * «fulfillment.state_changed», que es el nombre que le puso un programador, no
+ * lo que pasó. Pedidos ya resolvía esto con su propia tabla; esta pantalla
+ * seguía sin usarla porque sus hechos son otros —los de logística—.
+ *
+ * Sin entrada en la tabla se cae a la clave cruda, que se lee feo pero se lee:
+ * un hecho nuevo en la base no deja una fila en blanco.
+ */
+/**
+ * A qué estado llevó un cambio.
+ *
+ * Está en `payload.to` y NO en `to_value`: esa columna es de los ejes del
+ * pedido, y un hecho de logística la deja nula. Sin esto, cinco pasos seguidos
+ * se leían como cinco «Cambio de estado» idénticos — una línea de tiempo que
+ * dice cuándo pero no a qué no responde la única pregunta que se le hace.
+ */
+function destinoDe(fact: { to_value: string | null; payload: Record<string, unknown> }) {
+  const destino = fact.to_value ?? fact.payload.to
+  if (typeof destino !== 'string') return null
+  return `fulfillment.state.${destino}` as MessageKey
+}
+
+const HECHO: Record<string, MessageKey> = {
+  'fulfillment.created': 'fulfillment.event.created',
+  'fulfillment.assigned': 'fulfillment.event.assigned',
+  'fulfillment.state_changed': 'fulfillment.event.stateChanged',
+  'fulfillment.delivered': 'fulfillment.event.delivered',
+  'shipment.opened': 'fulfillment.event.shipmentOpened',
+  'shipment.updated': 'fulfillment.event.shipmentUpdated',
+  'shipment.tracking': 'fulfillment.event.shipmentTracking',
+}
 
 /**
  * El detalle de una entrega: de dónde sale, a dónde va, qué bultos tiene y qué
@@ -84,6 +120,10 @@ export function FulfillmentDrawer({
   )
   const tracking = useTrackingEvents(shipmentIds)
   const facts = useOrderFacts(fulfillment?.order_id ?? null)
+  // Qué hay que preparar. Una pantalla de preparación que dice «Unidades: 2»
+  // pero no QUÉ dos obliga a abrir el pedido en otra pestaña para hacer el
+  // trabajo que esta pantalla pide.
+  const items = useOrderItems(fulfillment?.order_id ?? null)
   const warehouses = useWarehouses()
 
   const transition = useTransitionFulfillment()
@@ -156,7 +196,18 @@ export function FulfillmentDrawer({
               {fulfillment.is_late && (
                 <StatusChip tone="error" label={t('fulfillment.field.late')} />
               )}
+              {/* Solo cuando falta cobrar: es lo único que cambia lo que se
+                  hace con el paquete. Un «Cobrado» permanente sería adorno. */}
+              {fulfillment.payment_status !== 'paid' && (
+                <StatusChip tone="warning" label={t('fulfillment.detail.unpaid')} />
+              )}
             </Stack>
+
+            {fulfillment.payment_status !== 'paid' && (
+              <Alert severity="warning" sx={{ mt: 1 }}>
+                {t('fulfillment.detail.unpaidHelp')}
+              </Alert>
+            )}
 
             <Typography variant="body2" sx={{ color: 'var(--muted)' }}>
               {t('fulfillment.field.units')}: {fulfillment.unit_count} ·{' '}
@@ -403,6 +454,35 @@ export function FulfillmentDrawer({
 
           <Divider />
 
+          {/* ---- Qué hay que preparar ------------------------------------- */}
+          <Stack spacing={1}>
+            <Typography variant="subtitle2">{t('fulfillment.detail.items')}</Typography>
+            {(items.data ?? []).length === 0 ? (
+              <Typography variant="body2" sx={{ color: 'var(--muted)' }}>
+                {t('fulfillment.detail.noItems')}
+              </Typography>
+            ) : (
+              <Table size="small">
+                <TableBody>
+                  {(items.data ?? []).map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell sx={{ pl: 0 }}>
+                        <Typography variant="body2">{item.name}</Typography>
+                        <Typography variant="caption" sx={{ color: 'var(--muted)' }}>
+                          {item.sku}
+                          {item.variant_label ? ` · ${item.variant_label}` : ''}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right" sx={{ pr: 0, fontWeight: 700 }}>
+                        ×{item.quantity}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </Stack>
+
           {/* ---- Línea de tiempo ------------------------------------------ */}
           <Stack spacing={1}>
             <Typography variant="subtitle2">{t('fulfillment.detail.timeline')}</Typography>
@@ -412,8 +492,8 @@ export function FulfillmentDrawer({
                   {formatDateTime(fact.created_at, locale)}
                 </Typography>
                 <Typography variant="body2">
-                  {fact.event_type}
-                  {fact.to_value ? ` → ${fact.to_value}` : ''}
+                  {HECHO[fact.event_type] ? t(HECHO[fact.event_type]!) : fact.event_type}
+                  {destinoDe(fact) ? ` → ${t(destinoDe(fact)!)}` : ''}
                   {fact.note ? ` · ${fact.note}` : ''}
                 </Typography>
               </Stack>

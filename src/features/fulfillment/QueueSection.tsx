@@ -5,6 +5,7 @@ import { StatusChip } from '@/shared/ui/StatusChip'
 import LocalShippingRoundedIcon from '@mui/icons-material/LocalShippingRounded'
 import {
   Box,
+  Button,
   Card,
   Stack,
   Tab,
@@ -25,9 +26,11 @@ import { SearchField } from '@/shared/ui/SearchField'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { useDebouncedValue } from '@/shared/lib/useDebouncedValue'
 import { EmptyState, ErrorState } from '@/shared/ui/states'
+import { useFeedback } from '@/shared/ui/feedback-context'
+import { FulfillmentError } from './errors'
 import { FulfillmentDrawer } from './FulfillmentDrawer'
-import { useFulfillments } from './hooks'
-import type { FulfillmentRow, FulfillmentState } from './types'
+import { useFulfillments, useTransitionFulfillment } from './hooks'
+import { siguientePaso, type FulfillmentRow, type FulfillmentState } from './types'
 
 /**
  * Los estados que la cola ofrece como pestaña.
@@ -66,10 +69,19 @@ const TONE: Record<FulfillmentState, 'default' | 'info' | 'warning' | 'success' 
  * comprador y guía— y lo hace en el SERVIDOR, no filtrando en memoria una
  * página que ya vino recortada.
  *
- * Ninguna acción vive en la fila: todas están en el detalle. Mover una entrega
- * es un acto con motivo y con consecuencias en el pedido, y un botón «entregar»
- * al final de una tabla es la forma más rápida de entregarlo en la fila
- * equivocada.
+ * ## La acción del paso siguiente vive en la FILA
+ *
+ * Antes no: todas estaban en el detalle, con el argumento de que un botón
+ * «entregar» al final de una tabla es la forma más rápida de entregarlo en la
+ * fila equivocada. El argumento sigue siendo bueno para las acciones que
+ * DECIDEN algo —anular, marcar incidencia, abrir guía— y esas siguen dentro.
+ *
+ * Lo que se movió fuera es lo que no decide nada: el paso siguiente, que es
+ * uno solo y lo dice la máquina. Recorrer una entrega de recojo costaba cinco
+ * veces «abrir, elegir en un desplegable de seis destinos, pulsar Mover,
+ * cerrar», y ese desplegable no protegía de nada: seguía siendo la fila en la
+ * que se hizo clic. El botón dice el paso por su nombre —«Marcar lista»— en vez
+ * de obligar a traducir un estado a una acción.
  */
 export function QueueSection() {
   const { t, locale } = useI18n()
@@ -77,11 +89,21 @@ export function QueueSection() {
   const [state, setState] = useState('')
   const [term, setTerm] = useState('')
   const debounced = useDebouncedValue(term, 300)
-  const [selected, setSelected] = useState<FulfillmentRow | null>(null)
+  /**
+   * Se guarda el ID, no la fila.
+   *
+   * Guardar el objeto lo congelaba: al mover una entrega, la lista se
+   * refrescaba y el cajón abierto seguía enseñando el estado viejo y ofreciendo
+   * las acciones del estado viejo. El operador movía, no veía cambiar nada y
+   * volvía a pulsar. Derivarlo de la lista hace que el cajón se actualice con
+   * ella, que es lo que cualquiera espera de una pantalla que acaba de actuar.
+   */
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const filter = { storeId: activeStore?.id ?? null, state, term: debounced }
   const queue = useFulfillments(filter)
   const list = queue.data ?? []
+  const selected = list.find((row) => row.fulfillment_id === selectedId) ?? null
   const isEmpty = !queue.isPending && !queue.isError && list.length === 0
 
   // Pagina lo que YA esta cargado: es para poder leer la tabla, no para
@@ -121,8 +143,15 @@ export function QueueSection() {
         {queue.isPending && <TableSkeleton columns={6} />}
         {queue.isError && <ErrorState error={queue.error} onRetry={() => void queue.refetch()} />}
         {isEmpty && (
+          /* El título nombra la TIENDA activa. Sin eso, mirar la tienda
+             equivocada se lee como «nadie ha comprado todavía», que es una
+             conclusión distinta y falsa. */
           <EmptyState
-            title={t('fulfillment.queue.empty')}
+            title={
+              activeStore
+                ? `${t('fulfillment.queue.emptyIn')} ${activeStore.name}`
+                : t('fulfillment.queue.empty')
+            }
             description={t('fulfillment.queue.emptyBody')}
             icon={<LocalShippingRoundedIcon fontSize="small" />}
           />
@@ -137,6 +166,7 @@ export function QueueSection() {
                 <TableCell align="right">{t('fulfillment.field.units')}</TableCell>
                 <TableCell align="right">{t('fulfillment.field.shippingCost')}</TableCell>
                 <TableCell>{t('common.status')}</TableCell>
+                <TableCell align="right" />
               </TableRow>
             </TableHead>
             <TableBody>
@@ -145,7 +175,7 @@ export function QueueSection() {
                   key={row.fulfillment_id}
                   hover
                   sx={{ cursor: 'pointer' }}
-                  onClick={() => setSelected(row)}
+                  onClick={() => setSelectedId(row.fulfillment_id)}
                 >
                   <TableCell>
                     <Stack>
@@ -189,7 +219,18 @@ export function QueueSection() {
                       {row.is_late && (
                         <StatusChip tone="error" label={t('fulfillment.field.late')} />
                       )}
+                      {/* Solo cuando FALTA cobrar. Un «Cobrado» en cada fila es
+                          ruido; lo que cambia lo que se hace con el paquete es
+                          lo contrario, y por eso solo aparece eso. */}
+                      {row.payment_status !== 'paid' && (
+                        <StatusChip tone="warning" label={t('fulfillment.detail.unpaid')} />
+                      )}
                     </Stack>
+                  </TableCell>
+                  {/* El clic de la acción NO abre el cajón: son dos intenciones
+                      distintas sobre la misma fila. */}
+                  <TableCell align="right" onClick={(evento) => evento.stopPropagation()}>
+                    <PasoSiguiente row={row} />
                   </TableCell>
                 </TableRow>
               ))}
@@ -209,10 +250,47 @@ export function QueueSection() {
         )}
       </Card>
 
-      <FulfillmentDrawer
-        fulfillment={selected}
-        onClose={() => setSelected(null)}
-      />
+      <FulfillmentDrawer fulfillment={selected} onClose={() => setSelectedId(null)} />
     </Stack>
+  )
+}
+
+/**
+ * El paso siguiente de una entrega, como un botón que lo dice por su nombre.
+ *
+ * Solo aparece cuando hay UN paso obvio: en `failed` y en los estados
+ * terminales devuelve `null` y la celda queda vacía, porque una incidencia se
+ * resuelve mirándola y no avanzándola a ciegas.
+ *
+ * La transición la sigue validando el trigger de la base. Que el botón ofrezca
+ * el paso correcto es una comodidad, igual que el desplegable del detalle.
+ */
+function PasoSiguiente({ row }: { row: FulfillmentRow }) {
+  const { t } = useI18n()
+  const { notify } = useFeedback()
+  const { can } = useTenant()
+  const transition = useTransitionFulfillment()
+
+  const destino = siguientePaso(row.state, row.strategy)
+  if (!destino || !can('orders.write')) return null
+
+  return (
+    <Button
+      size="small"
+      variant="outlined"
+      disabled={transition.isPending}
+      onClick={() => {
+        void transition
+          .mutateAsync({ fulfillmentId: row.fulfillment_id, to: destino, reason: '' })
+          .then(() => notify(t('fulfillment.action.moved'), 'success'))
+          .catch((error: unknown) => {
+            const key: MessageKey =
+              error instanceof FulfillmentError ? error.key : 'fulfillment.error.generic'
+            notify(t(key), 'error')
+          })
+      }}
+    >
+      {t(`fulfillment.next.${destino}` as MessageKey)}
+    </Button>
   )
 }

@@ -124,6 +124,36 @@ export type ReturnCondition = (typeof RETURN_CONDITIONS)[number]
  * un botón de más aquí produce un error de dominio, no un salto ilegal. Existe
  * para no ofrecer acciones que se sabe que van a fallar.
  */
+/**
+ * El paso que toca AHORA, uno solo, por estado y por estrategia.
+ *
+ * `FULFILLMENT_NEXT` dice qué es legal; esto dice qué es lo normal. Son cosas
+ * distintas y la pantalla necesitaba las dos: obligar a elegir entre seis
+ * destinos legales para hacer lo único que se hace el 95 % de las veces
+ * convertía «vino y se lo llevó» en cuatro clics y un desplegable.
+ *
+ * La bifurcación está en `ready`, y es real: una entrega que ya está lista o
+ * sale a la calle (`in_transit`) o se la lleva el cliente del mostrador
+ * (`delivered`). Quien lo sabe es la ESTRATEGIA del método, no el operador.
+ *
+ * Devuelve `null` en los estados terminales y en `failed`, donde no hay un paso
+ * obvio: una incidencia se resuelve mirándola, no avanzándola a ciegas.
+ */
+export function siguientePaso(
+  state: FulfillmentState,
+  strategy: DeliveryStrategy,
+): FulfillmentState | null {
+  if (state === 'pending') return 'allocated'
+  if (state === 'allocated') return 'picking'
+  if (state === 'picking') return 'packed'
+  if (state === 'packed') return 'ready'
+  if (state === 'ready') {
+    return strategy === 'ship' || strategy === 'local_delivery' ? 'in_transit' : 'delivered'
+  }
+  if (state === 'in_transit') return 'delivered'
+  return null
+}
+
 export const FULFILLMENT_NEXT: Record<FulfillmentState, readonly FulfillmentState[]> = {
   pending: ['allocated', 'cancelled'],
   allocated: ['picking', 'packed', 'ready', 'in_transit', 'cancelled', 'failed'],
@@ -206,6 +236,14 @@ export const fulfillmentSchema = z.object({
   order_number: z.string(),
   customer_email: z.string().nullable(),
   order_status: z.string(),
+  /**
+   * El estado del PAGO, que la vista ya devolvía y esta pantalla ignoraba.
+   *
+   * Quien prepara un recojo entrega mercancía en mano: no verlo aquí obliga a
+   * abrir otra pantalla o a fiarse. Es la única columna del pedido que cambia
+   * lo que la persona hace con el paquete.
+   */
+  payment_status: z.string(),
   fulfillment_status: z.string(),
   sequence: z.number(),
   method_code: z.string(),

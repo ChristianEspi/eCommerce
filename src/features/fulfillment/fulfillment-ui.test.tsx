@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '@/test/render'
@@ -308,6 +308,77 @@ describe('La cola de preparación', () => {
     // La promesa venció y la entrega no ha salido: la vista lo calcula, no la
     // pantalla, y aquí se comprueba que llega y se pinta.
     expect(celdas.getByText('Fuera de plazo')).toBeInTheDocument()
+  })
+
+  /**
+   * El paso siguiente, en la FILA.
+   *
+   * Recorrer una entrega costaba cinco veces «abrir el cajón, elegir entre seis
+   * destinos, pulsar Mover, cerrar» — veinte clics para lo único que se hace.
+   * El botón dice el paso por su nombre y no obliga a traducir un estado a una
+   * acción.
+   */
+  it('la fila ofrece el paso siguiente por su nombre, sin abrir el detalle', async () => {
+    const fake = backend()
+    renderFulfillment(fake)
+    const usuario = userEvent.setup()
+
+    // La fixtura esta en `allocated`: lo que toca es empezar a preparar.
+    const boton = await screen.findByRole('button', { name: 'Empezar a preparar' })
+    await usuario.click(boton)
+
+    await waitFor(() =>
+      expect(fake.state.rpcCalls.some((call) => call.name === 'fulfillment_transition')).toBe(true),
+    )
+    const llamada = fake.state.rpcCalls.find((call) => call.name === 'fulfillment_transition')
+    expect(llamada?.args.p_to).toBe('picking')
+  })
+
+  /**
+   * Un envio ya listo sale a la calle; un recojo se lo lleva el cliente. Quien lo
+   * sabe es la ESTRATEGIA del metodo, no el operador, y por eso el boton no es el
+   * mismo en los dos casos.
+   */
+  it('desde «lista», el paso depende de si se envia o se recoge', async () => {
+    const fake = backend()
+    fake.state.tables.fulfillment_overview = [
+      { ...QUEUE_ROW, state: 'ready', strategy: 'pickup' },
+    ]
+    renderFulfillment(fake)
+
+    expect(await screen.findByRole('button', { name: 'Marcar entregada' })).toBeInTheDocument()
+  })
+
+  /**
+   * Lo unico que cambia lo que se hace con el paquete.
+   *
+   * Un «Cobrado» en cada fila seria adorno; lo accionable es lo contrario, y por
+   * eso solo aparece eso. Quien entrega en mostrador tiene que verlo sin abrir
+   * otra pantalla.
+   */
+  it('avisa en la fila cuando la entrega todavia no esta cobrada', async () => {
+    const fake = backend()
+    fake.state.tables.fulfillment_overview = [
+      { ...QUEUE_ROW, payment_status: 'pending' },
+    ]
+    renderFulfillment(fake)
+
+    const fila = (await screen.findByText('EC-20260828-00001')).closest('tr')
+    expect(within(fila as HTMLElement).getByText('Sin cobrar')).toBeInTheDocument()
+  })
+
+  /**
+   * El vacio nombra la TIENDA.
+   *
+   * Mirar la tienda equivocada se leia como «nadie ha comprado todavia», que es
+   * una conclusion distinta y falsa. Paso de verdad al recorrer la pantalla.
+   */
+  it('sin entregas, el vacio dice de que tienda esta hablando', async () => {
+    const fake = backend()
+    fake.state.tables.fulfillment_overview = []
+    renderFulfillment(fake)
+
+    expect(await screen.findByText(/No hay entregas en/)).toBeInTheDocument()
   })
 
   it('el detalle ofrece SOLO las transiciones que la máquina permite', async () => {
