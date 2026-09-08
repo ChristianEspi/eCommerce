@@ -13,6 +13,7 @@
 export const es = {
     'common.loading': 'Cargando…',
     'common.retry': 'Reintentar',
+    'common.refresh': 'Actualizar',
     'common.error.title': 'Algo salió mal',
     'common.error.body': 'No pudimos completar la operación. Vuelve a intentarlo.',
     'common.empty.title': 'Nada por aquí todavía',

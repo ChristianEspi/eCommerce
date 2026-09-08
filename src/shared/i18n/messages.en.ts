@@ -11,6 +11,7 @@ import type { MessageKey } from "./messages"
 export const en: Readonly<Record<MessageKey, string>> = {
     'common.loading': 'Loading…',
     'common.retry': 'Try again',
+    'common.refresh': 'Refresh',
     'common.error.title': 'Something went wrong',
     'common.error.body': 'We could not complete the operation. Please try again.',
     'common.empty.title': 'Nothing here yet',
