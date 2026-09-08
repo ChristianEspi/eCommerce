@@ -79,6 +79,15 @@ export interface PaymentGatewayOptions {
    * abierto con el pago dentro.
    */
   readonly returnUrl?: (storeSlug: string) => string
+  /**
+   * La credencial de cada pasarela, por `provider_code`.
+   *
+   * Entra por aqui porque los adaptadores son PUROS —ninguno lee el
+   * entorno— y porque quien sabe leer secretos es el borde, no una carpeta
+   * compartida que la suite ejecuta en Node. Un adaptador sin credencial no
+   * finge un cobro: simula si sabe, y rechaza si no.
+   */
+  readonly secretFor?: (providerCode: string) => string | null
 }
 
 export interface PaymentGateway {
@@ -151,6 +160,7 @@ export function createPaymentGateway(options: PaymentGatewayOptions): PaymentGat
       const provider: PaymentProvider = resolvePaymentProvider(providerCode, {
         captureMode: text(intent, 'capture_mode', 'automatic') === 'manual' ? 'manual' : 'automatic',
         returnUrl: options.returnUrl?.(request.storeSlug) ?? null,
+        secret: options.secretFor?.(providerCode) ?? null,
       })
       const authorize = requireOperation(provider, 'authorize', provider.authorize)
 
@@ -164,6 +174,7 @@ export function createPaymentGateway(options: PaymentGatewayOptions): PaymentGat
           idempotencyKey: request.idempotencyKey,
           customerEmail: request.customerEmail,
           returnUrl: options.returnUrl?.(request.storeSlug) ?? null,
+          providerToken: request.providerToken ?? null,
         })
       } catch (error) {
         // La pasarela reventó. Se anota como intento fallido —queda la fila— y

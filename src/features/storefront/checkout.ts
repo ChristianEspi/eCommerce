@@ -348,6 +348,14 @@ export function newIdempotencyKey(): string {
 }
 
 export interface StartCheckoutInput extends CheckoutValues {
+  /**
+   * El instrumento ya TOKENIZADO por la pasarela, cuando el medio lo pide.
+   *
+   * No es un dato de tarjeta: es la referencia de un solo uso que Culqi
+   * devuelve a cambio de uno, creada contra sus servidores desde el propio
+   * navegador. El numero no pasa por aqui, ni por el borde, ni por la base.
+   */
+  paymentToken?: string | null
   /** Slug de la URL pública. La tienda la resuelve el servidor a partir de él. */
   storeSlug: string
   cart: Cart
@@ -425,6 +433,9 @@ export async function startCheckout(input: StartCheckoutInput): Promise<OrderRes
       // se paga, no QUÉ se compra, y si entrara, quien ve rechazada su tarjeta no
       // podría reintentar con transferencia sin que se leyera como otra compra.
       ...(input.paymentMethodCode ? { payment_method_code: input.paymentMethodCode } : {}),
+      // El token del instrumento. Se omite cuando no hay: un `null` seria
+      // «no tokenizo», que es distinto de «no se pregunto».
+      ...(input.paymentToken ? { payment_token: input.paymentToken } : {}),
       items,
       accept_price_changes: input.acceptPriceChanges === true,
       // P10. La lista viaja vacía cuando no se tecleó nada: un `[]` es «no hay

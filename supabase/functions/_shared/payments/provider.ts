@@ -66,6 +66,18 @@ export type PaymentResultStatus =
 export interface PaymentAuthorizeInput {
   /** Identificador del intento en ESTE sistema, no en la pasarela. */
   readonly intentId: string
+  /**
+   * El instrumento, ya TOKENIZADO por la pasarela en el navegador.
+   *
+   * Nunca es un numero de tarjeta: es lo que la pasarela devuelve a cambio
+   * de uno, dentro de su propio iframe. Esa es la razon de que exista este
+   * campo y no un `cardNumber` — con el numero aqui, todo el servidor
+   * entraria en el alcance de PCI; con el token, ninguno.
+   *
+   * `null` para los medios que no tokenizan nada: transferencia, efectivo,
+   * o una pasarela alojada que devuelve `requires_action` y cobra fuera.
+   */
+  readonly providerToken?: string | null
   /** Decimal como texto. Nunca `number`. */
   readonly amount: string
   readonly currency: string

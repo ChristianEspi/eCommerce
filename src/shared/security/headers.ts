@@ -63,6 +63,19 @@ export type CspInput = {
    * para no publicar una directiva que no se aplica.
    */
   includeFrameAncestors?: boolean
+  /**
+   * Los orígenes de la pasarela de pago, si el despliegue tiene una configurada.
+   *
+   * Una pasarela de tarjeta necesita tres permisos que la política niega por
+   * defecto: cargar su script, hablar con su API y abrir su iframe —ahí es donde
+   * se teclea la tarjeta, y ese aislamiento es justo lo que mantiene el número
+   * fuera de esta aplicación—.
+   *
+   * Va como ENTRADA y no como constante para que un despliegue sin pasarela
+   * conserve `script-src 'self'` y `frame-src 'none'`. Abrirlo para todos porque
+   * un tenant cobra con tarjeta sería pagar el riesgo entre todos.
+   */
+  paymentGatewayOrigins?: readonly string[]
 }
 
 /**
@@ -91,22 +104,32 @@ export function contentSecurityPolicy(input: CspInput): string {
   ]
   const sockets = api.map(websocketOrigin)
 
+  // Vacío mientras no haya pasarela configurada: sin ella, `script-src` sigue
+  // siendo `'self'` y `frame-src` sigue siendo `'none'`.
+  const gateway = [...new Set(input.paymentGatewayOrigins ?? [])]
+
   const directives: Array<[string, string[]]> = [
     ['default-src', ["'none'"]],
-    ['script-src', ["'self'", ...input.inlineScriptHashes.map((hash) => `'${hash}'`)]],
+    [
+      'script-src',
+      ["'self'", ...input.inlineScriptHashes.map((hash) => `'${hash}'`), ...gateway],
+    ],
     ['style-src', ["'self'", "'unsafe-inline'", GOOGLE_FONTS_CSS]],
     ['font-src', ["'self'", GOOGLE_FONTS_FILES, 'data:']],
     // Las imágenes de producto viven en el Storage del proyecto (contrato:
     // bucket con ruta por tenant), así que el origen de Supabase basta. `blob:`
     // es la previsualización local al subir una imagen desde el backoffice.
     ['img-src', ["'self'", 'data:', 'blob:', ...api]],
-    ['connect-src', ["'self'", ...api, ...sockets]],
+    ['connect-src', ["'self'", ...api, ...sockets, ...gateway]],
     ['manifest-src', ["'self'"]],
     ['worker-src', ["'self'", 'blob:']],
     // Ni un `<iframe>`, ni un `<object>`, ni un `<embed>`. La aplicación no
     // incrusta nada de terceros; el día que incruste una pasarela, se declara
     // ese origen aquí y el cambio se ve en la revisión.
-    ['frame-src', ["'none'"]],
+    // El iframe de la pasarela es la única excepción, y solo si hay pasarela:
+    // ahí se teclea la tarjeta, y ese aislamiento es lo que mantiene el número
+    // fuera de esta aplicación. Sin pasarela configurada sigue siendo `'none'`.
+    ['frame-src', gateway.length > 0 ? gateway : ["'none'"]],
     ['object-src', ["'none'"]],
     // `base-uri` es el que casi nadie pone y el que convierte un XSS de DOM en
     // reescritura de TODAS las rutas relativas del documento.

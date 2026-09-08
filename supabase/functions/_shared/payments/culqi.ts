@@ -63,6 +63,74 @@ export interface CulqiOptions {
    * esperara una acción que la pasarela no tiene.
    */
   readonly captureMode?: 'automatic' | 'manual'
+  /**
+   * La clave secreta (`sk_…`), del entorno del borde. Sin ella se simula.
+   *
+   * No se lee aquí con `Deno.env` porque este archivo se ejecuta también en Node
+   * dentro de la suite: un adaptador que toca el entorno deja de poder probarse
+   * con el resto.
+   */
+  readonly secret?: string | null
+}
+
+const CULQI_CHARGES = 'https://api.culqi.com/v2/charges'
+
+/** Si Culqi no contesta en este tiempo, el cobro se marca agotado — que NO es
+ *  lo mismo que rechazado: puede haberse cobrado y no habernos llegado. */
+const TIMEOUT_MS = 20_000
+
+/** El importe en céntimos enteros, que es lo que Culqi espera. */
+function aCentimos(amount: string): number {
+  return Math.round(Number(amount) * 100)
+}
+
+/**
+ * El cobro de verdad.
+ *
+ * Un solo `POST`. Culqi cobra en el acto, así que un 2xx es dinero movido y se
+ * devuelve como `captured`, no como `authorized`.
+ */
+async function cobrar(
+  secret: string,
+  token: string,
+  input: PaymentAuthorizeInput,
+): Promise<PaymentResult> {
+  const control = new AbortController()
+  const alarma = setTimeout(() => control.abort(), TIMEOUT_MS)
+  try {
+    const respuesta = await fetch(CULQI_CHARGES, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', Authorization: `Bearer ${secret}` },
+      signal: control.signal,
+      body: JSON.stringify({
+        amount: aCentimos(input.amount),
+        currency_code: input.currency,
+        email: input.customerEmail,
+        source_id: token,
+        // Sale en el panel de Culqi: es lo que permite conciliar un cargo con un
+        // intento sin cruzar hojas de calculo.
+        metadata: { intent_id: input.intentId },
+      }),
+    })
+    const cuerpo = (await respuesta.json().catch(() => ({}))) as Record<string, unknown>
+
+    if (respuesta.ok) {
+      const id = typeof cuerpo.id === 'string' ? cuerpo.id : referenceFor(input.intentId, 'auth')
+      return ok('captured', input.amount, id)
+    }
+
+    // El texto del proveedor va a la bitacora del comercio, nunca a la cara del
+    // comprador: la vitrina traduce por codigo.
+    const detalle =
+      typeof cuerpo.merchant_message === 'string'
+        ? cuerpo.merchant_message
+        : 'Culqi rechazo el cargo'
+    return ko('declined', input.amount, 'CLQ51', detalle)
+  } catch {
+    return ko('timeout', input.amount, 'CLQ99', 'Culqi no respondio a tiempo')
+  } finally {
+    clearTimeout(alarma)
+  }
 }
 
 /** Los céntimos como entero 0-99, sobre TEXTO y nunca sobre coma flotante. */
@@ -107,7 +175,9 @@ function ko(
   }
 }
 
-export function createCulqiProvider(_options: CulqiOptions = {}): PaymentProvider {
+export function createCulqiProvider(options: CulqiOptions = {}): PaymentProvider {
+  const secret = options.secret ?? null
+
   return {
     code: CULQI_PROVIDER_CODE,
     capabilities: {
@@ -121,19 +191,45 @@ export function createCulqiProvider(_options: CulqiOptions = {}): PaymentProvide
     },
 
     authorize(input: PaymentAuthorizeInput): Promise<PaymentResult> {
-      const reference = referenceFor(input.intentId, 'auth')
-      switch (centsOf(input.amount)) {
-        case 1:
+      const token = input.providerToken ?? null
+
+      // --- Con credencial: se cobra de verdad --------------------------------
+      if (secret) {
+        if (!token) {
+          // Sin instrumento no hay nada que cobrar, y aprobarlo igual seria lo
+          // peor que puede hacer un conector de pagos.
           return Promise.resolve(
-            ko('declined', input.amount, 'CLQ51', 'Tarjeta rechazada por el emisor (simulado)'),
+            ko(
+              'declined',
+              input.amount,
+              'CLQ40',
+              'No llego el token de la tarjeta desde el navegador',
+            ),
           )
-        case 2:
-          return Promise.resolve(
-            ko('timeout', input.amount, 'CLQ99', 'Culqi no respondio a tiempo (simulado)'),
-          )
-        default:
-          return Promise.resolve(ok('captured', input.amount, reference))
+        }
+        return cobrar(secret, token, input)
       }
+
+      // --- Sin credencial: simulacro -----------------------------------------
+      //
+      // Manda el ULTIMO DIGITO del token cuando lo hay, y los centimos del total
+      // cuando no. El token gana porque, con formulario delante, quien prueba
+      // espera que la TARJETA decida el resultado; los centimos siguen para los
+      // casos sin formulario (pruebas de servidor, sandbox).
+      const reference = referenceFor(input.intentId, 'auth')
+      const ultimo = token ? Number(token.slice(-1)) : centsOf(input.amount)
+
+      if (token ? ultimo === 0 : ultimo === 1) {
+        return Promise.resolve(
+          ko('declined', input.amount, 'CLQ51', 'Tarjeta rechazada por el emisor (simulado)'),
+        )
+      }
+      if (!token && ultimo === 2) {
+        return Promise.resolve(
+          ko('timeout', input.amount, 'CLQ99', 'Culqi no respondio a tiempo (simulado)'),
+        )
+      }
+      return Promise.resolve(ok('captured', input.amount, reference))
     },
 
     refund(input: PaymentReferenceInput): Promise<PaymentResult> {

@@ -44,6 +44,11 @@ export const CHECKOUT_ALLOWED_FIELDS = [
   // P09: QUE medio de pago eligio el comprador. Un codigo del comercio, no una
   // instruccion de cobro: sin importe, sin proveedor y sin credencial.
   'payment_method_code',
+  // P09: el instrumento ya TOKENIZADO por la pasarela en el navegador.
+  // No es un dato de tarjeta: es la referencia de un solo uso que la
+  // pasarela devuelve a cambio de uno, y por eso puede cruzar el servidor
+  // sin meterlo en el alcance de PCI.
+  'payment_token',
   // P10: los codigos que el comprador tecleo. Dos listas y no una porque son
   // dos cosas distintas: el cupon cambia el PRECIO y la tarjeta paga una PARTE
   // del precio. Ninguno de los dos lleva importe.
@@ -95,6 +100,29 @@ const METHOD_CODE_RE = /^[a-z0-9][a-z0-9_-]{0,40}$/
  * compra. Si entrara, un comprador cuya tarjeta se rechaza no podría reintentar
  * con transferencia sin que el intento se leyera como otra compra.
  */
+/**
+ * El token del instrumento, si el medio lo necesita.
+ *
+ * Se comprueba la FORMA y nada mas: que sea texto corto y sin espacios. Que
+ * el token exista, no haya caducado y corresponda a esta tienda lo decide la
+ * pasarela, que es la unica que puede saberlo — validarlo aqui seria una
+ * segunda autoridad sobre un dato que no es nuestro.
+ *
+ * NO entra en el `request_hash`, igual que el medio de pago: reintentar la
+ * misma compra con otra tarjeta despues de un rechazo tiene que seguir
+ * siendo la misma compra.
+ */
+const PAYMENT_TOKEN_RE = /^[A-Za-z0-9_-]{6,120}$/
+
+export function optionalPaymentToken(body: Record<string, unknown>): string | null {
+  const raw = typeof body.payment_token === 'string' ? body.payment_token.trim() : ''
+  if (raw === '') return null
+  if (!PAYMENT_TOKEN_RE.test(raw)) {
+    throw badRequest('CAMPO_INVALIDO', '`payment_token` no tiene la forma de un token de pago')
+  }
+  return raw
+}
+
 export function optionalPaymentMethodCode(body: Record<string, unknown>): string | null {
   const raw = typeof body.payment_method_code === 'string' ? body.payment_method_code.trim() : ''
   if (raw === '') return null
@@ -333,6 +361,7 @@ export async function parseCheckoutBody(
       : normalizeShippingAddress(body.billing_address)
   const notes = optionalText(body, 'notes', 1000)
   const paymentMethodCode = optionalPaymentMethodCode(body)
+  const paymentToken = optionalPaymentToken(body)
   // Cinco cupones es el mismo tope que impone `ebim.evaluate_promotions`, y no
   // es una limitación técnica: más de cinco códigos en un carrito es un intento
   // de probar códigos, no una compra. Tres tarjetas regalo es lo que cabe en un
@@ -367,6 +396,7 @@ export async function parseCheckoutBody(
     notes: notes ?? null,
     items,
     paymentMethodCode,
+    paymentToken,
     couponCodes,
     giftCardCodes,
     delivery,

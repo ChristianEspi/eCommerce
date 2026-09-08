@@ -111,6 +111,21 @@ const handler = serveJson(
       service: rpcCaller(serviceClient(trace)),
       caller: rpcCaller(hasSession ? userClient(request, trace) : anonClient(trace)),
       hasSession,
+      /**
+       * La credencial de cada pasarela, una variable por `provider_code`.
+       *
+       * Se lee AQUÍ y no dentro del adaptador: este es el borde, el único sitio
+       * del repositorio con entorno. Los adaptadores de `_shared/payments` son
+       * puros para que la suite los ejecute en Node junto al resto.
+       *
+       * Una variable por pasarela y no un objeto con todas: así ninguna ve la
+       * credencial de otra, y dar de alta una nueva no obliga a tocar el
+       * despliegue de las que ya cobran.
+       *
+       * Sin variable, el conector simula (si sabe) o rechaza. Nunca finge.
+       */
+      secretFor: (providerCode) =>
+        Deno.env.get(`EBIM_PAYMENT_SECRET_${providerCode.toUpperCase()}`) ?? null,
     })
 
     try {

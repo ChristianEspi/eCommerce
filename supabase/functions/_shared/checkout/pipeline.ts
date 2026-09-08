@@ -458,6 +458,10 @@ export async function runCheckout(
         customerEmail: input.customerEmail,
         storeSlug: input.storeSlug,
         methodCode: input.paymentMethodCode,
+        // El instrumento ya tokenizado, cuando el medio lo necesita. Aqui no
+        // hay ningun dato de tarjeta: solo la referencia de un solo uso que la
+        // pasarela devolvio en el navegador.
+        providerToken: input.paymentToken,
       })
 
       if (outcome.status === 'declined') {

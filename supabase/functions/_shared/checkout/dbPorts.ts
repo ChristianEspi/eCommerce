@@ -110,6 +110,18 @@ export interface DbPortOptions {
   readonly caller: RpcCaller
   /** `true` si la petición traía `Authorization`. No prueba nada por sí solo. */
   readonly hasSession: boolean
+  /**
+   * La credencial de cada pasarela, por `provider_code`.
+   *
+   * La pone el BORDE, que es el único sitio del repositorio donde se leen
+   * secretos. Aquí no se lee el entorno a propósito: este archivo vive en
+   * `_shared`, la suite lo ejecuta en Node, y un `Deno.env` lo dejaría sin poder
+   * probarse con el resto.
+   *
+   * Sin ella, cada adaptador decide: el que tiene simulacro simula, el que no,
+   * rechaza. Ninguno finge un cobro.
+   */
+  readonly secretFor?: (providerCode: string) => string | null
 }
 
 export function createDbPorts(options: DbPortOptions): CheckoutPorts {
@@ -117,7 +129,20 @@ export function createDbPorts(options: DbPortOptions): CheckoutPorts {
   // P09: el gancho de la etapa 8 deja de ser un `not_required` fijo. El
   // pipeline no se entera —misma firma, mismo puerto— y el dominio de pedidos
   // tampoco: quien conoce la pasarela es este adaptador, y solo por su `code`.
-  const gateway = createPaymentGateway({ service })
+  /**
+   * La credencial de cada pasarela llega por OPCIONES, no se lee aqui.
+   *
+   * Este archivo vive en `_shared`, que la suite ejecuta en Node: tocar
+   * `Deno.env` aqui lo dejaria sin poder probarse. Quien lee secretos es el
+   * borde —`functions/checkout/index.ts`— y los baja por esta puerta.
+   *
+   * Sin credencial, `null`: un adaptador con simulacro simula y uno sin
+   * simulacro rechaza. Ninguno finge un cobro.
+   */
+  const gateway = createPaymentGateway({
+    service,
+    ...(options.secretFor ? { secretFor: options.secretFor } : {}),
+  })
 
   return {
     async begin(request: CheckoutRequest): Promise<IntentClaim> {
@@ -424,6 +449,8 @@ export function createDbPorts(options: DbPortOptions): CheckoutPorts {
       }
     },
 
+    // El token viaja tal cual: este adaptador no lo mira ni lo guarda, solo
+    // lo lleva del pipeline a la pasarela.
     authorizePayment: (request) => gateway.authorizePayment(request),
 
     async placeOrder(input): Promise<PlacedOrder> {

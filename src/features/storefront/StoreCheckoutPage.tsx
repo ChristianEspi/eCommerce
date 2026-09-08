@@ -20,6 +20,8 @@ import { DeliveryPicker } from './components/DeliveryPicker'
 import { PaymentPicker } from './components/PaymentPicker'
 import { useDeliveryOptions } from './delivery'
 import { defaultPaymentCode, usePaymentMethods } from './payment'
+import { CardFields } from './components/CardFields'
+import { pareceTarjeta, tokenizarTarjeta, type DatosTarjeta } from './cardToken'
 import {
   CheckoutError,
   checkoutSchema,
@@ -226,7 +228,30 @@ export function StoreCheckoutPage() {
    * teclear, al reves que la entrega.
    */
   const payment = usePaymentMethods(store.store_id)
+
+  /**
+   * La tarjeta vive en estado local y NO en el formulario.
+   *
+   * `react-hook-form` guarda lo que se envia, y estos datos son justo lo que
+   * no se envia: se cambian por un token antes de salir del navegador. Si
+   * entraran en el esquema, acabarian en el `resolver`, en los reintentos y —
+   * el dia que alguien anada telemetria de formularios— en una traza.
+   */
+  const [tarjeta, setTarjeta] = useState<DatosTarjeta>({
+    numero: '',
+    mes: '',
+    anio: '',
+    cvv: '',
+    email: '',
+  })
   const paymentMethods = useMemo(() => payment.data ?? [], [payment.data])
+
+  // Se pregunta por la FAMILIA y no por el codigo: `tarjeta`, `visa` o
+  // `culqi-card` son nombres que pone el comercio; `card` es del sistema.
+  const medioElegido = paymentMethods.find(
+    (metodo) => metodo.code === (watched.paymentMethodCode ?? ''),
+  )
+  const pideTarjeta = medioElegido?.kind === 'card'
 
   // Se marca solo cuando la eleccion es inequivoca: con un unico medio,
   // obligar a pulsarlo es un clic que no decide nada. Con dos o mas se deja en
@@ -244,9 +269,21 @@ export function StoreCheckoutPage() {
       : 0
 
   const mutation = useMutation({
-    mutationFn: (input: { values: CheckoutValues; acceptPriceChanges: boolean }) => {
+    mutationFn: async (input: { values: CheckoutValues; acceptPriceChanges: boolean }) => {
+      /**
+       * La tarjeta se cambia por un token ANTES de llamar al checkout.
+       *
+       * Aqui y no en el servidor porque ese intercambio ocurre contra la
+       * pasarela desde el propio navegador: es lo que mantiene el numero
+       * fuera de todo el backend y, con el, el alcance de PCI.
+       */
+      const paymentToken = pideTarjeta
+        ? await tokenizarTarjeta({ ...tarjeta, email: input.values.customerEmail })
+        : null
+
       writePendingAttempt(storeSlug, { key: idempotencyKey, startedAt: Date.now() })
       return startCheckout({
+        paymentToken,
         ...input.values,
         storeSlug,
         cart,
@@ -392,6 +429,16 @@ export function StoreCheckoutPage() {
       // elegir. Una tienda sin medios configurados sigue vendiendo.
       if (paymentMethods.length > 0 && !values.paymentMethodCode) {
         setErrorKey('store.checkout.error.payment.method')
+        return
+      }
+      // Luhn en el navegador no valida una tarjeta —eso lo dice el emisor—:
+      // evita gastar una llamada a la pasarela por un digito mal tecleado.
+      if (pideTarjeta && !pareceTarjeta(tarjeta.numero)) {
+        setErrorKey('store.card.numberInvalid')
+        return
+      }
+      if (pideTarjeta && (tarjeta.mes.length < 1 || tarjeta.anio.length < 2 || tarjeta.cvv.length < 3)) {
+        setErrorKey('store.card.incomplete')
         return
       }
 
@@ -581,6 +628,13 @@ export function StoreCheckoutPage() {
               onSelect={(code) => setValue('paymentMethodCode', code)}
               error={null}
             />
+
+            {/* Los datos de la tarjeta solo cuando se ha elegido una: pedir
+                un numero de tarjeta a quien va a pagar por transferencia es
+                pedir un dato que nadie va a usar. */}
+            {pideTarjeta && (
+              <CardFields datos={tarjeta} onCambio={setTarjeta} error={null} />
+            )}
             {deliveryOptions.length > 0 && (
               <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>
                 {t('store.delivery.help')}

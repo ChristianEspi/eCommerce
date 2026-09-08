@@ -20,6 +20,17 @@ import type { PaymentProvider } from './provider.ts'
 import { SANDBOX_PROVIDER_CODE, createSandboxProvider, type SandboxOptions } from './sandbox.ts'
 
 export interface ProviderResolveOptions extends SandboxOptions {
+  /**
+   * La credencial de la pasarela, si la hay.
+   *
+   * Entra por aqui y no se lee dentro del adaptador porque los adaptadores
+   * de esta carpeta son PUROS: ninguno toca `Deno.env`, y por eso la suite
+   * los ejecuta en Node junto al resto. Quien lee el entorno es el borde.
+   *
+   * Sin ella, un adaptador con simulacro debe simular y uno sin simulacro
+   * debe rechazar; lo que nunca debe hacer es fingir un cobro.
+   */
+  readonly secret?: string | null
   /** Configuración PÚBLICA del medio (`payment_methods.public_config`). Sin secretos. */
   readonly publicConfig?: Record<string, unknown>
 }

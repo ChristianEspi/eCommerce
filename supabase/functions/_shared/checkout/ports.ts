@@ -330,6 +330,14 @@ export interface PaymentRequest {
    * siendo válido para un comercio sin pasarela contratada.
    */
   readonly methodCode: string | null
+  /**
+   * El instrumento tokenizado, cuando el medio lo necesita (tarjeta).
+   *
+   * Viaja desde el navegador porque es alli donde se crea: la pasarela lo
+   * entrega a cambio de la tarjeta, dentro de su iframe. Aqui no hay ningun
+   * dato de tarjeta, solo su referencia de un solo uso.
+   */
+  readonly providerToken?: string | null
 }
 
 export interface PaymentOutcome {
@@ -400,6 +408,14 @@ export interface CheckoutRequest {
    * `null` = la tienda no cobra en línea.
    */
   readonly paymentMethodCode: string | null
+  /**
+   * El instrumento tokenizado, cuando el medio lo necesita (tarjeta).
+   *
+   * Opcional: la inmensa mayoria de las compras —transferencia, efectivo,
+   * credito— no tokenizan nada, y exigirlo obligaria a escribir `null` en
+   * cada llamada que nunca vera una tarjeta.
+   */
+  readonly paymentToken?: string | null
   /**
    * Los códigos de cupón que el comprador tecleó. P10.
    *

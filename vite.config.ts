@@ -71,6 +71,23 @@ const INDENT = `${String.fromCharCode(10)}    `
 function securityHeadersPlugin(env: Record<string, string>): Plugin {
   const supabaseOrigin = originOf(env.VITE_SUPABASE_URL)
   const hubOrigin = originOf(env.VITE_EBIM_HUB_URL)
+
+  /**
+   * Los origenes de Culqi, y SOLO si hay clave publica configurada.
+   *
+   * La clave es el interruptor de la pasarela en el navegador: sin ella no se
+   * carga su script ni se abre su iframe, asi que abrirle la politica seria
+   * pagar el riesgo sin usar la funcion. Un despliegue sin Culqi conserva
+   * `script-src 'self'` y `frame-src 'none'` intactos.
+   *
+   * Son tres cosas y cada una tiene su motivo: `checkout.culqi.com` sirve el
+   * script y el iframe donde se teclea la tarjeta —ese aislamiento es lo que
+   * mantiene el numero fuera de esta aplicacion— y `api.culqi.com` es a donde
+   * el propio script envia los datos para devolver el token.
+   */
+  const paymentGatewayOrigins = env.VITE_CULQI_PUBLIC_KEY
+    ? ['https://checkout.culqi.com', 'https://api.culqi.com', 'https://3ds.culqi.com']
+    : []
   const inlineScriptHashes: string[] = []
   let outDir = 'dist'
 
@@ -100,6 +117,7 @@ function securityHeadersPlugin(env: Record<string, string>): Plugin {
           supabaseOrigin,
           hubOrigin,
           inlineScriptHashes,
+          paymentGatewayOrigins,
           includeFrameAncestors: false,
         })
 
@@ -135,7 +153,17 @@ function securityHeadersPlugin(env: Record<string, string>): Plugin {
       mkdirSync(dirname(file), { recursive: true })
       writeFileSync(
         file,
-        renderHeadersFile(securityHeaders({ supabaseOrigin, hubOrigin, inlineScriptHashes })),
+        // Los MISMOS orígenes de pasarela que la etiqueta `<meta>`. Si este
+        // fichero se quedara sin ellos, la política del despliegue bloquearía lo
+        // que la de desarrollo permite, y el fallo solo saldría en producción.
+        renderHeadersFile(
+          securityHeaders({
+            supabaseOrigin,
+            hubOrigin,
+            inlineScriptHashes,
+            paymentGatewayOrigins,
+          }),
+        ),
         'utf8',
       )
     },
