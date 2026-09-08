@@ -74,6 +74,14 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'auth.invalid.email': 'That email does not look valid',
     'auth.notConfigured': 'The eCommerce Supabase project is not connected yet.',
     'nav.dashboard': 'Home',
+    // Sidebar headings. Separators, not destinations: they name the family, not
+    // a screen — hence broad nouns rather than verbs.
+    'nav.group.catalog': 'Catalog',
+    'nav.group.inventory': 'Inventory',
+    'nav.group.customers': 'Customers',
+    'nav.group.sales': 'Sales',
+    'nav.group.store': 'Store',
+    'nav.group.system': 'System',
     'nav.products': 'Products',
     'nav.orders': 'Orders',
     'nav.settings': 'Settings',

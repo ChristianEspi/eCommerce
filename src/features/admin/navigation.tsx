@@ -26,6 +26,9 @@ import type { MessageKey } from '@/shared/i18n/messages'
 import type { Permission } from '@/shared/lib/roles'
 import type { Crumb } from '@/shared/ui/AppBreadcrumbs'
 
+/** Los bloques del sidebar. El orden de `NAV_GROUPS` manda, no este tipo. */
+export type NavGroupId = 'catalog' | 'inventory' | 'customers' | 'sales' | 'store' | 'system'
+
 export interface NavItem {
   to: string
   label: MessageKey
@@ -35,7 +38,33 @@ export interface NavItem {
   capability?: CapabilityId
   /** Permiso de rol. Ortogonal a la capacidad: hacen falta los dos. */
   permission?: Permission
+  /**
+   * Bloque bajo el que se pinta. Sin grupo se pinta arriba del todo y sin
+   * cabecera: es el sitio de Inicio, que no pertenece a ninguna familia porque
+   * las resume todas.
+   */
+  group?: NavGroupId
 }
+
+/**
+ * Las cabeceras, en el orden en que se pintan.
+ *
+ * Son SEPARADORES, no botones: no se pliegan ni se navegan. La razón es que
+ * dieciséis de las pantallas del backoffice ya llevan `SectionTabs` dentro, así
+ * que un grupo plegable metería un tercer nivel (grupo → módulo → pestaña) y
+ * cada clic de más es una pantalla que alguien deja de encontrar. Agrupar sin
+ * plegar no acorta el menú —lo alarga un poco—, pero parte una lista de
+ * veintidós entradas en bloques de dos a cinco, que es lo que se escanea de un
+ * vistazo.
+ */
+export const NAV_GROUPS: readonly { id: NavGroupId; label: MessageKey }[] = [
+  { id: 'catalog', label: 'nav.group.catalog' },
+  { id: 'inventory', label: 'nav.group.inventory' },
+  { id: 'customers', label: 'nav.group.customers' },
+  { id: 'sales', label: 'nav.group.sales' },
+  { id: 'store', label: 'nav.group.store' },
+  { id: 'system', label: 'nav.group.system' },
+]
 
 /**
  * Navegación del backoffice. Fuente única del sidebar y de las migas.
@@ -60,78 +89,105 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'nav.products',
     icon: <Inventory2RoundedIcon fontSize="small" />,
     capability: 'catalog',
+    group: 'catalog',
   },
   {
     to: '/app/categories',
     label: 'nav.categories',
     icon: <CategoryRoundedIcon fontSize="small" />,
     capability: 'catalog',
+    group: 'catalog',
   },
   {
     to: '/app/pim',
     label: 'nav.pim',
     icon: <TuneRoundedIcon fontSize="small" />,
     capability: 'catalog.advanced',
+    group: 'catalog',
   },
   {
     to: '/app/pricing',
     label: 'nav.pricing',
     icon: <PriceChangeRoundedIcon fontSize="small" />,
     capability: 'pricing.lists',
+    group: 'catalog',
+  },
+  {
+    // Con el catálogo y no con las ventas: una promoción se define sobre el
+    // producto y el precio, y quien la monta viene de ajustar tarifas.
+    to: '/app/promotions',
+    label: 'nav.promotions',
+    icon: <LocalOfferRoundedIcon fontSize="small" />,
+    capability: 'promotions',
+    group: 'catalog',
   },
   {
     to: '/app/inventory',
     label: 'nav.inventory',
     icon: <WarehouseRoundedIcon fontSize="small" />,
     capability: 'inventory.multiwarehouse',
+    group: 'inventory',
+  },
+  {
+    // Planificación es lo que dice CUÁNTO habrá que tener: vive al lado de las
+    // existencias, no al lado de la fuerza de ventas que la alimenta.
+    to: '/app/planning',
+    label: 'nav.planning',
+    icon: <QueryStatsRoundedIcon fontSize="small" />,
+    capability: 'planning.demand',
+    group: 'inventory',
   },
   {
     to: '/app/customers',
     label: 'nav.customers',
     icon: <PeopleAltRoundedIcon fontSize="small" />,
     capability: 'customers',
+    group: 'customers',
   },
   {
     to: '/app/sales',
     label: 'nav.sales',
     icon: <BadgeRoundedIcon fontSize="small" />,
     capability: 'sales.force',
+    group: 'customers',
   },
   {
-    to: '/app/planning',
-    label: 'nav.planning',
-    icon: <QueryStatsRoundedIcon fontSize="small" />,
-    capability: 'planning.demand',
-  },
-  {
+    // Cotizaciones y surtidos son ACUERDOS con un cliente, no documentos de
+    // venta: lo que se pacta antes de que haya un pedido.
     to: '/app/quotes',
     label: 'nav.quotes',
     icon: <RequestQuoteRoundedIcon fontSize="small" />,
     capability: 'trade.quotes',
+    group: 'customers',
   },
   {
     to: '/app/assortments',
     label: 'nav.assortments',
     icon: <FactCheckRoundedIcon fontSize="small" />,
     capability: 'trade.assortments',
-  },
-  {
-    to: '/app/credit',
-    label: 'nav.credit',
-    icon: <AccountBalanceRoundedIcon fontSize="small" />,
-    capability: 'credit.management',
+    group: 'customers',
   },
   {
     to: '/app/orders',
     label: 'nav.orders',
     icon: <ReceiptLongRoundedIcon fontSize="small" />,
     capability: 'orders',
+    group: 'sales',
   },
   {
     to: '/app/payments',
     label: 'nav.payments',
     icon: <PaymentsRoundedIcon fontSize="small" />,
     capability: 'payments',
+    group: 'sales',
+  },
+  {
+    // Cobranza va detrás de pagos: es lo que queda cuando el pago NO llegó.
+    to: '/app/credit',
+    label: 'nav.credit',
+    icon: <AccountBalanceRoundedIcon fontSize="small" />,
+    capability: 'credit.management',
+    group: 'sales',
   },
   {
     // P12: entregas, devoluciones y la red de reparto. Va DESPUES de pedidos y
@@ -141,12 +197,14 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'nav.fulfillment',
     icon: <LocalShippingRoundedIcon fontSize="small" />,
     capability: 'fulfillment',
+    group: 'sales',
   },
   {
-    to: '/app/promotions',
-    label: 'nav.promotions',
-    icon: <LocalOfferRoundedIcon fontSize="small" />,
-    capability: 'promotions',
+    to: '/app/content',
+    label: 'nav.content',
+    icon: <ArticleRoundedIcon fontSize="small" />,
+    capability: 'content.cms',
+    group: 'store',
   },
   {
     // P13: ventas, embudo y búsquedas. Va DESPUÉS del contenido porque se mira
@@ -156,14 +214,14 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'nav.analytics',
     icon: <InsightsRoundedIcon fontSize="small" />,
     capability: 'analytics.basic',
+    group: 'store',
   },
   {
-    to: '/app/content',
-    label: 'nav.content',
-    icon: <ArticleRoundedIcon fontSize="small" />,
-    capability: 'content.cms',
+    to: '/app/settings',
+    label: 'nav.settings',
+    icon: <SettingsRoundedIcon fontSize="small" />,
+    group: 'system',
   },
-  { to: '/app/settings', label: 'nav.settings', icon: <SettingsRoundedIcon fontSize="small" /> },
   {
     // P13: salud, incidentes, rastro y auditoría. SIN capacidad —igual que
     // Ajustes— y CON permiso: quien no administra el tenant no tiene nada que
@@ -173,6 +231,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'nav.operations',
     icon: <HealthAndSafetyRoundedIcon fontSize="small" />,
     permission: 'tenant.manage',
+    group: 'system',
   },
   {
     // P14: monitor de integraciones, webhooks y credenciales de la API de
@@ -183,12 +242,14 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'nav.integrations',
     icon: <HubRoundedIcon fontSize="small" />,
     permission: 'tenant.manage',
+    group: 'system',
   },
   {
     to: '/app/diagnostics',
     label: 'nav.diagnostics',
     icon: <MonitorHeartRoundedIcon fontSize="small" />,
     permission: 'tenant.manage',
+    group: 'system',
   },
 ]
 
@@ -213,6 +274,37 @@ export function visibleNavItems(
     if (item.capability && access.capabilitiesReady && !access.has(item.capability)) return false
     return true
   })
+}
+
+/** Un bloque del sidebar ya resuelto: su cabecera y lo que va debajo. */
+export interface NavSection {
+  id: NavGroupId | null
+  /** `null` en el bloque de arriba, que no lleva cabecera. */
+  label: MessageKey | null
+  items: NavItem[]
+}
+
+/**
+ * Reparte en bloques lo que YA se puede ver. Función PURA, y separada a
+ * propósito de `visibleNavItems`: primero se decide qué entra —rol y
+ * capacidades— y solo después dónde se pinta.
+ *
+ * Un grupo sin entradas visibles NO se pinta. Es lo único que impide que un
+ * tenant sin nada de comercial se encuentre una cabecera «VENTAS» presidiendo
+ * el vacío, que se lee como una pantalla que se rompió al cargar.
+ */
+export function groupNavItems(items: readonly NavItem[]): NavSection[] {
+  const sections: NavSection[] = []
+
+  const sueltos = items.filter((item) => !item.group)
+  if (sueltos.length > 0) sections.push({ id: null, label: null, items: sueltos })
+
+  for (const grupo of NAV_GROUPS) {
+    const dentro = items.filter((item) => item.group === grupo.id)
+    if (dentro.length > 0) sections.push({ id: grupo.id, label: grupo.label, items: dentro })
+  }
+
+  return sections
 }
 
 /**

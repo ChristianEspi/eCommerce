@@ -36,7 +36,7 @@ import { useI18n } from '@/shared/i18n/i18n-context'
 import { AppBreadcrumbs } from '@/shared/ui/AppBreadcrumbs'
 import { BrandLockup } from '@/shared/ui/BrandLockup'
 import { useAppearance } from '@/theme/appearance-context'
-import { NAV_ITEMS, crumbsForPath, visibleNavItems } from './navigation'
+import { NAV_ITEMS, crumbsForPath, groupNavItems, visibleNavItems } from './navigation'
 import { CompanySwitcher, StoreSwitcher } from './StoreSwitcher'
 
 const SIDEBAR_WIDTH = 244
@@ -52,6 +52,8 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     has,
     capabilitiesReady: status === 'ready',
   })
+  // Y solo despues se reparte en bloques: agrupar es presentacion, no permiso.
+  const sections = groupNavItems(items)
 
   return (
     <Box
@@ -78,7 +80,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         `minHeight: 0` no es decoracion: un hijo de un contenedor flex se niega
         por defecto a encogerse por debajo del alto de su contenido, asi que sin
         el, `overflowY` no llega a activarse nunca y la lista simplemente se sale
-        por abajo. Es lo que pasaba al llegar a diecinueve modulos: «Configuracion»
+        por abajo. Es lo que pasaba al llegar a veintidos modulos: «Configuracion»
         quedaba cortada contra el borde y no habia forma de alcanzarla.
 
         `overscrollBehavior: contain` evita que al llegar al final del menu el
@@ -109,32 +111,68 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           '&:hover::-webkit-scrollbar-thumb': { background: 'rgba(255,255,255,.36)' },
         }}
       >
-        {items.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            onClick={onNavigate}
-            className="eb-nav-h"
-            style={({ isActive }) => ({
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              padding: '9px 12px',
-              borderRadius: 10,
-              fontSize: 13,
-              fontWeight: 700,
-              textDecoration: 'none',
-              minHeight: 40,
-              color: isActive ? '#fff' : 'rgba(237,247,241,.9)',
-              background: isActive ? 'rgba(255,255,255,.16)' : 'transparent',
-              boxShadow: isActive ? 'inset 0 0 0 1px rgba(255,255,255,.14)' : 'none',
-              borderLeft: isActive ? '3px solid #D6F5C9' : '3px solid transparent',
-            })}
+        {sections.map((section, indice) => (
+          <Box
+            key={section.id ?? 'root'}
+            // `group` + `aria-labelledby` es lo que convierte la cabecera en
+            // ESTRUCTURA: sin eso un lector de pantalla recita veintidos
+            // enlaces seguidos y el texto del separador queda suelto en medio,
+            // sin decir de que es titulo (WCAG AA).
+            {...(section.label
+              ? { role: 'group', 'aria-labelledby': `nav-group-${section.id}` }
+              : {})}
           >
-            {item.icon}
-            {t(item.label)}
-          </NavLink>
+            {section.label && (
+              <Typography
+                id={`nav-group-${section.id}`}
+                // El primer bloque con cabecera ya viene despues del hueco de
+                // Inicio; los siguientes necesitan aire para que la cabecera se
+                // lea pegada a LO SUYO y no al bloque anterior.
+                sx={{
+                  mt: indice === 0 ? 0 : 2,
+                  mb: 0.5,
+                  px: 1.5,
+                  fontSize: 10.5,
+                  fontWeight: 700,
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  color: 'rgba(237,247,241,.55)',
+                }}
+              >
+                {t(section.label)}
+              </Typography>
+            )}
+
+            <Stack spacing={0.5}>
+              {section.items.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.end}
+                  onClick={onNavigate}
+                  className="eb-nav-h"
+                  style={({ isActive }) => ({
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '9px 12px',
+                    borderRadius: 10,
+                    fontSize: 13,
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                    minHeight: 40,
+                    color: isActive ? '#fff' : 'rgba(237,247,241,.9)',
+                    background: isActive ? 'rgba(255,255,255,.16)' : 'transparent',
+                    boxShadow: isActive ? 'inset 0 0 0 1px rgba(255,255,255,.14)' : 'none',
+                    borderLeft: isActive ? '3px solid #D6F5C9' : '3px solid transparent',
+                  })}
+                >
+                  {item.icon}
+                  {t(item.label)}
+                </NavLink>
+              ))}
+            </Stack>
+          </Box>
         ))}
       </Stack>
 
