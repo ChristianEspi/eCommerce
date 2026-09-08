@@ -197,6 +197,32 @@ export function OrderDrawer({
   const postVenta = current.status === 'fulfilled'
 
   /**
+   * Los atajos con nombre.
+   *
+   * No son transiciones nuevas: son las MISMAS que ofrece el desplegable, con la
+   * etiqueta que usaría una persona. Solo aparecen si la máquina las permite
+   * desde donde está el pedido, así que la lista se vacía sola en los estados
+   * terminales en vez de ofrecer botones que fallan.
+   *
+   * Son dos y no diez a propósito. Un atajo por transición sería el desplegable
+   * otra vez, en horizontal: lo que hace útil esta fila es que solo estén las
+   * que se piden a diario, y que lo raro siga estando —completo— debajo.
+   */
+  const atajos: Array<{
+    key: MessageKey
+    axis: OrderAxis
+    to: string
+    primary?: boolean
+    destructive?: boolean
+  }> = []
+  if (nextForAxis('payment_status', current.payment_status).includes('paid')) {
+    atajos.push({ key: 'orders.quick.markPaid', axis: 'payment_status', to: 'paid', primary: true })
+  }
+  if (nextForAxis('order_status', current.status).includes('cancelled')) {
+    atajos.push({ key: 'orders.quick.cancel', axis: 'order_status', to: 'cancelled', destructive: true })
+  }
+
+  /**
    * Cerrar el ciclo comercial, que son DOS tramos y no uno.
    *
    * `pending → fulfilled` no existe: la máquina obliga a pasar por `paid`. Se
@@ -496,6 +522,41 @@ export function OrderDrawer({
           {canWrite && awaitingApproval && (
             <Alert severity="warning">{t('orders.approval.blocked')}</Alert>
           )}
+
+          {/* Lo que se hace todos los días, con su nombre.
+              El desplegable de abajo sigue siendo la puerta completa —los tres
+              ejes, todos sus destinos— pero obliga a traducir «ya me pagaron» a
+              «eje Pago, estado Pagado», que es vocabulario de quien programó
+              esto y no de quien lo usa. Estas son las dos transiciones que se
+              piden a diario; el resto sigue una línea más abajo. */}
+          {canWrite && !awaitingApproval && atajos.length > 0 && (
+            <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap' }}>
+              {atajos.map((atajo) => (
+                <Button
+                  key={atajo.key}
+                  size="small"
+                  variant={atajo.primary ? 'contained' : 'outlined'}
+                  color={atajo.destructive ? 'error' : 'primary'}
+                  disabled={busy}
+                  onClick={() =>
+                    void run(
+                      () =>
+                        transition.mutateAsync({
+                          orderId: orderRef,
+                          axis: atajo.axis,
+                          to: atajo.to,
+                          reason: '',
+                        }),
+                      'orders.toast.updated',
+                    )
+                  }
+                >
+                  {t(atajo.key)}
+                </Button>
+              ))}
+            </Stack>
+          )}
+
           {canWrite && (
             <>
               <TextField

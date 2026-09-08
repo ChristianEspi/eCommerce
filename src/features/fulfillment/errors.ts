@@ -48,6 +48,10 @@ export function mapFulfillmentCode(code: string): MessageKey {
       return 'fulfillment.error.noLines'
     case 'MOTIVO_REQUERIDO':
       return 'fulfillment.error.reasonRequired'
+    // P19 · No es un fallo: es la regla de la tienda. Sin mensaje propio caía en
+    // «vuelve a intentarlo», que invita a repetir algo que nunca va a pasar.
+    case 'PAGO_PENDIENTE':
+      return 'fulfillment.error.unpaid'
     case 'MOTIVO_NO_VALIDO':
     case 'LINEAS_NO_VALIDAS':
     case 'DECISION_NO_VALIDA':

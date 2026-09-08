@@ -135,6 +135,11 @@ interface PlaceArgs {
   address?: Record<string, string>
   delivery?: Record<string, unknown> | null
   tenant?: typeof TENANT_A
+  /**
+   * Cuenta corporativa del comprador. Va en el alta y no despues: el snapshot
+   * del pedido es inmutable, asi que un `update` posterior lo rechaza la base.
+   */
+  accountId?: string | null
 }
 
 async function place(args: PlaceArgs = {}): Promise<Row> {
@@ -143,7 +148,7 @@ async function place(args: PlaceArgs = {}): Promise<Row> {
   const rows = await svc(
     `select public.create_order_for_slug(
        $1, $2, $3::jsonb, null, null, $4::jsonb, null, null,
-       'storefront', null, null, null, null, $5::jsonb) as result`,
+       'storefront', $6, null, null, null, $5::jsonb) as result`,
     [
       tenant.storeSlug,
       `compradora${compradorSeq}@correo.test`,
@@ -156,6 +161,7 @@ async function place(args: PlaceArgs = {}): Promise<Row> {
         : args.delivery === null
           ? null
           : JSON.stringify(args.delivery),
+      args.accountId ?? null,
     ],
   )
   return rows[0]?.result as Row
@@ -509,6 +515,157 @@ describe('despacho parcial', () => {
     expect(types).toContain('fulfillment.created')
     expect(types).toContain('fulfillment.state_changed')
     expect(types).toContain('order.fulfillment_status_changed')
+  })
+})
+
+/**
+ * P19 · La tienda que no entrega sin cobrar.
+ *
+ * Apagado por defecto: encenderlo para todos habria roto la operacion de
+ * cualquier tenant que vende a credito. Y frena la ENTREGA, no la preparacion:
+ * preparar mientras llega la transferencia es trabajo util y sin riesgo; lo que
+ * no se recupera es la mercancia que ya salio.
+ */
+/**
+ * P19 · La tienda que no entrega sin cobrar.
+ *
+ * Apagado por defecto: encenderlo para todos habria roto la operacion de
+ * cualquier tenant que vende a credito. Y frena la ENTREGA, no la preparacion —
+ * preparar mientras llega la transferencia es trabajo util y sin riesgo; lo que
+ * no se recupera es la mercancia que ya salio.
+ */
+describe('exigir el cobro antes de entregar', () => {
+  /** Deja la entrega LISTA. `ready` no sale de `pending`: pasa por asignada. */
+  async function dejarLista(entrega: string) {
+    for (const paso of ['allocated', 'ready']) {
+      await asUser(ordersA(), `select public.fulfillment_transition($1, $2) as result`, [
+        entrega,
+        paso,
+      ])
+    }
+  }
+
+  /** Un pedido nuevo con su entrega, opcionalmente de una cuenta corporativa. */
+  async function nueva(accountId: string | null = null) {
+    const order = await place({ delivery: null, accountId })
+    const [row] = await asUser(
+      ordersA(),
+      `select public.fulfillment_create($1, 'estandar') as result`,
+      [order.order_id],
+    )
+    return {
+      pedido: String(order.order_id),
+      entrega: String((row?.result as Row).fulfillment_id),
+    }
+  }
+
+  /** Una cuenta corporativa con su cliente, para las dos pruebas de credito. */
+  async function cuentaConCredito(codigo: string, estado: 'ok' | 'blocked') {
+    const [cliente] = await svc(
+      `insert into public.customers (organization_id, company_id, kind, code, name)
+       values ($1, $2, 'company', $3, $3) returning id`,
+      [TENANT_A.organizationId, TENANT_A.companyId, `CLI-${codigo}`],
+    )
+    const [cuenta] = await svc(
+      `insert into public.business_accounts
+         (organization_id, company_id, customer_id, code, name, credit_limit, credit_status)
+       values ($1, $2, $3, $4, $4, '10000.00', $5::public.credit_status) returning id`,
+      [TENANT_A.organizationId, TENANT_A.companyId, String(cliente?.id), codigo, estado],
+    )
+    return String(cuenta?.id)
+  }
+
+  beforeEach(async () => {
+    await svc(`update public.store_settings set require_payment_before_dispatch = true`)
+  })
+
+  afterAll(async () => {
+    await svc(`update public.store_settings set require_payment_before_dispatch = false`)
+  })
+
+  it('preparar SI se puede: el candado esta en la entrega, no en el almacen', async () => {
+    const { entrega } = await nueva()
+    for (const paso of ['allocated', 'picking', 'packed', 'ready']) {
+      await asUser(ordersA(), `select public.fulfillment_transition($1, $2) as result`, [
+        entrega,
+        paso,
+      ])
+    }
+    const [fila] = await svc(`select state::text from public.fulfillments where id = $1`, [entrega])
+    expect(fila?.state).toBe('ready')
+  })
+
+  it('entregar sin cobrar se rechaza', async () => {
+    const { entrega } = await nueva()
+    await dejarLista(entrega)
+
+    const message = await expectFailure(() =>
+      asUser(ordersA(), `select public.fulfillment_transition($1, 'delivered') as result`, [entrega]),
+    )
+    expect(message).toMatch(/PAGO_PENDIENTE/)
+  })
+
+  it('salir en camino tampoco: el paquete ya no vuelve', async () => {
+    const { entrega } = await nueva()
+    await dejarLista(entrega)
+
+    const message = await expectFailure(() =>
+      asUser(ordersA(), `select public.fulfillment_transition($1, 'in_transit') as result`, [entrega]),
+    )
+    expect(message).toMatch(/PAGO_PENDIENTE/)
+  })
+
+  it('cobrado, entrega sin problema', async () => {
+    const { entrega, pedido } = await nueva()
+    await dejarLista(entrega)
+    await svc(`update public.orders set payment_status = 'paid' where id = $1`, [pedido])
+
+    await asUser(ordersA(), `select public.fulfillment_transition($1, 'delivered') as result`, [
+      entrega,
+    ])
+    const [fila] = await svc(`select state::text from public.fulfillments where id = $1`, [entrega])
+    expect(fila?.state).toBe('delivered')
+  })
+
+  /**
+   * Sin esta excepcion la regla estorbaria justo en el caso para el que existe
+   * una linea de credito, y una regla que estorba se apaga entera el primer dia:
+   * se habria cambiado un control por ninguno.
+   */
+  it('una cuenta con linea de credito entrega sin cobrar', async () => {
+    const cuenta = await cuentaConCredito('CRED', 'ok')
+    const { entrega } = await nueva(cuenta)
+    await dejarLista(entrega)
+
+    await asUser(ordersA(), `select public.fulfillment_transition($1, 'delivered') as result`, [
+      entrega,
+    ])
+    const [fila] = await svc(`select state::text from public.fulfillments where id = $1`, [entrega])
+    expect(fila?.state).toBe('delivered')
+  })
+
+  /** Y una cuenta con el credito BLOQUEADO no es una cuenta a credito. */
+  it('con el credito bloqueado, la excepcion no aplica', async () => {
+    const cuenta = await cuentaConCredito('BLOQ', 'blocked')
+    const { entrega } = await nueva(cuenta)
+    await dejarLista(entrega)
+
+    const message = await expectFailure(() =>
+      asUser(ordersA(), `select public.fulfillment_transition($1, 'delivered') as result`, [entrega]),
+    )
+    expect(message).toMatch(/PAGO_PENDIENTE/)
+  })
+
+  it('con el ajuste apagado, todo sigue como antes', async () => {
+    const { entrega } = await nueva()
+    await dejarLista(entrega)
+    await svc(`update public.store_settings set require_payment_before_dispatch = false`)
+
+    await asUser(ordersA(), `select public.fulfillment_transition($1, 'delivered') as result`, [
+      entrega,
+    ])
+    const [fila] = await svc(`select state::text from public.fulfillments where id = $1`, [entrega])
+    expect(fila?.state).toBe('delivered')
   })
 })
 

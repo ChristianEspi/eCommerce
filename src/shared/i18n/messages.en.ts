@@ -259,6 +259,9 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'settings.section.checkoutHelp': 'Who can complete an order in your store.',
     'settings.checkoutRequiresAccount': 'Require an account to buy',
     'settings.checkoutRequiresAccountHelp': 'With this on, nobody completes an order without signing in. The catalog and the cart stay open.',
+    'settings.requirePaymentBeforeDispatch': 'Do not hand over until paid',
+    'settings.requirePaymentBeforeDispatchHelp':
+      'Preparing the order still works; what is blocked is marking it in transit or delivered while no payment is on record. Accounts with a credit line are exempt.',
     'store.checkout.error.spendingLimit':
       'The amount is over your approval limit. Ask whoever manages your account to review it.',
     'store.checkout.error.payment': 'The payment could not be authorised. Try another method.',
@@ -926,6 +929,8 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'orders.transitionAfterHelp': 'The sale is closed. All that is left is undoing it, in full or in part.',
     'orders.closeHint': 'This order is paid and delivered. It only needs closing.',
     'orders.closeNow': 'Close order',
+    'orders.quick.markPaid': 'Mark as paid',
+    'orders.quick.cancel': 'Cancel order',
     'orders.payment.pending': 'Unpaid',
     'orders.payment.authorized': 'Authorized',
     'orders.payment.paid': 'Paid',
@@ -2724,6 +2729,7 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'fulfillment.error.quantity': 'Those units do not fit: check what is already committed.',
     'fulfillment.error.noLines': 'There is nothing left to ship on this order.',
     'fulfillment.error.reasonRequired': 'A reason is required.',
+    'fulfillment.error.unpaid': 'This store does not hand over unpaid orders. Record the payment first.',
     'fulfillment.error.invalid': 'Some of the data is not valid.',
     'fulfillment.error.coverage': 'We do not reach that address with that method.',
     'fulfillment.error.noRate': 'That method has no applicable rate for this purchase.',

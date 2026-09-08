@@ -68,6 +68,8 @@ export const storeSettingsSchema = z.object({
   contact_address: z.string().nullable().default(null),
   /** P18 · La tienda solo vende a quien ha iniciado sesión. */
   checkout_requires_account: z.boolean().nullable().default(false),
+  /** P19 · La tienda no entrega mercancía sin haber cobrado. */
+  require_payment_before_dispatch: z.boolean().nullable().default(false),
   /**
    * White-label por tokens (P11-SaaS). `catch(null)` en los tres de lista
    * cerrada: un valor que la app no conoce cae al de suite en vez de dejar la
@@ -163,6 +165,13 @@ export const storeFormSchema = z.object({
    * la sesión verificada; esto solo la declara.
    */
   checkout_requires_account: z.boolean(),
+  /**
+   * Frena la ENTREGA, no la preparación: preparar mientras llega la
+   * transferencia es trabajo útil, y lo que no se recupera es la mercancía que
+   * ya salió. Las cuentas con línea de crédito quedan exentas — sin esa
+   * excepción la regla estorbaría justo donde el crédito existe.
+   */
+  require_payment_before_dispatch: z.boolean(),
 })
 export type StoreFormValues = z.infer<typeof storeFormSchema>
 
@@ -186,6 +195,7 @@ export function toForm(name: string, settings: StoreSettings | null): StoreFormV
     email_reply_to: settings?.email_reply_to ?? '',
     favicon_url: settings?.favicon_url ?? null,
     checkout_requires_account: settings?.checkout_requires_account ?? false,
+    require_payment_before_dispatch: settings?.require_payment_before_dispatch ?? false,
   }
 }
 

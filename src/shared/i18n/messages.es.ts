@@ -263,6 +263,9 @@ export const es = {
     'settings.section.checkoutHelp': 'Quién puede completar un pedido en tu tienda.',
     'settings.checkoutRequiresAccount': 'Exigir cuenta para comprar',
     'settings.checkoutRequiresAccountHelp': 'Con esto activo, nadie completa un pedido sin haber iniciado sesión. El catálogo y el carrito siguen abiertos.',
+    'settings.requirePaymentBeforeDispatch': 'No entregar sin haber cobrado',
+    'settings.requirePaymentBeforeDispatchHelp':
+      'Preparar el pedido se puede igual; lo que se frena es marcarlo en camino o entregado mientras no conste el pago. Las cuentas con línea de crédito quedan exentas.',
     'store.checkout.error.spendingLimit':
       'El importe supera tu límite de autorización. Pídele a quien administra tu cuenta que lo revise.',
     'store.checkout.error.payment': 'El pago no se pudo autorizar. Prueba con otro medio.',
@@ -935,6 +938,8 @@ export const es = {
     'orders.transitionAfterHelp': 'La venta está cerrada. Lo único que queda es deshacerla, entera o en parte.',
     'orders.closeHint': 'Este pedido está cobrado y entregado. Solo falta cerrarlo.',
     'orders.closeNow': 'Cerrar pedido',
+    'orders.quick.markPaid': 'Marcar como cobrado',
+    'orders.quick.cancel': 'Cancelar pedido',
     'orders.payment.pending': 'Sin cobrar',
     'orders.payment.authorized': 'Autorizado',
     'orders.payment.paid': 'Cobrado',
@@ -2735,6 +2740,7 @@ export const es = {
     'fulfillment.error.quantity': 'No caben esas unidades: revisa lo que ya está comprometido.',
     'fulfillment.error.noLines': 'No queda nada por despachar en este pedido.',
     'fulfillment.error.reasonRequired': 'Hace falta indicar el motivo.',
+    'fulfillment.error.unpaid': 'Esta tienda no entrega pedidos sin cobrar. Registra el pago y vuelve.',
     'fulfillment.error.invalid': 'Alguno de los datos no es válido.',
     'fulfillment.error.coverage': 'No llegamos a esa dirección con ese método.',
     'fulfillment.error.noRate': 'Ese método no tiene tarifa aplicable para esta compra.',

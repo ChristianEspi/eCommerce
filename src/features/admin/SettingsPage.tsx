@@ -434,6 +434,31 @@ export function SettingsPage() {
                       <Typography sx={{ color: 'var(--muted)', fontSize: 13, mt: 0.5 }}>
                         {t('settings.checkoutRequiresAccountHelp')}
                       </Typography>
+
+                      {/* P19 · La otra regla del mismo orden: no soltar la
+                          mercancía sin haber cobrado. Va apagada porque vender a
+                          crédito es despachar hoy y cobrar a treinta días, y
+                          encenderla para todos habría roto esa operación. */}
+                      <Controller
+                        control={form.control}
+                        name="require_payment_before_dispatch"
+                        render={({ field }) => (
+                          <FormControlLabel
+                            sx={{ mt: 1.5 }}
+                            control={
+                              <Switch
+                                checked={field.value}
+                                disabled={busy}
+                                onChange={(event) => field.onChange(event.target.checked)}
+                              />
+                            }
+                            label={t('settings.requirePaymentBeforeDispatch')}
+                          />
+                        )}
+                      />
+                      <Typography sx={{ color: 'var(--muted)', fontSize: 13, mt: 0.5 }}>
+                        {t('settings.requirePaymentBeforeDispatchHelp')}
+                      </Typography>
                     </SectionCard>
                   </Stack>
                 )}
