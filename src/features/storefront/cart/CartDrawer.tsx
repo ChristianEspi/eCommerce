@@ -111,6 +111,19 @@ export function CartDrawer({ storeSlug }: { storeSlug: string }) {
                 )}
               </Typography>
             </Stack>
+            {quoted && Number(quoted.discountTotal) > 0 && (
+              <Stack
+                direction="row"
+                sx={{ justifyContent: 'space-between', alignItems: 'baseline', gap: 2 }}
+              >
+                <Typography sx={{ fontSize: TS.label, color: 'var(--accent-deep)', fontWeight: 700 }}>
+                  {t('store.cart.discount')}
+                </Typography>
+                <Typography sx={{ fontSize: TS.label, color: 'var(--accent-deep)', fontWeight: 700 }}>
+                  {`- ${formatMoney(Number(quoted.discountTotal), quoted.currency, locale)}`}
+                </Typography>
+              </Stack>
+            )}
             {/* Que el precio es del acuerdo se dice AQUI y no solo en la
                 página: es donde el comprador ve el número por primera vez. */}
             {discounted && (

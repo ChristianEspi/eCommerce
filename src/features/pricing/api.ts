@@ -11,7 +11,7 @@ import {
   PRICE_LIST_ASSIGNMENTS_TABLE,
   PRICE_LIST_ITEMS_TABLE,
   PRICE_LIST_CONFLICTS_RPC,
-  PRICE_QUOTE_PUBLIC_RPC,
+  PROMOTION_QUOTE_PUBLIC_RPC,
   PRICE_QUOTE_RPC,
   PRODUCTS_TABLE,
   PRODUCT_UOMS_TABLE,
@@ -25,6 +25,7 @@ import {
   priceListItemSchema,
   priceListSchema,
   priceQuoteSchema,
+  promotionQuoteSchema,
   pricedProductSchema,
   pricedUomSchema,
   pricedVariantSchema,
@@ -38,6 +39,7 @@ import {
   type PriceListFormValues,
   type PriceListItem,
   type PriceQuoteResult,
+  type PromotionQuoteResult,
   type PricedProduct,
   type PricedUom,
   type PricedVariant,
@@ -593,14 +595,31 @@ export interface PublicQuoteItem {
 export async function quotePublicCart(input: {
   storeSlug: string
   items: readonly PublicQuoteItem[]
-}): Promise<PriceQuoteResult> {
+  couponCodes?: readonly string[]
+}): Promise<PromotionQuoteResult> {
   const supabase = tryGetStorefrontRpcClient()
   if (!supabase) throw new PricingError('auth.notConfigured', 'CONFIG_INCOMPLETA')
 
-  const { data, error } = await supabase.rpc(PRICE_QUOTE_PUBLIC_RPC, {
+  // `promotion_quote_for_slug` y no `price_quote_for_slug`: la primera es la
+  // segunda MÁS las campañas —por dentro llama a `ebim.build_quote` y le pasa
+  // el resultado a `ebim.apply_promotions`—, que es exactamente lo que hace
+  // `create_order` al cobrar.
+  //
+  // Cotizar sin ellas era prometer un total que la tienda no iba a cobrar: un
+  // carrito con «Lleva 3, paga 2» se enseñaba a S/ 5,723.76 y se cobraba a
+  // S/ 3,060.64. Cobrar de menos rompe la confianza igual que cobrar de más:
+  // en los dos casos el número que el comprador leyó era mentira.
+  //
+  // Los cupones son lo ÚNICO que el navegador declara aquí, y puede: los teclea
+  // el comprador y los valida el servidor. El canal, el segmento y el cliente
+  // siguen saliendo de la sesión.
+  const codes = (input.couponCodes ?? []).map((code) => code.trim()).filter((code) => code !== '')
+
+  const { data, error } = await supabase.rpc(PROMOTION_QUOTE_PUBLIC_RPC, {
     p_store_slug: input.storeSlug,
     p_items: input.items,
+    ...(codes.length > 0 ? { p_coupon_codes: codes } : {}),
   })
   if (error) throw pricingErrorFromDb(error)
-  return priceQuoteSchema.parse(data)
+  return promotionQuoteSchema.parse(data)
 }

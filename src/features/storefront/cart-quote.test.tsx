@@ -34,7 +34,7 @@ vi.mock('@/shared/lib/supabase', () => ({
 
 const { StorefrontLayout } = await import('./StorefrontLayout')
 const { StoreCartPage } = await import('./StoreCartPage')
-const { PRICE_QUOTE_PUBLIC_RPC } = await import('@/shared/lib/db-schema')
+const { PROMOTION_QUOTE_PUBLIC_RPC } = await import('@/shared/lib/db-schema')
 
 const STORE = 'aaaa1111-1111-4111-8111-111111111111'
 const P_SILLA = 'cccc1111-1111-4111-8111-111111111111'
@@ -70,7 +70,11 @@ function store() {
   }
 }
 
-/** Cotización del servidor: precio de lista, con impuesto ya calculado. */
+/**
+ * Cotización del servidor: precio de lista, promociones e impuesto ya
+ * calculados. Es la forma que devuelve `promotion_quote_for_slug`, que es
+ * `build_quote` MÁS las campañas — la misma que usa `create_order` al cobrar.
+ */
 function cotizacion(source: 'catalog' | 'price_list' = 'price_list') {
   return {
     currency: 'PEN',
@@ -78,6 +82,8 @@ function cotizacion(source: 'catalog' | 'price_list' = 'price_list') {
     tax_inclusive: false,
     quoted_at: '2026-08-27T00:00:00.000Z',
     subtotal: '184.00',
+    discount_total: '0.00',
+    promotions: { applied: [] },
     tax_total: '33.12',
     grand_total: '217.12',
     lines: [
@@ -109,7 +115,7 @@ function backend(options: { quote?: (args: Record<string, unknown>) => unknown }
       public_products: [],
       public_product_images: [],
     },
-    ...(options.quote ? { rpc: { [PRICE_QUOTE_PUBLIC_RPC]: options.quote } } : {}),
+    ...(options.quote ? { rpc: { [PROMOTION_QUOTE_PUBLIC_RPC]: options.quote } } : {}),
   })
 }
 
@@ -170,6 +176,40 @@ describe('el resumen del carrito lo decide el servidor', () => {
   it('avisa de que el precio salió de un acuerdo y no del catálogo', async () => {
     renderCart(backend({ quote: () => cotizacion('price_list') }))
     expect(await screen.findByText('Precio especial')).toBeInTheDocument()
+  })
+
+  /**
+   * El total que se ENSEÑA es el que se COBRA, campañas incluidas.
+   *
+   * Hasta aquí el carrito cotizaba con `price_quote_for_slug`, que resuelve
+   * listas de precio y no sabe de promociones; `create_order` sí las aplica. Un
+   * carrito con «Lleva 3, paga 2» se enseñaba a S/ 5,723.76 y se cobraba a
+   * S/ 3,060.64 — comprobado contra el proyecto real, pedido EC-20260908-00029.
+   *
+   * Cobrar de menos rompe la confianza igual que cobrar de más: en los dos casos
+   * el número que el comprador leyó antes de decidir era falso.
+   */
+  it('el descuento de las campañas se ve ANTES de confirmar, con su nombre', async () => {
+    renderCart(
+      backend({
+        quote: () => ({
+          ...cotizacion(),
+          discount_total: '46.00',
+          tax_total: '24.84',
+          grand_total: '162.84',
+          promotions: {
+            applied: [{ promotion_id: null, code: 'nutri-3x2', label: 'Lleva 3, paga 2', amount: '46.00' }],
+          },
+        }),
+      }),
+    )
+
+    const card = await screen.findByRole('heading', { name: 'Resumen' })
+    const resumen = card.parentElement as HTMLElement
+    expect(await within(resumen).findByText('Descuento')).toBeInTheDocument()
+    expect(within(resumen).getByText('- S/ 46.00')).toBeInTheDocument()
+    // Y el total es el de la base, no una resta hecha aquí.
+    expect(within(resumen).getByText('S/ 162.84')).toBeInTheDocument()
   })
 
   it('sin acuerdo aplicado no promete un precio especial', async () => {

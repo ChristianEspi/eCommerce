@@ -27,6 +27,7 @@ export {
   UNITS_OF_MEASURE_TABLE,
   PRICE_QUOTE_RPC,
   PRICE_QUOTE_PUBLIC_RPC,
+  PROMOTION_QUOTE_PUBLIC_RPC,
   PRICE_LIST_CONFLICTS_RPC,
 } from '@/shared/lib/db-schema'
 
@@ -251,6 +252,40 @@ export const priceQuoteSchema = z.object({
   grand_total: moneyText,
 })
 export type PriceQuoteResult = z.infer<typeof priceQuoteSchema>
+
+/**
+ * Una campaña que SÍ entró en el total.
+ *
+ * `ebim.apply_promotions` devuelve además las descartadas y por qué; aquí solo
+ * se lee lo aplicado, que es lo que la vitrina puede nombrar sin explicarle al
+ * comprador reglas que no le afectan.
+ */
+export const appliedPromotionSchema = z.object({
+  promotion_id: z.string().uuid().nullable().default(null),
+  code: z.string().nullable().default(null),
+  /** Nombre de cara al comprador. En la base es `label`, no `name`. */
+  label: z.string().nullable().default(null),
+  /** Lo que descontó ESTA campaña. */
+  amount: moneyText.nullable().default(null),
+  coupon_code: z.string().nullable().default(null),
+})
+
+/**
+ * La cotización CON promociones (`promotion_quote_for_slug`).
+ *
+ * Es la de arriba más el descuento: la función de la base devuelve
+ * `p_quote || {discount_total, promotions}`, así que todo lo que ya se leía
+ * sigue en su sitio. La diferencia importa —`subtotal + impuesto - descuento`—
+ * porque es la identidad que usa `create_order` para cobrar.
+ */
+export const promotionQuoteSchema = priceQuoteSchema.extend({
+  discount_total: moneyText.default('0.00'),
+  promotions: z
+    .object({ applied: z.array(appliedPromotionSchema).default([]) })
+    .partial()
+    .default({}),
+})
+export type PromotionQuoteResult = z.infer<typeof promotionQuoteSchema>
 
 // ---------------------------------------------------------------------------
 // Formularios

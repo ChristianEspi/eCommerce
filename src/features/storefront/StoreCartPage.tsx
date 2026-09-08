@@ -95,6 +95,19 @@ export function StoreCartPage() {
             </Typography>
           </Stack>
 
+          {/* Las campañas, restadas y con nombre. Sin esta fila el total no
+              cuadraba con la suma de las líneas. */}
+          {quoted && Number(quoted.discountTotal) > 0 && (
+            <Stack direction="row" sx={{ justifyContent: 'space-between', mt: 0.5 }}>
+              <Typography sx={{ color: 'var(--accent-deep)', fontWeight: 700 }}>
+                {t('store.cart.discount')}
+              </Typography>
+              <Typography sx={{ color: 'var(--accent-deep)', fontWeight: 700 }}>
+                {`- ${formatMoney(Number(quoted.discountTotal), quoted.currency, locale)}`}
+              </Typography>
+            </Stack>
+          )}
+
           {/* Impuesto y total tienen su ALTO RESERVADO desde el primer pintado
               (P15-SaaS). Hasta P14 las dos filas nacían al llegar la
               cotización y empujaban hacia abajo el separador y los dos

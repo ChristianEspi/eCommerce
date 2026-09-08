@@ -39,6 +39,7 @@ export function DeliveryPicker({
   selectedPickupPointId,
   onSelectPickupPoint,
   error,
+  faltaPais = false,
 }: {
   options: readonly DeliveryOption[]
   loading: boolean
@@ -48,9 +49,12 @@ export function DeliveryPicker({
   selectedPickupPointId: string
   onSelectPickupPoint: (id: string) => void
   error: string | null
+  /** La dirección todavía no dice el país, y la zona lo necesita para decidir. */
+  faltaPais?: boolean
 }) {
   const { t, locale } = useI18n()
   const selected = options.find((option) => option.code === selectedCode) ?? null
+  const hayNoDisponibles = options.some((option) => !option.available)
 
   if (loading) {
     return (
@@ -111,6 +115,15 @@ export function DeliveryPicker({
           ))}
         </RadioGroup>
       </FormControl>
+
+      {/* «No disponible para tu dirección» sobre una dirección incompleta es un
+          diagnóstico falso: la zona no descarta el domicilio, es que todavía no
+          sabe en qué país está. Sin esto, con el país vacío, los dos envíos
+          salían muertos y sin motivo, y el comprador solo podía concluir que a
+          su calle no se llega. */}
+      {faltaPais && hayNoDisponibles && (
+        <Alert severity="info">{t('store.delivery.needCountry')}</Alert>
+      )}
 
       {selected?.instructions && <Alert severity="info">{selected.instructions}</Alert>}
 

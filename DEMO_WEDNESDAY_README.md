@@ -52,27 +52,43 @@ transición no permitida.
 **Apunta el número de pedido en el paso 7**: el paso 8 depende de él y buscarlo
 a ciegas delante del cliente rompe el ritmo.
 
-### ⚠️ El precio NO cambia al iniciar sesión
+## 3-bis · El guion B2B, que es lo que se vende
 
-Existen 4 listas de precios con 1682 precios, y las buenas están asignadas por
-segmento («Corporativo», donde están las 7 cuentas de empresa). **Pero la vitrina
-no las aplica.** Todas las rutas públicas cotizan como visitante anónimo:
+> Esta sección **sustituye** al aviso «el precio no cambia al iniciar sesión»
+> que estuvo aquí hasta el 8 de septiembre. Ya no es cierto: el precio del
+> acuerdo llega a la vitrina, y desde el 8 también a la ficha.
 
-```sql
--- price_quote_for_slug, cart_payload, cart_refresh_prices,
--- promotion_quote_for_slug, delivery_options_for_slug
-ebim.build_quote(store, canal, items, null, null, now(), true)
---                                    ^^^^  ^^^^
---                                 segmento  cliente
-```
+**La cuenta:** `emoreno@grupoebim.com` → cuenta de empresa **Policlinico Andino
+SAC** → segmento **`clinicas`** → tarifa **convenio** (prioridad 80). El
+convenio cubre 545 de los 571 productos publicados, así que casi cualquier ficha
+sirve.
 
-No hay discrepancia entre lo que se enseña y lo que se cobra —el pedido se crea
-con el mismo precio público—, pero **no prometas precio B2B en la tienda**.
+| # | Dónde | Qué se ve |
+|---|---|---|
+| 1 | Ficha **sin sesión** | Alitraq a **S/ 238.95** — el precio de catálogo |
+| 2 | Entrar como `emoreno` | La misma ficha: **S/ 215.06**, el 238.95 tachado, «Precio acordado con tu empresa» |
+| 3 | Subir a **6 unidades** | Salta la escala por volumen y las campañas: subtotal 1,290.36, descuento −623.67, **total 786.69** |
+| 4 | Checkout paso 3 | Medio de pago **«Crédito empresa»** |
+| 5 | `/app/orders` | El pedido con la cuenta de empresa, el RUC y las líneas marcadas `convenio` |
 
-**Dónde sí se demuestra:** `/app/pricing` → pestaña **Simulador**. Ahí se elige
-cliente y segmento y se ve el precio que le corresponde, porque `price_quote`
-(backoffice) sí recibe los dos. Es una demostración de backoffice, no de
-vitrina — dilo así.
+**Rellena el campo «País».** Con el país vacío los dos envíos salen «No
+disponible para tu dirección» y solo queda el recojo. Desde el 8 la pantalla lo
+avisa, pero el rodeo es escribirlo.
+
+**El descuento se ve antes de confirmar.** Hasta el 8 el checkout cotizaba sin
+campañas y el pedido las aplicaba: se enseñaba S/ 5,723.76 y se cobraba
+S/ 3,060.64 (pedido real `EC-20260908-00029`). Ahora la vitrina cotiza con
+`promotion_quote_for_slug`, que es lo mismo que usa `create_order`.
+
+**El umbral de aprobación es S/ 5,000** y lo mira el **total final**, ya con
+descuento. La cuenta tiene la regla «Aprobacion sobre 5.000» aunque el
+interruptor «Exige aprobación» esté apagado. Si quieres enseñar la autorización,
+el carrito tiene que pasar de 5.000 **después** del descuento.
+
+**Dónde está el motor, si preguntan:** `/app/pricing` → pestaña **Simulador**
+elige cliente y segmento y explica la precedencia; `/app/customers` → **Cuentas
+B2B** → *Aprobaciones* tiene un comprobador de importe que consulta a la misma
+función del servidor que decide de verdad.
 
 ### El asistente de compra
 
@@ -199,6 +215,14 @@ administración de pedidos.
 1. **Rutas profundas dan 404 en QAS.** Falta la reescritura de SPA en Amplify.
    Navegando por la aplicación todo va bien; **recargar con F5 saca un 404**. Es
    configuración de AWS, fuera del repositorio.
+
+2. **`qas` va por detrás de `dev`.** La base es la MISMA para los dos
+   (`ehxlxbhtlmfgneiagdcj`), así que los guardas y los precios ya están vivos;
+   lo que no está en QAS es el frontend de los últimos días — precio de convenio
+   en la ficha, panel del carrito coherente con la página, panel de pedidos,
+   historial legible, validación de stock al añadir, botones de actualizar.
+   Comprobar antes de la demo con `git log --oneline origin/qas..dev`: si
+   devuelve algo, QAS no enseña lo que dice este documento.
 
 ### Gate «AI grounded» — casos adversariales
 

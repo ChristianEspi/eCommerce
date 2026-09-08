@@ -3,6 +3,9 @@ import { useCartQuote } from '@/features/pricing/useCartQuote'
 import type { PriceQuote } from '@/domain'
 import { useCart } from './cart-context'
 
+/** Constante y no `[]` en la firma: un array nuevo por render cambia la clave. */
+const SIN_CUPONES: readonly string[] = []
+
 /**
  * El carrito, con el precio que de verdad se va a cobrar.
  *
@@ -17,7 +20,11 @@ import { useCart } from './cart-context'
  * gasta una llamada: la cotización del panel ya está en caché cuando se abre la
  * página, y al revés.
  */
-export function useQuotedCart(storeSlug: string | undefined): {
+export function useQuotedCart(
+  storeSlug: string | undefined,
+  /** Cupones confirmados. El carrito no los pide; el checkout sí. */
+  coupons: readonly string[] = SIN_CUPONES,
+): {
   quote: ReturnType<typeof useCartQuote>
   quoted: PriceQuote | null
   /** Alguna línea sale de una lista de precios: hay acuerdo aplicado. */
@@ -39,7 +46,7 @@ export function useQuotedCart(storeSlug: string | undefined): {
     [cart.lines],
   )
 
-  const quote = useCartQuote(storeSlug, currency, requests)
+  const quote = useCartQuote(storeSlug, currency, requests, coupons)
   const quoted = quote.data ?? null
 
   return {

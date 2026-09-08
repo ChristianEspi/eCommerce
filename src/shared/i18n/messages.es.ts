@@ -866,6 +866,7 @@ export const es = {
     'store.cart.total': 'Total',
     'store.cart.listPrice': 'Precio especial',
     'store.cart.savings': 'Ahorras',
+    'store.cart.discount': 'Descuento',
     'store.product.chooseVariant': 'Elige una opción',
     'store.product.variantRequired': 'Elige una opción para continuar',
     'store.product.priceFrom': 'Desde',
@@ -2881,6 +2882,8 @@ export const es = {
     'store.delivery.pickupPoint': 'Dónde lo recoges',
     'store.delivery.promised': 'Llega entre',
     'store.delivery.unavailable': 'No disponible para tu dirección',
+    'store.delivery.needCountry':
+      'Completa el país para saber qué envíos llegan a tu dirección.',
     'store.delivery.shipping': 'Envío',
     'store.checkout.city': 'Ciudad',
     'store.checkout.region': 'Región o departamento',

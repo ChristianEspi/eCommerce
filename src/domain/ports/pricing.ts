@@ -45,6 +45,15 @@ export interface PriceContext {
   readonly storeSlug: string
   /** Moneda en la que se pide la cotización. La resuelve la tienda, no el comprador. */
   readonly currency: CurrencyCode
+  /**
+   * Cupones TECLEADOS por el comprador.
+   *
+   * La única excepción a la regla de arriba, y no la contradice: un cupón no es
+   * contexto que el servidor pueda derivar —nace de que alguien escribe un
+   * código— y lo que el navegador manda es el texto, no el descuento. Quien
+   * decide si vale, cuánto rebaja y si queda saldo sigue siendo la base.
+   */
+  readonly couponCodes?: readonly string[]
 }
 
 export interface PriceRequest {
@@ -90,14 +99,33 @@ export interface PricedLine {
   readonly minQuantity: MoneyAmount | null
 }
 
+/** Una campaña que entró en el total, con lo que rebajó. */
+export interface AppliedPromotion {
+  readonly id: string | null
+  readonly code: string | null
+  /** Nombre de cara al comprador. */
+  readonly label: string | null
+  readonly amount: MoneyAmount | null
+  /** El cupón que la activó, si hizo falta teclear uno. */
+  readonly couponCode: string | null
+}
+
 export interface PriceQuote {
   readonly currency: CurrencyCode
   /** `true` = los importes de línea ya llevan impuesto dentro. */
   readonly taxInclusive: boolean
   readonly lines: readonly PricedLine[]
   readonly netTotal: MoneyAmount
+  /**
+   * Lo que rebajan las campañas. Va aparte del subtotal a propósito: la
+   * identidad que cobra `create_order` es `subtotal + impuesto - descuento`, y
+   * mezclarlo en el neto haría imposible enseñarle al comprador de dónde sale.
+   */
+  readonly discountTotal: MoneyAmount
   readonly taxTotal: MoneyAmount
   readonly grossTotal: MoneyAmount
+  /** Las campañas aplicadas, para poder nombrarlas. */
+  readonly promotions: readonly AppliedPromotion[]
 }
 
 export interface PricingPort {

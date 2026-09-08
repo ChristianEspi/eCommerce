@@ -21,7 +21,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
 import { useSessionContext } from '@/features/auth/session-context'
-import { useCartQuote } from '@/features/pricing/useCartQuote'
+import { useQuotedCart } from './cart/useQuotedCart'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { useDocumentMeta } from '@/shared/seo/useDocumentMeta'
@@ -111,6 +111,9 @@ import { privateMeta } from './seo'
  * campo que se añada al formulario y no a esta lista pasaría el paso sin
  * comprobarse y reventaría al final, lejos de donde se escribió.
  */
+/** Constante y no `[]`: un array nuevo por render cambiaría la clave de la consulta. */
+const SIN_CUPONES: readonly string[] = []
+
 const PASOS = [
   { id: 'contacto', tituloKey: 'store.checkout.contact', cortoKey: 'store.checkout.step.contact' },
   { id: 'entrega', tituloKey: 'store.checkout.step.delivery', cortoKey: 'store.checkout.step.delivery' },
@@ -164,21 +167,9 @@ export function StoreCheckoutPage() {
   )
   const [resuming] = useState(() => readPendingAttempt(storeSlug) !== null)
 
-  // El array entra en la clave de la consulta: uno nuevo por render la
-  // invalidaría en bucle. Se arma con la forma del PUERTO, no con la del
-  // transporte: quien cotiza puede ser mañana el ERP del tenant.
-  const requests = useMemo(
-    () =>
-      cart.lines.map((line) => ({
-        productId: line.product_id,
-        variantId: line.variant_id,
-        uomCode: null,
-        quantity: line.quantity,
-      })),
-    [cart.lines],
-  )
-  const quote = useCartQuote(storeSlug, currency, requests)
-  const quoted = quote.data ?? null
+  /** Cupón ya confirmado por el comprador. Ver `irA`. */
+  const [cuponCotizado, setCuponCotizado] = useState<readonly string[]>(SIN_CUPONES)
+  const { quote, quoted } = useQuotedCart(storeSlug, cuponCotizado)
 
   const {
     register,
@@ -364,6 +355,13 @@ export function StoreCheckoutPage() {
     setErrorStage(null)
     setPaso(destino)
     setAlcanzado((previo) => Math.max(previo, destino))
+
+    // El cupón se cotiza al SALIR del paso donde se escribe, no mientras se
+    // teclea: cada valor distinto es una llamada al servidor, y «b», «bi»,
+    // «bie»… serían seis intentos fallidos por un código de seis letras. Aquí
+    // el comprador ya dijo que había terminado.
+    const cupon = (getValues('couponCode') ?? '').trim()
+    setCuponCotizado(cupon === '' ? SIN_CUPONES : [cupon])
   }
 
   const mutation = useMutation({
@@ -744,6 +742,7 @@ export function StoreCheckoutPage() {
                   selectedPickupPointId={watched.pickupPointId ?? ''}
                   onSelectPickupPoint={(id) => setValue('pickupPointId', id)}
                   error={null}
+                  faltaPais={deliveryAddress.country === undefined}
                 />
                 {deliveryOptions.length > 0 && (
                   <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>

@@ -34,7 +34,8 @@ vi.mock('@/shared/lib/supabase', () => ({
 
 const { quotePublicCart } = await import('./api')
 const { fetchDeliveryOptions } = await import('@/features/storefront/delivery')
-const { PRICE_QUOTE_PUBLIC_RPC, DELIVERY_OPTIONS_PUBLIC_RPC } = await import('@/shared/lib/db-schema')
+const { PROMOTION_QUOTE_PUBLIC_RPC, DELIVERY_OPTIONS_PUBLIC_RPC } =
+  await import('@/shared/lib/db-schema')
 
 const COTIZACION = {
   currency: 'PEN',
@@ -98,7 +99,10 @@ describe('el precio se pide con el cliente que lleva la sesion', () => {
       items: [{ product_id: CARRITO.lines[0]!.product_id, quantity: 2 }],
     })
 
-    expect(holder.conSesion.rpc).toHaveBeenCalledWith(PRICE_QUOTE_PUBLIC_RPC, expect.anything())
+    expect(holder.conSesion.rpc).toHaveBeenCalledWith(
+      PROMOTION_QUOTE_PUBLIC_RPC,
+      expect.anything(),
+    )
     // Lo importante es esto: con el anonimo, el comprador B2B ve catalogo.
     expect(holder.anonimo.rpc).not.toHaveBeenCalled()
   })
@@ -130,5 +134,22 @@ describe('el precio se pide con el cliente que lleva la sesion', () => {
     // El cliente lo deduce el servidor del token. Si algun dia apareciera aqui
     // un `customer_id`, cualquiera podria pedir el precio de otra empresa.
     expect(Object.keys(cuerpo as object).sort()).toEqual(['p_items', 'p_store_slug'])
+  })
+
+  /**
+   * El cupon es lo UNICO que el navegador declara, y puede: lo teclea el
+   * comprador y lo valida la base. Lo que no viaja es el descuento.
+   */
+  it('el cupon tecleado viaja; uno vacio no ensucia la peticion', async () => {
+    const items = [{ product_id: CARRITO.lines[0]!.product_id, quantity: 2 }]
+
+    await quotePublicCart({ storeSlug: 'la-tienda', items, couponCodes: ['  bienvenida  '] })
+    const [, conCupon] = holder.conSesion.rpc.mock.calls[0]!
+    expect((conCupon as { p_coupon_codes: string[] }).p_coupon_codes).toEqual(['bienvenida'])
+
+    holder.conSesion.rpc.mockClear()
+    await quotePublicCart({ storeSlug: 'la-tienda', items, couponCodes: ['   '] })
+    const [, sinCupon] = holder.conSesion.rpc.mock.calls[0]!
+    expect(Object.keys(sinCupon as object).sort()).toEqual(['p_items', 'p_store_slug'])
   })
 })

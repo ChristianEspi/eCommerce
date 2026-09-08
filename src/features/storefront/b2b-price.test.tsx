@@ -43,7 +43,7 @@ const { StorefrontLayout } = await import('./StorefrontLayout')
 const { StoreHomePage } = await import('./StoreHomePage')
 const { StoreProductPage } = await import('./StoreProductPage')
 const { StoreCartPage } = await import('./StoreCartPage')
-const { PRICE_QUOTE_PUBLIC_RPC } = await import('@/shared/lib/db-schema')
+const { PROMOTION_QUOTE_PUBLIC_RPC } = await import('@/shared/lib/db-schema')
 
 const STORE = 'aaaa1111-1111-4111-8111-111111111111'
 const P_SILLA = 'cccc1111-1111-4111-8111-111111111111'
@@ -108,6 +108,8 @@ function cotizacion(cantidad: number, source: 'catalog' | 'price_list' = 'price_
     tax_inclusive: false,
     quoted_at: '2026-09-08T00:00:00.000Z',
     subtotal: neto,
+    discount_total: '0.00',
+    promotions: { applied: [] },
     tax_total: '0.00',
     grand_total: neto,
     lines: [
@@ -145,7 +147,7 @@ function backend(
       public_products: [producto()],
       public_product_images: [],
     },
-    ...(options.quote ? { rpc: { [PRICE_QUOTE_PUBLIC_RPC]: options.quote } } : {}),
+    ...(options.quote ? { rpc: { [PROMOTION_QUOTE_PUBLIC_RPC]: options.quote } } : {}),
   })
 }
 

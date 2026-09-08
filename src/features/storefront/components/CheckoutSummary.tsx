@@ -85,6 +85,11 @@ export function CheckoutSummary({
 
   const subtotal = Number(quoted?.netTotal ?? subtotalLocal)
   const impuesto = quoted ? Number(quoted.taxTotal) : 0
+  // `grossTotal` ya viene con el descuento restado: la identidad de la base es
+  // `subtotal + impuesto - descuento`, y volver a restarlo aquí lo contaría dos
+  // veces. Esta cifra se enseña, no se recalcula.
+  const descuento = quoted ? Number(quoted.discountTotal) : 0
+  const campanas = quoted?.promotions ?? []
   const total = quoted ? Number(quoted.grossTotal) + (envio?.amount ?? 0) : null
 
   return (
@@ -192,6 +197,29 @@ export function CheckoutSummary({
       <Divider sx={{ my: 1.75 }} />
 
       <Fila etiqueta={t('store.cart.subtotal')} valor={formatMoney(subtotal, moneda, locale)} />
+
+      {/* Las campañas, con su nombre y ANTES del impuesto: es el orden en que se
+          calculan —el impuesto cae sobre lo pagadero— y el orden en que las lee
+          quien repasa la cuenta. Sin esta fila el total no cuadraba con la suma
+          de las líneas y no había forma de saber por qué. */}
+      {descuento > 0 && (
+        <>
+          <Fila
+            etiqueta={t('store.cart.discount')}
+            valor={`- ${formatMoney(descuento, moneda, locale)}`}
+            destacada
+          />
+          {campanas.map((promo) => (
+            <Typography
+              key={promo.id ?? promo.label ?? promo.code}
+              sx={{ fontSize: TS.micro, color: 'var(--muted)', mt: -0.5, mb: 0.5 }}
+            >
+              {promo.label ?? promo.code}
+              {promo.amount ? ` · − ${formatMoney(Number(promo.amount), moneda, locale)}` : ''}
+            </Typography>
+          ))}
+        </>
+      )}
 
       {quoted && impuesto > 0 && (
         <Fila etiqueta={t('store.cart.tax')} valor={formatMoney(impuesto, moneda, locale)} />

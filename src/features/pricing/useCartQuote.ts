@@ -23,17 +23,29 @@ import { serverPricing } from './serverPricing'
  * `retry: false`: si la tienda no existe o una línea ya no está publicada,
  * reintentar cuatro veces solo retrasa el aviso.
  */
-export const cartQuoteKey = (storeSlug: string, lines: readonly PriceRequest[]) =>
-  ['pricing', 'cart-quote', storeSlug, lines] as const
+export const cartQuoteKey = (
+  storeSlug: string,
+  lines: readonly PriceRequest[],
+  coupons: readonly string[] = [],
+) => ['pricing', 'cart-quote', storeSlug, lines, coupons] as const
 
 export function useCartQuote(
   storeSlug: string | undefined,
   currency: string,
   lines: readonly PriceRequest[],
+  /**
+   * Cupones ya CONFIRMADOS por el comprador, no lo que va tecleando: cada valor
+   * distinto es una clave distinta y por tanto una llamada al servidor.
+   */
+  coupons: readonly string[] = [],
 ) {
   return useQuery<PriceQuote>({
-    queryKey: cartQuoteKey(storeSlug ?? '', lines),
-    queryFn: () => serverPricing.quote({ storeSlug: storeSlug as string, currency }, lines),
+    queryKey: cartQuoteKey(storeSlug ?? '', lines, coupons),
+    queryFn: () =>
+      serverPricing.quote(
+        { storeSlug: storeSlug as string, currency, couponCodes: coupons },
+        lines,
+      ),
     enabled: Boolean(storeSlug) && lines.length > 0,
     retry: false,
     staleTime: 30_000,

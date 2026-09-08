@@ -29,6 +29,7 @@ export const serverPricing: PricingPort = {
     const result = await quotePublicCart({
       storeSlug: context.storeSlug,
       items: lines.map(toItem),
+      couponCodes: context.couponCodes,
     })
 
     const priced: PricedLine[] = result.lines.map((line) => ({
@@ -58,8 +59,16 @@ export const serverPricing: PricingPort = {
       taxInclusive: result.tax_inclusive,
       lines: priced,
       netTotal: result.subtotal,
+      discountTotal: result.discount_total,
       taxTotal: result.tax_total,
       grossTotal: result.grand_total,
+      promotions: (result.promotions.applied ?? []).map((promo) => ({
+        id: promo.promotion_id,
+        code: promo.code,
+        label: promo.label,
+        amount: promo.amount,
+        couponCode: promo.coupon_code,
+      })),
     }
   },
 }
