@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildTextSearchFilter } from '@/shared/lib/search'
-import { tryGetSupabaseClient, tryGetStorefrontClient } from '@/shared/lib/supabase'
+import { tryGetSupabaseClient, tryGetStorefrontRpcClient } from '@/shared/lib/supabase'
 import { PricingError, pricingErrorFromDb } from './errors'
 import type { ResolvedPriceRow } from './importCsv'
 import {
@@ -580,17 +580,21 @@ export interface PublicQuoteItem {
 }
 
 /**
- * Lo que pide el carrito del comprador anónimo.
+ * Lo que pide el carrito de la vitrina.
  *
  * Viaja el slug de la URL y QUÉ se quiere comprar. Nada más: ni precio, ni
- * canal, ni cliente. Usa el cliente de storefront (clave publicable, sin
- * sesión) porque el comprador no la tiene.
+ * canal, ni cliente — el cliente NO se declara, se deduce de quien firma.
+ *
+ * Por eso va con el cliente que lleva la sesión si la hay (P19) y no con el
+ * anónimo de la vitrina: la función es `security definer` y saca el acuerdo de
+ * `ebim.user_id()`. Pedirla sin token es pedir el precio de catálogo, que es lo
+ * que hacía —el motor resolvía bien y aquí no se le decía a quién—.
  */
 export async function quotePublicCart(input: {
   storeSlug: string
   items: readonly PublicQuoteItem[]
 }): Promise<PriceQuoteResult> {
-  const supabase = tryGetStorefrontClient()
+  const supabase = tryGetStorefrontRpcClient()
   if (!supabase) throw new PricingError('auth.notConfigured', 'CONFIG_INCOMPLETA')
 
   const { data, error } = await supabase.rpc(PRICE_QUOTE_PUBLIC_RPC, {

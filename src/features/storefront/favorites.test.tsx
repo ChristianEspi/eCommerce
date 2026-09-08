@@ -30,6 +30,7 @@ vi.mock('@/shared/lib/supabase', () => ({
   tryGetSupabaseClient: () => holder.auth,
   getSupabaseClient: () => holder.auth,
   tryGetStorefrontClient: () => holder.anon,
+  tryGetStorefrontRpcClient: () => holder.auth,
   getStorefrontClient: () => holder.anon,
 }))
 

@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { z } from 'zod'
 import { DELIVERY_OPTIONS_PUBLIC_RPC } from '@/shared/lib/db-schema'
 import { moneyText } from '@/shared/lib/money'
-import { storefrontClient } from './api'
+import { tryGetStorefrontRpcClient } from '@/shared/lib/supabase'
 import type { Cart } from './cart/cart'
 import { toOrderItems } from './cart/cart'
 
@@ -70,12 +70,23 @@ export interface DeliveryAddress {
   country?: string
 }
 
+/**
+ * Con el cliente que lleva la SESIÓN, como la cotización del carrito (P19).
+ *
+ * Esta función también cotiza por dentro —el umbral de envío gratis se decide
+ * sobre el subtotal—, así que pedirla anónima daría un umbral calculado con un
+ * subtotal que el comprador B2B no va a pagar: envío gratis que no llega, o al
+ * revés. Las dos cotizaciones tienen que mirar al mismo comprador.
+ */
 export async function fetchDeliveryOptions(input: {
   storeSlug: string
   address: DeliveryAddress
   cart: Cart
 }): Promise<DeliveryQuote> {
-  const { data, error } = await storefrontClient().rpc(DELIVERY_OPTIONS_PUBLIC_RPC, {
+  const supabase = tryGetStorefrontRpcClient()
+  if (!supabase) throw new Error('DELIVERY_QUOTE_FAILED')
+
+  const { data, error } = await supabase.rpc(DELIVERY_OPTIONS_PUBLIC_RPC, {
     p_store_slug: input.storeSlug,
     p_address: input.address,
     p_items: toOrderItems(input.cart),

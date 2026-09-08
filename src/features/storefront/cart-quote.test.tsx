@@ -27,6 +27,8 @@ vi.mock('@/shared/lib/supabase', () => ({
   tryGetSupabaseClient: () => holder.client,
   getSupabaseClient: () => holder.client,
   tryGetStorefrontClient: () => holder.client,
+
+  tryGetStorefrontRpcClient: () => holder.client,
   getStorefrontClient: () => holder.client,
 }))
 
@@ -149,8 +151,16 @@ describe('el resumen del carrito lo decide el servidor', () => {
     renderCart(backend({ quote: () => cotizacion() }))
 
     // El carrito guardaba 2 × 100.00 = 200.00; el servidor dice 184.00.
-    expect(await screen.findByText('S/ 184.00')).toBeInTheDocument()
+    //
+    // Desde P19 ese importe sale DOS veces —en la linea y en el resumen— porque
+    // la linea tambien pinta lo cotizado. No es ruido: con un acuerdo B2B el
+    // resumen bajaba y la linea se quedaba en el precio de catalogo, y dos
+    // numeros distintos para lo mismo en la misma pantalla es como se pierde la
+    // confianza en el total. Por eso se afirma sobre el resumen y no sobre la
+    // pantalla entera.
+    await screen.findAllByText('S/ 184.00')
     const card = resumen()
+    expect(within(card).getByText('S/ 184.00')).toBeInTheDocument()
     expect(within(card).queryByText('S/ 200.00')).not.toBeInTheDocument()
     expect(within(card).getByText('S/ 33.12')).toBeInTheDocument()
     expect(within(card).getByText('S/ 217.12')).toBeInTheDocument()
@@ -164,7 +174,7 @@ describe('el resumen del carrito lo decide el servidor', () => {
 
   it('sin acuerdo aplicado no promete un precio especial', async () => {
     renderCart(backend({ quote: () => cotizacion('catalog') }))
-    await screen.findByText('S/ 184.00')
+    await screen.findAllByText('S/ 184.00')
     expect(within(resumen()).queryByText('Precio especial')).not.toBeInTheDocument()
   })
 
@@ -179,7 +189,7 @@ describe('el resumen del carrito lo decide el servidor', () => {
       }),
     )
 
-    await screen.findByText('S/ 184.00')
+    await screen.findAllByText('S/ 184.00')
     expect(calls).toHaveLength(1)
     expect(calls[0]).toEqual({
       p_store_slug: 'la-tienda',

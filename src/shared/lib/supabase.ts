@@ -66,3 +66,28 @@ export function getStorefrontClient(): SupabaseClient {
 export function tryGetStorefrontClient(): SupabaseClient | null {
   return isSupabaseConfigured ? getStorefrontClient() : null
 }
+
+/**
+ * Cliente para las FUNCIONES de la vitrina que dependen de QUIÉN compra.
+ *
+ * La regla de arriba —la vitrina navega siempre anónima— vale para las vistas,
+ * que es donde nació: sus policies son `to anon` y darlas a `authenticated`
+ * abriría el catálogo interno de un tenant al usuario de otro.
+ *
+ * Con las funciones el problema es el contrario, y costó verlo: cotizar es
+ * `security definer`, no depende de ninguna policy, y **necesita saber quién
+ * pregunta**. Desde P19 el precio del acuerdo sale de `ebim.user_id()`, así que
+ * pedirlo con el cliente anónimo es garantizar que el comprador B2B vea el
+ * precio de catálogo aunque tenga sesión — que es exactamente lo que pasaba: el
+ * motor resolvía bien y el navegador no le decía a quién.
+ *
+ * Sin sesión, `supabase-js` manda la clave publicable y la llamada entra como
+ * `anon`, igual que antes. Con sesión manda el token del comprador. Las dos
+ * cosas están concedidas en la base, así que no hay caso degradado.
+ *
+ * Es el mismo criterio que ya usaba el carrito de servidor, que lleva desde P07
+ * eligiendo cliente según haya sesión o no.
+ */
+export function tryGetStorefrontRpcClient(): SupabaseClient | null {
+  return isSupabaseConfigured ? getSupabaseClient() : null
+}

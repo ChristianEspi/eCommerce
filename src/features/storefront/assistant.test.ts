@@ -18,6 +18,8 @@ const fetchPorIds = vi.fn()
 
 vi.mock('@/shared/lib/supabase', () => ({
   tryGetStorefrontClient: () => ({ functions: { invoke } }),
+
+  tryGetStorefrontRpcClient: () => null,
   tryGetSupabaseClient: () => null,
 }))
 

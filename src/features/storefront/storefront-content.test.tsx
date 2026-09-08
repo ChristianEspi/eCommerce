@@ -28,6 +28,7 @@ vi.mock('@/shared/lib/supabase', () => ({
   tryGetSupabaseClient: () => holder.client,
   getSupabaseClient: () => holder.client,
   tryGetStorefrontClient: () => holder.client,
+  tryGetStorefrontRpcClient: () => holder.client,
   getStorefrontClient: () => holder.client,
 }))
 

@@ -7,7 +7,8 @@ import { R, TS } from '@/theme/tokens'
 import { ProductMedia } from '../components/ProductMedia'
 import { QuantityStepper } from '../components/QuantityStepper'
 import { useSignedThumbnails } from '../hooks'
-import { MAX_LINE_QUANTITY, lineKey, lineTotalCents, type Cart, type CartLine } from './cart'
+import type { PriceQuote } from '@/domain'
+import { MAX_LINE_QUANTITY, lineKey, type Cart, type CartLine } from './cart'
 import { useCart } from './cart-context'
 
 /**
@@ -20,12 +21,25 @@ export function CartLineList({
   storeSlug,
   onNavigate,
   compact = false,
+  quoted = null,
 }: {
   cart: Cart
   storeSlug: string
   /** El panel se cierra al pulsar un enlace; la página no necesita nada. */
   onNavigate?: () => void
   compact?: boolean
+  /**
+   * La cotización del SERVIDOR, si la pantalla la tiene.
+   *
+   * El precio guardado en el carrito es de escaparate, y desde P19 puede no ser
+   * el del comprador: con un acuerdo B2B el subtotal baja y la línea se quedaba
+   * diciendo el de catálogo. Dos números distintos para lo mismo en la misma
+   * pantalla es lo que hace que alguien deje de fiarse del total.
+   *
+   * Sin cotización —el panel lateral no la pide— manda el del carrito, como
+   * siempre.
+   */
+  quoted?: PriceQuote | null
 }) {
   const thumbs = useSignedThumbnails(cart.lines.map((line) => line.image_path))
 
@@ -39,10 +53,22 @@ export function CartLineList({
           imageUrl={line.image_path ? (thumbs[line.image_path] ?? null) : null}
           onNavigate={onNavigate}
           compact={compact}
+          precio={precioDe(line, quoted)}
         />
       ))}
     </Stack>
   )
+}
+
+/** Lo que se va a cobrar por una unidad, con su moneda. */
+function precioDe(line: CartLine, quoted: PriceQuote | null): { amount: number; currency: string } {
+  const cotizada = quoted?.lines.find(
+    (item) => item.productId === line.product_id && (item.variantId ?? null) === line.variant_id,
+  )
+  return {
+    amount: Number(cotizada?.unitPrice.amount ?? line.unit_price),
+    currency: quoted?.currency ?? line.currency,
+  }
 }
 
 function CartLineRow({
@@ -51,12 +77,14 @@ function CartLineRow({
   imageUrl,
   onNavigate,
   compact,
+  precio,
 }: {
   line: CartLine
   storeSlug: string
   imageUrl: string | null
   onNavigate?: () => void
   compact: boolean
+  precio: { amount: number; currency: string }
 }) {
   const { t, locale } = useI18n()
   const { setQuantity, remove } = useCart()
@@ -114,7 +142,7 @@ function CartLineRow({
           )}
         </Box>
         <Typography sx={{ fontSize: TS.label, color: 'var(--muted)', fontWeight: 600 }}>
-          {formatMoney(Number(line.unit_price), line.currency, locale)} · {t('store.cart.each')}
+          {formatMoney(precio.amount, precio.currency, locale)} · {t('store.cart.each')}
         </Typography>
 
         <Stack direction="row" sx={{ alignItems: 'center', gap: 0.5, mt: 0.5 }}>
@@ -145,7 +173,7 @@ function CartLineRow({
       </Stack>
 
       <Typography sx={{ fontWeight: 800, fontSize: TS.bodyStrong, whiteSpace: 'nowrap' }}>
-        {formatMoney(lineTotalCents(line) / 100, line.currency, locale)}
+        {formatMoney(precio.amount * line.quantity, precio.currency, locale)}
       </Typography>
     </Stack>
   )

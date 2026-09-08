@@ -10,6 +10,7 @@ vi.mock('@/shared/lib/supabase', () => ({
   tryGetSupabaseClient: () => null,
   getSupabaseClient: () => null,
   tryGetStorefrontClient: () => null,
+  tryGetStorefrontRpcClient: () => null,
   getStorefrontClient: () => null,
 }))
 

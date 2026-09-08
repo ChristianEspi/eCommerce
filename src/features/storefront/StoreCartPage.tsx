@@ -93,7 +93,7 @@ export function StoreCartPage() {
         }}
       >
         <Card sx={{ p: { xs: 1.5, md: 2.5 } }}>
-          <CartLineList cart={cart} storeSlug={storeSlug} />
+          <CartLineList cart={cart} storeSlug={storeSlug} quoted={quoted} />
         </Card>
 
         <Card sx={{ p: { xs: 1.5, md: 2.5 } }}>
