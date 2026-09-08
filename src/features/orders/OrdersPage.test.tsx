@@ -405,6 +405,69 @@ describe('OrdersPage — detalle en panel lateral', () => {
     expect(within(drawer).getByText(/todavía no filtran el listado/)).toBeInTheDocument()
   })
 
+  /**
+ * De donde SALE, no solo a donde va.
+   *
+   * Elegir destino sin ver el origen convierte «Nuevo estado» en una lista sin
+   * contexto: los valores cambian al cambiar de eje —cada uno tiene su
+   * vocabulario— y sin el punto de partida no hay forma de saber por que.
+   */
+  it('el selector de eje dice en que estado esta ese eje AHORA', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    const drawer = await openDrawer(user, 'MI-000001', 'Operación')
+    expect(within(drawer).getByText('Ahora: Pendiente')).toBeInTheDocument()
+
+    await user.click(within(drawer).getByRole('combobox', { name: /Qué se mueve/i }))
+    await user.click(await screen.findByRole('option', { name: 'Entrega' }))
+
+    // El mismo pedido, otro eje, otro punto de partida.
+    expect(within(drawer).getByText('Ahora: Sin despachar')).toBeInTheDocument()
+  })
+
+  /**
+   * Cancelar es TERMINAL: el pedido no vuelve a moverse.
+   *
+   * El atajo lo hacia de un clic, sin preguntar y sin motivo, en un boton rojo
+   * pegado a otro verde. La base tampoco lo exige —`order_transition` acepta el
+   * motivo vacio— asi que el unico sitio donde se puede parar es aqui.
+   */
+  it('cancelar pide confirmacion y motivo antes de tocar nada', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    const client = holder.client as FakeSupabase
+
+    const drawer = await openDrawer(user, 'MI-000001', 'Operación')
+    await user.click(within(drawer).getByRole('button', { name: 'Cancelar pedido' }))
+
+    expect(await screen.findByText('Cancelar este pedido')).toBeInTheDocument()
+    // Nada ha salido hacia el servidor todavia.
+    expect(client.state.rpcCalls.filter((c) => c.name === 'order_transition')).toHaveLength(0)
+
+    // Y sin motivo no se puede confirmar.
+    expect(screen.getByRole('button', { name: 'Sí, cancelar el pedido' })).toBeDisabled()
+  })
+
+  it('el motivo viaja con la cancelacion y queda en el historial', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    const client = holder.client as FakeSupabase
+
+    const drawer = await openDrawer(user, 'MI-000001', 'Operación')
+    await user.click(within(drawer).getByRole('button', { name: 'Cancelar pedido' }))
+    await user.type(await screen.findByRole('textbox', { name: /Por qué se cancela/i }), 'Duplicado')
+    await user.click(screen.getByRole('button', { name: 'Sí, cancelar el pedido' }))
+
+    await waitFor(() =>
+      expect(client.state.rpcCalls.some((c) => c.name === 'order_transition')).toBe(true),
+    )
+    const llamada = client.state.rpcCalls.find((c) => c.name === 'order_transition')
+    expect(llamada?.args.p_axis).toBe('order_status')
+    expect(llamada?.args.p_to).toBe('cancelled')
+    expect(llamada?.args.p_reason).toBe('Duplicado')
+  })
+
   it('cambiar de eje cambia el menu de destinos', async () => {
     const user = userEvent.setup()
     renderPage()
@@ -415,11 +478,13 @@ describe('OrdersPage — detalle en panel lateral', () => {
     await user.click(within(drawer).getByRole('combobox', { name: /Nuevo estado/i }))
 
     const options = (await screen.findAllByRole('option')).map((node) => node.textContent)
+    // «Anulado» a secas existía también en el eje del PAGO. Dos cosas distintas
+    // con el mismo nombre en la misma pantalla: ahora cada una dice de qué habla.
     expect(options).toEqual([
       'En preparación',
       'Despachado en parte',
       'Despachado',
-      'Anulado',
+      'Entrega anulada',
     ])
   })
 })

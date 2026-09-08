@@ -6,6 +6,10 @@ import {
   Box,
   Button,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   IconButton,
   MenuItem,
@@ -149,6 +153,8 @@ export function OrderDrawer({
   const [refSystem, setRefSystem] = useState('')
   const [refType, setRefType] = useState('invoice')
   const [refValue, setRefValue] = useState('')
+  const [cancelOpen, setCancelOpen] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
 
   // Al abrir otro pedido el formulario arranca limpio: arrastrar el motivo del
   // anterior lo pegaría en la línea de tiempo del nuevo.
@@ -214,12 +220,20 @@ export function OrderDrawer({
     to: string
     primary?: boolean
     destructive?: boolean
+    /** Pide confirmación y motivo antes de ejecutar. Solo lo irreversible. */
+    confirm?: boolean
   }> = []
   if (nextForAxis('payment_status', current.payment_status).includes('paid')) {
     atajos.push({ key: 'orders.quick.markPaid', axis: 'payment_status', to: 'paid', primary: true })
   }
   if (nextForAxis('order_status', current.status).includes('cancelled')) {
-    atajos.push({ key: 'orders.quick.cancel', axis: 'order_status', to: 'cancelled', destructive: true })
+    atajos.push({
+      key: 'orders.quick.cancel',
+      axis: 'order_status',
+      to: 'cancelled',
+      destructive: true,
+      confirm: true,
+    })
   }
 
   /**
@@ -266,6 +280,8 @@ export function OrderDrawer({
     fulfillment_status: current.fulfillment_status,
   }
   const allowed = nextForAxis(axis, currentOf[axis])
+  /** El valor ACTUAL del eje elegido, para poder enseñar de dónde sale. */
+  const valorActual = currentOf[axis]
   const awaitingApproval = current.approval_status === 'pending'
 
   async function run(action: () => Promise<unknown>, toast: MessageKey, after?: () => void) {
@@ -538,7 +554,16 @@ export function OrderDrawer({
                   variant={atajo.primary ? 'contained' : 'outlined'}
                   color={atajo.destructive ? 'error' : 'primary'}
                   disabled={busy}
-                  onClick={() =>
+                  onClick={() => {
+                    // Cancelar es TERMINAL: el pedido no vuelve a moverse. Un
+                    // clic sin preguntar, en un botón rojo pegado a otro verde y
+                    // en un panel por el que la gente curiosea, es la clase de
+                    // acción que se ejecuta sin querer y no se deshace.
+                    if (atajo.confirm) {
+                      setCancelReason('')
+                      setCancelOpen(true)
+                      return
+                    }
                     void run(
                       () =>
                         transition.mutateAsync({
@@ -549,7 +574,7 @@ export function OrderDrawer({
                         }),
                       'orders.toast.updated',
                     )
-                  }
+                  }}
                 >
                   {t(atajo.key)}
                 </Button>
@@ -559,12 +584,18 @@ export function OrderDrawer({
 
           {canWrite && (
             <>
+              {/* De dónde SALE, no solo a dónde va.
+                  Elegir un destino sin ver el origen convierte «Nuevo estado»
+                  en una lista sin contexto: los valores cambian al cambiar de
+                  eje —cada uno tiene su vocabulario— y sin el punto de partida
+                  no hay forma de saber por qué. */}
               <TextField
                 select
                 size="small"
                 label={t('orders.axis')}
                 value={axis}
                 onChange={(event) => setAxis(event.target.value as OrderAxis)}
+                helperText={`${t('orders.axisNow')}: ${t(valueLabel(axis, valorActual) as MessageKey)}`}
               >
                 {ORDER_AXES.map((value) => (
                   <MenuItem key={value} value={value}>
@@ -940,6 +971,57 @@ export function OrderDrawer({
         {tab === 'operation' && operation}
         {tab === 'history' && history}
       </Stack>
+
+      {/* Cancelar es terminal, y hasta ahora era un clic sin preguntar.
+          El motivo lo exige esta pantalla y no la base —`order_transition` lo
+          acepta vacío— porque el hueco es real: la entrega SÍ obliga a decir por
+          qué se anula, y el pedido no. Mientras esa asimetría siga en la base,
+          al menos no se cuela por aquí. */}
+      <Dialog open={cancelOpen} onClose={() => setCancelOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>{t('orders.cancel.title')}</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: 13, color: 'var(--muted)', mb: 2 }}>
+            {t('orders.cancel.body')}
+          </Typography>
+          <TextField
+            autoFocus
+            fullWidth
+            multiline
+            minRows={2}
+            size="small"
+            label={t('orders.cancel.reason')}
+            helperText={t('orders.cancel.reasonHelp')}
+            value={cancelReason}
+            onChange={(event) => setCancelReason(event.target.value)}
+            inputProps={{ maxLength: 1000 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCancelOpen(false)} disabled={busy}>
+            {t('common.close')}
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            disabled={busy || cancelReason.trim() === ''}
+            onClick={() =>
+              void run(
+                () =>
+                  transition.mutateAsync({
+                    orderId: orderRef,
+                    axis: 'order_status',
+                    to: 'cancelled',
+                    reason: cancelReason,
+                  }),
+                'orders.toast.updated',
+                () => setCancelOpen(false),
+              )
+            }
+          >
+            {t('orders.cancel.confirm')}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </FormDrawer>
   )
 }
