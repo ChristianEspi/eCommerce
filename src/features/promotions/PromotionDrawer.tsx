@@ -204,7 +204,11 @@ export function PromotionDrawer({
     setErrors(found)
     if (Object.keys(found).length > 0) return
     try {
-      await save.mutateAsync({ id: promotion?.id ?? null, values })
+      await save.mutateAsync({
+        id: promotion?.id ?? null,
+        values,
+        previa: promotion ? { image_url: promotion.image_url ?? null } : null,
+      })
       notify(t('promotions.campaigns.saved'), 'success')
       if (!promotion) onClose()
     } catch (error) {
@@ -584,6 +588,10 @@ export function PromotionDrawer({
                   label={`${row.is_exclusion ? '− ' : ''}${t(
                     `promotions.scope.${row.scope_kind}` as MessageKey,
                   )}${row.required_quantity ? ` ×${trimDecimals(row.required_quantity)}` : ''}`}
+                  // Mientras se borra, la pastilla se apaga: sin esto se queda
+                  // igual hasta que vuelve la relectura y parece que el clic no
+                  // hizo nada, así que se pulsa otra vez.
+                  disabled={removeScope.isPending}
                   onDelete={() => void removeScope.mutateAsync(row.id)}
                 />
               ))}
@@ -638,6 +646,11 @@ export function PromotionDrawer({
                     onPick={(option) => {
                       setTargetPicked(option)
                       setScopeTarget(option.id)
+                      // El campo pasa a decir lo ELEGIDO y no lo tecleado. Sin
+                      // esto seguía mostrando «Pañales» —el término de búsqueda—
+                      // y no había forma de saber si la elección había prendido:
+                      // parecía que tardaba, y se volvía a abrir el desplegable.
+                      setTargetTerm(option.primary)
                       // Al cambiar de producto, la variante elegida ya no es suya.
                       setScopeVariant('')
                     }}

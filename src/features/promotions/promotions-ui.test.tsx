@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '@/test/render'
@@ -374,8 +374,13 @@ describe('Campañas — el alta', () => {
     await usuario.click(panel.getByRole('combobox', { name: 'Alcance' }))
     await usuario.click(await screen.findByRole('option', { name: 'Producto' }))
 
-    // Se teclea el NOMBRE, que es por donde se busca de verdad.
-    await usuario.type(panel.getByRole('combobox', { name: /Busca y elige/ }), 'alitraq')
+    // Se busca por NOMBRE, que es por donde se busca de verdad. Con
+    // `fireEvent.change` y no `type`: el buscador espera 300 ms antes de
+    // consultar, y siete pulsaciones son siete ciclos de temporizador que en una
+    // maquina cargada se van del limite sin que falle nada de verdad.
+    fireEvent.change(panel.getByRole('combobox', { name: /Busca y elige/ }), {
+      target: { value: 'alitraq' },
+    })
     await usuario.click(await screen.findByRole('option', { name: /Alitraq/ }))
     await usuario.click(panel.getByRole('button', { name: 'Añadir' }))
 
@@ -385,7 +390,11 @@ describe('Campañas — el alta', () => {
     // Y NO el SKU, que es lo que se tecleaba antes y lo que rompia la consulta.
     expect(guardado?.product_id).not.toBe('QS-565341')
     expect(guardado?.scope_kind).toBe('product')
-  })
+    // Holgura explícita: el buscador va contra el servidor con 300 ms de espera
+    // antes de consultar, y son dos idas y vueltas. Con los 5 s de por defecto
+    // pasa en una máquina despejada y falla en una cargada, que es la peor
+    // forma de fallar: parece un fallo del código y es del reloj.
+  }, 20_000)
 
   it('un porcentaje inválido se detiene en el cliente y no llega a la base', async () => {
     const fake = backend()

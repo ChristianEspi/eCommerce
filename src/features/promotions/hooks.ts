@@ -60,12 +60,25 @@ export const giftCardsKey = (storeId: string | null, status: string, term: strin
 export const giftCardMovementsKey = (giftCardId: string | null) =>
   [...PROMOTIONS_KEY, 'gift-card-movements', giftCardId] as const
 
+/**
+ * Devuelve la PROMESA de las dos invalidaciones, y eso importa.
+ *
+ * Con `void` la mutación terminaba antes que el refresco: el panel se daba por
+ * hecho mientras la lista seguía enseñando lo viejo, así que un alcance recién
+ * añadido tardaba en aparecer y uno recién borrado seguía ahí. No era lentitud
+ * de la red, era que nadie esperaba a la relectura.
+ *
+ * Devolviéndola desde `onSuccess`, react-query mantiene `isPending` hasta que
+ * los datos están al día — y con eso el botón puede quedarse quieto en vez de
+ * invitar a pulsarlo otra vez.
+ */
 function useInvalidatePromotions() {
   const queryClient = useQueryClient()
-  return () => {
-    void queryClient.invalidateQueries({ queryKey: PROMOTIONS_KEY })
-    void queryClient.invalidateQueries({ queryKey: ['storefront'] })
-  }
+  return () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: PROMOTIONS_KEY }),
+      queryClient.invalidateQueries({ queryKey: ['storefront'] }),
+    ])
 }
 
 export function usePromotions(filter: PromotionFilter) {
@@ -79,11 +92,18 @@ export function usePromotions(filter: PromotionFilter) {
 export function useSavePromotion(scope: PromotionScopeIds | null) {
   const invalidate = useInvalidatePromotions()
   return useMutation({
-    mutationFn: (input: { id: string | null; values: PromotionFormValues }) => {
+    mutationFn: (input: {
+      id: string | null
+      values: PromotionFormValues
+      /** La campaña tal como estaba: sin ella se manda la foto aunque no cambie. */
+      previa?: { image_url: string | null } | null
+    }) => {
       if (!scope) throw new Error('SIN_TIENDA')
       return input.id === null
         ? createPromotion(scope, input.values)
-        : updatePromotion(scope, input.id, input.values).then(() => input.id as string)
+        : updatePromotion(scope, input.id, input.values, input.previa).then(
+            () => input.id as string,
+          )
     },
     onSuccess: invalidate,
   })

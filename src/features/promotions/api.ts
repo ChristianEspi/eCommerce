@@ -160,19 +160,34 @@ export async function updatePromotion(
   scope: PromotionScopeIds,
   id: string,
   values: PromotionFormValues,
+  /** La campaña tal como estaba. Sirve para no mandar lo que no ha cambiado. */
+  previa?: { image_url: string | null } | null,
 ): Promise<void> {
-  // Dos cosas que NO viajan en el `update`, y ninguna por olvido:
+  // `promotions` tiene GRANT **por columna** para `authenticated`: la RLS filtra
+  // filas y nunca columnas, así que la lista de lo actualizable se enumera una a
+  // una en la migración. Mandar una columna que no está en esa lista no da un
+  // aviso, da un 42501 —«tu rol no puede hacer ese cambio»— y tumba la consulta
+  // ENTERA, aunque el valor enviado sea idéntico al que ya había.
+  //
+  // Lo que NO viaja, y ninguno por olvido:
   //
   //  · el TENANT (`organization_id`, `company_id`, `store_id`) — mover una
   //    campaña de tenant no es una edición, es una fuga, y la policy la
   //    rechazaría de todas formas;
-  //  · `usage_count` — no tiene GRANT de UPDATE para `authenticated`, así que
-  //    enviarlo haría fallar la consulta entera.
+  //  · `kind` — el tipo es inmutable después de crear: sus alcances y escalas
+  //    cuelgan de él por clave ajena compuesta, y la pantalla ya bloquea el
+  //    selector. Se seguía enviando igualmente, y era la mitad del 42501;
+  //  · `image_url` **si no cambió** — es la otra mitad. La columna se añadió en
+  //    `20260902230000` sin ampliar el grant, así que hasta que se aplique
+  //    `20260908220000_promotion_image_grant.sql` cualquier edición que la
+  //    incluya falla. Enviándola solo cuando de verdad cambia, editar el resto
+  //    de la campaña funciona ya; cambiar la foto necesita esa migración.
   const row = toRow(scope, values)
+  const fuera = new Set(['organization_id', 'company_id', 'store_id', 'kind'])
+  if (previa && previa.image_url === row.image_url) fuera.add('image_url')
+
   const editable = Object.fromEntries(
-    Object.entries(row).filter(
-      ([key]) => key !== 'organization_id' && key !== 'company_id' && key !== 'store_id',
-    ),
+    Object.entries(row).filter(([key]) => !fuera.has(key)),
   )
   const { error } = await client().from(PROMOTIONS_TABLE).update(editable).eq('id', id)
   if (error) throw promotionsErrorFromDb(error)
