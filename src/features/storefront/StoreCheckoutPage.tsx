@@ -1,4 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded'
+import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded'
 import LockRoundedIcon from '@mui/icons-material/LockRounded'
 import ShoppingCartRoundedIcon from '@mui/icons-material/ShoppingCartRounded'
 import { Alert, AlertTitle, Box, Button, Card, Chip, Divider, Stack, TextField, Typography } from '@mui/material'
@@ -10,12 +12,13 @@ import { useSessionContext } from '@/features/auth/session-context'
 import { useCartQuote } from '@/features/pricing/useCartQuote'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
-import { formatMoney } from '@/shared/lib/format'
 import { useDocumentMeta } from '@/shared/seo/useDocumentMeta'
 import { PageHeader } from '@/shared/ui/PageHeader'
 import { EmptyState } from '@/shared/ui/states'
 import { TS } from '@/theme/tokens'
 import { useCart } from './cart/cart-context'
+import { CheckoutSteps } from './components/CheckoutSteps'
+import { CheckoutSummary } from './components/CheckoutSummary'
 import { DeliveryPicker } from './components/DeliveryPicker'
 import { PaymentPicker } from './components/PaymentPicker'
 import { useDeliveryOptions } from './delivery'
@@ -73,44 +76,45 @@ import { privateMeta } from './seo'
  *    que reintenta con la misma clave y `accept_price_changes`.
  */
 /**
- * Un paso del checkout.
+ * Los tres pasos, en orden.
  *
- * El formulario era una columna de diez campos sin una sola division: se lee
- * como un tramite largo y no como tres decisiones cortas, y esa sensacion es
- * la que hace abandonar. No es un stepper —partir la pagina en pantallas
- * anadiria navegacion, estado y una forma nueva de perder lo escrito—: es la
- * misma pagina de siempre, numerada, que da sentido de avance sin tocar el
- * flujo ni la validacion.
+ * ## Por qué ahora sí es un asistente por pasos
  *
- * El numero va `aria-hidden`: el titulo ya encabeza la seccion, y leer
- * «uno Contacto» no anade nada.
+ * Hasta ahora esto era **una sola página numerada**, y el comentario que
+ * ocupaba este sitio defendía esa decisión: partirla añade navegación, estado
+ * y una forma nueva de perder lo escrito. Sigue siendo verdad, y por eso el
+ * reparto se paga en un solo sitio —aquí— en vez de en tres pantallas con sus
+ * tres rutas: **los valores no se pierden al cambiar de paso** porque
+ * `react-hook-form` conserva lo registrado aunque el campo se desmonte, y no
+ * hay ruta nueva, así que tampoco hay historial que pueda devolver a alguien a
+ * un paso 2 sin paso 1.
+ *
+ * Lo que se gana a cambio es lo que pedía la pantalla: doce campos seguidos se
+ * leen como un trámite, y tres decisiones cortas se leen como una compra.
+ *
+ * ## La lista es el orden, y también la validación
+ *
+ * `CAMPOS` no es documentación: es lo que se valida al pulsar «Siguiente» y lo
+ * que decide a qué paso volver si el envío final encuentra un campo malo. Un
+ * campo que se añada al formulario y no a esta lista pasaría el paso sin
+ * comprobarse y reventaría al final, lejos de donde se escribió.
  */
-function Paso({ numero, titulo }: { numero: number; titulo: string }) {
-  return (
-    <Stack direction="row" sx={{ alignItems: 'center', gap: 1.25, mb: 2 }}>
-      <Box
-        aria-hidden
-        sx={{
-          width: 26,
-          height: 26,
-          flexShrink: 0,
-          borderRadius: '999px',
-          display: 'grid',
-          placeItems: 'center',
-          bgcolor: 'var(--accent-soft)',
-          color: 'var(--accent-deep)',
-          fontSize: 13,
-          fontWeight: 800,
-        }}
-      >
-        {numero}
-      </Box>
-      <Typography component="h2" sx={{ fontSize: TS.cardTitle, fontWeight: 800 }}>
-        {titulo}
-      </Typography>
-    </Stack>
-  )
-}
+const PASOS = [
+  { id: 'contacto', tituloKey: 'store.checkout.contact', cortoKey: 'store.checkout.step.contact' },
+  { id: 'entrega', tituloKey: 'store.checkout.step.delivery', cortoKey: 'store.checkout.step.delivery' },
+  { id: 'pago', tituloKey: 'store.checkout.payment', cortoKey: 'store.checkout.payment' },
+] as const satisfies ReadonlyArray<{
+  id: string
+  tituloKey: MessageKey
+  cortoKey: MessageKey
+}>
+
+/** Campos del esquema que vive en cada paso. El índice es el del paso. */
+const CAMPOS: ReadonlyArray<ReadonlyArray<keyof CheckoutValues>> = [
+  ['customerName', 'customerEmail', 'customerPhone'],
+  ['address', 'city', 'region', 'postalCode', 'country', 'reference', 'couponCode'],
+  ['paymentMethodCode'],
+]
 
 export function StoreCheckoutPage() {
   const { t, locale } = useI18n()
@@ -168,6 +172,8 @@ export function StoreCheckoutPage() {
     register,
     control,
     setValue,
+    getValues,
+    trigger,
     handleSubmit,
     formState: { errors },
   } = useForm<CheckoutValues>({
@@ -268,6 +274,86 @@ export function StoreCheckoutPage() {
       ? Number(selectedDelivery.amount)
       : 0
 
+  const [paso, setPaso] = useState(0)
+  /**
+   * El paso más lejano ya validado.
+   *
+   * Es lo que permite volver a corregir el correo desde el paso 3 con UN clic
+   * en la barra en vez de dos «Anterior» seguidos —el gesto más frecuente de
+   * cualquier compra—, sin abrir la puerta a saltarse un paso hacia delante.
+   */
+  const [alcanzado, setAlcanzado] = useState(0)
+  const ultimoPaso = PASOS.length - 1
+
+  /**
+   * Lo que un paso exige y el ESQUEMA no puede exigir.
+   *
+   * Elegir entrega y medio de pago solo es obligatorio cuando la tienda ofrece
+   * alguno, así que no cabe en un `zod` que no sabe qué tiene configurado este
+   * comercio. Vive aquí, y la usan las dos puertas —«Siguiente» y «Confirmar
+   * pedido»— para que no puedan discrepar.
+   *
+   * Ninguna de estas comprobaciones es la autoridad: las tres las vuelve a
+   * exigir el servidor. Aquí solo ahorran un viaje para recibir un error que
+   * ya se sabe.
+   */
+  const faltaEn = (indice: number): MessageKey | null => {
+    const values = getValues()
+    if (indice === 1) {
+      if (deliveryOptions.length > 0 && !values.deliveryMethodCode) {
+        return 'store.checkout.error.delivery.method'
+      }
+      if (selectedDelivery?.strategy === 'pickup' && !values.pickupPointId) {
+        return 'store.checkout.error.delivery.pickup'
+      }
+    }
+    if (indice === 2) {
+      if (paymentMethods.length > 0 && !values.paymentMethodCode) {
+        return 'store.checkout.error.payment.method'
+      }
+      // Luhn en el navegador no valida una tarjeta —eso lo dice el emisor—:
+      // evita gastar una llamada a la pasarela por un digito mal tecleado.
+      if (pideTarjeta && !pareceTarjeta(tarjeta.numero)) return 'store.card.numberInvalid'
+      if (
+        pideTarjeta &&
+        (tarjeta.mes.length < 1 || tarjeta.anio.length < 2 || tarjeta.cvv.length < 3)
+      ) {
+        return 'store.card.incomplete'
+      }
+    }
+    return null
+  }
+
+  /**
+   * Ir a un paso. Hacia atrás siempre; hacia delante, validando cada tramo.
+   *
+   * Se recorre paso a paso y no solo el de destino: pulsar el 3 desde el 1 con
+   * la dirección vacía tiene que parar en el 2, que es donde está el problema,
+   * y no dejar pasar por no haberlo mirado.
+   */
+  const irA = async (destino: number) => {
+    if (destino <= paso) {
+      setPaso(destino)
+      return
+    }
+    for (let i = paso; i < destino; i += 1) {
+      if (!(await trigger(CAMPOS[i] as Array<keyof CheckoutValues>))) {
+        setPaso(i)
+        return
+      }
+      const falta = faltaEn(i)
+      if (falta) {
+        setErrorKey(falta)
+        setPaso(i)
+        return
+      }
+    }
+    setErrorKey(null)
+    setErrorStage(null)
+    setPaso(destino)
+    setAlcanzado((previo) => Math.max(previo, destino))
+  }
+
   const mutation = useMutation({
     mutationFn: async (input: { values: CheckoutValues; acceptPriceChanges: boolean }) => {
       /**
@@ -346,6 +432,22 @@ export function StoreCheckoutPage() {
   }, [errorKey])
 
   /**
+   * Cambiar de paso devuelve la vista al principio del formulario.
+   *
+   * Sin esto, quien viene de elegir la entrega —abajo del todo en el paso 2—
+   * aterriza en el paso 3 mirando el pie de la tarjeta, con los campos de la
+   * tarjeta fuera de pantalla, y parece que no ha pasado nada.
+   */
+  useEffect(() => {
+    try {
+      window.scrollTo({ top: 0, behavior: 'auto' })
+    } catch {
+      // jsdom no implementa `scrollTo`. Que un entorno sin scroll no pueda
+      // desplazarse no es un error: es que no hay a dónde.
+    }
+  }, [paso])
+
+  /**
    * P18 · La tienda que solo vende a quien ha entrado.
    *
    * Se para ANTES del formulario, y no al pulsar «Confirmar pedido»: rellenar
@@ -406,48 +508,42 @@ export function StoreCheckoutPage() {
   }
 
   const submit = (acceptPriceChanges: boolean) =>
-    handleSubmit((values) => {
-      // Doble candado contra el doble envío: el botón se deshabilita mientras la
-      // mutación está en vuelo y, además, un segundo submit (Enter repetido, doble
-      // clic rápido) no llega a disparar nada. Ninguno de los dos es la garantía:
-      // la garantía es la clave de idempotencia del servidor.
-      if (mutation.isPending) return
+    handleSubmit(
+      (values) => {
+        // Doble candado contra el doble envío: el botón se deshabilita mientras la
+        // mutación está en vuelo y, además, un segundo submit (Enter repetido, doble
+        // clic rápido) no llega a disparar nada. Ninguno de los dos es la garantía:
+        // la garantía es la clave de idempotencia del servidor.
+        if (mutation.isPending) return
 
-      // Dos comprobaciones de FORMA, no de precio: que se eligió una opción
-      // cuando la tienda ofrece alguna, y que un recojo dice dónde. Las dos las
-      // vuelve a exigir la base; aquí evitan un viaje al servidor para recibir
-      // un error que ya se sabe.
-      if (deliveryOptions.length > 0 && !values.deliveryMethodCode) {
-        setErrorKey('store.checkout.error.delivery.method')
-        return
-      }
-      if (selectedDelivery?.strategy === 'pickup' && !values.pickupPointId) {
-        setErrorKey('store.checkout.error.delivery.pickup')
-        return
-      }
-      // Misma regla que la entrega: se exige elegir solo cuando hay algo que
-      // elegir. Una tienda sin medios configurados sigue vendiendo.
-      if (paymentMethods.length > 0 && !values.paymentMethodCode) {
-        setErrorKey('store.checkout.error.payment.method')
-        return
-      }
-      // Luhn en el navegador no valida una tarjeta —eso lo dice el emisor—:
-      // evita gastar una llamada a la pasarela por un digito mal tecleado.
-      if (pideTarjeta && !pareceTarjeta(tarjeta.numero)) {
-        setErrorKey('store.card.numberInvalid')
-        return
-      }
-      if (pideTarjeta && (tarjeta.mes.length < 1 || tarjeta.anio.length < 2 || tarjeta.cvv.length < 3)) {
-        setErrorKey('store.card.incomplete')
-        return
-      }
+        // Las MISMAS comprobaciones que abren cada paso, y en el mismo sitio: si
+        // esta lista y la de «Siguiente» pudieran discrepar, un día una dejaría
+        // pasar lo que la otra rechaza. Se repasan todas y no solo las del paso
+        // visible, porque un submit puede llegar por Enter desde cualquiera.
+        for (let i = 0; i < PASOS.length; i += 1) {
+          const falta = faltaEn(i)
+          if (falta) {
+            setErrorKey(falta)
+            setPaso(i)
+            return
+          }
+        }
 
-      setErrorKey(null)
-      setErrorStage(null)
-      mutation.mutate({ values, acceptPriceChanges })
-    })
-
+        setErrorKey(null)
+        setErrorStage(null)
+        mutation.mutate({ values, acceptPriceChanges })
+      },
+      (invalidos) => {
+        // Un campo inválido de un paso que ya no está en pantalla dejaría el
+        // botón sin hacer nada visible: ni error, ni pedido. Se vuelve al paso
+        // que lo contiene, que es donde está el mensaje.
+        const primero = CAMPOS.findIndex((campos) => campos.some((campo) => campo in invalidos))
+        if (primero >= 0) setPaso(primero)
+      },
+    )
   const stageKey = mapCheckoutStage(errorStage)
+
+  const enUltimo = paso === ultimoPaso
 
   return (
     <>
@@ -462,7 +558,13 @@ export function StoreCheckoutPage() {
 
       <Box
         component="form"
-        onSubmit={submit(false)}
+        // Solo queda un camino hasta aqui: el Enter del teclado. Y solo compra
+        // desde el ultimo paso — un Enter en el campo del nombre no puede
+        // saltarse la entrega y el pago.
+        onSubmit={(evento) => {
+          evento.preventDefault()
+          if (enUltimo) void submit(false)()
+        }}
         noValidate
         sx={{
           display: 'grid',
@@ -483,290 +585,189 @@ export function StoreCheckoutPage() {
             boxShadow: 'var(--sf-shadow)',
           }}
         >
-          <Paso numero={1} titulo={t('store.checkout.contact')} />
+          <CheckoutSteps
+            pasos={PASOS.map((definicion) => ({
+              id: definicion.id,
+              titulo: t(definicion.cortoKey),
+            }))}
+            actual={paso}
+            alcanzado={alcanzado}
+            onIr={(indice) => void irA(indice)}
+          />
+
+          <Typography component="h2" sx={{ fontSize: TS.cardTitle, fontWeight: 800, mb: 2 }}>
+            {t(PASOS[paso]!.tituloKey)}
+          </Typography>
 
           <Stack sx={{ gap: 2 }}>
-            <TextField
-              label={t('store.checkout.name')}
-              autoComplete="name"
-              required
-              error={Boolean(errors.customerName)}
-              helperText={errors.customerName ? t(errors.customerName.message as MessageKey) : ' '}
-              {...register('customerName')}
-            />
-            {/* Correo y teléfono comparten fila desde `sm`. Un teléfono con el
-                ancho de una dirección no solo desperdicia espacio: sugiere que
-                cabe algo más de lo que cabe, y alarga el formulario justo donde
-                el comprador ya decidió y solo quiere terminar. El nombre y la
-                dirección sí se quedan a lo ancho, que es lo que piden. */}
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-              <TextField
-                label={t('store.checkout.email')}
-                type="email"
-                autoComplete="email"
-                required
-                fullWidth
-                error={Boolean(errors.customerEmail)}
-                helperText={
-                  errors.customerEmail
-                    ? t(errors.customerEmail.message as MessageKey)
-                    : t('store.checkout.emailHint')
-                }
-                {...register('customerEmail')}
-              />
-              <TextField
-                label={t('store.checkout.phone')}
-                type="tel"
-                autoComplete="tel"
-                required
-                sx={{ width: { xs: '100%', sm: 220 }, flexShrink: 0 }}
-                error={Boolean(errors.customerPhone)}
-                helperText={
-                  errors.customerPhone ? t(errors.customerPhone.message as MessageKey) : ' '
-                }
-                {...register('customerPhone')}
-              />
-            </Stack>
-            <Divider sx={{ mt: 1 }} />
-            <Paso numero={2} titulo={t('store.checkout.step.delivery')} />
-
-            <TextField
-              label={t('store.checkout.address')}
-              autoComplete="street-address"
-              required
-              error={Boolean(errors.address)}
-              helperText={errors.address ? t(errors.address.message as MessageKey) : ' '}
-              {...register('address')}
-            />
-            {/* P12 · los cuatro campos de COBERTURA. Opcionales: una tienda
-                sin zonas configuradas no tiene por qué pedirlos, y exigirlos
-                rompería el checkout mínimo que funciona desde P06. */}
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-              <TextField
-                fullWidth
-                label={t('store.checkout.city')}
-                autoComplete="address-level2"
-                {...register('city')}
-              />
-              <TextField
-                fullWidth
-                label={t('store.checkout.region')}
-                autoComplete="address-level1"
-                {...register('region')}
-              />
-            </Stack>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-              <TextField
-                fullWidth
-                label={t('store.checkout.postalCode')}
-                autoComplete="postal-code"
-                {...register('postalCode')}
-              />
-              <TextField
-                fullWidth
-                label={t('store.checkout.country')}
-                autoComplete="country"
-                inputProps={{ maxLength: 2, style: { textTransform: 'uppercase' } }}
-                {...register('country')}
-              />
-            </Stack>
-            <TextField
-              label={t('store.checkout.reference')}
-              error={Boolean(errors.reference)}
-              helperText={
-                errors.reference
-                  ? t(errors.reference.message as MessageKey)
-                  : t('store.checkout.referenceHint')
-              }
-              {...register('reference')}
-            />
-            {/* P10 · el cupón. Un solo campo, y lo que se manda es TEXTO: si
-                descuenta y cuánto lo decide el servidor, que vuelve a evaluar
-                con la fila delante y bloqueada. Aquí no se valida contra nada:
-                comprobarlo en el navegador sería una segunda autoridad sobre el
-                mismo dato, y la del navegador siempre acaba desactualizada. */}
-            <TextField
-              label={t('store.checkout.coupon')}
-              error={Boolean(errors.couponCode)}
-              helperText={
-                errors.couponCode
-                  ? t(errors.couponCode.message as MessageKey)
-                  : t('store.checkout.couponHint')
-              }
-              inputProps={{ style: { textTransform: 'uppercase' } }}
-              {...register('couponCode')}
-            />
-            <Divider />
-
-            {/* P12 · cómo lo quiere recibir. Envío, recojo, reparto propio y
-                entrega digital son opciones de ESTE checkout, no de otro. */}
-            <DeliveryPicker
-              options={deliveryOptions}
-              loading={delivery.isFetching && deliveryOptions.length === 0}
-              failed={delivery.isError}
-              selectedCode={watched.deliveryMethodCode ?? ''}
-              onSelect={(code) => {
-                setValue('deliveryMethodCode', code)
-                setValue('pickupPointId', '')
-              }}
-              selectedPickupPointId={watched.pickupPointId ?? ''}
-              onSelectPickupPoint={(id) => setValue('pickupPointId', id)}
-              error={null}
-            />
-
-            <Divider />
-            <Paso numero={3} titulo={t('store.checkout.payment')} />
-
-            {/* El pago va DESPUES de la entrega y antes del boton: es la
-                ultima decision de la compra, y ponerlo arriba obliga a
-                elegir como se paga algo cuyo total todavia no se conoce. */}
-            <PaymentPicker
-              methods={paymentMethods}
-              loading={payment.isLoading}
-              failed={payment.isError}
-              selectedCode={watched.paymentMethodCode ?? ''}
-              onSelect={(code) => setValue('paymentMethodCode', code)}
-              error={null}
-            />
-
-            {/* Los datos de la tarjeta solo cuando se ha elegido una: pedir
-                un numero de tarjeta a quien va a pagar por transferencia es
-                pedir un dato que nadie va a usar. */}
-            {pideTarjeta && (
-              <CardFields datos={tarjeta} onCambio={setTarjeta} error={null} />
-            )}
-            {deliveryOptions.length > 0 && (
-              <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>
-                {t('store.delivery.help')}
-              </Typography>
-            )}
-          </Stack>
-        </Card>
-
-        <Card
-          sx={{
-            p: { xs: 2, md: 2.5 },
-            borderRadius: 'var(--sf-radius)',
-            border: '1px solid var(--sf-line)',
-            boxShadow: 'var(--sf-shadow)',
-          }}
-        >
-          <Typography component="h2" sx={{ fontSize: TS.cardTitle, fontWeight: 800, mb: 1.5 }}>
-            {t('store.cart.summary')}
-          </Typography>
-
-          {/* Resumen previo COMPLETO: qué, cuántas, a cuánto la unidad y cuánto
-              suma la línea. Un resumen que solo enseña el total obliga a
-              confiar; este se puede comprobar. */}
-          <Stack component="ul" sx={{ listStyle: 'none', m: 0, p: 0, gap: 1 }}>
-            {cart.lines.map((line) => {
-              const quotedLine = quoted?.lines.find(
-                (item) =>
-                  item.productId === line.product_id &&
-                  (item.variantId ?? null) === line.variant_id,
-              )
-              const unitPrice = quotedLine?.unitPrice.amount ?? line.unit_price
-              const lineCurrency = quoted?.currency ?? line.currency
-              return (
-                <Stack
-                  component="li"
-                  key={`${line.product_id}|${line.variant_id ?? ''}`}
-                  direction="row"
-                  sx={{ justifyContent: 'space-between', gap: 1, fontSize: TS.body }}
-                >
-                  <Stack sx={{ minWidth: 0 }}>
-                    <Typography sx={{ fontSize: TS.body, color: 'var(--muted)', fontWeight: 600 }}>
-                      {line.quantity} × {line.name}
-                    </Typography>
-                    <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>
-                      {formatMoney(Number(unitPrice), lineCurrency, locale)} · {t('store.cart.each')}
-                    </Typography>
-                  </Stack>
-                  <Typography sx={{ fontSize: TS.body, fontWeight: 700, whiteSpace: 'nowrap' }}>
-                    {formatMoney(Number(unitPrice) * line.quantity, lineCurrency, locale)}
-                  </Typography>
+            {paso === 0 && (
+              <>
+                <TextField
+                  label={t('store.checkout.name')}
+                  autoComplete="name"
+                  required
+                  error={Boolean(errors.customerName)}
+                  helperText={
+                    errors.customerName ? t(errors.customerName.message as MessageKey) : ' '
+                  }
+                  {...register('customerName')}
+                />
+                {/* Correo y teléfono comparten fila desde `sm`. Un teléfono con el
+                    ancho de una dirección no solo desperdicia espacio: sugiere que
+                    cabe algo más de lo que cabe, y alarga el formulario justo donde
+                    el comprador ya decidió y solo quiere terminar. El nombre y la
+                    dirección sí se quedan a lo ancho, que es lo que piden. */}
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                  <TextField
+                    label={t('store.checkout.email')}
+                    type="email"
+                    autoComplete="email"
+                    required
+                    fullWidth
+                    error={Boolean(errors.customerEmail)}
+                    helperText={
+                      errors.customerEmail
+                        ? t(errors.customerEmail.message as MessageKey)
+                        : t('store.checkout.emailHint')
+                    }
+                    {...register('customerEmail')}
+                  />
+                  <TextField
+                    label={t('store.checkout.phone')}
+                    type="tel"
+                    autoComplete="tel"
+                    required
+                    sx={{ width: { xs: '100%', sm: 220 }, flexShrink: 0 }}
+                    error={Boolean(errors.customerPhone)}
+                    helperText={
+                      errors.customerPhone ? t(errors.customerPhone.message as MessageKey) : ' '
+                    }
+                    {...register('customerPhone')}
+                  />
                 </Stack>
-              )
-            })}
+              </>
+            )}
+
+            {paso === 1 && (
+              <>
+                <TextField
+                  label={t('store.checkout.address')}
+                  autoComplete="street-address"
+                  required
+                  error={Boolean(errors.address)}
+                  helperText={errors.address ? t(errors.address.message as MessageKey) : ' '}
+                  {...register('address')}
+                />
+                {/* P12 · los cuatro campos de COBERTURA. Opcionales: una tienda
+                    sin zonas configuradas no tiene por qué pedirlos, y exigirlos
+                    rompería el checkout mínimo que funciona desde P06. */}
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                  <TextField
+                    fullWidth
+                    label={t('store.checkout.city')}
+                    autoComplete="address-level2"
+                    {...register('city')}
+                  />
+                  <TextField
+                    fullWidth
+                    label={t('store.checkout.region')}
+                    autoComplete="address-level1"
+                    {...register('region')}
+                  />
+                </Stack>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                  <TextField
+                    fullWidth
+                    label={t('store.checkout.postalCode')}
+                    autoComplete="postal-code"
+                    {...register('postalCode')}
+                  />
+                  <TextField
+                    fullWidth
+                    label={t('store.checkout.country')}
+                    autoComplete="country"
+                    inputProps={{ maxLength: 2, style: { textTransform: 'uppercase' } }}
+                    {...register('country')}
+                  />
+                </Stack>
+                <TextField
+                  label={t('store.checkout.reference')}
+                  error={Boolean(errors.reference)}
+                  helperText={
+                    errors.reference
+                      ? t(errors.reference.message as MessageKey)
+                      : t('store.checkout.referenceHint')
+                  }
+                  {...register('reference')}
+                />
+                {/* P10 · el cupón. Un solo campo, y lo que se manda es TEXTO: si
+                    descuenta y cuánto lo decide el servidor, que vuelve a evaluar
+                    con la fila delante y bloqueada. Aquí no se valida contra nada:
+                    comprobarlo en el navegador sería una segunda autoridad sobre el
+                    mismo dato, y la del navegador siempre acaba desactualizada. */}
+                <TextField
+                  label={t('store.checkout.coupon')}
+                  error={Boolean(errors.couponCode)}
+                  helperText={
+                    errors.couponCode
+                      ? t(errors.couponCode.message as MessageKey)
+                      : t('store.checkout.couponHint')
+                  }
+                  inputProps={{ style: { textTransform: 'uppercase' } }}
+                  {...register('couponCode')}
+                />
+                <Divider />
+
+                {/* P12 · cómo lo quiere recibir. Envío, recojo, reparto propio y
+                    entrega digital son opciones de ESTE checkout, no de otro. */}
+                <DeliveryPicker
+                  options={deliveryOptions}
+                  loading={delivery.isFetching && deliveryOptions.length === 0}
+                  failed={delivery.isError}
+                  selectedCode={watched.deliveryMethodCode ?? ''}
+                  onSelect={(code) => {
+                    setValue('deliveryMethodCode', code)
+                    setValue('pickupPointId', '')
+                  }}
+                  selectedPickupPointId={watched.pickupPointId ?? ''}
+                  onSelectPickupPoint={(id) => setValue('pickupPointId', id)}
+                  error={null}
+                />
+                {deliveryOptions.length > 0 && (
+                  <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>
+                    {t('store.delivery.help')}
+                  </Typography>
+                )}
+              </>
+            )}
+
+            {paso === 2 && (
+              <>
+                {/* El pago va DESPUES de la entrega y antes del boton: es la
+                    ultima decision de la compra, y ponerlo arriba obliga a
+                    elegir como se paga algo cuyo total todavia no se conoce. */}
+                <PaymentPicker
+                  methods={paymentMethods}
+                  loading={payment.isLoading}
+                  failed={payment.isError}
+                  selectedCode={watched.paymentMethodCode ?? ''}
+                  onSelect={(code) => setValue('paymentMethodCode', code)}
+                  error={null}
+                />
+
+                {/* Los datos de la tarjeta solo cuando se ha elegido una: pedir
+                    un numero de tarjeta a quien va a pagar por transferencia es
+                    pedir un dato que nadie va a usar. */}
+                {pideTarjeta && <CardFields datos={tarjeta} onCambio={setTarjeta} error={null} />}
+              </>
+            )}
           </Stack>
 
-          <Divider sx={{ my: 1.5 }} />
-
-          <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-            <Typography sx={{ fontWeight: 700 }}>{t('store.cart.subtotal')}</Typography>
-            <Typography sx={{ fontWeight: 800 }}>
-              {formatMoney(
-                Number(quoted?.netTotal ?? subtotal),
-                quoted?.currency ?? currency,
-                locale,
-              )}
-            </Typography>
-          </Stack>
-
-          {quoted && Number(quoted.taxTotal) > 0 && (
-            <Stack direction="row" sx={{ justifyContent: 'space-between', mt: 0.5 }}>
-              <Typography sx={{ color: 'var(--muted)' }}>{t('store.cart.tax')}</Typography>
-              <Typography sx={{ color: 'var(--muted)' }}>
-                {formatMoney(Number(quoted.taxTotal), quoted.currency, locale)}
-              </Typography>
-            </Stack>
-          )}
-
-          {/* El transporte va SEPARADO del total. Un comprador que ve un total
-              mayor que la suma de sus líneas y ninguna línea que lo explique es
-              un comprador que abandona el carrito. */}
-          {selectedDelivery?.available && (
-            <Stack direction="row" sx={{ justifyContent: 'space-between', mt: 0.5 }}>
-              <Typography sx={{ color: 'var(--muted)' }}>
-                {t('store.delivery.shipping')}
-              </Typography>
-              <Typography sx={{ color: 'var(--muted)' }}>
-                {shippingAmount === 0
-                  ? t('store.delivery.free')
-                  : formatMoney(shippingAmount, selectedDelivery.currency, locale)}
-              </Typography>
-            </Stack>
-          )}
-
-          {quoted && (
-            <Stack direction="row" sx={{ justifyContent: 'space-between', mt: 1 }}>
-              <Typography sx={{ fontWeight: 800 }}>{t('store.cart.total')}</Typography>
-              <Typography sx={{ fontWeight: 800 }}>
-                {formatMoney(Number(quoted.grossTotal) + shippingAmount, quoted.currency, locale)}
-              </Typography>
-            </Stack>
-          )}
-
-          {/* Estado de la cotización: siempre uno de los tres, nunca el vacío.
-              «Confirmando precios…» tiene que poder distinguirse de «este es el
-              precio» y de «no pudimos confirmarlo». */}
-          <Typography sx={{ fontSize: TS.label, color: 'var(--muted)', mt: 0.5 }}>
-            {quote.isFetching
-              ? t('store.cart.quoting')
-              : quoted
-                ? t('store.cart.quoted')
-                : quote.isError
-                  ? t('store.cart.quoteFailed')
-                  : t('store.cart.taxNote')}
-          </Typography>
-
-          {priceChanged && (
-            <Chip
-              size="small"
-              color="warning"
-              label={t('store.cart.priceChanged')}
-              sx={{ mt: 1 }}
-            />
-          )}
-
+          {/* El aviso vive junto a los botones y no en el resumen: casi todos
+              estos errores («elige cómo quieres recibirlo») señalan un campo de
+              ESTE paso, y leerlos en la otra columna obliga a buscar dónde. */}
           {errorKey && (
-            <Alert
-              severity="error"
-              sx={{ mt: 2 }}
-              role="alert"
-              tabIndex={-1}
-              ref={alertRef}
-            >
+            <Alert severity="error" sx={{ mt: 2 }} role="alert" tabIndex={-1} ref={alertRef}>
               {t(errorKey)}
               {stageKey && (
                 <Typography component="span" sx={{ display: 'block', fontSize: TS.label, mt: 0.5 }}>
@@ -776,15 +777,56 @@ export function StoreCheckoutPage() {
             </Alert>
           )}
 
-          <Button
-            type="submit"
-            variant="contained"
-            fullWidth
-            disabled={mutation.isPending}
-            sx={{ mt: 2 }}
-          >
-            {mutation.isPending ? t('store.checkout.sending') : t('store.checkout.submit')}
-          </Button>
+          {/* La acción de avanzar está SIEMPRE en el mismo sitio: «Siguiente»,
+              «Siguiente», «Confirmar pedido». Mover el botón de compromiso a la
+              otra columna en el último paso obligaría a buscarlo justo en el
+              momento en el que menos hay que hacer dudar a nadie. */}
+          <Stack direction="row" sx={{ alignItems: 'center', gap: 1.5, mt: 2.5 }}>
+            {paso > 0 && (
+              <Button
+                type="button"
+                variant="text"
+                onClick={() => void irA(paso - 1)}
+                startIcon={<ArrowBackRoundedIcon />}
+                sx={{ color: 'var(--accent-deep)' }}
+              >
+                {t('store.checkout.back')}
+              </Button>
+            )}
+            <Box sx={{ flex: 1 }} />
+            {/* NINGUNO de los dos es `type="submit"`, y esto no es un descuido.
+                Ocupan el mismo sitio, asi que React reutiliza el nodo y le
+                cambiaba el `type` al cambiar de paso; como validar es asincrono,
+                ese cambio caia en el microtask que se drena ANTES de que el
+                navegador ejecutara la accion por defecto del clic, y el
+                «Siguiente» que te llevaba al paso 3 enviaba el formulario el
+                solo. Con un solo medio de pago —que se preselecciona— ese envio
+                fantasma no daba ningun error: registraba el pedido.
+
+                Verificado en un navegador de verdad, no en jsdom: alli el
+                encadenamiento de microtasks no se reproduce y el fallo no se ve.
+                Un boton sin accion por defecto no puede tener ese eco. */}
+            {enUltimo ? (
+              <Button
+                type="button"
+                variant="contained"
+                disabled={mutation.isPending}
+                onClick={() => void submit(false)()}
+                startIcon={<LockRoundedIcon />}
+              >
+                {mutation.isPending ? t('store.checkout.sending') : t('store.checkout.submit')}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="contained"
+                onClick={() => void irA(paso + 1)}
+                endIcon={<ArrowForwardRoundedIcon />}
+              >
+                {t('store.checkout.next')}
+              </Button>
+            )}
+          </Stack>
 
           {/* Confirmar el precio nuevo reintenta con la MISMA clave: es la misma
               compra, no una segunda. */}
@@ -793,17 +835,58 @@ export function StoreCheckoutPage() {
               type="button"
               variant="outlined"
               fullWidth
-              sx={{ mt: 1 }}
+              sx={{ mt: 1.5 }}
               onClick={() => void submit(true)()}
             >
               {t('store.checkout.acceptPrices')}
             </Button>
           )}
-
-          <Typography sx={{ fontSize: TS.label, color: 'var(--muted)', mt: 1.5 }}>
-            {t('store.checkout.noPayment')}
-          </Typography>
         </Card>
+
+        <CheckoutSummary
+          lines={cart.lines}
+          quoted={quoted}
+          subtotalLocal={Number(subtotal)}
+          currencyLocal={currency}
+          envio={
+            selectedDelivery?.available
+              ? { amount: shippingAmount, currency: selectedDelivery.currency }
+              : null
+          }
+          estado={
+            quote.isFetching
+              ? 'pidiendo'
+              : quoted
+                ? 'confirmada'
+                : quote.isError
+                  ? 'fallida'
+                  : 'sinPedir'
+          }
+          acciones={
+            <>
+              {priceChanged && (
+                <Chip
+                  size="small"
+                  color="warning"
+                  label={t('store.cart.priceChanged')}
+                  sx={{ mt: 1 }}
+                />
+              )}
+              {/* Lo que se promete cambia con el medio elegido. Dejar «todavía no
+                  cobramos en línea» debajo de un formulario de tarjeta que SÍ
+                  cobra es la clase de frase que se descubre cuando ya no toca. */}
+              <Stack direction="row" sx={{ alignItems: 'flex-start', gap: 0.75, mt: 1.5 }}>
+                <LockRoundedIcon
+                  aria-hidden
+                  sx={{ fontSize: 14, color: 'var(--accent-deep)', mt: '2px', flexShrink: 0 }}
+                />
+                <Typography sx={{ fontSize: TS.micro, color: 'var(--muted)' }}>
+                  {pideTarjeta ? t('store.checkout.securePay') : t('store.checkout.noPayment')}
+                </Typography>
+              </Stack>
+            </>
+          }
+        />
       </Box>
     </>
   )

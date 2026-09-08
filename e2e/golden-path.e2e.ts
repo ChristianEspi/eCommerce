@@ -79,26 +79,96 @@ test.describe('la vitrina', () => {
     await expect(page.getByText(/Tu carrito está vacío/i)).toHaveCount(0)
   })
 
-  test('el checkout pide contacto, entrega y PAGO, en tres pasos', async ({ page, vigilante }) => {
+  /**
+   * Rellenar el paso 2 como lo rellena una persona.
+   *
+   * La entrega depende de la dirección y del tenant: puede haber envío, puede
+   * haber solo recojo, y el recojo pide además dónde. Por eso no se codifica una
+   * opción concreta —se elegiría una que mañana no está—: se toma la primera que
+   * el servidor deja habilitada, que es exactamente lo que hace quien compra.
+   */
+  async function elegirEntrega(page: Page) {
+    await page.getByLabel(/dirección de entrega/i).fill('Av. Arequipa 100')
+
+    const disponibles = page.getByRole('radio').and(page.locator(':not([disabled])'))
+    await expect(disponibles.first()).toBeVisible({ timeout: 20_000 })
+    await disponibles.first().click()
+
+    // El recojo pide punto; el envío no. Se atiende si aparece y no si no.
+    const punto = page.getByRole('combobox').filter({ hasNotText: /buscar/i }).last()
+    if (await punto.isVisible().catch(() => false)) {
+      await punto.click()
+      const opcion = page.getByRole('option').first()
+      if (await opcion.isVisible().catch(() => false)) await opcion.click()
+    }
+  }
+
+  /** Contacto y entrega hechos: deja la pantalla en el paso de pago. */
+  async function llegarAlPago(page: Page) {
     await comprarAlgo(page)
     await page.goto(`${TIENDA}/checkout`)
 
-    // Los tres encabezados numerados son el cambio visible de este sprint.
-    await expect(page.getByRole('heading', { name: /contacto/i })).toBeVisible({ timeout: 20_000 })
-    await expect(page.getByRole('heading', { name: /^entrega$/i })).toBeVisible()
-    await expect(page.getByRole('heading', { name: /^pago$/i })).toBeVisible()
+    await page.getByLabel(/nombre y apellido/i).fill('Ana Perez', { timeout: 20_000 })
+    await page.getByLabel(/correo/i).fill('ana@compradora.com')
+    await page.getByLabel(/teléfono/i).fill('+51 999 888 777')
+    await page.getByRole('button', { name: 'Siguiente' }).click()
 
-    // Y el selector de pago con medios de verdad de esta tienda.
+    await expect(page.getByRole('heading', { name: /^entrega$/i })).toBeVisible()
+    await elegirEntrega(page)
+    await page.getByRole('button', { name: 'Siguiente' }).click()
+
+    await expect(page.getByRole('heading', { name: /^pago$/i })).toBeVisible()
+  }
+
+  test('el checkout avanza por tres pasos y no deja saltarse ninguno', async ({
+    page,
+    vigilante,
+  }) => {
+    await comprarAlgo(page)
+    await page.goto(`${TIENDA}/checkout`)
+
+    // Se empieza en el paso 1, y los otros dos NO se pueden pulsar: llegar al
+    // pago se gana rellenando, no haciendo clic en la barra.
+    await expect(page.getByRole('heading', { name: /datos de contacto/i })).toBeVisible({
+      timeout: 20_000,
+    })
+    await expect(page.getByRole('button', { name: /^entrega$/i })).toBeDisabled()
+    await expect(page.getByRole('button', { name: /^pago$/i })).toBeDisabled()
+
+    await page.getByLabel(/nombre y apellido/i).fill('Ana Perez')
+    await page.getByLabel(/correo/i).fill('ana@compradora.com')
+    await page.getByLabel(/teléfono/i).fill('+51 999 888 777')
+    await page.getByRole('button', { name: 'Siguiente' }).click()
+
+    await expect(page.getByRole('heading', { name: /^entrega$/i })).toBeVisible()
+    // Y el resumen sigue delante en cada paso: el total es la cifra por la que
+    // se decide seguir.
+    await expect(page.getByRole('heading', { name: /^resumen$/i })).toBeVisible()
+
+    await elegirEntrega(page)
+    await page.getByRole('button', { name: 'Siguiente' }).click()
+
+    await expect(page.getByRole('heading', { name: /^pago$/i })).toBeVisible()
     await expect(page.getByRole('radio', { name: /transferencia bancaria/i })).toBeVisible({
       timeout: 20_000,
     })
+    // Llegar al paso de pago no es comprar: el pedido lo confirma quien compra.
+    await expect(page.getByRole('button', { name: 'Confirmar pedido' })).toBeVisible()
 
     expect(vigilante.errores).toEqual([])
   })
 
+  test('se puede volver atrás sin perder lo escrito', async ({ page }) => {
+    await llegarAlPago(page)
+
+    // El gesto más frecuente de cualquier compra: corregir el correo desde el
+    // final, de un solo clic en la barra.
+    await page.getByRole('button', { name: /^contacto/i }).click()
+    await expect(page.getByLabel(/correo/i)).toHaveValue('ana@compradora.com')
+  })
+
   test('elegir transferencia enseña sus instrucciones antes de pedir', async ({ page }) => {
-    await comprarAlgo(page)
-    await page.goto(`${TIENDA}/checkout`)
+    await llegarAlPago(page)
 
     await page.getByRole('radio', { name: /transferencia bancaria/i }).click({ timeout: 20_000 })
     // Qué hacer para pagar es lo único accionable de una transferencia.

@@ -126,11 +126,22 @@ export function StoreOrderPage() {
    * cobrado —el banco puede decir que no— y confundir las dos cosas es cómo una
    * pantalla acaba dando por buena una compra que no lo está.
    *
-   * `paid` es el único estado que cuenta. `authorized` es dinero retenido y aún
-   * sin cobrar, y llamarle «pagado» adelanta un hecho que todavía puede no
-   * ocurrir.
+   * Lo que NO se puede dar por hecho es que solo haya un vocabulario. Aquí se
+   * juntan dos, y por eso esto estaba mal: el seguimiento devuelve el estado del
+   * PEDIDO (`paid`) y la respuesta del checkout devuelve el del INTENTO de cobro
+   * (`captured`). Comparando solo con `paid`, un pedido recién cobrado con
+   * tarjeta se anunciaba como «Pendiente de pago» —y al recargar cambiaba a
+   * «Pagado», porque entonces ya no había estado de navegación—. Verificado
+   * contra la base: el pedido estaba cobrado; lo que mentía era el chip.
+   *
+   * Lo que sigue fuera de la lista es `authorized`: es dinero retenido y aún sin
+   * cobrar, y llamarle «pagado» adelanta un hecho que todavía puede no ocurrir.
    */
-  const yaPagado = (fromState?.payment_status ?? tracked.data?.payment_status) === 'paid'
+  const PAGADO = ['paid', 'captured']
+  // El del pedido MANDA sobre el del intento: es el que sobrevive a la recarga y
+  // el que sigue siendo cierto si el cobro se revierte después.
+  const estadoPago = tracked.data?.payment_status ?? fromState?.payment_status ?? null
+  const yaPagado = estadoPago !== null && PAGADO.includes(estadoPago)
 
   return (
     <Stack sx={{ gap: 2, maxWidth: 720, mx: 'auto' }}>

@@ -364,7 +364,8 @@ describe('de la ficha al carrito', () => {
     // Y el botón vuelve AQUÍ: mandarlo al backoffice tras pedirle la sesión
     // para comprar sería perderlo.
     expect(screen.getByRole('link', { name: 'Iniciar sesión' })).toHaveAttribute('href', '/login')
-    expect(screen.queryByRole('button', { name: /Confirmar pedido/ })).not.toBeInTheDocument()
+    // El formulario no llega a montarse: ni su primer campo esta.
+    expect(screen.queryByLabelText(/Nombre y apellido/)).not.toBeInTheDocument()
   })
 
   it('con sesión, la misma tienda enseña el formulario de siempre', async () => {
@@ -389,7 +390,7 @@ describe('de la ficha al carrito', () => {
       ])
     renderStorefront(fake, '/s/casa-nordica/checkout', makeSession())
 
-    expect(await screen.findByRole('button', { name: /Confirmar pedido/ })).toBeInTheDocument()
+    expect(await screen.findByLabelText(/Nombre y apellido/)).toBeInTheDocument()
   })
 
   it('una tienda abierta sigue vendiendo a quien no ha entrado', async () => {
@@ -398,7 +399,7 @@ describe('de la ficha al carrito', () => {
 
     // La regla es del comercio y viene apagada: encenderla por defecto habría
     // cortado la venta de toda tienda ya en producción.
-    expect(await screen.findByRole('button', { name: /Confirmar pedido/ })).toBeInTheDocument()
+    expect(await screen.findByLabelText(/Nombre y apellido/)).toBeInTheDocument()
   })
 
   it('el carrito de otra tienda no se ve en esta', async () => {
@@ -440,21 +441,15 @@ describe('de la ficha al carrito', () => {
 })
 
 describe('checkout', () => {
-  async function rellenar(user: ReturnType<typeof userEvent.setup>) {
-    await user.type(await screen.findByLabelText(/Nombre y apellido/), 'Ana Pérez')
-    await user.type(screen.getByLabelText(/Correo/), 'ana@compradora.com')
-    await user.type(screen.getByLabelText(/Teléfono/), '+51 999 888 777')
-    await user.type(screen.getByLabelText(/Dirección de entrega/), 'Av. Primavera 120')
-  }
-
   it('manda tienda, productos y cantidades — y ningún importe', async () => {
     const user = userEvent.setup()
     const fake = backend()
     sembrarCarrito([LINEA_SILLA])
     renderStorefront(fake, '/s/casa-nordica/checkout')
 
-    await rellenar(user)
+    await rellenarContacto(user)
     await user.type(screen.getByLabelText(/Referencia/), 'Portón verde')
+    await irAPagar(user)
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
 
     await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
@@ -489,7 +484,8 @@ describe('checkout', () => {
     sembrarCarrito([LINEA_SILLA])
     renderStorefront(fake, '/s/casa-nordica/checkout')
 
-    await rellenar(user)
+    await rellenarContacto(user)
+    await irAPagar(user)
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
 
     await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
@@ -504,8 +500,9 @@ describe('checkout', () => {
     sembrarCarrito([LINEA_SILLA])
     renderStorefront(fake, '/s/casa-nordica/checkout')
 
-    await rellenar(user)
+    await rellenarContacto(user)
     await user.type(screen.getByLabelText(/Cupón de descuento/), 'verano-25')
+    await irAPagar(user)
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
 
     await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
@@ -535,7 +532,8 @@ describe('checkout', () => {
     sembrarCarrito([LINEA_SILLA])
     renderStorefront(fake, '/s/casa-nordica/checkout')
 
-    await rellenar(user)
+    await rellenarContacto(user)
+    await irAPagar(user)
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
 
     await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
@@ -552,9 +550,12 @@ describe('checkout', () => {
 
     await user.type(await screen.findByLabelText(/Nombre y apellido/), 'Ana Pérez')
     await user.type(screen.getByLabelText(/Correo/), 'no-es-un-correo')
-    await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
+    await user.click(screen.getByRole('button', { name: 'Siguiente' }))
 
+    // Y se para en el paso 1: dejar avanzar con el correo mal solo aplaza el
+    // aviso hasta un sitio donde ya no se ve el campo que lo causa.
     expect(await screen.findByText('Escribe un correo válido')).toBeInTheDocument()
+    expect(screen.queryByLabelText(/Dirección de entrega/)).not.toBeInTheDocument()
     expect(fake.state.invocations).toHaveLength(0)
   })
 
@@ -562,7 +563,7 @@ describe('checkout', () => {
     renderStorefront(backend(), '/s/casa-nordica/checkout')
 
     expect(await screen.findByText('Tu carrito está vacío')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Confirmar pedido' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/Nombre y apellido/)).not.toBeInTheDocument()
   })
 
   it('doble clic no crea dos pedidos', async () => {
@@ -580,8 +581,9 @@ describe('checkout', () => {
     sembrarCarrito([LINEA_SILLA])
     renderStorefront(fake, '/s/casa-nordica/checkout')
 
-    await rellenar(user)
+    await rellenarContacto(user)
     const form = document.querySelector('form') as HTMLFormElement
+    await irAPagar(user)
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
 
     // El botón se bloquea mientras el pedido está en vuelo...
@@ -615,10 +617,12 @@ describe('checkout', () => {
     sembrarCarrito([LINEA_SILLA])
     renderStorefront(fake, '/s/casa-nordica/checkout')
 
-    await rellenar(user)
+    await rellenarContacto(user)
+    await irAPagar(user)
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
     await screen.findByRole('alert')
 
+    await irAPagar(user)
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
     await waitFor(() => expect(fake.state.invocations).toHaveLength(2))
 
@@ -639,7 +643,8 @@ describe('checkout', () => {
     sembrarCarrito([LINEA_SILLA])
     renderStorefront(fake, '/s/casa-nordica/checkout')
 
-    await rellenar(user)
+    await rellenarContacto(user)
+    await irAPagar(user)
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
 
     const alerta = await screen.findByRole('alert')
@@ -679,7 +684,8 @@ describe('checkout', () => {
     localStorage.setItem(cartTokenStorageKey(STORE), CART_TOKEN)
     renderStorefront(fake, '/s/casa-nordica/checkout')
 
-    await rellenar(user)
+    await rellenarContacto(user)
+    await irAPagar(user)
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
 
     // El pedido sale: las lineas viajan en el cuerpo, el token solo era el ancla.
@@ -714,7 +720,8 @@ describe('checkout', () => {
     sembrarCarrito([LINEA_SILLA])
     renderStorefront(fake, '/s/casa-nordica/checkout')
 
-    await rellenar(user)
+    await rellenarContacto(user)
+    await irAPagar(user)
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/precio de algo de tu carrito/i)
@@ -747,7 +754,8 @@ describe('checkout', () => {
 
     expect(await screen.findByText('Tenías una compra a medias')).toBeInTheDocument()
 
-    await rellenar(user)
+    await rellenarContacto(user)
+    await irAPagar(user)
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
 
     await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
@@ -768,7 +776,8 @@ describe('checkout', () => {
     sembrarCarrito([LINEA_SILLA])
     renderStorefront(fake, '/s/casa-nordica/checkout')
 
-    await rellenar(user)
+    await rellenarContacto(user)
+    await irAPagar(user)
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
 
     await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
@@ -785,10 +794,8 @@ describe('confirmación', () => {
     sembrarCarrito([LINEA_SILLA])
     renderStorefront(fake, '/s/casa-nordica/checkout')
 
-    await user.type(await screen.findByLabelText(/Nombre y apellido/), 'Ana Pérez')
-    await user.type(screen.getByLabelText(/Correo/), 'ana@compradora.com')
-    await user.type(screen.getByLabelText(/Teléfono/), '+51 999 888 777')
-    await user.type(screen.getByLabelText(/Dirección de entrega/), 'Av. Primavera 120')
+    await rellenarContacto(user)
+    await irAPagar(user)
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
 
     expect(await screen.findByRole('heading', { name: 'Pedido registrado' })).toBeInTheDocument()
@@ -804,6 +811,33 @@ describe('confirmación', () => {
     // El intento se cierra: si quedara, la próxima compra reusaría su clave y
     // el servidor devolvería el pedido anterior.
     expect(sessionStorage.getItem(attemptStorageKey('casa-nordica'))).toBeNull()
+  })
+
+  /**
+   * Un cobro con tarjeta se anuncia PAGADO en el mismo momento.
+   *
+   * Aqui se juntan dos vocabularios: el checkout devuelve el estado del INTENTO
+   * (`captured`) y el seguimiento el del PEDIDO (`paid`). Comparando solo con
+   * `paid`, la pantalla decia «Pendiente de pago» sobre un pedido ya cobrado —y
+   * al recargar cambiaba de opinion, porque entonces ya no habia estado de
+   * navegacion—. Comprobado contra la base antes de escribir esto: el pedido
+   * estaba cobrado; lo que mentia era el chip.
+   */
+  it('un cobro capturado se anuncia PAGADO, no pendiente', async () => {
+    const user = userEvent.setup()
+    const fake = backend({
+      onCheckout: (body) => ({ ...respuestaPedido(body), payment_status: 'captured' }),
+    })
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(fake, '/s/casa-nordica/checkout')
+
+    await rellenarContacto(user)
+    await irAPagar(user)
+    await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
+
+    expect(await screen.findByRole('heading', { name: 'Pedido registrado' })).toBeInTheDocument()
+    expect(screen.getByText('Pagado')).toBeInTheDocument()
+    expect(screen.queryByText('Pendiente de pago')).not.toBeInTheDocument()
   })
 
   it('sin estado de navegación sigue mostrando el número de la URL', async () => {
@@ -874,11 +908,37 @@ function backendConEntrega(options: { onCheckout?: (body: Record<string, unknown
   return fake
 }
 
+/**
+ * Contacto y direccion: deja la pantalla en el PASO 2, que es donde estan la
+ * entrega, la referencia y el cupon.
+ *
+ * El «Siguiente» de en medio no es ceremonia del test: es la unica forma de
+ * llegar al paso 2, y por tanto comprueba de paso que el paso 1 valida y deja
+ * pasar. Si dejara de hacerlo, TODOS los tests de esta pantalla se caerian, que
+ * es exactamente lo que tiene que pasar.
+ */
 async function rellenarContacto(user: ReturnType<typeof userEvent.setup>) {
   await user.type(await screen.findByLabelText(/Nombre y apellido/), 'Ana Pérez')
   await user.type(screen.getByLabelText(/Correo/), 'ana@compradora.com')
   await user.type(screen.getByLabelText(/Teléfono/), '+51 999 888 777')
-  await user.type(screen.getByLabelText(/Dirección de entrega/), 'Av. Primavera 120')
+  await user.click(screen.getByRole('button', { name: 'Siguiente' }))
+  await user.type(
+    await screen.findByLabelText(/Dirección de entrega/),
+    'Av. Primavera 120',
+  )
+}
+
+/**
+ * Avanza al PASO 3, donde vive «Confirmar pedido».
+ *
+ * Tolera que ya se este en el: hay tests que llegan al pago por su cuenta. Lo
+ * que no tolera es quedarse a medias — si el paso no avanza, el `findByRole`
+ * del final no encuentra el boton y el test falla, que es lo correcto.
+ */
+async function irAPagar(user: ReturnType<typeof userEvent.setup>) {
+  const siguiente = screen.queryByRole('button', { name: 'Siguiente' })
+  if (siguiente) await user.click(siguiente)
+  return screen.findByRole('button', { name: 'Confirmar pedido' })
 }
 
 describe('entrega en el checkout (P12)', () => {
@@ -918,6 +978,7 @@ describe('entrega en el checkout (P12)', () => {
 
     await rellenarContacto(user)
     await user.click(await screen.findByRole('radio', { name: /Envío estándar/ }))
+    await irAPagar(user)
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
 
     await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
@@ -942,11 +1003,14 @@ describe('entrega en el checkout (P12)', () => {
 
     await rellenarContacto(user)
     await screen.findByRole('radio', { name: /Envío estándar/ })
-    await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
+    await user.click(screen.getByRole('button', { name: 'Siguiente' }))
 
     expect(
       await screen.findByText('Elige cómo quieres recibir tu pedido.'),
     ).toBeInTheDocument()
+    // Y NO se pasa al pago: preguntar como quiere pagar algo cuyo envio no se
+    // ha decidido es preguntar por un total que todavia no existe.
+    expect(screen.queryByRole('button', { name: 'Confirmar pedido' })).not.toBeInTheDocument()
     // No se llegó a llamar al borde: el error se resolvió aquí.
     expect(fake.state.invocations).toHaveLength(0)
   })
@@ -961,6 +1025,7 @@ describe('entrega en el checkout (P12)', () => {
     await rellenarContacto(user)
     expect(await screen.findByText('Esta tienda todavía no cobra envío.')).toBeInTheDocument()
 
+    await irAPagar(user)
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
     expect(await screen.findByRole('heading', { name: 'Pedido registrado' })).toBeInTheDocument()
 
@@ -1003,10 +1068,11 @@ function backendConPago(
   return fake
 }
 
-/** Contacto + entrega elegida: el punto justo antes de decidir como se paga. */
+/** Contacto, entrega elegida y paso 3 en pantalla: donde se decide como se paga. */
 async function llegarAlPago(user: ReturnType<typeof userEvent.setup>) {
   await rellenarContacto(user)
   await user.click(await screen.findByRole('radio', { name: /Envío estándar/ }))
+  await irAPagar(user)
 }
 
 describe('medio de pago en el checkout (P09)', () => {
@@ -1018,6 +1084,7 @@ describe('medio de pago en el checkout (P09)', () => {
 
     await llegarAlPago(user)
     await user.click(await screen.findByRole('radio', { name: /Transferencia bancaria/ }))
+    await irAPagar(user)
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
 
     await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
@@ -1040,6 +1107,7 @@ describe('medio de pago en el checkout (P09)', () => {
     renderStorefront(fake, '/s/casa-nordica/checkout')
 
     await llegarAlPago(user)
+    await irAPagar(user)
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
 
     // Con dos medios no hay preseleccion posible: se pide elegir y NO se llama
@@ -1071,11 +1139,148 @@ describe('medio de pago en el checkout (P09)', () => {
     renderStorefront(fake, '/s/casa-nordica/checkout')
 
     await llegarAlPago(user)
+    await irAPagar(user)
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
 
     await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
     const body = fake.state.invocations[0]?.body as Record<string, unknown>
     // Ni la clave viaja: un `null` seria «no eligio», y aqui no se pregunto.
     expect(Object.keys(body)).not.toContain('payment_method_code')
+  })
+})
+
+/**
+ * El checkout partido en tres pasos.
+ *
+ * Partir un formulario en pantallas tiene un coste conocido y una sola forma de
+ * salir mal: perder lo escrito. Estos tests son esa garantia, y la otra mitad
+ * —que no se pueda saltar un paso sin validarlo— sin la cual el reparto solo
+ * habria movido los errores al final, lejos del campo que los causa.
+ */
+describe('los tres pasos del checkout', () => {
+  it('volver atras conserva lo escrito, y volver adelante tambien', async () => {
+    const user = userEvent.setup()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(backend(), '/s/casa-nordica/checkout')
+
+    await rellenarContacto(user)
+    await irAPagar(user)
+
+    // Paso 3. Se vuelve al 1 por la barra, de un solo clic: corregir el correo
+    // es el gesto mas frecuente de cualquier compra. El nombre accesible lleva
+    // el estado pegado —«Contacto · Completado»—, que es justo lo que hace que
+    // un lector de pantalla no tenga que adivinar por que ese boton si se pulsa.
+    await user.click(screen.getByRole('button', { name: /^Contacto/ }))
+
+    const correo = await screen.findByLabelText(/Correo/)
+    expect(correo).toHaveValue('ana@compradora.com')
+    expect(screen.getByLabelText(/Nombre y apellido/)).toHaveValue('Ana Pérez')
+
+    // Y la direccion del paso 2 sigue ahi al pasar de nuevo por el.
+    await user.click(screen.getByRole('button', { name: 'Siguiente' }))
+    expect(await screen.findByLabelText(/Dirección de entrega/)).toHaveValue(
+      'Av. Primavera 120',
+    )
+  })
+
+  it('no se puede saltar a un paso que nadie ha validado', async () => {
+    const user = userEvent.setup()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(backend(), '/s/casa-nordica/checkout')
+
+    // Recien abierto, el paso 3 es un destino que no se ha ganado: pulsarlo
+    // llevaria a elegir como pagar sin saber a donde va ni cuanto suma.
+    expect(await screen.findByRole('button', { name: 'Pago' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Entrega' })).toBeDisabled()
+
+    await rellenarContacto(user)
+    expect(screen.getByRole('button', { name: /^Contacto/ })).toBeEnabled()
+  })
+
+  /**
+   * Llegar al ultimo paso NO es comprar.
+   *
+   * Esto se rompio de verdad, y de la peor forma posible: el boton de avanzar y
+   * el de confirmar ocupan el mismo sitio, asi que React reutilizaba el nodo y
+   * le cambiaba el `type` de `button` a `submit`. Como validar el paso es
+   * asincrono, el cambio caia en el microtask que se drena ANTES de que el
+   * navegador ejecute la accion por defecto del clic — y el «Siguiente» que te
+   * llevaba al paso 3 enviaba el formulario por su cuenta.
+   *
+   * Con un solo medio de pago, que se preselecciona, ese envio fantasma no daba
+   * ningun error: registraba el pedido. Por eso el test usa exactamente ese
+   * caso, que es el unico en el que el fallo cobra.
+   */
+  it('llegar al paso de pago no registra el pedido por su cuenta', async () => {
+    const user = userEvent.setup()
+    const fake = backendConEntrega()
+    fake.state.tables.public_payment_methods = MEDIOS_PAGO.slice(0, 1)
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(fake, '/s/casa-nordica/checkout')
+
+    await rellenarContacto(user)
+
+    // La invariante que mata el eco, y la unica comprobable aqui: NINGUN boton
+    // de la botonera tiene accion por defecto. Sin `type="submit"` no hay nada
+    // que el navegador pueda enviar por su cuenta al reutilizar el nodo.
+    const siguiente = screen.getByRole('button', { name: 'Siguiente' })
+    expect(siguiente).toHaveAttribute('type', 'button')
+
+    await user.click(await screen.findByRole('radio', { name: /Envío estándar/ }))
+    await user.click(siguiente)
+
+    // Se llego al paso 3, con el medio ya marcado y sin nada que reprochar...
+    const confirmar = await screen.findByRole('button', { name: 'Confirmar pedido' })
+    expect(confirmar).toHaveAttribute('type', 'button')
+    expect(screen.getByRole('radio', { name: /Yape/ })).toBeChecked()
+    // ...y aun asi NO se ha comprado nada. Comprar lo decide el comprador.
+    expect(fake.state.invocations).toHaveLength(0)
+  })
+
+  /**
+   * El Enter del teclado tampoco compra desde el primer paso.
+   *
+   * Es el otro camino que queda hasta el `submit` del formulario, y sin guardia
+   * se saltaria la entrega y el medio de pago enteros.
+   */
+  it('un submit desde el primer paso no compra: solo avanza el ultimo', async () => {
+    const user = userEvent.setup()
+    const fake = backend()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(fake, '/s/casa-nordica/checkout')
+
+    // Todo relleno y valido —si no, lo que pararia el envio seria el esquema y
+    // no la guardia, y el test no probaria nada—, y de vuelta al paso 1.
+    await rellenarContacto(user)
+    await user.click(screen.getByRole('button', { name: /^Contacto/ }))
+    await screen.findByLabelText(/Nombre y apellido/)
+
+    fireEvent.submit(document.querySelector('form') as HTMLFormElement)
+
+    // La espera es deliberada y no un `waitFor`: lo que se afirma es que algo NO
+    // pasa, y eso necesita una ventana. Sin la guardia, en esta ventana el
+    // pedido sale y la pantalla salta a la confirmacion.
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    expect(fake.state.invocations).toHaveLength(0)
+    expect(screen.queryByRole('heading', { name: 'Pedido registrado' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText(/Nombre y apellido/)).toBeInTheDocument()
+  })
+
+  it('el resumen acompana los tres pasos con el total del servidor', async () => {
+    const user = userEvent.setup()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(backend(), '/s/casa-nordica/checkout')
+
+    // El total es la unica cifra por la que alguien decide seguir: tiene que
+    // estar delante en los tres pasos, no solo en el ultimo.
+    const resumen = (await screen.findByRole('heading', { name: 'Resumen' }))
+      .closest('div') as HTMLElement
+    expect(within(resumen).getByText('2 artículos')).toBeInTheDocument()
+
+    await rellenarContacto(user)
+    expect(screen.getByText('2 artículos')).toBeInTheDocument()
+    await irAPagar(user)
+    expect(screen.getByText('2 artículos')).toBeInTheDocument()
   })
 })
