@@ -52,6 +52,28 @@ transición no permitida.
 **Apunta el número de pedido en el paso 7**: el paso 8 depende de él y buscarlo
 a ciegas delante del cliente rompe el ritmo.
 
+### ⚠️ El precio NO cambia al iniciar sesión
+
+Existen 4 listas de precios con 1682 precios, y las buenas están asignadas por
+segmento («Corporativo», donde están las 7 cuentas de empresa). **Pero la vitrina
+no las aplica.** Todas las rutas públicas cotizan como visitante anónimo:
+
+```sql
+-- price_quote_for_slug, cart_payload, cart_refresh_prices,
+-- promotion_quote_for_slug, delivery_options_for_slug
+ebim.build_quote(store, canal, items, null, null, now(), true)
+--                                    ^^^^  ^^^^
+--                                 segmento  cliente
+```
+
+No hay discrepancia entre lo que se enseña y lo que se cobra —el pedido se crea
+con el mismo precio público—, pero **no prometas precio B2B en la tienda**.
+
+**Dónde sí se demuestra:** `/app/pricing` → pestaña **Simulador**. Ahí se elige
+cliente y segmento y se ve el precio que le corresponde, porque `price_quote`
+(backoffice) sí recibe los dos. Es una demostración de backoffice, no de
+vitrina — dilo así.
+
 ### El asistente de compra
 
 Botón flotante abajo a la derecha, en cualquier página de la tienda. **Función
