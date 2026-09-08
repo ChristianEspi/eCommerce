@@ -15,6 +15,7 @@
  * DESPLIEGUE —fila dada de alta sin desplegar el adaptador—, y por eso sale con
  * su propio código y no como «no soportado».
  */
+import { CULQI_PROVIDER_CODE, createCulqiProvider } from './culqi.ts'
 import type { PaymentProvider } from './provider.ts'
 import { SANDBOX_PROVIDER_CODE, createSandboxProvider, type SandboxOptions } from './sandbox.ts'
 
@@ -27,6 +28,7 @@ export type PaymentProviderFactory = (options: ProviderResolveOptions) => Paymen
 
 const FACTORIES = new Map<string, PaymentProviderFactory>([
   [SANDBOX_PROVIDER_CODE, (options) => createSandboxProvider(options)],
+  [CULQI_PROVIDER_CODE, (options) => createCulqiProvider(options)],
 ])
 
 export class UnknownPaymentProviderError extends Error {
