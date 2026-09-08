@@ -1,6 +1,6 @@
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import ShoppingCartRoundedIcon from '@mui/icons-material/ShoppingCartRounded'
-import { Box, Button, Card, Drawer, IconButton, Stack, Typography } from '@mui/material'
+import { Box, Button, Card, Chip, Drawer, IconButton, Stack, Typography } from '@mui/material'
 import { Link } from 'react-router-dom'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { formatMoney } from '@/shared/lib/format'
@@ -8,17 +8,22 @@ import { EmptyState } from '@/shared/ui/states'
 import { TS } from '@/theme/tokens'
 import { CartLineList } from './CartLineList'
 import { useCart } from './cart-context'
+import { useQuotedCart } from './useQuotedCart'
 
 /**
- * Panel lateral del carrito.
+ * Panel lateral del carrito: el mismo carrito que la página, y por tanto el
+ * mismo precio.
  *
- * Se abre solo al añadir algo: el comprador ve qué acaba de meter sin perder la
- * página en la que estaba, que es justo lo que se pierde al mandarlo al carrito
- * a página completa. La página `/cart` sigue existiendo para revisar con calma.
+ * Cotiza contra el servidor igual que `/cart`. No es un lujo: sin ello el panel
+ * sumaba los precios de escaparate y la página los del acuerdo, así que un
+ * comprador con convenio veía «S/ 79.60» aquí y «S/ 71.64» un clic después. La
+ * consulta es la misma —misma clave, misma caché—, así que enseñarlo bien no
+ * cuesta una llamada de más.
  */
 export function CartDrawer({ storeSlug }: { storeSlug: string }) {
   const { t, locale } = useI18n()
   const { cart, count, subtotal, currency, isOpen, closeCart } = useCart()
+  const { quoted, discounted } = useQuotedCart(storeSlug)
   const empty = cart.lines.length === 0
 
   return (
@@ -67,7 +72,13 @@ export function CartDrawer({ storeSlug }: { storeSlug: string }) {
             />
           ) : (
             <Card sx={{ p: 1.5 }}>
-              <CartLineList cart={cart} storeSlug={storeSlug} onNavigate={closeCart} compact />
+              <CartLineList
+                cart={cart}
+                storeSlug={storeSlug}
+                onNavigate={closeCart}
+                compact
+                quoted={quoted}
+              />
             </Card>
           )}
         </Box>
@@ -93,9 +104,23 @@ export function CartDrawer({ storeSlug }: { storeSlug: string }) {
                 {t('store.cart.subtotal')}
               </Typography>
               <Typography className="tnum" sx={{ fontWeight: 800, fontSize: 20 }}>
-                {formatMoney(Number(subtotal), currency, locale)}
+                {formatMoney(
+                  Number(quoted?.netTotal ?? subtotal),
+                  quoted?.currency ?? currency,
+                  locale,
+                )}
               </Typography>
             </Stack>
+            {/* Que el precio es del acuerdo se dice AQUI y no solo en la
+                página: es donde el comprador ve el número por primera vez. */}
+            {discounted && (
+              <Chip
+                size="small"
+                color="success"
+                label={t('store.cart.listPrice')}
+                sx={{ mt: 1 }}
+              />
+            )}
             {/* El impuesto y el total definitivos los calcula el servidor al
                 confirmar: aquí no se promete un número que no es el de cobro. */}
             <Typography sx={{ fontSize: TS.label, color: 'var(--muted)', mt: 0.5, mb: 1.75 }}>

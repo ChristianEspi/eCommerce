@@ -2893,6 +2893,7 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.product.trust.delivery': 'Delivery quoted at checkout',
     'store.product.trust.payment': 'Pay with the shop methods',
     'store.product.trust.stock': 'Real warehouse stock',
+    'store.product.agreementPrice': 'Price agreed with your company',
     'store.card.number': 'Card number',
     'store.card.numberInvalid': 'Check the card number.',
     'store.card.month': 'Month',

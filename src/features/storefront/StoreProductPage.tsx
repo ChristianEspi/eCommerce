@@ -16,6 +16,7 @@ import {
 } from '@mui/material'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useAgreementPrice } from '@/features/pricing/useAgreementPrice'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { formatMoney } from '@/shared/lib/format'
 import { useDocumentMeta } from '@/shared/seo/useDocumentMeta'
@@ -66,6 +67,18 @@ export function StoreProductPage() {
   const product = usePublicProduct(store.store_id, productSlug)
   const gallery = useGallery(product.data?.product_id ?? null)
   const variants = usePublicVariants(product.data)
+
+  /**
+   * El precio del acuerdo, si quien mira tiene uno.
+   *
+   * Con variantes NO se pregunta: la ficha anuncia un «desde» hasta que el
+   * comprador elige talla, y cotizar el maestro daría un número que no se
+   * corresponde con lo que va a comprar.
+   */
+  const conAcuerdo = useAgreementPrice(
+    storeSlug,
+    product.data && product.data.kind !== 'variant' ? product.data : null,
+  )
 
   // Relacionados «simples»: el resto de su categoría. Si no tiene categoría o
   // no llega para llenar la fila, `pickRelated` completa con el catálogo.
@@ -270,12 +283,30 @@ export function StoreProductPage() {
               }}
             >
               {formatMoney(
-                Number(hasVariants ? (item.price_from ?? item.price) : item.price),
-                item.currency,
+                conAcuerdo
+                  ? conAcuerdo.amount
+                  : Number(hasVariants ? (item.price_from ?? item.price) : item.price),
+                conAcuerdo?.currency ?? item.currency,
                 locale,
               )}
             </Typography>
-            {!hasVariants && discount !== null && item.compare_at_price && (
+            {/* Con acuerdo, el tachado es el precio PÚBLICO —de eso se ahorra— y
+                no el `compare_at_price`, que es la referencia de la oferta
+                abierta a todos. Enseñar los dos tachados en la misma línea
+                obligaría al comprador a averiguar cuál de los dos es el suyo. */}
+            {conAcuerdo && (
+              <>
+                <Typography component="s" sx={{ color: 'var(--muted)', fontWeight: 600 }}>
+                  {formatMoney(Number(item.price), item.currency, locale)}
+                </Typography>
+                <Chip
+                  label={t('store.cart.listPrice')}
+                  size="small"
+                  sx={{ bgcolor: 'var(--accent)', color: '#FFFFFF', fontWeight: 800 }}
+                />
+              </>
+            )}
+            {!conAcuerdo && !hasVariants && discount !== null && item.compare_at_price && (
               <>
                 <Typography component="s" sx={{ color: 'var(--muted)', fontWeight: 600 }}>
                   {formatMoney(Number(item.compare_at_price), item.currency, locale)}
@@ -288,6 +319,15 @@ export function StoreProductPage() {
               </>
             )}
           </Stack>
+
+          {/* Por qué ese precio y no el de la etiqueta. Sin esta línea, un
+              número más bajo que el del catálogo parece un error de la tienda
+              —o peor, un precio que va a cambiar en la caja. */}
+          {conAcuerdo && (
+            <Typography sx={{ fontSize: TS.label, color: 'var(--accent-deep)', fontWeight: 700 }}>
+              {t('store.product.agreementPrice')}
+            </Typography>
+          )}
 
           <Box
             sx={{

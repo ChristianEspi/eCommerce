@@ -2903,6 +2903,7 @@ export const es = {
     'store.product.trust.delivery': 'Entrega calculada al comprar',
     'store.product.trust.payment': 'Pago por los medios de la tienda',
     'store.product.trust.stock': 'Stock real de almacén',
+    'store.product.agreementPrice': 'Precio acordado con tu empresa',
     'store.card.number': 'Número de tarjeta',
     'store.card.numberInvalid': 'Revisa el número de la tarjeta.',
     'store.card.month': 'Mes',

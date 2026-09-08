@@ -1,8 +1,6 @@
 import ShoppingCartRoundedIcon from '@mui/icons-material/ShoppingCartRounded'
 import { Alert, Box, Button, Card, Chip, Divider, Stack, Typography } from '@mui/material'
-import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { useCartQuote } from '@/features/pricing/useCartQuote'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { formatMoney } from '@/shared/lib/format'
 import { useDocumentMeta } from '@/shared/seo/useDocumentMeta'
@@ -11,6 +9,7 @@ import { EmptyState } from '@/shared/ui/states'
 import { TS } from '@/theme/tokens'
 import { CartLineList } from './cart/CartLineList'
 import { useCart } from './cart/cart-context'
+import { useQuotedCart } from './cart/useQuotedCart'
 import { useStorefront } from './hooks'
 import { privateMeta } from './seo'
 
@@ -39,23 +38,7 @@ export function StoreCartPage() {
     privateMeta({ store, storeSlug, locale, pathname: `/s/${storeSlug}` }, t('store.cart.title'), '/cart'),
   )
 
-  // El array entra en la clave de la consulta: uno nuevo por render la
-  // invalidaría en bucle. Se arma con la forma del PUERTO, no con la del
-  // transporte: quien cotiza puede ser mañana el ERP del tenant.
-  const requests = useMemo(
-    () =>
-      cart.lines.map((line) => ({
-        productId: line.product_id,
-        variantId: line.variant_id,
-        uomCode: null,
-        quantity: line.quantity,
-      })),
-    [cart.lines],
-  )
-  const quote = useCartQuote(storeSlug, currency, requests)
-
-  const quoted = quote.data ?? null
-  const discounted = quoted?.lines.some((line) => line.source === 'price_list') ?? false
+  const { quote, quoted, discounted } = useQuotedCart(storeSlug)
 
   if (cart.lines.length === 0) {
     return (
