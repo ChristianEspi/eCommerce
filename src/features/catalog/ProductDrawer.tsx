@@ -13,6 +13,7 @@ import {
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import { useForm } from 'react-hook-form'
 import { useCapabilities } from '@/features/capabilities/capabilities-context'
+import { useTaxCategories } from '@/features/admin/settings/taxes'
 import {
   useAdjustInventory,
   useStoreWarehouses,
@@ -115,6 +116,12 @@ export function ProductDrawer({
 
   const brands = useBrands(open && advanced)
   const families = useFamilies(open && advanced)
+
+  // Las categorías fiscales las administra Configuración; aquí solo se elige
+  // una. La marcada por defecto se nombra en la ayuda para que «vacío» no se
+  // lea como «sin impuesto».
+  const categoriasFiscales = useTaxCategories(open)
+  const porDefecto = (categoriasFiscales.data ?? []).find((fila) => fila.is_default) ?? null
 
   /*
    * La existencia inicial, y por qué está aquí y no solo en Inventario.
@@ -463,6 +470,41 @@ export function ProductDrawer({
               {...register('stock')}
             />
           </Stack>
+
+          {/* La tasa del producto, junto al precio y no en Configuración.
+              El impuesto se piensa cuando se pone el precio —«¿este va con IGV
+              o está exonerado?»— y hasta ahora no había dónde decirlo: la
+              columna existía y el catálogo entero caía en la categoría por
+              defecto de la sociedad.
+
+              Vacío NO es «sin impuesto», es «la de siempre», y el texto de
+              ayuda lo dice con el nombre de la que se aplicaría: dejar que
+              alguien lo lea como exento sería la peor forma de equivocarse. */}
+          <TextField
+            select
+            label={t('catalog.field.taxCategory')}
+            fullWidth
+            disabled={!canWrite}
+            // `displayEmpty` y no el hueco en blanco de «Marca» o «Familia»:
+            // ahí vacío se lee bien como «ninguna», pero un campo de impuesto en
+            // blanco se lee como «no lleva», que es lo contrario de lo que pasa.
+            SelectProps={{ displayEmpty: true }}
+            InputLabelProps={{ shrink: true }}
+            value={watch('tax_category_id')}
+            helperText={
+              porDefecto
+                ? `${t('catalog.field.taxCategory.help')} ${porDefecto.name}`
+                : t('catalog.field.taxCategory.help')
+            }
+            {...register('tax_category_id')}
+          >
+            <MenuItem value="">{t('catalog.field.taxCategory.default')}</MenuItem>
+            {(categoriasFiscales.data ?? []).map((categoria) => (
+              <MenuItem key={categoria.id} value={categoria.id}>
+                {categoria.name}
+              </MenuItem>
+            ))}
+          </TextField>
 
           {/* En qué almacén entra. Solo al dar de alta: después, la existencia
               se mueve desde Inventario con su movimiento y su motivo. */}

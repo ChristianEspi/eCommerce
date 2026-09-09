@@ -61,6 +61,12 @@ export const productSchema = z.object({
   kind: z.enum(PIM_PRODUCT_KINDS).default('simple'),
   brand_id: z.string().uuid().nullable().default(null),
   family_id: z.string().uuid().nullable().default(null),
+  /**
+   * Categoría fiscal del producto. `null` = la que la sociedad marcó por
+   * defecto, que es el primer escalón de `ebim.effective_tax_rate` después del
+   * producto. Nulo no es «sin impuesto»: es «el de siempre».
+   */
+  tax_category_id: z.string().uuid().nullable().default(null),
 })
 export type Product = z.infer<typeof productSchema>
 
@@ -146,6 +152,8 @@ export const productFormSchema = z.object({
   /** Cadena vacía = sin marca. El `null` lo pone la capa de datos. */
   brand_id: z.string(),
   family_id: z.string(),
+  /** Cadena vacía = la categoría fiscal por defecto de la sociedad. */
+  tax_category_id: z.string(),
 })
 export type ProductFormValues = z.infer<typeof productFormSchema>
 
@@ -182,6 +190,7 @@ export function productToForm(product: Product | null): ProductFormValues {
     kind: product?.kind ?? 'simple',
     brand_id: product?.brand_id ?? '',
     family_id: product?.family_id ?? '',
+    tax_category_id: product?.tax_category_id ?? '',
   }
 }
 

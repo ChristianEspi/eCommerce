@@ -40,6 +40,7 @@ const PRODUCT_SELECT = [
   'kind',
   'brand_id',
   'family_id',
+  'tax_category_id',
 ].join(', ')
 
 export type ProductStatusFilter = ProductStatus | 'all'
@@ -136,6 +137,10 @@ export async function saveProduct(input: {
     kind: values.kind,
     brand_id: values.brand_id || null,
     family_id: values.family_id || null,
+    // Vacío = `null` = la categoría fiscal por defecto de la sociedad. Se manda
+    // igual al crear y al editar: omitirlo en la edición dejaría imposible
+    // volver un producto exonerado a la tasa general.
+    tax_category_id: values.tax_category_id || null,
   }
 
   const body = input.productId

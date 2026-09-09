@@ -81,6 +81,8 @@ describe('validacion del formulario de producto', () => {
     kind: 'simple' as const,
     brand_id: '',
     family_id: '',
+    // Vacio = la categoria fiscal por defecto de la sociedad.
+    tax_category_id: '',
   }
 
   it('acepta un producto bien formado', () => {
@@ -315,6 +317,7 @@ describe('exportar a CSV', () => {
     kind: 'simple',
     brand_id: null,
     family_id: null,
+    tax_category_id: null,
     ...over,
   })
 

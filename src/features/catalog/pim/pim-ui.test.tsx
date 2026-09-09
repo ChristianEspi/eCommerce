@@ -69,6 +69,8 @@ function variantProduct() {
     kind: 'variant',
     brand_id: null,
     family_id: null,
+    // Sin categoria fiscal propia: manda la que la sociedad marco por defecto.
+    tax_category_id: null,
   } satisfies Product
 }
 

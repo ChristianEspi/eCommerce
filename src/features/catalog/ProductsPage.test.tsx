@@ -31,6 +31,8 @@ const { ProductsPage } = await import('./ProductsPage')
 
 const PRODUCT_ID = '88888888-8888-4888-8888-888888888888'
 const CATEGORY_ID = '77777777-7777-4777-8777-777777777777'
+const TAX_DEFAULT_ID = '66666666-6666-4666-8666-666666666661'
+const TAX_EXEMPT_ID = '66666666-6666-4666-8666-666666666662'
 
 function backend(role: 'admin' | 'viewer' = 'admin', products = defaultProducts()): FakeSupabase {
   return createFakeSupabase({
@@ -50,6 +52,12 @@ function backend(role: 'admin' | 'viewer' = 'admin', products = defaultProducts(
           status: 'active',
           currency: 'PEN',
         },
+      ],
+      // Las tres del tenant, con la general marcada por defecto: es lo que la
+      // ficha nombra cuando el producto no elige ninguna.
+      tax_categories: [
+        { id: TAX_DEFAULT_ID, code: 'igv18', name: 'IGV general (18%)', is_default: true },
+        { id: TAX_EXEMPT_ID, code: 'exonerado', name: 'Exonerado', is_default: false },
       ],
       categories: [
         {
@@ -260,6 +268,61 @@ describe('ProductsPage — alta y edicion', () => {
     for (const field of TENANT_FIELDS) {
       expect(invocation?.body).not.toHaveProperty(field)
     }
+  })
+
+  /**
+   * La categoria fiscal, que hasta ahora no se podia elegir.
+   *
+   * `products.tax_category_id` es el PRIMER escalon de
+   * `ebim.effective_tax_rate`, y sin pantalla el catalogo entero caia en la
+   * categoria que la sociedad marco por defecto: no habia forma de vender un
+   * exonerado y un gravado en el mismo catalogo, que es justo lo que la pantalla
+   * de Impuestos promete.
+   */
+  it('el impuesto elegido viaja con el producto', async () => {
+    const user = userEvent.setup()
+    const fake = backend()
+    renderPage(fake)
+
+    await user.click(await screen.findByRole('button', { name: 'Nuevo producto' }))
+    const drawer = await screen.findByRole('dialog')
+
+    await user.type(within(drawer).getByLabelText('Nombre'), 'Arroz')
+    await user.type(within(drawer).getByLabelText('SKU'), 'ARR-001')
+    await user.type(within(drawer).getByLabelText('Precio'), '4.50')
+
+    await user.click(within(drawer).getByRole('combobox', { name: 'Impuesto' }))
+    await user.click(await screen.findByRole('option', { name: 'Exonerado' }))
+    await user.click(within(drawer).getByRole('button', { name: 'Guardar' }))
+
+    await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
+    expect(fake.state.invocations[0]?.body).toMatchObject({ tax_category_id: TAX_EXEMPT_ID })
+  })
+
+  /**
+   * Y vacio NO es «sin impuesto»: es «la de siempre».
+   *
+   * Viaja `null` para que la base baje al siguiente escalon de la cascada. Si se
+   * omitiera el campo, un producto exonerado no podria volver nunca a la tasa
+   * general — el `patch` solo toca lo que llega.
+   */
+  it('sin elegir impuesto viaja null, no se omite', async () => {
+    const user = userEvent.setup()
+    const fake = backend()
+    renderPage(fake)
+
+    await user.click(await screen.findByRole('button', { name: 'Nuevo producto' }))
+    const drawer = await screen.findByRole('dialog')
+
+    await user.type(within(drawer).getByLabelText('Nombre'), 'Mesa')
+    await user.type(within(drawer).getByLabelText('SKU'), 'MES-002')
+    await user.type(within(drawer).getByLabelText('Precio'), '99.00')
+    await user.click(within(drawer).getByRole('button', { name: 'Guardar' }))
+
+    await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
+    const body = fake.state.invocations[0]?.body as Record<string, unknown>
+    expect(body).toHaveProperty('tax_category_id')
+    expect(body.tax_category_id).toBeNull()
   })
 
   /**

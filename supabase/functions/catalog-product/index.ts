@@ -43,6 +43,10 @@ const ALLOWED_FIELDS = [
   'kind',
   'brand_id',
   'family_id',
+  // La categoria fiscal del producto es el PRIMER escalon de
+  // `ebim.effective_tax_rate`: sin ella, todo el catalogo cae en la que la
+  // sociedad marco por defecto. Nulo no es «sin impuesto», es «el de siempre».
+  'tax_category_id',
 ] as const
 
 const PRODUCT_STATUS = ['draft', 'published', 'archived'] as const
@@ -122,6 +126,7 @@ const handler = serveJson(
         kind: body.kind === undefined ? 'simple' : requireEnum(body, 'kind', PRODUCT_KIND),
         brand_id: optionalUuid(body, 'brand_id'),
         family_id: optionalUuid(body, 'family_id'),
+        tax_category_id: optionalUuid(body, 'tax_category_id'),
       }
 
       const { data, error } = await client
@@ -156,6 +161,7 @@ const handler = serveJson(
     if ('kind' in body) patch.kind = requireEnum(body, 'kind', PRODUCT_KIND)
     if ('brand_id' in body) patch.brand_id = optionalUuid(body, 'brand_id')
     if ('family_id' in body) patch.family_id = optionalUuid(body, 'family_id')
+    if ('tax_category_id' in body) patch.tax_category_id = optionalUuid(body, 'tax_category_id')
     if ('status' in body) {
       patch.status = status
       // `published` sin fecha viola el CHECK de la tabla: se rellena aquí.
