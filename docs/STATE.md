@@ -48,8 +48,23 @@ el maestro comercial; el P00-SaaS fue el análisis de plataforma.
 - **Deuda declarada, no resuelta** (viene de la auditoría de backend, y las pantallas no la tapan):
   D2 el gancho de bloqueo por mora, D3 la emisión del comprobante hacia el outbox —la pestaña de
   comprobantes lo dice en pantalla— y D5 el ejecutor de programaciones.
-- **Sin push.** Los commits del recorrido son locales: `git push` no puede autenticarse desde este
-  shell («Cannot prompt because user interactivity has been disabled»).
+- **Sin push desde el agente.** `git push` no puede autenticarse desde este shell («Cannot prompt
+  because user interactivity has been disabled»): el credential helper es Git Credential Manager y
+  necesita una ventana. Los commits salen del terminal del operador — así se subió `dev` el
+  2026-09-08.
+
+## Preparación de la demo (2026-09-08 / 09)
+
+Migración aplicada a DEV/QAS —son el mismo proyecto, `ehxlxbhtlmfgneiagdcj`— con
+`node scripts/aplicar-migracion.mjs <archivo>`, porque `supabase db push` pide la contraseña de la
+base de forma interactiva:
+
+| Migración | Qué corrige | Verificación |
+|---|---|---|
+| `20260908220000_promotion_image_grant.sql` | `promotions.image_url` se añadió en `20260902230000` sin ampliar el GRANT **por columna**, así que cualquier UPDATE del formulario moría con 42501 («tu rol no puede hacer ese cambio») aunque no se tocara la foto | `information_schema.column_privileges`: `image_url` ya está en la lista de UPDATE para `authenticated`; `kind` sigue **fuera** a propósito (el tipo es inmutable tras crear la campaña) |
+
+**Lección para tablas con GRANT por columna:** añadir una columna es añadirla también al GRANT. No hay
+linter que lo recuerde, y el síntoma —un 403 con rol de administrador— no apunta a la causa.
 
 ## Recuperación de la ejecución interrumpida (2026-08-30)
 
