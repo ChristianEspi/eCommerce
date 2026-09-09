@@ -628,13 +628,36 @@ describe('exigir el cobro antes de entregar', () => {
   })
 
   /**
+   * El medio con el que se va a cobrar ESTE pedido. Es lo que distingue una
+   * venta a credito de una que simplemente todavia no se ha pagado.
+   */
+  async function conMedio(pedido: string, codigo: string, familia: 'credit' | 'wallet') {
+    const [store] = await svc(`select store_id, organization_id, company_id from public.orders where id = $1`, [pedido])
+    const [metodo] = await svc(
+      `insert into public.payment_methods
+         (organization_id, company_id, store_id, code, kind, display_name, capture_mode, is_active)
+       values ($1, $2, $3, $4, $5::public.payment_method_kind, $4, 'manual', true)
+       returning id`,
+      [store?.organization_id, store?.company_id, store?.store_id, codigo, familia],
+    )
+    await svc(
+      `insert into public.payment_intents
+         (organization_id, company_id, store_id, order_id, payment_method_id,
+          currency, amount, idempotency_key)
+       values ($1, $2, $3, $4, $5, 'PEN', '10.00', $6)`,
+      [store?.organization_id, store?.company_id, store?.store_id, pedido, metodo?.id, `int-${codigo}-${pedido}`],
+    )
+  }
+
+  /**
    * Sin esta excepcion la regla estorbaria justo en el caso para el que existe
    * una linea de credito, y una regla que estorba se apaga entera el primer dia:
    * se habria cambiado un control por ninguno.
    */
-  it('una cuenta con linea de credito entrega sin cobrar', async () => {
+  it('el pedido VENDIDO a credito entrega sin cobrar', async () => {
     const cuenta = await cuentaConCredito('CRED', 'ok')
-    const { entrega } = await nueva(cuenta)
+    const { entrega, pedido } = await nueva(cuenta)
+    await conMedio(pedido, 'credito-test', 'credit')
     await dejarLista(entrega)
 
     await asUser(ordersA(), `select public.fulfillment_transition($1, 'delivered') as result`, [
@@ -644,10 +667,31 @@ describe('exigir el cobro antes de entregar', () => {
     expect(fila?.state).toBe('delivered')
   })
 
+  /**
+   * La exencion es del PEDIDO, no de la cuenta.
+   *
+   * Tener credito disponible no es estar usandolo: quien elige Yape esta
+   * diciendo que paga ahora. Mirando solo la cuenta, el control quedaba apagado
+   * para todos sus pedidos por el solo hecho de que existiera una linea — que
+   * es como salio `EC-20260909-00031` sin cobrar y con la mercancia fuera.
+   */
+  it('la misma cuenta pagando con billetera NO entrega sin cobrar', async () => {
+    const cuenta = await cuentaConCredito('CRED-YAPE', 'ok')
+    const { entrega, pedido } = await nueva(cuenta)
+    await conMedio(pedido, 'yape-test', 'wallet')
+    await dejarLista(entrega)
+
+    const message = await expectFailure(() =>
+      asUser(ordersA(), `select public.fulfillment_transition($1, 'delivered') as result`, [entrega]),
+    )
+    expect(message).toMatch(/PAGO_PENDIENTE/)
+  })
+
   /** Y una cuenta con el credito BLOQUEADO no es una cuenta a credito. */
   it('con el credito bloqueado, la excepcion no aplica', async () => {
     const cuenta = await cuentaConCredito('BLOQ', 'blocked')
-    const { entrega } = await nueva(cuenta)
+    const { entrega, pedido } = await nueva(cuenta)
+    await conMedio(pedido, 'credito-bloq', 'credit')
     await dejarLista(entrega)
 
     const message = await expectFailure(() =>
