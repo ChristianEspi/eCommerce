@@ -23,17 +23,35 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
  * editar el resto de la campaña funcione igual.
  */
 
-const captura = vi.hoisted(() => ({ tabla: '', patch: null as Record<string, unknown> | null }))
+const captura = vi.hoisted(() => ({
+  tabla: '',
+  patch: null as Record<string, unknown> | null,
+  select: '',
+  filtros: [] as string[],
+}))
 
 const cliente = {
   from(tabla: string) {
     captura.tabla = tabla
-    return {
+    const consulta = {
       update(patch: Record<string, unknown>) {
         captura.patch = patch
         return { eq: () => Promise.resolve({ error: null }) }
       },
+      select(campos: string) {
+        captura.select = campos
+        return consulta
+      },
+      order: () => consulta,
+      limit: () => consulta,
+      eq(columna: string) {
+        captura.filtros.push(columna)
+        return consulta
+      },
+      or: () => consulta,
+      then: (resolver: (v: unknown) => unknown) => resolver({ data: [], error: null }),
     }
+    return consulta
   },
 }
 
@@ -45,12 +63,14 @@ vi.mock('@/shared/lib/supabase', () => ({
   getStorefrontClient: () => cliente,
 }))
 
-const { updatePromotion } = await import('./api')
+const { updatePromotion, searchScopeTargets } = await import('./api')
+
+const STORE = '33333333-3333-4333-8333-333333333333'
 
 const SCOPE = {
   organizationId: '11111111-1111-4111-8111-111111111111',
   companyId: '22222222-2222-4222-8222-222222222222',
-  storeId: '33333333-3333-4333-8333-333333333333',
+  storeId: STORE,
 }
 
 const VALORES = {
@@ -80,6 +100,42 @@ const VALORES = {
 beforeEach(() => {
   captura.tabla = ''
   captura.patch = null
+  captura.select = ''
+  captura.filtros = []
+})
+
+/**
+ * Cada tabla del alcance tiene su propia forma, y suponerla se paga con un 400.
+ *
+ * `brands` cuelga de la SOCIEDAD y no de una tienda: no tiene `store_id`, y su
+ * código se llama `code`, no `slug`. Filtrarla por tienda pedía una columna
+ * inexistente y el buscador de marcas moría en silencio — la pantalla se
+ * quedaba sin opciones y sin decir por qué.
+ */
+describe('el buscador del alcance consulta cada tabla como es', () => {
+  it('la marca NO se filtra por tienda y su código es `code`', async () => {
+    await searchScopeTargets({ storeId: STORE, kind: 'brand', term: 'abb' })
+
+    expect(captura.tabla).toBe('brands')
+    expect(captura.select).toBe('id, name, code')
+    expect(captura.filtros).not.toContain('store_id')
+  })
+
+  it('el producto SÍ se filtra por tienda y su código es `sku`', async () => {
+    await searchScopeTargets({ storeId: STORE, kind: 'product', term: 'ali' })
+
+    expect(captura.tabla).toBe('products')
+    expect(captura.select).toBe('id, name, sku')
+    expect(captura.filtros).toContain('store_id')
+  })
+
+  it('la categoría se filtra por tienda y su código es `slug`', async () => {
+    await searchScopeTargets({ storeId: STORE, kind: 'category', term: 'vita' })
+
+    expect(captura.tabla).toBe('categories')
+    expect(captura.select).toBe('id, name, slug')
+    expect(captura.filtros).toContain('store_id')
+  })
 })
 
 describe('el update de una campaña manda solo lo que puede actualizar', () => {

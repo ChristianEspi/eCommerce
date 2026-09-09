@@ -381,8 +381,21 @@ describe('Campañas — el alta', () => {
     fireEvent.change(panel.getByRole('combobox', { name: /Busca y elige/ }), {
       target: { value: 'alitraq' },
     })
-    await usuario.click(await screen.findByRole('option', { name: /Alitraq/ }))
-    await usuario.click(panel.getByRole('button', { name: 'Añadir' }))
+    // El clic se REINTENTA hasta que la elección prende, y el botón encendido es
+    // la señal de que prendió. El panel tiene varias consultas en vuelo —los
+    // alcances, sus nombres— y cada una que vuelve repinta el desplegable: el
+    // nodo que se acababa de encontrar podía estar ya reemplazado, y el clic
+    // caía sobre un elemento suelto sin llegar a MUI. Pasaba solo con la máquina
+    // cargada, que es cuando esas respuestas llegan tarde y separadas.
+    const anadir = panel.getByRole('button', { name: 'Añadir' })
+    await waitFor(
+      async () => {
+        await usuario.click(await screen.findByRole('option', { name: /Alitraq/ }))
+        expect(anadir).toBeEnabled()
+      },
+      { timeout: 10_000 },
+    )
+    await usuario.click(anadir)
 
     await waitFor(() => expect(fake.state.tables.promotion_scopes?.length).toBe(1))
     const guardado = fake.state.tables.promotion_scopes?.[0]
@@ -391,9 +404,10 @@ describe('Campañas — el alta', () => {
     expect(guardado?.product_id).not.toBe('QS-565341')
     expect(guardado?.scope_kind).toBe('product')
     // Holgura explícita: el buscador va contra el servidor con 300 ms de espera
-    // antes de consultar, y son dos idas y vueltas. Con los 5 s de por defecto
-    // pasa en una máquina despejada y falla en una cargada, que es la peor
-    // forma de fallar: parece un fallo del código y es del reloj.
+    // antes de consultar, y son dos idas y vueltas sobre la página entera. Con
+    // los 5 s de por defecto pasa en una máquina despejada y falla en una
+    // cargada, que es la peor forma de fallar: parece un fallo del código y es
+    // del reloj.
   }, 20_000)
 
   it('un porcentaje inválido se detiene en el cliente y no llega a la base', async () => {

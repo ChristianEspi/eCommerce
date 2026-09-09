@@ -29,6 +29,7 @@ import {
   useRemoveScope,
   useRemoveTier,
   useSavePromotion,
+  useScopeNames,
   useScopeTargets,
   useScopeVariants,
   useScopes,
@@ -171,13 +172,45 @@ export function PromotionDrawer({
   const [targetTerm, setTargetTerm] = useState('')
   const [targetPicked, setTargetPicked] = useState<PickerOption | null>(null)
   const targetDebounced = useDebouncedValue(targetTerm, 300)
-  const targets = useScopeTargets(scope?.storeId ?? null, scopeKind, targetDebounced)
+  /**
+   * Con algo ya elegido y el texto igual a su nombre no hay nada que buscar: la
+   * consulta devolvería justo lo que ya está elegido. Apagarla ahorra una ida y
+   * vuelta por cada elección y, sobre todo, evita que la lista se repinte
+   * debajo del dedo justo después de elegir.
+   */
+  const yaElegido = targetPicked !== null && targetPicked.primary === targetDebounced
+  const targets = useScopeTargets(
+    scope?.storeId ?? null,
+    scopeKind,
+    targetDebounced,
+    !yaElegido,
+  )
   const targetOptions: PickerOption[] = (targets.data ?? []).map((fila) => ({
     id: fila.id,
     primary: fila.name,
     secondary: fila.code,
   }))
   const variantes = useScopeVariants(scopeKind === 'variant' ? (scopeTarget || null) : null)
+
+  /**
+   * ¿Hay algo que añadir? «Todo el carrito» no necesita destino; el resto sí, y
+   * una variante necesita además cuál.
+   */
+  const alcanceListo =
+    scopeKind === 'all' ||
+    (scopeTarget !== '' && (scopeKind !== 'variant' || scopeVariant !== ''))
+
+  const nombres = useScopeNames(scopes.data ?? [])
+  /** El nombre de lo que apunta un alcance; vacío mientras no se sepa. */
+  const nombreDe = (fila: {
+    product_id: string | null
+    variant_id: string | null
+    category_id: string | null
+    brand_id: string | null
+  }) => {
+    const id = fila.variant_id ?? fila.product_id ?? fila.category_id ?? fila.brand_id
+    return id ? (nombres.data?.[id] ?? '') : ''
+  }
   const [scopeQuantity, setScopeQuantity] = useState('')
   const [scopeExclusion, setScopeExclusion] = useState(false)
   const [scopeDescendants, setScopeDescendants] = useState(false)
@@ -209,6 +242,18 @@ export function PromotionDrawer({
         values,
         previa: promotion ? { image_url: promotion.image_url ?? null } : null,
       })
+      /**
+       * Lo elegido en el alcance y no añadido se guarda TAMBIÉN.
+       *
+       * Son dos botones y el de abajo es el que parece «el de guardar»: quien
+       * elegía un producto y pulsaba «Guardar» veía «Campaña guardada» —cierto—
+       * y perdía la elección sin que nadie se lo dijera. Al reabrir el panel no
+       * había alcance, y la conclusión razonable era que no se había guardado
+       * nada. Guardar significa guardar lo que hay en la pantalla.
+       */
+      if (promotion && scopeKind !== 'all' && scopeTarget !== '' && alcanceListo) {
+        await submitScope()
+      }
       notify(t('promotions.campaigns.saved'), 'success')
       if (!promotion) onClose()
     } catch (error) {
@@ -585,9 +630,13 @@ export function PromotionDrawer({
                   key={row.id}
                   size="small"
                   color={row.is_exclusion ? 'error' : 'default'}
+                  // El tipo Y a qué apunta. «Producto» a secas no distingue dos
+                  // alcances de producto, ni deja reconocer el recién añadido.
                   label={`${row.is_exclusion ? '− ' : ''}${t(
                     `promotions.scope.${row.scope_kind}` as MessageKey,
-                  )}${row.required_quantity ? ` ×${trimDecimals(row.required_quantity)}` : ''}`}
+                  )}${nombreDe(row) ? `: ${nombreDe(row)}` : ''}${
+                    row.required_quantity ? ` ×${trimDecimals(row.required_quantity)}` : ''
+                  }`}
                   // Mientras se borra, la pastilla se apaga: sin esto se queda
                   // igual hasta que vuelve la relectura y parece que el clic no
                   // hizo nada, así que se pulsa otra vez.
@@ -602,7 +651,20 @@ export function PromotionDrawer({
               )}
             </Stack>
 
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="flex-start">
+            {/* Los campos en REJILLA que se parte sola, no en una fila.
+                En una fila cabían dos controles; con «Variante» son tres más los
+                interruptores, y todo se estrujaba hasta que el buscador de
+                producto se quedaba en «Bu…» y el de variante en «Esc…». Un
+                campo que no se puede leer no se puede rellenar.
+                Cada uno pide 220 px y, cuando no caben, bajan de línea. */}
+            <Box
+              sx={{
+                display: 'grid',
+                gap: 1.5,
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                alignItems: 'start',
+              }}
+            >
               <TextField
                 select
                 size="small"
@@ -617,7 +679,6 @@ export function PromotionDrawer({
                   setTargetPicked(null)
                   setTargetTerm('')
                 }}
-                sx={{ minWidth: 160 }}
               >
                 {SCOPE_KINDS.map((kind) => (
                   <MenuItem key={kind} value={kind}>
@@ -635,7 +696,7 @@ export function PromotionDrawer({
                   valor que no está a la vista en ninguna pantalla no se puede
                   rellenar bien. */}
               {scopeKind !== 'all' && (
-                <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Box sx={{ minWidth: 0 }}>
                   <EntityPicker
                     label={t('promotions.field.target')}
                     placeholder={t('promotions.hint.target')}
@@ -654,6 +715,11 @@ export function PromotionDrawer({
                       // Al cambiar de producto, la variante elegida ya no es suya.
                       setScopeVariant('')
                     }}
+                    onClear={() => {
+                      setTargetPicked(null)
+                      setScopeTarget('')
+                      setScopeVariant('')
+                    }}
                     loading={targets.isFetching}
                     minChars={2}
                   />
@@ -668,7 +734,6 @@ export function PromotionDrawer({
                   onChange={(event) => setScopeVariant(event.target.value)}
                   disabled={scopeTarget === ''}
                   helperText={scopeTarget === '' ? t('promotions.hint.variantFirst') : undefined}
-                  sx={{ minWidth: 180 }}
                 >
                   {(variantes.data ?? []).map((variante) => (
                     <MenuItem key={variante.id} value={variante.id}>
@@ -684,9 +749,17 @@ export function PromotionDrawer({
                   label={t('promotions.field.requiredQuantity')}
                   value={scopeQuantity}
                   onChange={(event) => setScopeQuantity(event.target.value)}
-                  sx={{ minWidth: 140 }}
                 />
               )}
+            </Box>
+
+            {/* Interruptores y acción en su propia fila: son decisiones sobre lo
+                de arriba, no un campo más, y metidos en la rejilla robaban el
+                ancho justo al buscador. */}
+            <Stack
+              direction="row"
+              sx={{ gap: 2, alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}
+            >
               {/* Solo en un alcance de CATEGORÍA: en los demás la casilla no
                   significa nada y la base la rechaza. Apagada por defecto —una
                   campaña no se amplía sola a lo que alguien cuelgue mañana—. */}
@@ -711,7 +784,21 @@ export function PromotionDrawer({
                 }
                 label={t('promotions.field.exclusion')}
               />
-              <Button onClick={() => void submitScope()}>{t('promotions.scope.add')}</Button>
+              <Box sx={{ flex: 1 }} />
+              {/* Botón de verdad y no un enlace: es la acción que de hecho
+                  añade el alcance, y compitiendo con el «Guardar» del pie —que
+                  guarda la campaña y NO el alcance— pasaba por decoración.
+                  Apagado mientras falte lo que hace falta: pulsarlo con el
+                  buscador vacío añadía la elección anterior, que ya no estaba a
+                  la vista. */}
+              <Button
+                variant="contained"
+                size="small"
+                disabled={!alcanceListo || addScope.isPending}
+                onClick={() => void submitScope()}
+              >
+                {t('promotions.scope.add')}
+              </Button>
             </Stack>
           </Stack>
         )}

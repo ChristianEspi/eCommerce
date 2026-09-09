@@ -14,6 +14,7 @@ import {
   fetchGiftCards,
   fetchPromotionEvents,
   fetchPromotions,
+  fetchScopeNames,
   fetchScopeVariants,
   fetchScopes,
   searchScopeTargets,
@@ -29,7 +30,7 @@ import {
   type PromotionScopeIds,
   type ScopeInput,
 } from './api'
-import type { PromotionFormValues, ScopeKind } from './types'
+import type { PromotionFormValues, PromotionScope, ScopeKind } from './types'
 
 /**
  * Estado de promociones en el cliente.
@@ -132,11 +133,31 @@ export function useScopes(promotionId: string | null) {
 }
 
 /** Candidatos para el alcance: productos, categorías o marcas, según el tipo. */
-export function useScopeTargets(storeId: string | null, kind: ScopeKind, term: string) {
+export function useScopeTargets(
+  storeId: string | null,
+  kind: ScopeKind,
+  term: string,
+  /** Con algo ya elegido no hay nada que buscar: se apaga. */
+  enabled = true,
+) {
   return useQuery({
     queryKey: [...PROMOTIONS_KEY, 'scope-targets', storeId, kind, term] as const,
     queryFn: () => searchScopeTargets({ storeId, kind, term }),
-    enabled: Boolean(storeId) && kind !== 'all',
+    enabled: enabled && Boolean(storeId) && kind !== 'all',
+  })
+}
+
+/** Los nombres de lo que apunta cada alcance, para que la pastilla diga cuál. */
+export function useScopeNames(scopes: readonly PromotionScope[]) {
+  const ids = scopes
+    .map((s) => s.product_id ?? s.variant_id ?? s.category_id ?? s.brand_id ?? '')
+    .filter(Boolean)
+    .sort()
+    .join(',')
+  return useQuery({
+    queryKey: [...PROMOTIONS_KEY, 'scope-names', ids] as const,
+    queryFn: () => fetchScopeNames(scopes),
+    enabled: ids !== '',
   })
 }
 

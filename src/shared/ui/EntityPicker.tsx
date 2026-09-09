@@ -54,6 +54,7 @@ export function EntityPicker({
   options,
   value = null,
   onPick,
+  onClear,
   loading = false,
   disabled = false,
   error = false,
@@ -72,6 +73,12 @@ export function EntityPicker({
   /** Lo ya elegido, en los buscadores que se quedan con una elección. */
   value?: PickerOption | null
   onPick: (option: PickerOption) => void
+  /**
+   * La **✕** del campo. Sin esto, borrar vaciaba el texto y dejaba la elección
+   * viva por debajo: el campo se veía vacío y seguía apuntando a lo de antes,
+   * así que «Añadir» agregaba algo que ya no estaba a la vista.
+   */
+  onClear?: () => void
   loading?: boolean
   disabled?: boolean
   error?: boolean
@@ -122,10 +129,23 @@ export function EntityPicker({
       onInputChange={(_, next, reason) => {
         // `reset` es lo que dispara MUI al fijar un valor: si se propagara,
         // borraría el término justo después de elegir y relanzaría la consulta.
-        if (reason !== 'reset') onTermChange(next)
+        //
+        // `blur` es la otra mitad, y con `blurOnSelect` llega SIEMPRE detrás de
+        // una elección: MUI vacía el texto al salir del campo. El resultado era
+        // un campo en blanco justo después de haber elegido algo —lo elegido
+        // seguía vivo por dentro— y nadie puede confiar en un formulario que no
+        // enseña lo que tiene.
+        if (reason !== 'reset' && reason !== 'blur') onTermChange(next)
       }}
       onChange={(_, option) => {
-        if (!option) return
+        if (!option) {
+          // MUI manda `null` al pulsar la ✕. Es la única señal de que se ha
+          // soltado la elección, y hay que propagarla: si no, el estado de
+          // arriba se queda con lo elegido y el campo dice otra cosa.
+          onTermChange('')
+          onClear?.()
+          return
+        }
         onPick(option)
         if (clearOnPick) onTermChange('')
       }}
@@ -145,12 +165,19 @@ export function EntityPicker({
       PaperComponent={PaperConTope}
       slotProps={{ listbox: { sx: { maxHeight: 320, py: 0.5 } } }}
       renderOption={(props, option) => {
-        const { key, ...rest } = props as typeof props & { key?: string }
+        // La clave es el ID y NO la que trae MUI, que es la etiqueta: dos marcas
+        // que se llaman igual —las hay— chocaban, y React avisaba de que puede
+        // duplicar u omitir opciones. Un identificador es único por definición.
+        //
+        // Se quita del objeto en vez de dejarla pasar: esparcir una `key` dentro
+        // del JSX es otro aviso de React, y silenciarlo escondería este.
+        const rest = { ...props } as Record<string, unknown>
+        delete rest.key
         const yaEsta = alreadyIn?.has(option.id) ?? false
         return (
           <Box
             component="li"
-            key={key ?? option.id}
+            key={option.id}
             {...rest}
             sx={{
               display: 'flex',

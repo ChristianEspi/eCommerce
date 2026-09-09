@@ -240,33 +240,83 @@ export async function searchScopeTargets(input: {
 }): Promise<ScopeCandidate[]> {
   if (!input.storeId || input.kind === 'all') return []
 
-  const tabla =
-    input.kind === 'category'
-      ? CATEGORIES_TABLE
-      : input.kind === 'brand'
-        ? BRANDS_TABLE
-        : PRODUCTS_TABLE
-  // Las marcas y las categorías no tienen SKU; el producto sí, y es por donde se
-  // busca la mitad de las veces.
-  const campos = tabla === PRODUCTS_TABLE ? ['name', 'sku'] : ['name', 'slug']
+  // Cada tabla tiene su propia forma, y darla por supuesta se paga con un 400:
+  //
+  //  · `products` y `categories` cuelgan de una TIENDA y se filtran por ella;
+  //  · `brands` cuelga de la SOCIEDAD —no tiene `store_id`— y su código se
+  //    llama `code`, no `slug`. Filtrarla por tienda pedía una columna que no
+  //    existe, y el buscador de marcas respondía 400 sin decir nada en pantalla.
+  //
+  // El aislamiento de la marca no se pierde por no filtrar aquí: lo garantiza su
+  // RLS por `organization_id`/`company_id`, que es donde tiene que estar.
+  const porTipo = {
+    category: { tabla: CATEGORIES_TABLE, codigo: 'slug', porTienda: true },
+    brand: { tabla: BRANDS_TABLE, codigo: 'code', porTienda: false },
+    product: { tabla: PRODUCTS_TABLE, codigo: 'sku', porTienda: true },
+    variant: { tabla: PRODUCTS_TABLE, codigo: 'sku', porTienda: true },
+  } as const satisfies Record<
+    Exclude<ScopeKind, 'all'>,
+    { tabla: string; codigo: string; porTienda: boolean }
+  >
 
-  let query = client()
-    .from(tabla)
-    .select(tabla === PRODUCTS_TABLE ? 'id, name, sku' : 'id, name, slug')
-    .eq('store_id', input.storeId)
-    .order('name')
-    .limit(20)
+  const { tabla, codigo, porTienda } = porTipo[input.kind]
 
-  const filtro = buildTextSearchFilter(input.term, campos)
+  let query = client().from(tabla).select(`id, name, ${codigo}`).order('name').limit(20)
+  if (porTienda) query = query.eq('store_id', input.storeId)
+
+  const filtro = buildTextSearchFilter(input.term, ['name', codigo])
   if (filtro) query = query.or(filtro)
 
   const { data, error } = await query
   if (error) throw promotionsErrorFromDb(error)
 
   return (data ?? []).map((fila) => {
-    const row = fila as { id: string; name: string; sku?: string | null; slug?: string | null }
-    return { id: row.id, name: row.name, code: row.sku ?? row.slug ?? null }
+    const row = fila as Record<string, unknown>
+    const code = row[codigo]
+    return {
+      id: String(row.id),
+      name: String(row.name),
+      code: typeof code === 'string' ? code : null,
+    }
   })
+}
+
+/**
+ * Cómo se llama aquello a lo que apunta cada alcance.
+ *
+ * La pastilla decía «Producto» y nada más: con dos alcances de producto no había
+ * forma de saber cuál era cuál, ni de reconocer el que acababas de añadir. La
+ * tabla guarda uuids, así que los nombres hay que ir a buscarlos.
+ *
+ * Una consulta por tipo y solo con los ids que de verdad aparecen: son cuatro
+ * como mucho, y casi siempre una.
+ */
+export async function fetchScopeNames(
+  scopes: readonly PromotionScope[],
+): Promise<Record<string, string>> {
+  const porTabla: Array<[string, Array<string | null>]> = [
+    [PRODUCTS_TABLE, scopes.map((s) => s.product_id)],
+    [PRODUCT_VARIANTS_TABLE, scopes.map((s) => s.variant_id)],
+    [CATEGORIES_TABLE, scopes.map((s) => s.category_id)],
+    [BRANDS_TABLE, scopes.map((s) => s.brand_id)],
+  ]
+
+  const nombres: Record<string, string> = {}
+  await Promise.all(
+    porTabla.map(async ([tabla, crudos]) => {
+      const ids = [...new Set(crudos.filter((id): id is string => Boolean(id)))]
+      if (ids.length === 0) return
+      const { data, error } = await client().from(tabla).select('id, name').in('id', ids)
+      // Un nombre que no se puede leer no rompe la pantalla: la pastilla se
+      // queda con su etiqueta de siempre, que es lo que hacía hasta ahora.
+      if (error) return
+      for (const fila of data ?? []) {
+        const row = fila as { id: string; name: string }
+        nombres[row.id] = row.name
+      }
+    }),
+  )
+  return nombres
 }
 
 /** Las variantes de un producto ya elegido: el segundo paso del alcance `variant`. */
