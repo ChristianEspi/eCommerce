@@ -88,6 +88,32 @@
   --sf-grid-gap-md: 20px;
 
   /* ---------------------------------------------------------------------
+     DESCUBRIMIENTO: PORTADA Y ENCABEZADOS
+     ---------------------------------------------------------------------
+     Otra vez las medidas de HOY, al pixel, sacadas a variables. Lo que cambia
+     entre temas es cuanto pesa la cubierta frente al catalogo:
+
+      · premium mira antes de comprar, asi que la portada es grande y el aire
+        forma parte del argumento;
+      · catalog sabe lo que busca, asi que la portada se aparta y lo que gana
+        jerarquia es llegar al catalogo;
+      · retail y universal se quedan en el medio, que es donde estaban.
+
+     Ninguna de estas reglas mira el rubro del comercio. Una farmacia se ve
+     como una farmacia porque elige `retail` y tiene su catalogo, no porque el
+     codigo pregunte a que se dedica. */
+  --sf-hero-min: 260px;
+  --sf-hero-min-md: 340px;
+  --sf-hero-pad: 24px;
+  --sf-hero-pad-md: 48px;
+  --sf-hero-title: 30px;
+  --sf-hero-title-md: 52px;
+
+  /* El titulo de una banda de la portada. */
+  --sf-heading: 21px;
+  --sf-heading-md: 24px;
+
+  /* ---------------------------------------------------------------------
      TINTES DE ORIENTACION
      ---------------------------------------------------------------------
      Seis fondos suaves para las puertas de la portada: categorias y marcas.
@@ -265,4 +291,32 @@
   --sf-card-price: 18px;
   --sf-grid-gap: 16px;
   --sf-grid-gap-md: 28px;
+
+  /* La portada como argumento: mas alta, mas aire y un titular que ocupa. */
+  --sf-hero-min: 320px;
+  --sf-hero-min-md: 460px;
+  --sf-hero-pad: 28px;
+  --sf-hero-pad-md: 64px;
+  --sf-hero-title: 34px;
+  --sf-hero-title-md: 60px;
+  --sf-featured-title: 30px;
+  --sf-featured-title-md: 46px;
+  --sf-heading: 22px;
+  --sf-heading-md: 28px;
+}
+
+/* CATALOG: la portada se aparta. No desaparece —una tienda sin cubierta no
+   dice a que se dedica— pero deja de comerse la primera pantalla, que es lo que
+   quiere quien entra a buscar entre miles de referencias. */
+.sf-scope[data-store-theme='catalog'] {
+  --sf-hero-min: 180px;
+  --sf-hero-min-md: 240px;
+  --sf-hero-pad: 20px;
+  --sf-hero-pad-md: 36px;
+  --sf-hero-title: 24px;
+  --sf-hero-title-md: 38px;
+  --sf-featured-title: 22px;
+  --sf-featured-title-md: 30px;
+  --sf-heading: 19px;
+  --sf-heading-md: 21px;
 }

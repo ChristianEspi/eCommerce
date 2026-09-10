@@ -74,7 +74,7 @@ export function SectionHeading({
           <Typography
             component={component}
             sx={{
-              fontSize: { xs: 21, md: 24 },
+              fontSize: { xs: 'var(--sf-heading)', md: 'var(--sf-heading-md)' },
               fontWeight: 800,
               letterSpacing: '-0.025em',
               lineHeight: 1.2,

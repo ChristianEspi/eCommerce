@@ -36,7 +36,7 @@ export function StoreHero({ store }: { store: PublicStore }) {
         borderRadius: 'var(--sf-radius)',
         overflow: 'hidden',
         background: hasImage ? 'var(--neutral-soft)' : 'var(--hero-grad)',
-        minHeight: { xs: 260, md: 340 },
+        minHeight: { xs: 'var(--sf-hero-min)', md: 'var(--sf-hero-min-md)' },
         display: 'flex',
         boxShadow: 'var(--sf-shadow)',
       }}
@@ -110,7 +110,7 @@ export function StoreHero({ store }: { store: PublicStore }) {
           position: 'relative',
           justifyContent: 'flex-end',
           gap: 1.25,
-          p: { xs: 3, md: 6 },
+          p: { xs: 'var(--sf-hero-pad)', md: 'var(--sf-hero-pad-md)' },
           maxWidth: 680,
           color: '#FFFFFF',
         }}
@@ -131,7 +131,7 @@ export function StoreHero({ store }: { store: PublicStore }) {
           sx={{
             // Escala fluida: llena la portada en escritorio sin desbordar en
             // móvil, que es donde compra el canal B2C.
-            fontSize: { xs: 30, md: 52 },
+            fontSize: { xs: 'var(--sf-hero-title)', md: 'var(--sf-hero-title-md)' },
             fontWeight: 800,
             letterSpacing: '-0.03em',
             lineHeight: 1.05,

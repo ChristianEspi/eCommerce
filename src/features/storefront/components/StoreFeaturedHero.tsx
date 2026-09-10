@@ -128,10 +128,17 @@ export function StoreFeaturedHero({
             </Typography>
           ) : null}
 
+          {/* El nombre del producto ES el `<h1>` de la portada cuando la
+              cubierta es una oferta concreta. La escala la pone el tema —una
+              portada editorial pide más cuerpo que un catálogo denso— pero el
+              NIVEL no se toca: la jerarquía del documento no es decoración. */}
           <Typography
             component="h1"
             sx={{
-              fontSize: { xs: 26, md: 38 },
+              fontSize: {
+                xs: 'var(--sf-featured-title, 26px)',
+                md: 'var(--sf-featured-title-md, 38px)',
+              },
               fontWeight: 800,
               letterSpacing: '-0.03em',
               lineHeight: 1.1,
