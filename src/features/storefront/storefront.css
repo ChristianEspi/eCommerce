@@ -154,3 +154,45 @@
     background: var(--sf-header-bg);
   }
 }
+
+/* ---------------------------------------------------------------------------
+   TEMA DE LA TIENDA
+   ---------------------------------------------------------------------------
+   Las diferencias entre los cuatro temas viajan por aqui y no por condicionales
+   repartidos en el JSX. La razon es de mantenimiento y es concreta: un
+   `if (theme === 'retail')` por componente convierte cuatro temas en cuatro
+   aplicaciones, y la quinta industria obliga a la quinta copia. Un atributo en
+   la frontera y una regla de CSS valen para todos los descendientes a la vez.
+
+   `universal` no aparece en ninguna regla: es el suelo, y lo que se ve sin
+   atributos es exactamente lo que la vitrina ya hacia. Eso es lo que hace que
+   una tienda que nunca eligio tema no cambie.
+   --------------------------------------------------------------------------- */
+
+/* Cabecera reducida: la tienda de miles de referencias quiere que la primera
+   pantalla sea catalogo. La barra pierde altura (variable del proveedor) y la
+   linea inferior se afina para que no compita con la de las familias. */
+.sf-scope[data-store-header='compact'] .sf-header {
+  --sf-line: color-mix(in srgb, var(--border) 35%, transparent);
+}
+
+/* Premium vende mirando: la cabecera deja de tener canto y se apoya en una
+   sombra bajisima. Una linea dura arriba encajona la portada. */
+.sf-scope[data-store-theme='premium'] .sf-header {
+  border-bottom-color: transparent;
+  box-shadow: 0 1px 24px -18px rgba(16, 24, 32, 0.6);
+}
+
+/* Retail y catalog reparten mas producto por fila: el aire entre secciones ya
+   lo baja `--sf-section-gap`, y aqui se acompana con esquinas menos generosas.
+   Un radio de 20 px en una tarjeta pequena se come la foto. */
+.sf-scope[data-store-cards='compact'] {
+  --sf-radius: 16px;
+  --sf-radius-sm: 12px;
+}
+
+/* Premium al reves: la foto es el argumento y la tarjeta la enmarca. */
+.sf-scope[data-store-theme='premium'] {
+  --sf-radius: 24px;
+  --sf-radius-sm: 16px;
+}

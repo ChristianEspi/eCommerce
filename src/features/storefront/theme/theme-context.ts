@@ -1,6 +1,6 @@
 import { createContext } from 'react'
 import type { CSSProperties } from 'react'
-import type { ImageRatio, SectionSpacing } from './types'
+import type { HeaderVariant, ImageRatio, SectionSpacing } from './types'
 import { DEFAULT_STORE_THEME, type ResolvedStoreTheme } from './resolve'
 
 /**
@@ -40,6 +40,32 @@ const AIRE: Record<SectionSpacing, { xs: number; md: number }> = {
   spacious: { xs: 24, md: 40 },
 }
 
+/**
+ * El aire ALREDEDOR del contenido, que no es el mismo que el aire entre
+ * secciones.
+ *
+ * Son dos medidas distintas y confundirlas cambia la tienda de quien no eligió
+ * nada: la portada separaba sus bandas con `{ xs: 2, md: 3 }` y el contenedor
+ * respiraba con `{ xs: 2.5, md: 4 }`. `comfortable` conserva las dos.
+ */
+const MARGEN: Record<SectionSpacing, { xs: number; md: number }> = {
+  compact: { xs: 14, md: 22 },
+  comfortable: { xs: 20, md: 32 },
+  spacious: { xs: 28, md: 48 },
+}
+
+/**
+ * La altura de la barra.
+ *
+ * `standard` es la de hoy, al píxel. `compact` recorta lo justo para que en
+ * `catalog` —miles de referencias, quien busca sabe lo que busca— la primera
+ * pantalla sea catálogo y no navegación.
+ */
+const BARRA: Record<HeaderVariant, { xs: number; md: number }> = {
+  standard: { xs: 60, md: 68 },
+  compact: { xs: 52, md: 56 },
+}
+
 /** La proporción de `ProductMedia`, que hoy viene cableada en `1 / 1`. */
 const PROPORCION: Record<ImageRatio, string> = {
   square: '1 / 1',
@@ -58,10 +84,16 @@ const PROPORCION: Record<ImageRatio, string> = {
  */
 export function themeCssVars(theme: ResolvedStoreTheme): CSSProperties {
   const aire = AIRE[theme.style.sectionSpacing]
+  const margen = MARGEN[theme.style.sectionSpacing]
+  const barra = BARRA[theme.style.headerVariant]
 
   return {
     '--sf-section-gap': `${aire.xs}px`,
     '--sf-section-gap-md': `${aire.md}px`,
+    '--sf-main-pad': `${margen.xs}px`,
+    '--sf-main-pad-md': `${margen.md}px`,
+    '--sf-header-h': `${barra.xs}px`,
+    '--sf-header-h-md': `${barra.md}px`,
     '--sf-image-ratio': PROPORCION[theme.style.imageRatio],
     '--sf-grid-xs': String(theme.definition.gridColumns.xs),
     '--sf-grid-sm': String(theme.definition.gridColumns.sm),

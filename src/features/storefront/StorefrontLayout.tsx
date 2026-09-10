@@ -171,19 +171,11 @@ export function StorefrontLayout() {
           <SkipToContentLink label={t('store.skipToContent')} />
           <StoreHeader store={store} storeSlug={storeSlug as string} />
 
-          <Container
-            component="main"
-            id={CONTENT_ANCHOR}
-            // `tabIndex={-1}`: sin esto el salto mueve el scroll pero NO el
-            // foco, y el siguiente Tab vuelve al principio de la cabecera.
-            tabIndex={-1}
-            maxWidth="lg"
-            sx={{ flex: 1, py: { xs: 2.5, md: 4 }, '&:focus': { outline: 'none' } }}
-          >
+          <StoreMain>
             <ErrorBoundary>
               <Outlet context={context} />
             </ErrorBoundary>
-          </Container>
+          </StoreMain>
 
           {/* Las páginas del comercio —quiénes somos, envíos, términos— NO van
               en la cabecera: sus tres trabajos son buscar, entrar a lo tuyo y
@@ -274,6 +266,36 @@ function StorefrontSurface({ children }: { children: ReactNode }) {
   )
 }
 
+/**
+ * El contenedor del contenido.
+ *
+ * Lo único que el tema cambia aquí son dos cosas, y las dos son valores, no
+ * condiciones: el ancho —`lg` para casi todo, `xl` para un catálogo de miles de
+ * referencias— y el aire alrededor. El resto (el ancla del salto de contenido,
+ * el `tabIndex`, el `ErrorBoundary`) no depende del tema y no se mueve.
+ */
+function StoreMain({ children }: { children: ReactNode }) {
+  const { style } = useStorefrontTheme()
+
+  return (
+    <Container
+      component="main"
+      id={CONTENT_ANCHOR}
+      // `tabIndex={-1}`: sin esto el salto mueve el scroll pero NO el
+      // foco, y el siguiente Tab vuelve al principio de la cabecera.
+      tabIndex={-1}
+      maxWidth={style.contentWidth}
+      sx={{
+        flex: 1,
+        py: { xs: 'var(--sf-main-pad)', md: 'var(--sf-main-pad-md)' },
+        '&:focus': { outline: 'none' },
+      }}
+    >
+      {children}
+    </Container>
+  )
+}
+
 /** Marco neutro para los estados en los que todavía no hay tienda que pintar. */
 function Shell({ children }: { children: ReactNode }) {
   return (
@@ -298,6 +320,10 @@ function StoreHeader({ store, storeSlug }: { store: PublicStore; storeSlug: stri
    * Con la consulta de medios se renderiza UNO, en el sitio que le toca.
    */
   const enMovil = useMediaQuery('(max-width:899.95px)')
+  // El tema decide el ANCHO de la barra y su altura; nada de lo que la barra
+  // contiene —buscador, cuenta, carrito, familias— depende de él. Un tema que
+  // quitara uno de esos tres dejaría de ser un tema.
+  const { style } = useStorefrontTheme()
 
   return (
     <Box
@@ -314,8 +340,14 @@ function StoreHeader({ store, storeSlug }: { store: PublicStore; storeSlug: stri
         borderBottom: '1px solid var(--sf-line)',
       }}
     >
-      <Container maxWidth="lg" disableGutters>
-        <Toolbar sx={{ gap: 1.5, px: { xs: 2, md: 3 }, minHeight: { xs: 60, md: 68 } }}>
+      <Container maxWidth={style.contentWidth} disableGutters>
+        <Toolbar
+          sx={{
+            gap: 1.5,
+            px: { xs: 2, md: 3 },
+            minHeight: { xs: 'var(--sf-header-h)', md: 'var(--sf-header-h-md)' },
+          }}
+        >
           <Box
             component={Link}
             to={`/s/${storeSlug}`}
@@ -463,9 +495,13 @@ function StoreCategories({ storeSlug, storeId }: { storeSlug: string; storeId: s
 
 function StorePagesFooter({ storeSlug, storeName }: { storeSlug: string; storeName: string }) {
   const { data } = useStoreNavigation(storeSlug)
+  // El pie comparte ancho con el contenido a propósito: es una línea DENTRO del
+  // mismo contenedor, no una banda con ancho propio. Cuando lo tenía, la página
+  // se arrastraba en horizontal.
+  const { style } = useStorefrontTheme()
 
   return (
-    <Container maxWidth="lg" component="footer" sx={{ pb: 3, pt: 1 }}>
+    <Container maxWidth={style.contentWidth} component="footer" sx={{ pb: 3, pt: 1 }}>
       <Stack
         direction={{ xs: 'column', sm: 'row' }}
         sx={{
