@@ -40,6 +40,9 @@ import { SectionCard } from '@/shared/ui/SectionCard'
 import { SectionTabs } from '@/shared/ui/SectionTabs'
 import { StatusChip } from '@/shared/ui/StatusChip'
 import { GhostButton, PrimaryButton } from '@/shared/ui/buttons'
+import GroupRoundedIcon from '@mui/icons-material/GroupRounded'
+import { useSessionContext } from '@/features/auth/session-context'
+import { MembersSection } from './settings/MembersSection'
 import { TaxesSection } from './settings/TaxesSection'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState, ErrorState, LoadingState, UnauthorizedState } from '@/shared/ui/states'
@@ -201,6 +204,9 @@ export function SettingsPage() {
   const { t } = useI18n()
   const { notify } = useFeedback()
   const { activeStore, activeCompanyId, tenant, status: tenantStatus, can } = useTenant()
+  // Para no ofrecerle a nadie quitarse el acceso a sí mismo: la base lo
+  // rechazaría igual, pero un botón que va a fallar es un botón que miente.
+  const { session } = useSessionContext()
   const canManage = can('store.manage')
   // Dos ejes distintos: `can` es el ROL y `has` es lo que la sociedad CONTRATÓ.
   // Hacen falta los dos, y la base los vuelve a comprobar por separado.
@@ -782,6 +788,31 @@ export function SettingsPage() {
                     </CapabilityFeature>
                   </Stack>
                 )}
+              </ManagedSection>
+            ),
+          },
+          {
+            id: 'users',
+            label: t('admin.settings.tab.users'),
+            content: (
+              <ManagedSection>
+                <Card>
+                  <CardContent>
+                    <SectionCard
+                      icon={<GroupRoundedIcon />}
+                      title={t('settings.section.users')}
+                      subtitle={t('settings.section.usersHelp')}
+                      padded
+                    >
+                      <MembersSection
+                        organizationId={tenant?.organization_id ?? null}
+                        companyId={activeCompanyId}
+                        canManage={canManage}
+                        currentUserId={session?.user?.id ?? null}
+                      />
+                    </SectionCard>
+                  </CardContent>
+                </Card>
               </ManagedSection>
             ),
           },
