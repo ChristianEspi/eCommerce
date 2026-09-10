@@ -85,17 +85,23 @@ function renderApp(initialPath: string) {
   const router = createMemoryRouter(routes, { initialEntries: [initialPath] })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
 
-  return render(
-    <I18nProvider initial="es">
-      <AppearanceProvider initial={DEFAULT_APPEARANCE}>
-        <QueryClientProvider client={queryClient}>
-          <SessionProvider>
-            <RouterProvider router={router} />
-          </SessionProvider>
-        </QueryClientProvider>
-      </AppearanceProvider>
-    </I18nProvider>,
-  )
+  // Se devuelve el router además del árbol: con `createMemoryRouter` la barra
+  // del navegador no se mueve, así que `window.location` no sirve para afirmar
+  // a dónde acabó una redirección.
+  return {
+    router,
+    ...render(
+      <I18nProvider initial="es">
+        <AppearanceProvider initial={DEFAULT_APPEARANCE}>
+          <QueryClientProvider client={queryClient}>
+            <SessionProvider>
+              <RouterProvider router={router} />
+            </SessionProvider>
+          </QueryClientProvider>
+        </AppearanceProvider>
+      </I18nProvider>,
+    ),
+  }
 }
 
 describe('flujo login → onboarding → /app', () => {
@@ -221,6 +227,59 @@ describe('flujo login → onboarding → /app', () => {
       await screen.findByText('Tu cuenta no está habilitada para eCommerce'),
     ).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Crea tu tienda' })).not.toBeInTheDocument()
+  })
+
+  /**
+   * Un COMPRADOR no es un empleado sin permisos.
+   *
+   * Los dos llegan a `/app` con un token sin `org_id`, y desde el token no se
+   * distinguen. Lo que los separa es un dato de servidor: el vínculo con una
+   * cuenta B2B, que `my_business_accounts()` resuelve sin aceptar argumentos.
+   * Para el comprador ese cartel era un final del que no se salía.
+   */
+  it('un comprador con vínculo B2B acaba en la tienda, no en el cartel', async () => {
+    fake.state.session = makeSession({ withTenantClaims: false })
+    // La fila va COMPLETA a propósito: el guard reusa `fetchMyAccounts`, que
+    // valida el contrato entero. Si el esquema no pasa, no se redirige y se
+    // cae al cartel — falla del lado seguro, y esta prueba lo cubriría.
+    fake.state.rpc.my_business_accounts = () => [
+      {
+        account_id: '77777777-7777-4777-8777-777777777777',
+        code: 'BOT-01',
+        name: 'Botica Central',
+        customer_name: 'Botica Central SAC',
+        customer_kind: 'company',
+        role: 'buyer',
+        status: 'active',
+        requires_approval: false,
+        purchase_order_required: false,
+      },
+    ]
+    fake.state.tables.public_stores = [{ slug: 'bodega', name: 'Bodega Central' }]
+
+    const { router } = renderApp('/app')
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/s/bodega'))
+    // Y el cartel no llega a quedarse: uno que dice «no estás habilitado» y se
+    // va solo es peor que no enseñarlo.
+    expect(
+      screen.queryByText('Tu cuenta no está habilitada para eCommerce'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('sin vínculo de compra no se adivina: se deja el cartel y una puerta', async () => {
+    // Mandar a la vitrina a un empleado mal configurado le esconde su problema
+    // real, así que aquí no se redirige. Pero tampoco se le deja sin salida.
+    fake.state.session = makeSession({ withTenantClaims: false })
+    fake.state.rpc.my_business_accounts = () => []
+    fake.state.tables.public_stores = [{ slug: 'bodega', name: 'Bodega Central' }]
+
+    renderApp('/app')
+
+    expect(
+      await screen.findByText('Tu cuenta no está habilitada para eCommerce'),
+    ).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Ver la tienda' })).toBeInTheDocument()
   })
 
   it('cerrar sesión devuelve al login', async () => {

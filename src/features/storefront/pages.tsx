@@ -1,13 +1,11 @@
 import LoginRoundedIcon from '@mui/icons-material/LoginRounded'
 import StorefrontRoundedIcon from '@mui/icons-material/StorefrontRounded'
 import { Box, Button, Card, Stack, Typography } from '@mui/material'
-import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useI18n } from '@/shared/i18n/i18n-context'
-import { STOREFRONT_SLUG, isSupabaseConfigured } from '@/shared/lib/env'
 import { BrandLockup } from '@/shared/ui/BrandLockup'
 import { TS } from '@/theme/tokens'
-import { fetchOnlyPublicStore } from './api'
+import { useDefaultStoreSlug } from './default-store'
 
 /**
  * Pantallas sueltas fuera de la vitrina de una tienda.
@@ -42,17 +40,10 @@ import { fetchOnlyPublicStore } from './api'
 export function LandingPage() {
   const { t } = useI18n()
 
-  const store = useQuery({
-    queryKey: ['landing', 'only-store'],
-    queryFn: fetchOnlyPublicStore,
-    // Sin backend configurado no hay a quién preguntar, y sin slug declarado
-    // tampoco hace falta: el declarado manda.
-    enabled: isSupabaseConfigured && STOREFRONT_SLUG === '',
-    staleTime: 5 * 60 * 1000,
-  })
-
-  const slug = STOREFRONT_SLUG || store.data?.slug || null
-  const storeName = STOREFRONT_SLUG ? null : (store.data?.name ?? null)
+  // La regla de «a qué tienda» vive en `default-store.ts`: la comparte con el
+  // guard del backoffice, que la necesita para no dejar a un comprador atrapado
+  // en un cartel sin salida.
+  const { slug, name: storeName } = useDefaultStoreSlug()
 
   return (
     <Box sx={{ display: 'grid', placeItems: 'center', minHeight: '100dvh', p: { xs: 2, md: 6 } }}>
