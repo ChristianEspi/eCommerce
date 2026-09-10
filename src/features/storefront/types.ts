@@ -93,6 +93,22 @@ export const publicStoreSchema = z.object({
    * verificada; esto solo evita enseñar un formulario que se va a rechazar.
    */
   checkout_requires_account: z.boolean().nullable().catch(false).default(false),
+  /**
+   * Theme Engine (P02). Los tres llegan CRUDOS y así se quedan aquí.
+   *
+   * `z.unknown()` no es dejadez: es la frontera entre las dos capas. Lo que
+   * viene de la base puede ser un tema que esta versión no conoce, un JSON
+   * escrito a mano o directamente nada —una respuesta anterior al despliegue de
+   * la migración no trae estas columnas—. Validarlo con un `enum` haría fallar
+   * el `parse` de TODA la tienda por un campo de presentación, y la vitrina se
+   * quedaría en blanco por elegir mal el ancho del contenedor.
+   *
+   * Quien decide qué significa cada valor es `resolveStoreTheme`, y ahí lo
+   * desconocido cae a lo seguro en vez de romper.
+   */
+  theme_preset: z.unknown(),
+  storefront_style: z.unknown(),
+  home_layout: z.unknown(),
 })
 export type PublicStore = z.infer<typeof publicStoreSchema>
 

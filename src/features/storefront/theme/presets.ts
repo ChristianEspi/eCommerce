@@ -2,10 +2,16 @@ import {
   normalizeHomeLayout as normalizeHomeLayoutCon,
   normalizeStorefrontStyle as normalizeStorefrontStyleCon,
   normalizeThemePreset,
+  sanitizeHomeLayout as sanitizeHomeLayoutCon,
 } from './normalize'
 import type { HomeLayout, HomeSectionConfig, StorefrontStyle, ThemeDefinition, ThemePreset } from './types'
 
-export { MAX_ITEMS_LIMITS, SECTIONS_WITH_MAX_ITEMS, normalizeThemePreset } from './normalize'
+export {
+  MAX_ITEMS_LIMITS,
+  SECTIONS_WITH_MAX_ITEMS,
+  normalizeThemePreset,
+  sanitizeStorefrontStyle,
+} from './normalize'
 export * from './types'
 
 /**
@@ -142,6 +148,11 @@ export function normalizeStorefrontStyle(valor: unknown, preset: ThemePreset): S
 
 export function normalizeHomeLayout(valor: unknown): HomeLayout {
   return normalizeHomeLayoutCon(valor, DEFAULT_HOME_LAYOUT)
+}
+
+/** Lo que se GUARDA del orden de la Home: sin completar. Ver `normalize.ts`. */
+export function sanitizeHomeLayout(valor: unknown): HomeLayout {
+  return sanitizeHomeLayoutCon(valor, DEFAULT_HOME_LAYOUT)
 }
 
 /** El preset resuelto, listo para que el proveedor lo exponga (P04). */

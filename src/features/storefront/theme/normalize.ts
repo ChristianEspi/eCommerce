@@ -35,6 +35,21 @@ import {
  * cerrada y la de valores también, así que lo que no está nombrado no entra —
  * por ausencia, no por filtro. Un filtro solo detiene lo que alguien previó;
  * una lista blanca detiene también lo que nadie imaginó.
+ *
+ * ## Dos familias de funciones, y la diferencia importa
+ *
+ * **`sanitize*` es lo que se GUARDA.** Devuelve lo que la tienda dijo de
+ * verdad, sin nada de más: un estilo con dos claves sigue teniendo dos, y un
+ * orden de Home vacío sigue vacío. Vacío ahí no significa «portada en blanco»,
+ * significa «lo que no digo, lo hereda del tema».
+ *
+ * **`normalize*` es lo que se PINTA.** Completa: rellena el estilo con el
+ * preset y añade al final las secciones que la configuración no mencionaba.
+ *
+ * Confundirlas tiene una consecuencia concreta y silenciosa: si el formulario
+ * guardara la versión completa, la primera vez que alguien tocara el teléfono
+ * de contacto congelaría el orden de la portada de esa tienda, y el día que la
+ * suite añadiera una sección nueva esa tienda no la vería nunca.
  */
 
 /** Cuánto puede pedir una sección de colección. */
@@ -85,6 +100,44 @@ export function normalizeThemePreset(valor: unknown): ThemePreset {
 }
 
 /**
+ * Las siete claves del estilo con su lista de valores, en un solo sitio.
+ *
+ * Escribirlas una vez y recorrerlas es lo que impide el fallo clásico de esta
+ * clase de código: añadir una octava opción al contrato y que una de las dos
+ * funciones se quede sin enterarse.
+ */
+const CLAVES_DE_ESTILO = [
+  ['headerVariant', HEADER_VARIANTS],
+  ['heroVariant', HERO_VARIANTS],
+  ['productCardVariant', PRODUCT_CARD_VARIANTS],
+  ['categoryVariant', CATEGORY_VARIANTS],
+  ['contentWidth', CONTENT_WIDTHS],
+  ['imageRatio', IMAGE_RATIOS],
+  ['sectionSpacing', SECTION_SPACINGS],
+] as const satisfies ReadonlyArray<readonly [keyof StorefrontStyle, readonly string[]]>
+
+/**
+ * Lo que la tienda dijo de verdad: SOLO las claves válidas que traía.
+ *
+ * Parcial a propósito. Es lo que se guarda y lo que edita el formulario, porque
+ * un estilo completo guardado convertiría «heredo de mi tema» en «tengo estos
+ * siete valores fijos», y cambiar de tema después no cambiaría nada.
+ */
+export function sanitizeStorefrontStyle(valor: unknown): Partial<StorefrontStyle> {
+  const crudo = esObjetoPlano(valor) ? valor : {}
+  const salida: Record<string, string> = {}
+
+  for (const [clave, permitidos] of CLAVES_DE_ESTILO) {
+    const dado = crudo[clave]
+    if (typeof dado === 'string' && (permitidos as readonly string[]).includes(dado)) {
+      salida[clave] = dado
+    }
+  }
+
+  return salida as Partial<StorefrontStyle>
+}
+
+/**
  * El estilo de la tienda, completo y con todas sus claves resueltas.
  *
  * Devuelve siempre el objeto entero —nunca uno parcial— para que quien lo
@@ -102,20 +155,19 @@ export function normalizeStorefrontStyle(
   presets: Readonly<Record<ThemePreset, ThemeDefinition>>,
 ): StorefrontStyle {
   const base = presets[normalizeThemePreset(preset)]
-  const crudo = esObjetoPlano(valor) ? valor : {}
 
+  // El preset primero y lo que pisó la tienda encima. `id` y `gridColumns` se
+  // quedan fuera enumerando las claves: un `...base` habría colado los dos en
+  // un objeto que el contrato dice que no los tiene.
   return {
-    headerVariant: deLaLista(crudo.headerVariant, HEADER_VARIANTS, base.headerVariant),
-    heroVariant: deLaLista(crudo.heroVariant, HERO_VARIANTS, base.heroVariant),
-    productCardVariant: deLaLista(
-      crudo.productCardVariant,
-      PRODUCT_CARD_VARIANTS,
-      base.productCardVariant,
-    ),
-    categoryVariant: deLaLista(crudo.categoryVariant, CATEGORY_VARIANTS, base.categoryVariant),
-    contentWidth: deLaLista(crudo.contentWidth, CONTENT_WIDTHS, base.contentWidth),
-    imageRatio: deLaLista(crudo.imageRatio, IMAGE_RATIOS, base.imageRatio),
-    sectionSpacing: deLaLista(crudo.sectionSpacing, SECTION_SPACINGS, base.sectionSpacing),
+    headerVariant: base.headerVariant,
+    heroVariant: base.heroVariant,
+    productCardVariant: base.productCardVariant,
+    categoryVariant: base.categoryVariant,
+    contentWidth: base.contentWidth,
+    imageRatio: base.imageRatio,
+    sectionSpacing: base.sectionSpacing,
+    ...sanitizeStorefrontStyle(valor),
   }
 }
 
@@ -157,10 +209,7 @@ function seccionNormalizada(
  * no existe, y detener la Home entera por una entrada de más sería cambiar un
  * hueco por una pantalla vacía.
  */
-export function normalizeHomeLayout(
-  valor: unknown,
-  porDefecto: HomeLayout,
-): HomeLayout {
+function seccionesReconocidas(valor: unknown, porDefecto: HomeLayout): HomeSectionConfig[] {
   const defectoPorId = new Map(porDefecto.sections.map((s) => [s.id, s]))
   const crudo = esObjetoPlano(valor) ? valor : {}
   const guardadas = Array.isArray(crudo.sections) ? crudo.sections : []
@@ -181,6 +230,27 @@ export function normalizeHomeLayout(
     vistas.add(id as HomeSectionId)
     salida.push(seccionNormalizada(entrada, base))
   }
+
+  return salida
+}
+
+/**
+ * Lo que la tienda dijo de verdad sobre su portada: sin completar.
+ *
+ * Es lo que se guarda. Una lista vacía se queda vacía porque significa «uso el
+ * orden heredado», y sustituirla por las trece secciones de hoy congelaría esa
+ * tienda en el orden de hoy.
+ */
+export function sanitizeHomeLayout(valor: unknown, porDefecto: HomeLayout): HomeLayout {
+  return { version: 1, sections: seccionesReconocidas(valor, porDefecto) }
+}
+
+export function normalizeHomeLayout(
+  valor: unknown,
+  porDefecto: HomeLayout,
+): HomeLayout {
+  const salida = seccionesReconocidas(valor, porDefecto)
+  const vistas = new Set(salida.map((s) => s.id))
 
   for (const seccion of porDefecto.sections) {
     if (!vistas.has(seccion.id)) salida.push(seccion)

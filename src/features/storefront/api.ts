@@ -100,7 +100,7 @@ export function storefrontClient(): SupabaseClient {
   return storefront()
 }
 
-const STORE_SELECT = [
+const STORE_COLUMNS = [
   'store_id',
   'slug',
   'name',
@@ -121,7 +121,24 @@ const STORE_SELECT = [
   'ui_density',
   'business_display_name',
   'checkout_requires_account',
-].join(', ')
+]
+
+/**
+ * Las tres columnas del Theme Engine, aparte y por un motivo operativo.
+ *
+ * PostgREST no ignora una columna que no existe: devuelve 400 y la consulta
+ * ENTERA se cae. Durante un despliegue en el que la app sale antes que la
+ * migración —que es exactamente lo que pasa cuando el front se publica solo—,
+ * pedirlas en el mismo `select` dejaría la vitrina sin tienda, no sin tema.
+ *
+ * Por eso van separadas: si la respuesta dice que no existen, se repite la
+ * consulta sin ellas y la tienda se pinta con el tema por defecto. Un despliegue
+ * a medias degrada la presentación; no cierra el comercio.
+ */
+export const THEME_COLUMNS = ['theme_preset', 'storefront_style', 'home_layout'] as const
+
+const STORE_SELECT = [...STORE_COLUMNS, ...THEME_COLUMNS].join(', ')
+const STORE_SELECT_SIN_TEMA = STORE_COLUMNS.join(', ')
 
 const CATEGORY_SELECT = 'category_id, store_id, parent_id, slug, name, position'
 
@@ -228,12 +245,39 @@ export async function fetchOnlyPublicStore(): Promise<{ slug: string; name: stri
   return store ?? null
 }
 
+/**
+ * `undefined_column` de Postgres: la columna pedida no existe.
+ *
+ * Se mira el CÓDIGO y nunca el texto. Es la regla del repositorio —el `message`
+ * de PostgREST lleva dentro nombres de tabla y de policy, y ramificar por él se
+ * rompe en cuanto el servidor cambia una palabra— y aquí además basta: en esta
+ * consulta las únicas columnas que pueden faltar son las tres del tema, porque
+ * el resto lleva desplegado desde hace fases.
+ */
+const COLUMNA_INEXISTENTE = '42703'
+
+/**
+ * Se recuerda entre llamadas: una vez sabido que la base va por detrás, no
+ * tiene sentido pagar la consulta fallida en cada navegación.
+ */
+let baseSinTema = false
+
+/** Vuelve a intentar con las columnas del tema. Para las pruebas y para el día
+ *  en que la migración sí esté aplicada sin haber recargado la pestaña. */
+export function resetStorefrontThemeProbe(): void {
+  baseSinTema = false
+}
+
 export async function fetchPublicStore(slug: string): Promise<PublicStore> {
-  const { data, error } = await storefront()
-    .from(PUBLIC_STORES_VIEW)
-    .select(STORE_SELECT)
-    .eq('slug', slug)
-    .maybeSingle()
+  const consultar = (select: string) =>
+    storefront().from(PUBLIC_STORES_VIEW).select(select).eq('slug', slug).maybeSingle()
+
+  let { data, error } = await consultar(baseSinTema ? STORE_SELECT_SIN_TEMA : STORE_SELECT)
+
+  if (error && !baseSinTema && error.code === COLUMNA_INEXISTENTE) {
+    baseSinTema = true
+    ;({ data, error } = await consultar(STORE_SELECT_SIN_TEMA))
+  }
 
   if (error) throw new StorefrontError(error)
   if (!data) throw new StorefrontNotFoundError(slug)

@@ -1,5 +1,16 @@
 import { z } from 'zod'
 import { BRAND_FONTS, BRAND_RADII, DENSITIES } from '@/theme/tokens'
+import {
+  homeLayoutField,
+  storefrontStyleField,
+  themePresetSchema,
+} from '@/features/storefront/theme/schema'
+import {
+  DEFAULT_THEME_PRESET,
+  normalizeThemePreset,
+  sanitizeHomeLayout,
+  sanitizeStorefrontStyle,
+} from '@/features/storefront/theme/presets'
 
 /**
  * Personalización de la tienda (`/app/settings`).
@@ -90,6 +101,14 @@ export const storeSettingsSchema = z.object({
    */
   custom_domain_status: z.string().nullable().default('none'),
   custom_domain_verified_at: z.string().nullable().default(null),
+  /**
+   * Theme Engine (P02). Crudos, como en la vitrina y por el mismo motivo: un
+   * `enum` aquí haría fallar el `parse` de toda la pantalla de Configuración
+   * por un campo de presentación. `toForm` los resuelve contra el contrato.
+   */
+  theme_preset: z.unknown(),
+  storefront_style: z.unknown(),
+  home_layout: z.unknown(),
 })
 export type StoreSettings = z.infer<typeof storeSettingsSchema>
 
@@ -172,6 +191,20 @@ export const storeFormSchema = z.object({
    * excepción la regla estorbaría justo donde el crédito existe.
    */
   require_payment_before_dispatch: z.boolean(),
+  /**
+   * Theme Engine. Los tres se guardan SIEMPRE para owner/admin: elegir entre
+   * cuatro disposiciones de los mismos componentes es tematización, igual que
+   * el acento o la densidad, y no depende de `content.white_label`. La raya
+   * está en la migración `20260910220000` y la impone la policy, no esta
+   * pantalla.
+   *
+   * `storefront_style` y `home_layout` guardan lo que la tienda DIJO, no la
+   * versión completa: lo que no dicen lo hereda del tema. Ver `sanitize*` en
+   * `storefront/theme/normalize.ts`.
+   */
+  theme_preset: themePresetSchema,
+  storefront_style: storefrontStyleField,
+  home_layout: homeLayoutField,
 })
 export type StoreFormValues = z.infer<typeof storeFormSchema>
 
@@ -196,6 +229,20 @@ export function toForm(name: string, settings: StoreSettings | null): StoreFormV
     favicon_url: settings?.favicon_url ?? null,
     checkout_requires_account: settings?.checkout_requires_account ?? false,
     require_payment_before_dispatch: settings?.require_payment_before_dispatch ?? false,
+    /**
+     * Theme Engine. Los tres pasan por el contrato antes de llegar al
+     * formulario, así que una fila anterior al despliegue de la migración —o
+     * una escrita a mano— no deja la pantalla de Configuración sin cargar: se
+     * lee como la tienda `universal` sin nada pisado que era.
+     *
+     * `sanitize` y no `normalize`: aquí se está preparando lo que se va a
+     * GUARDAR. Completar el estilo con los siete valores del preset convertiría
+     * «heredo de mi tema» en siete valores fijos, y cambiar de tema después no
+     * cambiaría nada.
+     */
+    theme_preset: normalizeThemePreset(settings?.theme_preset ?? DEFAULT_THEME_PRESET),
+    storefront_style: sanitizeStorefrontStyle(settings?.storefront_style),
+    home_layout: sanitizeHomeLayout(settings?.home_layout),
   }
 }
 

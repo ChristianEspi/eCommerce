@@ -82,6 +82,9 @@ const SETTINGS_SELECT = [
   'email_reply_to',
   'custom_domain_status',
   'custom_domain_verified_at',
+  'theme_preset',
+  'storefront_style',
+  'home_layout',
 ].join(', ')
 
 function client(): SupabaseClient {
@@ -166,6 +169,13 @@ export async function saveStoreSettings(input: SaveSettingsInput): Promise<void>
     checkout_requires_account: values.checkout_requires_account,
     // P19 · Misma naturaleza: regla de negocio del comercio, se envía siempre.
     require_payment_before_dispatch: values.require_payment_before_dispatch,
+    // Theme Engine · Tematización, NO addon. Va fuera del bloque premium a
+    // propósito: elegir entre cuatro disposiciones de los mismos componentes no
+    // quita el lockup de la suite, y cobrar por ello sería vender una casilla en
+    // vez de una capacidad. La policy no lo gatea; esto no lo gatea tampoco.
+    theme_preset: values.theme_preset,
+    storefront_style: values.storefront_style,
+    home_layout: values.home_layout,
     // PREMIUM. Igual que `white_label` desde P02: sin la capacidad el campo NO
     // se envía, en vez de enviarse vacío. Guardar el teléfono de contacto no
     // puede apagar de paso una tipografía que el tenant tenía. Si alguien lo
