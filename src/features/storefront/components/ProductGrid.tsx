@@ -6,14 +6,20 @@ import { ProductCard } from './ProductCard'
  * Rejilla del catálogo, mobile-first de verdad: **dos columnas ya en el móvil**
  * (que es como se ven las tiendas en el teléfono) y hasta cuatro en escritorio.
  * `auto-rows: 1fr` iguala la altura de las tarjetas sin medir nada en JS.
+ *
+ * Las columnas y el aire salen de variables que pone el tema. Fuera de la
+ * vitrina esas variables no existen, y por eso llevan RESERVA: 2/3/4 y 12/20
+ * px, que es exactamente lo que la rejilla hacía antes del Theme Engine. Una
+ * rejilla que se quedara sin columnas por una variable ausente sería una lista
+ * de una columna, y eso no se ve en ninguna prueba de unidad.
  */
 const GRID_SX = {
   display: 'grid',
-  gap: { xs: 1.5, md: 2.5 },
+  gap: { xs: 'var(--sf-grid-gap, 12px)', md: 'var(--sf-grid-gap-md, 20px)' },
   gridTemplateColumns: {
-    xs: 'repeat(2, minmax(0, 1fr))',
-    sm: 'repeat(3, minmax(0, 1fr))',
-    lg: 'repeat(4, minmax(0, 1fr))',
+    xs: 'repeat(var(--sf-grid-xs, 2), minmax(0, 1fr))',
+    sm: 'repeat(var(--sf-grid-sm, 3), minmax(0, 1fr))',
+    lg: 'repeat(var(--sf-grid-lg, 4), minmax(0, 1fr))',
   },
   gridAutoRows: '1fr',
 } as const

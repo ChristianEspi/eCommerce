@@ -63,6 +63,31 @@
   --sf-header-bg: color-mix(in srgb, var(--card) 88%, transparent);
 
   /* ---------------------------------------------------------------------
+     LA TARJETA DE PRODUCTO, EN MEDIDAS
+     ---------------------------------------------------------------------
+     Estos cinco valores son los de HOY, al pixel. Existen como variables —y no
+     como numeros dentro del componente— para que las cuatro presentaciones de
+     tarjeta salgan de reglas de CSS colgadas de la frontera, en vez de cuatro
+     ramas dentro de `ProductCard`.
+
+     La diferencia importa: una rama por tema dentro del componente obliga a
+     tocar el componente para el quinto tema, y en cuanto una rama se olvida de
+     pintar el boton de comprar, hay un tema donde no se puede comprar. Con
+     variables, lo que cambia es la MEDIDA; lo que la tarjeta HACE es siempre lo
+     mismo. */
+  --sf-card-pad: 10px;
+  --sf-card-pad-md: 12px;
+  --sf-card-gap: 8px;
+  --sf-card-title: 15px;
+  --sf-card-price: 19px;
+
+  /* La rejilla del catalogo: dos columnas ya en el movil, que es como se ven
+     las tiendas en el telefono. El numero de columnas lo pone el tema
+     (`--sf-grid-*`, del proveedor); el aire entre ellas, esto. */
+  --sf-grid-gap: 12px;
+  --sf-grid-gap-md: 20px;
+
+  /* ---------------------------------------------------------------------
      TINTES DE ORIENTACION
      ---------------------------------------------------------------------
      Seis fondos suaves para las puertas de la portada: categorias y marcas.
@@ -195,4 +220,49 @@
 .sf-scope[data-store-theme='premium'] {
   --sf-radius: 24px;
   --sf-radius-sm: 16px;
+}
+
+/* ---------------------------------------------------------------------------
+   LAS CUATRO PRESENTACIONES DE LA TARJETA
+   ---------------------------------------------------------------------------
+   Cuatro looks, UNA tarjeta. Lo que cambia son medidas y pesos; lo que la
+   tarjeta hace —enlace real al producto, corazon, vista rapida, comprar o
+   elegir opciones, precio y tachado del mismo producto— es identico en las
+   cuatro, y hay pruebas parametrizadas que lo fijan.
+
+   El contrato de P01 nombra DOS densidades (`comfortable` y `compact`) porque
+   son las dos que el componente distingue de verdad. Las cuatro presentaciones
+   salen de cruzar esa densidad con el tema, que ya viaja en el mismo elemento.
+   Inventar cuatro nombres de densidad habria obligado a otra migracion para
+   ampliar el CHECK y no habria dado ni un pixel mas de diferencia.
+   --------------------------------------------------------------------------- */
+
+/* COMPACTA (retail y catalog): mas producto por pantalla. El nombre baja, el
+   precio se mantiene —es lo que decide— y la caja se estrecha. */
+.sf-scope[data-store-cards='compact'] {
+  --sf-card-pad: 8px;
+  --sf-card-pad-md: 10px;
+  --sf-card-gap: 6px;
+  --sf-card-title: 13.5px;
+  --sf-card-price: 18px;
+  --sf-grid-gap: 10px;
+  --sf-grid-gap-md: 14px;
+}
+
+/* RETAIL: el precio es el protagonista. Sube por encima del nombre y el
+   descuento pesa mas: quien compra jabon y paracetamol compara cifras. */
+.sf-scope[data-store-theme='retail'] {
+  --sf-card-price: 20px;
+}
+
+/* EDITORIAL (premium): la foto manda y el texto acompana. Mas aire dentro de la
+   tarjeta y un nombre que se lee, no que se escanea. */
+.sf-scope[data-store-theme='premium'] {
+  --sf-card-pad: 14px;
+  --sf-card-pad-md: 18px;
+  --sf-card-gap: 10px;
+  --sf-card-title: 16px;
+  --sf-card-price: 18px;
+  --sf-grid-gap: 16px;
+  --sf-grid-gap-md: 28px;
 }

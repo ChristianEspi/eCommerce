@@ -125,8 +125,8 @@ export function ProductCard({
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        p: compact ? 1 : { xs: 1.25, md: 1.5 },
-        gap: compact ? 0.75 : 1,
+        p: compact ? 1 : { xs: 'var(--sf-card-pad)', md: 'var(--sf-card-pad-md)' },
+        gap: compact ? 0.75 : 'var(--sf-card-gap)',
         borderRadius: 'var(--sf-radius)',
         // La separación entre tarjetas la da la sombra, no el borde: una línea
         // nítida alrededor de cada una convierte la rejilla en una cuadrícula.
@@ -174,10 +174,15 @@ export function ProductCard({
           ...(available ? {} : { '& img': { filter: 'grayscale(1)', opacity: 0.5 } }),
         }}
       >
+        {/* La proporción la pone el tema: cuadrada para un envase, vertical
+            para una prenda. Con RESERVA cuadrada, que es la de siempre — y solo
+            aquí: el carrito y el resumen de pago siguen con su miniatura
+            cuadrada, porque ahí la foto identifica, no vende. */}
         <ProductMedia
           url={imageUrl}
           alt={product.primary_image_alt ?? product.name}
           fit="contain"
+          ratio="var(--sf-image-ratio, 1 / 1)"
         />
 
         {onToggleFavorite && (
@@ -273,7 +278,7 @@ export function ProductCard({
         <Typography
           component="h3"
           sx={{
-            fontSize: compact ? 13.5 : 15,
+            fontSize: compact ? 13.5 : 'var(--sf-card-title)',
             fontWeight: 650,
             lineHeight: 1.35,
             letterSpacing: '-0.005em',
@@ -320,7 +325,7 @@ export function ProductCard({
           <Typography
             className="tnum"
             sx={{
-              fontSize: compact ? 16 : 19,
+              fontSize: compact ? 16 : 'var(--sf-card-price)',
               fontWeight: 800,
               letterSpacing: '-0.02em',
               lineHeight: 1.2,
