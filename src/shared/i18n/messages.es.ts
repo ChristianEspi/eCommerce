@@ -426,6 +426,10 @@ export const es = {
     // Para el comprador que compra en más de una tienda. No se elige por él:
     // son SUS tiendas, no la lista de clientes del SaaS.
     'tenant.buyer.pickStore': 'Tu cuenta es de compras. Elige a qué tienda quieres entrar.',
+    'tenant.buyer.enterStore': 'Entrar a {store}',
+    // Desde el panel de cuenta de vuelta a comprar. El logotipo de la cabecera
+    // ya lleva a la portada, pero eso hay que saberlo.
+    'account.keepShopping': 'Ir a la tienda',
     'tenant.unauthorized.body':
       'Tu sesión es válida pero no trae la cuenta ni la sociedad que esta app necesita. Pide al administrador de tu empresa que te habilite eCommerce.',
     'admin.account': 'Tu cuenta',

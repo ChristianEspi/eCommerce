@@ -1,5 +1,7 @@
 import ApartmentRoundedIcon from '@mui/icons-material/ApartmentRounded'
+import StorefrontRoundedIcon from '@mui/icons-material/StorefrontRounded'
 import {
+  Button,
   Card,
   CardContent,
   Chip,
@@ -231,9 +233,34 @@ export function StoreAccountPage() {
 
   return (
     <Stack spacing={2.5}>
-      <Typography component="h1" sx={{ fontSize: 22, fontWeight: 800 }}>
-        {t('account.title')}
-      </Typography>
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={1.5}
+        sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}
+      >
+        <Typography component="h1" sx={{ fontSize: 22, fontWeight: 800 }}>
+          {t('account.title')}
+        </Typography>
+
+        {/* La vuelta a comprar, explícita.
+            El logotipo de la cabecera ya lleva a la portada de la tienda, pero
+            eso hay que saberlo: quien entra a mirar su deuda y decide reponer
+            no debería tener que adivinar dónde se pulsa. Solo aparece con
+            tienda resuelta —esta pantalla también se monta suelta— porque sin
+            slug no hay a dónde ir. */}
+        {storefront && (
+          <Button
+            variant="outlined"
+            size="small"
+            component={Link}
+            to={`/s/${storefront.storeSlug}`}
+            startIcon={<StorefrontRoundedIcon fontSize="small" />}
+            sx={{ alignSelf: { xs: 'flex-start', sm: 'auto' }, flexShrink: 0 }}
+          >
+            {t('account.keepShopping')}
+          </Button>
+        )}
+      </Stack>
 
       <SectionTabs
         ariaLabel={t('account.title')}

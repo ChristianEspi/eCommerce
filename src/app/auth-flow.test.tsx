@@ -237,9 +237,11 @@ describe('flujo login → onboarding → /app', () => {
    * cuenta B2B, que `my_business_accounts()` resuelve sin aceptar argumentos.
    * Para el comprador ese cartel era un final del que no se salía.
    */
-  it('un comprador acaba en SU tienda, no en el cartel', async () => {
+  it('un comprador acaba en el panel de SU tienda, no en el cartel', async () => {
     // El destino sale del vínculo, no del despliegue: `my_stores()` resuelve
-    // persona → cuenta B2B → sociedad → tiendas de esa sociedad.
+    // persona → cuenta B2B → sociedad → tiendas de esa sociedad. Y va al PANEL
+    // de su cuenta: quien escribe la dirección del backoffice no viene a mirar
+    // escaparate, viene a ver lo suyo.
     fake.state.session = makeSession({ withTenantClaims: false })
     fake.state.rpc.my_stores = () => [{ slug: 'botica-sur', name: 'Botica Sur' }]
     // La del despliegue es OTRA. Si el guard la usara, esta prueba lo cazaría.
@@ -247,7 +249,7 @@ describe('flujo login → onboarding → /app', () => {
 
     const { router } = renderApp('/app')
 
-    await waitFor(() => expect(router.state.location.pathname).toBe('/s/botica-sur'))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/s/botica-sur/account'))
     // Y el cartel no llega a quedarse: uno que dice «no estás habilitado» y se
     // va solo es peor que no enseñarlo.
     expect(
@@ -264,8 +266,9 @@ describe('flujo login → onboarding → /app', () => {
 
     const { router } = renderApp('/app')
 
-    expect(await screen.findByRole('link', { name: 'Ver Botica Sur' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Ver Botica Norte' })).toBeInTheDocument()
+    const sur = await screen.findByRole('link', { name: 'Entrar a Botica Sur' })
+    expect(sur).toHaveAttribute('href', '/s/botica-sur/account')
+    expect(screen.getByRole('link', { name: 'Entrar a Botica Norte' })).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/app')
   })
 

@@ -70,8 +70,14 @@ export function RequireTenant({ children }: { children: ReactNode }) {
 
     const propias = mias.data ?? []
     // Una sola: no hay nada que preguntar.
+    //
+    // Al PANEL de su cuenta, no a la portada. Quien escribe la dirección del
+    // backoffice no viene a mirar escaparate: viene a ver lo suyo —qué pidió,
+    // cuánto debe, qué cupo le queda, qué cupones tiene—, que es justo lo que
+    // hay en `/account`. Y desde ahí la tienda está a un clic, en la cabecera
+    // y en el botón de seguir comprando.
     if (propias.length === 1 && propias[0]) {
-      return <Navigate to={`/s/${propias[0].slug}`} replace />
+      return <Navigate to={`/s/${propias[0].slug}/account`} replace />
     }
 
     return (
@@ -83,8 +89,13 @@ export function RequireTenant({ children }: { children: ReactNode }) {
             {/* Las SUYAS, con su nombre. No es la lista de clientes del SaaS:
                 son las tiendas donde esta persona ya compra. */}
             {propias.map((tienda) => (
-              <Button key={tienda.slug} variant="contained" component={Link} to={`/s/${tienda.slug}`}>
-                {t('landing.visitNamed').replace('{store}', tienda.name)}
+              <Button
+                key={tienda.slug}
+                variant="contained"
+                component={Link}
+                to={`/s/${tienda.slug}/account`}
+              >
+                {t('tenant.buyer.enterStore').replace('{store}', tienda.name)}
               </Button>
             ))}
             {/* Último recurso, solo para quien no compra en ninguna: la tienda

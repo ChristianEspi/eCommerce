@@ -423,6 +423,10 @@ export const en: Readonly<Record<MessageKey, string>> = {
     // For a buyer who shops in more than one store. Nobody chooses for them:
     // these are THEIR stores, not the SaaS customer list.
     'tenant.buyer.pickStore': 'Yours is a buying account. Pick the store you want to enter.',
+    'tenant.buyer.enterStore': 'Enter {store}',
+    // From the account panel back to shopping. The header logo already goes to
+    // the storefront, but you have to know that.
+    'account.keepShopping': 'Go to the store',
     'tenant.unauthorized.body':
       'Your session is valid but it does not carry the account and company this app needs. Ask your company administrator to enable eCommerce for you.',
     'admin.account': 'Your account',
