@@ -57,12 +57,40 @@ async function svc<T = Record<string, unknown>>(query: string): Promise<T[]> {
 const PORTERAS = /has_capability|company_is_entitled/
 const LLAMADA_A_PORTERA = /(?:has_capability|company_is_entitled)\s*\(([^)]*)\)/g
 
+/**
+ * El candado INDIRECTO de la IA.
+ *
+ * `ai_consume_for` ya no nombra su capacidad: la resuelve con
+ * `ebim.ai_capability_for(p_feature)`, porque cada uso de IA es un addon
+ * distinto y el que se cobra depende de quién llame. Un extractor que solo mira
+ * literales dentro de la llamada a la portera deja de ver ese candado y
+ * declararía «solo UI» algo que la base sí está exigiendo.
+ *
+ * Se resuelve leyendo la tabla de traducción, que existe ÚNICAMENTE para
+ * alimentar a `company_is_entitled`: lo que aparece como resultado ahí está
+ * gateado en servidor, por definición de esa función.
+ */
+const MAPA_DE_IA = /ai_capability_for\s*\(/
+const CAPACIDAD_DE_IA = /then\s+'([^']+)'/g
+
 function capabilitiesMentioned(expressions: readonly string[]): Set<string> {
   const known = new Set(CAPABILITIES.map((c) => c.id as string))
   const found = new Set<string>()
 
   for (const raw of expressions) {
-    if (!raw || !PORTERAS.test(raw)) continue
+    if (!raw) continue
+
+    // El cuerpo de la propia tabla de traducción: sus resultados son
+    // capacidades, y la única razón de que existan es ser el argumento de la
+    // portera dos líneas más abajo.
+    if (raw.includes('when') && MAPA_DE_IA.test(raw) === false && /ai\.[a-z.]+/.test(raw)) {
+      for (const par of raw.matchAll(CAPACIDAD_DE_IA)) {
+        const code = par[1] as string
+        if (known.has(code)) found.add(code)
+      }
+    }
+
+    if (!PORTERAS.test(raw)) continue
     for (const call of raw.matchAll(LLAMADA_A_PORTERA)) {
       const literals = [...(call[1] as string).matchAll(/'([^']*)'/g)].map((m) => m[1] as string)
       const code = literals.at(-1)
@@ -178,8 +206,12 @@ describe('las capacidades vendibles se hacen cumplir en el servidor', () => {
       'promotions',
       'analytics.advanced',
       // La IA es la única con coste marginal por uso: perder su candado no
-      // abre un módulo de más, abre una factura.
+      // abre un módulo de más, abre una factura. Los tres se hacen cumplir por
+      // la misma vía —`ai_consume_for` resuelve la capacidad de su
+      // funcionalidad— y por eso ninguno puede quedarse fuera de esta lista.
       'ai.assist',
+      'ai.catalog.copy',
+      'ai.insights',
     ]
     for (const code of conCandado) {
       expect([code, enforced.has(code)]).toEqual([code, true])

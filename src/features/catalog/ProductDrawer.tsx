@@ -1,14 +1,17 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded'
 import {
   Alert,
   Box,
   Button,
+  CircularProgress,
   InputAdornment,
   MenuItem,
   Stack,
   Tab,
   Tabs,
   TextField,
+  Typography,
 } from '@mui/material'
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import { useForm } from 'react-hook-form'
@@ -33,6 +36,7 @@ import { RelationsPanel } from './pim/RelationsPanel'
 import { UomsPanel } from './pim/UomsPanel'
 import { VariantsPanel } from './pim/VariantsPanel'
 import { useBrands, useFamilies } from './pim/hooks'
+import { pedirBorradorDeFicha, type MotivoSinBorrador } from './api/copy'
 import {
   categoryTree,
   PRODUCT_KINDS,
@@ -227,6 +231,36 @@ export function ProductDrawer({
   const busy = isSubmitting || save.isPending
   const kind = watch('kind')
 
+  /**
+   * El borrador de la ficha, que es una SUGERENCIA y no un guardado.
+   *
+   * Escribe en el formulario y ya está: no toca la base. Quien lo pidió lo lee,
+   * lo corrige y decide si guarda, igual que si lo hubiera tecleado. Un botón
+   * de IA que guarda solo convierte una ayuda en una publicación que nadie
+   * aprobó, y en el catálogo de una botica eso no es una molestia, es un riesgo.
+   */
+  const [redactando, setRedactando] = useState(false)
+  const [avisoIA, setAvisoIA] = useState<MotivoSinBorrador | 'ok' | null>(null)
+
+  async function redactarFicha() {
+    if (!product?.id) return
+    setRedactando(true)
+    setAvisoIA(null)
+    try {
+      const { draft, motivo } = await pedirBorradorDeFicha(product.id)
+      if (draft) {
+        setValue('description', draft, { shouldDirty: true, shouldValidate: true })
+        setAvisoIA('ok')
+      } else {
+        setAvisoIA(motivo ?? 'proveedor')
+      }
+    } catch (error) {
+      setServerError(error instanceof CatalogError ? error.key : 'catalog.error.generic')
+    } finally {
+      setRedactando(false)
+    }
+  }
+
   // El árbol se arma una vez por lista de categorías, no en cada tecla del
   // formulario: son decenas de filas y el cajón repinta con cada carácter.
   const arbol = useMemo(() => categoryTree(categories), [categories])
@@ -345,16 +379,57 @@ export function ProductDrawer({
             />
           </Stack>
 
-          <TextField
-            label={t('catalog.field.description')}
-            fullWidth
-            multiline
-            minRows={3}
-            disabled={!canWrite}
-            error={Boolean(errors.description)}
-            helperText={fieldError('description') ?? t('common.optional')}
-            {...register('description')}
-          />
+          <Stack sx={{ gap: 0.75 }}>
+            <TextField
+              label={t('catalog.field.description')}
+              fullWidth
+              multiline
+              minRows={3}
+              disabled={!canWrite}
+              error={Boolean(errors.description)}
+              helperText={fieldError('description') ?? t('common.optional')}
+              {...register('description')}
+            />
+
+            {/* Solo al EDITAR: para redactar hace falta un producto guardado del
+                que leer nombre, marca y categoría con su RLS. En el alta no hay
+                nada de eso todavía, y un botón que no puede funcionar es peor
+                que un botón que no está. */}
+            {canWrite && product?.id && (
+              <Stack direction="row" sx={{ gap: 1.25, alignItems: 'center', flexWrap: 'wrap' }}>
+                <Button
+                  size="small"
+                  startIcon={
+                    redactando ? (
+                      <CircularProgress size={14} color="inherit" />
+                    ) : (
+                      <AutoAwesomeRoundedIcon fontSize="small" />
+                    )
+                  }
+                  disabled={redactando || busy}
+                  onClick={() => void redactarFicha()}
+                  sx={{ textTransform: 'none', fontWeight: 700 }}
+                >
+                  {redactando ? t('catalog.copy.writing') : t('catalog.copy.draft')}
+                </Button>
+
+                <Typography sx={{ fontSize: 12.5, color: 'var(--muted)', flex: 1, minWidth: 220 }}>
+                  {t('catalog.copy.notice')}
+                </Typography>
+              </Stack>
+            )}
+
+            {avisoIA && (
+              <Alert
+                severity={avisoIA === 'ok' ? 'success' : 'info'}
+                onClose={() => setAvisoIA(null)}
+              >
+                {avisoIA === 'ok'
+                  ? t('catalog.copy.done')
+                  : t(`catalog.copy.motivo.${avisoIA}` as MessageKey)}
+              </Alert>
+            )}
+          </Stack>
 
           {/* Con RUTA y agrupado por su raíz: en una lista de cuarenta, dos
               «Cuidado» sueltos no se distinguen, y saber de qué madre cuelga

@@ -74,6 +74,8 @@ export const SELLABLE_CAPABILITY_IDS = [
   // ademas de contratarse se mide: el entitlement dice si puede, la cuota dice
   // cuanto. Ver `boundaries.ts` → frontera `ai`.
   'ai.assist',
+  'ai.catalog.copy',
+  'ai.insights',
 ] as const
 
 export const CAPABILITY_IDS = [
@@ -401,6 +403,36 @@ export const CAPABILITIES: readonly Capability[] = [
     state: 'implemented',
     grants:
       'Asistente de compra sobre el catálogo real, con cuota por sociedad, consumo atómico y traza auditable de qué se preguntó y si sirvió.',
+  },
+  {
+    id: 'ai.catalog.copy',
+    name: 'Redacción de fichas con IA',
+    boundary: 'ai',
+    entitlement: `${ENTITLEMENT_PREFIX}ai.catalog.copy`,
+    // Addon aparte del asistente y no una extensión suya: son dos productos
+    // que se venden por separado, y hasta esta fase contratar uno abría el
+    // otro sin que nadie lo decidiera.
+    //
+    // Redacta la PRESENTACIÓN —forma, concentración, contenido del envase,
+    // laboratorio— y nunca la indicación terapéutica. En un catálogo donde 181
+    // de las 281 fichas vacías son medicamentos, un modelo escribiendo «para
+    // qué sirve» no es una función de producto, es un problema sanitario. El
+    // texto sale como borrador que una persona aprueba.
+    state: 'implemented',
+    grants:
+      'Borrador de ficha de producto a partir de su nombre, marca y categoría, limitado a la presentación y revisado por una persona antes de guardarse.',
+  },
+  {
+    id: 'ai.insights',
+    name: 'Análisis y alertas con IA',
+    boundary: 'ai',
+    entitlement: `${ENTITLEMENT_PREFIX}ai.insights`,
+    // Lee indicadores que YA calcula la base y dice cuáles merecen atención.
+    // No inventa cifras: recibe las filas resueltas y devuelve cuáles señalar y
+    // por qué, con la misma regla de lista cerrada que el asistente.
+    state: 'implemented',
+    grants:
+      'Lectura de los indicadores de la tienda para señalar qué merece atención, sobre cifras calculadas por la base y nunca por el modelo.',
   },
   {
     id: 'content.cms',

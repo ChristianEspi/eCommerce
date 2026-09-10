@@ -41,6 +41,29 @@ async function contratarIA(tenant: typeof TENANT_A) {
   )
 }
 
+/** Contrata una capacidad cualquiera: es lo que hace del uso de IA un addon. */
+async function contratar(tenant: typeof TENANT_A, capability: string) {
+  await svc(
+    `insert into public.tenant_entitlements
+       (organization_id, company_id, entitlement_code, is_active, source)
+     values ($1, $2, $3, true, 'hub')
+     on conflict (organization_id, company_id, entitlement_code)
+       do update set is_active = true`,
+    [tenant.organizationId, tenant.companyId, `ecommerce.${capability}`],
+  )
+}
+
+/** Consume una unidad de la funcionalidad que se le diga. */
+async function consumirDe(tenant: typeof TENANT_A, feature: string) {
+  return comoAdmin(tenant, async () => {
+    const rows = await svc<{ r: Record<string, unknown> }>(
+      `select ebim.ai_consume($1, 1) as r`,
+      [feature],
+    )
+    return rows[0]?.r as Record<string, unknown>
+  })
+}
+
 async function consumir(tenant: typeof TENANT_A, unidades = 1) {
   return comoAdmin(tenant, async () => {
     const rows = await svc<{ r: Record<string, unknown> }>(
@@ -345,7 +368,7 @@ describe('la traza', () => {
 })
 
 describe('la puerta que PostgREST ve', () => {
-  it('las cuatro funciones existen en `public`', async () => {
+  it('las funciones del modulo existen en `public`', async () => {
     // `ebim` no está expuesto: sin envoltorio, `rpc('ai_consume')` responde
     // «function not found» y el fallo se lee como un problema de permisos
     // cuando es de enrutado.
@@ -363,6 +386,9 @@ describe('la puerta que PostgREST ve', () => {
       'ai_feedback',
       'ai_record',
       'ai_record_for_store',
+      // El desglose por modulo: con UN presupuesto compartido, es lo que
+      // responde en que se esta yendo.
+      'ai_usage_by_feature',
     ])
   })
 
@@ -426,5 +452,95 @@ describe('el plano de cobro no se toca desde fuera', () => {
     )
 
     expect(fallo).toMatch(/permission denied/i)
+  })
+})
+
+/**
+ * Cada uso de IA es un ADDON, y se activa por separado.
+ *
+ * Antes `ai_consume_for` comprobaba `ai.assist` con el nombre escrito a mano
+ * dentro, así que `p_feature` solo etiquetaba la traza: contratar el asistente
+ * de la vitrina abría también cualquier otro uso que se añadiera después. Un
+ * addon que se activa solo no es un addon, y eso es lo que se fija aquí.
+ */
+describe('cada uso de IA se contrata por separado', () => {
+  it('contratar el asistente NO abre la redaccion de fichas', async () => {
+    await contratar(TENANT_A, 'ai.assist')
+
+    expect((await consumirDe(TENANT_A, 'assistant')).allowed).toBe(true)
+
+    const ficha = await consumirDe(TENANT_A, 'catalog.copy')
+    expect(ficha.allowed).toBe(false)
+    expect(ficha.reason).toBe('DISABLED')
+  })
+
+  it('contratada la suya, la redaccion de fichas consume igual', async () => {
+    await contratar(TENANT_A, 'ai.assist')
+    await contratar(TENANT_A, 'ai.catalog.copy')
+
+    const ficha = await consumirDe(TENANT_A, 'catalog.copy')
+    expect(ficha.allowed).toBe(true)
+  })
+
+  /**
+   * Y comparten presupuesto.
+   *
+   * El entitlement es la puerta; la cuota es el presupuesto. Partirlo en un
+   * contador por addon inventa una contabilidad que el proveedor no tiene: el
+   * coste real son tokens y son una sola factura.
+   */
+  it('los dos addons gastan del MISMO contador', async () => {
+    await contratar(TENANT_A, 'ai.assist')
+    await contratar(TENANT_A, 'ai.catalog.copy')
+    await svc(
+      `insert into public.ai_quotas (organization_id, company_id, plan, trial_quota)
+       values ($1, $2, 'trial', 2)
+       on conflict (organization_id, company_id) do update set trial_quota = 2`,
+      [TENANT_A.organizationId, TENANT_A.companyId],
+    )
+
+    expect((await consumirDe(TENANT_A, 'assistant')).allowed).toBe(true)
+    expect((await consumirDe(TENANT_A, 'catalog.copy')).allowed).toBe(true)
+
+    // La tercera no cabe, venga del módulo que venga.
+    const tercera = await consumirDe(TENANT_A, 'assistant')
+    expect(tercera.allowed).toBe(false)
+    expect(tercera.reason).toBe('TRIAL_EXPIRED')
+  })
+
+  /**
+   * Lo que no está declarado se deniega, en vez de caer al asistente.
+   *
+   * Si alguien añade un uso nuevo y olvida declararlo, tiene que romperse
+   * ruidosamente y no gastar en silencio la cuota contratada para otra cosa.
+   */
+  it('una funcionalidad sin capacidad declarada no gasta la de nadie', async () => {
+    await contratar(TENANT_A, 'ai.assist')
+
+    const inventada = await consumirDe(TENANT_A, 'lo.que.sea')
+    expect(inventada.allowed).toBe(false)
+    expect(inventada.reason).toBe('FEATURE_NO_DECLARADA')
+  })
+
+  it('el saldo dice QUE esta activado, no solo cuanto queda', async () => {
+    await contratar(TENANT_A, 'ai.catalog.copy')
+
+    const saldo = await estado(TENANT_A)
+    expect(saldo.enabled).toBe(true)
+    expect(saldo.features).toEqual({
+      assistant: false,
+      'catalog.copy': true,
+      insights: false,
+    })
+  })
+
+  it('sin ninguna contratada no se anuncia un saldo que no se puede gastar', async () => {
+    const saldo = await estado(TENANT_B)
+    expect(saldo.enabled).toBe(false)
+    expect(saldo.features).toEqual({
+      assistant: false,
+      'catalog.copy': false,
+      insights: false,
+    })
   })
 })
