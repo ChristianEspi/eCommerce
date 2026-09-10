@@ -79,6 +79,23 @@ export const CUSTOMER_AGING_RPC = 'customer_aging'
 /** `ebim.suggest_order` — devuelve FILAS con su motivo; no crea nada. */
 export const SUGGEST_ORDER_RPC = 'suggest_order'
 
+// --- IA medida (migración 20260910100000) ----------------------------------
+// SIN `satisfies` por el mismo motivo que las capacidades, más abajo: la
+// migración todavía no está aplicada en el proyecto enlazado contra el que se
+// generan los tipos. La red de seguridad es `supabase/tests/ai-metering.test.ts`,
+// que comprueba estos nombres contra el esquema real de las migraciones.
+export const AI_QUOTAS_TABLE = 'ai_quotas'
+export const AI_USAGE_TABLE = 'ai_usage'
+export const AI_INTERACTIONS_TABLE = 'ai_interactions'
+/** Estado del saldo. Solo lectura: mirar el medidor no gasta cuota. */
+export const AI_ENTITLEMENT_RPC = 'ai_entitlement'
+/** Valida y descuenta en la MISMA transacción. Lo llaman las Edge Functions. */
+export const AI_CONSUME_RPC = 'ai_consume'
+/** Deja la traza y suma los tokens, ya conocidos tras responder. */
+export const AI_RECORD_RPC = 'ai_record'
+/** El pulgar. Única columna de la traza que puede cambiar una persona. */
+export const AI_FEEDBACK_RPC = 'ai_feedback'
+
 // --- Capacidades y entitlements (P02-SaaS, migración 160000) ---------------
 // SIN `satisfies`: `database.types.ts` se genera contra el proyecto Supabase
 // ENLAZADO y la migración 160000 todavía no está aplicada allí (esta fase no

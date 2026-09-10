@@ -70,6 +70,10 @@ export const SELLABLE_CAPABILITY_IDS = [
   'planning.demand',
   // Fase 07. El comprobante fiscal, sobre el puerto que ya estaba escrito.
   'invoicing',
+  // La IA. Unica capacidad con coste marginal POR USO, y por eso la unica que
+  // ademas de contratarse se mide: el entitlement dice si puede, la cuota dice
+  // cuanto. Ver `boundaries.ts` → frontera `ai`.
+  'ai.assist',
 ] as const
 
 export const CAPABILITY_IDS = [
@@ -384,6 +388,19 @@ export const CAPABILITIES: readonly Capability[] = [
     state: 'implemented',
     grants:
       'Comprobante fiscal con impuesto por línea copiado del pedido, su bitácora de estados y la inmutabilidad de lo ya aceptado.',
+  },
+  {
+    id: 'ai.assist',
+    name: 'Asistencia con IA',
+    boundary: 'ai',
+    entitlement: `${ENTITLEMENT_PREFIX}ai.assist`,
+    // La unica capacidad que se MIDE y no solo se contrata. El entitlement dice
+    // si la sociedad puede; la cuota de `ai_quotas` dice cuanto. Contratada sin
+    // configurar NO significa sin limite: cae al bucket de prueba, porque un
+    // modulo de pago activado sin tope es una factura abierta.
+    state: 'implemented',
+    grants:
+      'Asistente de compra sobre el catálogo real, con cuota por sociedad, consumo atómico y traza auditable de qué se preguntó y si sirvió.',
   },
   {
     id: 'content.cms',

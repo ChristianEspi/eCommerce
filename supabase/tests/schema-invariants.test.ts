@@ -36,6 +36,30 @@ const TENANT_ANCHOR = ['tenants']
  */
 const REFERENCE_CATALOG = ['app_capabilities', 'currencies', 'integration_providers']
 
+/**
+ * PLANO DE COBRO. Los dos contadores de IA (migracion 20260910100000).
+ *
+ * Se saltan dos invariantes, y las dos por la misma razon: no son tablas que
+ * alguien consulte, son un contador.
+ *
+ * **Sin PK uuid.** Su clave ES su unicidad: `(organizacion, sociedad, periodo)`
+ * en `ai_usage` y `(organizacion, sociedad)` en `ai_quotas`. Ponerles un uuid
+ * de sobra permitiria DOS filas para el mismo mes de la misma sociedad, que es
+ * exactamente el error que la clave compuesta impide: dos contadores paralelos
+ * y una cuota que sirve el doble.
+ *
+ * **Sin policy.** RLS activada y forzada, y ni una puerta para `authenticated`.
+ * Aqui «sin policy» no es un olvido, es el cierre: se llega por
+ * `ebim.ai_entitlement()`, que es `security definer` y solo habla de TU
+ * sociedad. Un SELECT directo sobre el contador no anade nada que el medidor no
+ * diga y si anade superficie sobre el plano de cobro. Es el mismo diseno que
+ * GMAO tiene en produccion para `platform.ai_usage`.
+ *
+ * La exencion es NOMINAL a proposito, igual que la de arriba: el dia que
+ * alguien meta aqui una tabla que si tiene lectores, el hueco se ve.
+ */
+const BILLING_PLANE = ['ai_quotas', 'ai_usage']
+
 beforeAll(async () => {
   db = await createTestDatabase()
 }, 120_000)
@@ -76,6 +100,12 @@ describe('RLS', () => {
       order by c.relname
     `)
     for (const row of result) {
+      // El plano de cobro se cierra a propósito: se llega por función, no por
+      // policy. Ver `BILLING_PLANE`.
+      if (BILLING_PLANE.includes(String(row.table_name))) {
+        expect(`${row.table_name}:${row.policies}`).toMatch(/:0$/)
+        continue
+      }
       expect(`${row.table_name}:${row.policies}`).not.toMatch(/:0$/)
     }
   })
@@ -220,6 +250,9 @@ describe('dinero y tipos', () => {
     expect(result.length).toBeGreaterThan(0)
     for (const row of result) {
       if (REFERENCE_CATALOG.includes(String(row.table_name))) continue
+      // Contadores: su clave compuesta ES la garantía de que no hay dos filas
+      // para el mismo periodo. Ver `BILLING_PLANE`.
+      if (BILLING_PLANE.includes(String(row.table_name))) continue
       expect(`${row.table_name}.${row.column_name}:${row.type_name}`).toMatch(/:uuid$/)
     }
   })

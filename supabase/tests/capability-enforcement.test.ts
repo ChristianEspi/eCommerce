@@ -43,13 +43,27 @@ async function svc<T = Record<string, unknown>>(query: string): Promise<T[]> {
  * confunde el nombre de un rol con el de una capacidad, porque una policy suele
  * llevar `has_role(..., '{owner,admin,catalog}')` al lado.
  */
+/**
+ * Las DOS porteras del servidor, no una.
+ *
+ * `ebim.has_capability` es `can_access AND company_is_entitled`: la pertenencia
+ * y el addon. Una función que ya comprobó la pertenencia por su cuenta —o que
+ * deliberadamente no la comprueba, como las que sirven a la vitrina pública,
+ * donde quien pregunta es un visitante anónimo— llama directamente a
+ * `company_is_entitled`, y eso sigue siendo un candado de servidor sobre el
+ * addon. Mirar solo `has_capability` daba por «gateada solo en la UI» una
+ * capacidad que en realidad tiene su candado en la base.
+ */
+const PORTERAS = /has_capability|company_is_entitled/
+const LLAMADA_A_PORTERA = /(?:has_capability|company_is_entitled)\s*\(([^)]*)\)/g
+
 function capabilitiesMentioned(expressions: readonly string[]): Set<string> {
   const known = new Set(CAPABILITIES.map((c) => c.id as string))
   const found = new Set<string>()
 
   for (const raw of expressions) {
-    if (!raw || !raw.includes('has_capability')) continue
-    for (const call of raw.matchAll(/has_capability\s*\(([^)]*)\)/g)) {
+    if (!raw || !PORTERAS.test(raw)) continue
+    for (const call of raw.matchAll(LLAMADA_A_PORTERA)) {
       const literals = [...(call[1] as string).matchAll(/'([^']*)'/g)].map((m) => m[1] as string)
       const code = literals.at(-1)
       if (code !== undefined && known.has(code)) found.add(code)
@@ -163,6 +177,9 @@ describe('las capacidades vendibles se hacen cumplir en el servidor', () => {
       'pricing.lists',
       'promotions',
       'analytics.advanced',
+      // La IA es la única con coste marginal por uso: perder su candado no
+      // abre un módulo de más, abre una factura.
+      'ai.assist',
     ]
     for (const code of conCandado) {
       expect([code, enforced.has(code)]).toEqual([code, true])

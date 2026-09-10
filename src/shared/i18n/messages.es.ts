@@ -315,6 +315,19 @@ export const es = {
     'capabilities.locked.body':
       'Tu empresa no tiene activado este módulo. Se activa desde la consola de EBIM, no desde aquí: escribe a quien lleva la cuenta.',
     'capabilities.locked.inline': 'Módulo no incluido en tu plan:',
+
+    // --- IA medida (20260910100000) ----------------------------------------
+    // Los dos finales se nombran por separado porque llevan a sitios distintos:
+    // la prueba agotada lleva a contratar, la cuota del mes a ampliar.
+    'ai.meter.title': 'Asistencia con IA',
+    'ai.meter.trial': 'Prueba: te quedan {n} consultas.',
+    'ai.meter.active': 'Te quedan {n} consultas este mes.',
+    'ai.meter.trialExpired': 'Se agotó la prueba. Escribe a quien lleva la cuenta para activarla.',
+    'ai.meter.quotaExceeded': 'Se agotó la cuota del mes. Se renueva el día 1.',
+    'ai.error.quota': 'No queda cuota de IA para este mes.',
+    'ai.error.notEntitled': 'Tu empresa no tiene activada la asistencia con IA.',
+    'ai.error.forbidden': 'No tienes permiso para esto.',
+    'ai.error.generic': 'No se pudo completar la consulta con IA.',
     'capabilities.error.forbidden': 'Tu cuenta no puede consultar la configuración de esta sociedad.',
     'capabilities.error.generic': 'No pudimos leer qué módulos tiene activos tu empresa.',
     'capabilities.error.hubMissing':

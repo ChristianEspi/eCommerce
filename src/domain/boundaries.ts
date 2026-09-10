@@ -54,6 +54,12 @@ export const PLATFORM_AREA_IDS = [
   // fallan sus cobros porque no pagó el addon de observabilidad es un tenant
   // que llama por teléfono.
   'observability',
+  // La IA NO es un dominio de comercio: no decide nada sobre productos, precios
+  // ni pedidos. Es una capacidad que sirve a catálogo, planificación, analítica
+  // y operación por igual, y meterla entre los dominios habría obligado a
+  // elegir cuál de ellos la «posee». Que ademas se venda es propiedad de la
+  // capacidad, no de la frontera.
+  'ai',
   'shell',
 ] as const
 export type PlatformAreaId = (typeof PLATFORM_AREA_IDS)[number]
@@ -408,6 +414,29 @@ export const BOUNDARIES: readonly Boundary[] = [
       'order_suggestions, order_suggestion_items y demand_forecasts con RLS default deny (20260902180000)',
       'ebim.suggest_order — devuelve FILAS con su motivo; no crea nada',
       'cada línea sugerida guarda por qué: una cifra que nadie discute es una que nadie corrige',
+    ],
+  },
+  {
+    id: 'ai',
+    kind: 'platform',
+    // La IA como capacidad MEDIDA, no como adorno de una pantalla.
+    //
+    // Es la unica frontera cuyo coste es marginal por uso: todo lo demas del
+    // producto cuesta lo mismo se use o no. De ahi que lo primero que exista
+    // aqui no sea un asistente sino un contador, un tope y una traza. Un modulo
+    // que gasta dinero por llamada y no se mide es una factura abierta.
+    //
+    // Ninguna llamada al proveedor sale del navegador: la clave vive en los
+    // secretos de las Edge Functions y no entra jamas en el bundle.
+    state: 'implemented',
+    responsibility:
+      'Cuánta IA puede gastar cada sociedad, en qué se gastó y si sirvió: entitlement, cuota, consumo atómico y traza con opinión.',
+    paths: ['features/ai'],
+    serverSide: [
+      'ai_quotas, ai_usage y ai_interactions con RLS default deny y forzada (20260910100000)',
+      'ebim.ai_consume — valida y descuenta en la MISMA transacción; el `for update` impide servir de más en concurrencia',
+      'ebim.ai_record — separada del consumo porque los tokens solo se conocen después de responder',
+      'el texto de la traza entra recortado y redactado en la frontera, no en quien llama',
     ],
   },
 

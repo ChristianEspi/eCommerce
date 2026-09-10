@@ -311,6 +311,20 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'capabilities.locked.body':
       'Your company has not activated this module. It is turned on from the EBIM console, not from here — talk to whoever manages the account.',
     'capabilities.locked.inline': 'Module not included in your plan:',
+
+    // --- Metered AI (20260910100000) ---------------------------------------
+    // The two end states are named separately because they lead somewhere
+    // different: a spent trial leads to buying, a spent monthly quota to
+    // topping up.
+    'ai.meter.title': 'AI assistance',
+    'ai.meter.trial': 'Trial: {n} queries left.',
+    'ai.meter.active': '{n} queries left this month.',
+    'ai.meter.trialExpired': 'The trial is over. Talk to whoever manages the account to activate it.',
+    'ai.meter.quotaExceeded': 'This month’s quota is spent. It renews on the 1st.',
+    'ai.error.quota': 'No AI quota left this month.',
+    'ai.error.notEntitled': 'Your company has not activated AI assistance.',
+    'ai.error.forbidden': 'You do not have permission for this.',
+    'ai.error.generic': 'The AI request could not be completed.',
     'capabilities.error.forbidden': 'Your account cannot read the configuration of this company.',
     'capabilities.error.generic': 'We could not read which modules your company has active.',
     'capabilities.error.hubMissing':
