@@ -46,6 +46,9 @@ import {
   type StorefrontOutlet,
 } from './hooks'
 import { useFavorites } from './useFavorites'
+import { StorefrontThemeProvider } from './theme/StorefrontThemeProvider'
+import { useStorefrontTheme } from './theme/useStorefrontTheme'
+import { themeCssVars, themeDataAttributes } from './theme/theme-context'
 import type { PublicStore } from './types'
 // La tipografia de la VITRINA, auto-alojada. Se importa aqui —y no en el
 // arranque de la app— para que viaje en el chunk del storefront: quien entra al
@@ -155,25 +158,12 @@ export function StorefrontLayout() {
         currency={store.currency}
         authenticated={sessionStatus === 'authenticated'}
       >
-        {/* `sf-scope`: las variables de piel de la vitrina (radios, sombras,
-            superficies) viven solo bajo esta clase, asi que el backoffice
-            —que comparte tokens de color— no se entera de nada. */}
-        <Box
-          className="sf-scope"
-          sx={{
-            // `100vh` primero y `100dvh` solo donde existe. El pie ya iba al
-            // final de la columna, pero en vistas embebidas —el navegador
-            // simple del editor, un iframe de previsualizacion— `dvh` calcula
-            // MENOS que el alto real y quedaba una banda de fondo bajo el pie.
-            // Con las dos, el que no entienda `dvh` se queda con `vh` y nadie
-            // ve el hueco.
-            minHeight: '100vh',
-            '@supports (min-height: 100dvh)': { minHeight: '100dvh' },
-            bgcolor: 'var(--bg)',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
+        {/* El tema de la tienda se monta AQUÍ y no más arriba: envuelve la
+            frontera visual y nada más, así que el backoffice —que nunca pasa
+            por este árbol— no lo recibe. Es la misma línea que dibuja
+            `.sf-scope` en el CSS, dicha en React. */}
+        <StorefrontThemeProvider store={store}>
+          <StorefrontSurface>
           {/* Primer elemento enfocable del documento: sin él, llegar al
               catálogo con el teclado obliga a pasar por el logo, el menú, la
               cuenta y el carrito en CADA página. El destino ya existía
@@ -238,9 +228,49 @@ export function StorefrontLayout() {
         storeSlug={storeSlug as string}
         storeId={store.store_id}
       />
-        </Box>
+          </StorefrontSurface>
+        </StorefrontThemeProvider>
       </CartProvider>
     </AppearanceProvider>
+  )
+}
+
+/**
+ * La frontera visual de la vitrina, en un componente propio.
+ *
+ * Existe por una razón muy concreta: los atributos y las variables del tema
+ * salen de `useStorefrontTheme()`, y un componente no puede leer un contexto
+ * que él mismo acaba de montar. Separarlo es lo que permite que el proveedor
+ * envuelva exactamente a esta caja y a nada más.
+ *
+ * De aquí para abajo, las diferencias entre temas viajan en CSS —`data-store-*`
+ * y `--sf-*`— en vez de en condicionales repartidos por el JSX. Un `if (theme
+ * === 'retail')` por componente convierte cuatro temas en cuatro aplicaciones.
+ */
+function StorefrontSurface({ children }: { children: ReactNode }) {
+  const theme = useStorefrontTheme()
+
+  return (
+    <Box
+      className="sf-scope"
+      {...themeDataAttributes(theme)}
+      style={themeCssVars(theme)}
+      sx={{
+        // `100vh` primero y `100dvh` solo donde existe. El pie ya iba al
+        // final de la columna, pero en vistas embebidas —el navegador
+        // simple del editor, un iframe de previsualizacion— `dvh` calcula
+        // MENOS que el alto real y quedaba una banda de fondo bajo el pie.
+        // Con las dos, el que no entienda `dvh` se queda con `vh` y nadie
+        // ve el hueco.
+        minHeight: '100vh',
+        '@supports (min-height: 100dvh)': { minHeight: '100dvh' },
+        bgcolor: 'var(--bg)',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      {children}
+    </Box>
   )
 }
 
