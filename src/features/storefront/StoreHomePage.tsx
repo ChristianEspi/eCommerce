@@ -11,21 +11,15 @@ import { CONTENT_ANCHOR } from '@/shared/ui/SkipToContentLink'
 import { EmptyState, ErrorState } from '@/shared/ui/states'
 import { TS } from '@/theme/tokens'
 import { BackToTop } from './components/BackToTop'
-import { BrandRow } from './components/BrandRow'
-import { BrandTrustStrip } from './components/BrandTrustStrip'
 import { CategoryBar } from './components/CategoryBar'
-import { ProductRow } from './components/ProductRow'
-import { OffersFeaturedBand } from './components/OffersFeaturedBand'
-import { PromoCarousel } from './components/PromoCarousel'
-import { StoreServicesStrip } from './components/StoreServicesStrip'
-import { ContentBlocks } from './components/ContentBlocks'
 import { ProductGrid, ProductGridSkeleton } from './components/ProductGrid'
 import { ProductQuickView } from './components/ProductQuickView'
 import { useFavorites } from './useFavorites'
 import { StoreFilterPanel } from './components/StoreFilterPanel'
-import { StoreFeaturedHero } from './components/StoreFeaturedHero'
-import { StoreHero } from './components/StoreHero'
 import { StoreLandingSkeleton } from './components/StoreLandingSkeleton'
+import { HomeComposer } from './home/HomeComposer'
+import type { HomeSectionData } from './home/types'
+import { useStorefrontTheme } from './theme/useStorefrontTheme'
 import { StoreSortMenu } from './components/StoreSortMenu'
 import {
   OFERTAS_QUERY,
@@ -73,6 +67,9 @@ const SORTS: readonly SearchSort[] = ['relevance', 'price-asc', 'price-desc', 'n
 export function StoreHomePage() {
   const { t, locale } = useI18n()
   const { store, storeSlug } = useStorefront()
+  // El tema trae el ORDEN de la portada. No trae los datos ni decide qué hay:
+  // eso sigue resolviéndose aquí abajo, con las mismas consultas de siempre.
+  const tema = useStorefrontTheme()
   const { pathname } = useLocation()
   const [params, setParams] = useSearchParams()
 
@@ -450,24 +447,71 @@ export function StoreHomePage() {
   const cargandoPortada =
     !catalogo && (results.isPending || ofertasPages.isPending || content.isPending)
 
+  /**
+   * El orden de la portada, y qué queda de él en el catálogo.
+   *
+   * En el catálogo NO se pinta la portada: quien pidió «Ver todo» tendría que
+   * volver a pasar por delante de todo lo que ya vio para llegar a la rejilla.
+   * Sobrevive una sola sección, `promotions`, y sobrevive porque ya lo hacía:
+   * una campaña vigente es igual de relevante mirando la rejilla que mirando la
+   * portada, y su sitio es arriba en las dos.
+   *
+   * Se conserva la entrada TAL Y COMO la configuró el comercio —con su tope si
+   * lo tiene— en vez de fabricar una: si alguien apagó las promociones, están
+   * apagadas en los dos sitios.
+   */
+  const layoutAPintar = useMemo(() => {
+    if (!catalogo && !cargandoPortada) return tema.layout
+    const promociones = tema.layout.sections.find((seccion) => seccion.id === 'promotions')
+    return { version: 1 as const, sections: promociones ? [promociones] : [] }
+  }, [catalogo, cargandoPortada, tema.layout])
+
+  /**
+   * ¿Lo destacado se pinta como sección propia?
+   *
+   * Hoy va DENTRO de la banda de ofertas. Si el comercio lo saca a su propia
+   * fila, la banda tiene que quedarse solo con lo rebajado — si no, saldría dos
+   * veces en la misma pantalla.
+   */
+  const destacadosAparte = tema.layout.sections.some(
+    (seccion) => seccion.id === 'featured' && seccion.enabled,
+  )
+
+  const datosPortada: HomeSectionData = {
+    store,
+    storeSlug,
+    t,
+    hero: secciones.hero,
+    ofertas: secciones.ofertas,
+    destacados: secciones.destacados,
+    novedades: secciones.novedades,
+    masVendido: secciones.masVendido,
+    thumbsOfertas: rebajadosThumbs,
+    thumbsCatalogo: thumbnails,
+    thumbsNovedades: novedadesThumbs,
+    blocks,
+    assets,
+    images,
+    hasCmsHero,
+    cmsTraePortada,
+    cmsTraeProductos,
+    promociones: promosVigentes,
+    promoAssets: assetsPromos,
+    brands: brandOptions,
+    brandSelected: brand,
+    favorites: favorites.ids,
+    cargandoNovedades: novedadesPages.isPending,
+    cargandoCatalogo: results.isPending,
+    onToggleFavorite: (productId) => void favorites.toggle(productId),
+    onQuickView: (slug) => update('p', slug),
+    onPrefetch: prefetchProduct,
+    onSelectBrand: (code) => update('b', code),
+    destacadosAparte,
+  }
+
   return (
     <Stack sx={{ gap: { xs: 2, md: 3 } }}>
       {cargandoPortada ? <StoreLandingSkeleton /> : null}
-      {/* El hero y lo que compuso el comercio son la PORTADA. Al pedir «Ver
-          todo» estorban: quien va al catálogo tiene que volver a pasar por
-          delante de todo lo que ya vio para llegar a la rejilla. */}
-      {/* La portada abre con una oferta concreta si el catálogo tiene alguna;
-          con el lema del comercio si no. Un degradado con una frase se ve
-          bonito y no vende: no dice qué se compra ni a qué precio. */}
-      {catalogo || cargandoPortada ? null : secciones.hero.length > 0 ? (
-        <StoreFeaturedHero
-          products={secciones.hero}
-          storeSlug={storeSlug}
-          thumbnails={rebajadosThumbs}
-        />
-      ) : cmsTraePortada ? null : (
-        <StoreHero store={store} />
-      )}
 
       {/* El `<h1>` cuando la cubierta es un carrusel.
           Un carrusel son imágenes: no tiene texto que pueda ser el encabezado
@@ -475,12 +519,17 @@ export function StoreHomePage() {
           comercio cambiara el hero por un banner rotatorio. Va oculto a la
           vista y no al lector: quien navega por encabezados necesita saber
           dónde empieza el documento, y el nombre de la tienda ya está escrito
-          arriba en la cabecera. */}
+          arriba en la cabecera.
+
+          Va ANTES del compositor y no entre las secciones: es el encabezado del
+          documento, y quien navega por encabezados espera encontrarlo antes de
+          lo que titula, no después de la primera banda. */}
       {!catalogo && cmsTraePortada && !hasCmsHero && (
         <Typography component="h1" sx={visuallyHidden}>
           {store.name}
         </Typography>
       )}
+
 
       {/* Cabecera del catálogo: de dónde se viene, qué se está mirando y cómo
           se vuelve. Sin esto, «Ver todo» dejaba una rejilla sin título y sin
@@ -510,51 +559,15 @@ export function StoreHomePage() {
         </Stack>
       ) : null}
 
-      {/* `leadingHeading`: cuando el hero del CMS sustituye al de
-          `store_settings`, es él quien tiene que llevar el `<h1>`. Sin esto la
-          portada se quedaba sin encabezado de nivel 1 en cuanto el comercio
-          publicaba una portada — y quien navega por encabezados perdía la
-          única referencia de dónde empieza el documento. */}
-      {/* Las cuatro dudas que tiene alguien ANTES de mirar el primer precio:
-          cuándo llega, si es seguro pagar, quién le asesora y si puede
-          recogerlo. En el pie se leen después de decidir, o sea nunca. */}
-      {catalogo || cargandoPortada ? null : <StoreServicesStrip />}
+      {/* La portada, en el orden que el comercio configuró.
+          El compositor no decide QUÉ hay —eso se resolvió arriba, con los datos
+          completos— sino en qué orden se pinta y qué queda encendido.
 
-      {catalogo || cargandoPortada ? null : (
-        <OffersFeaturedBand
-          offers={secciones.ofertas}
-          featured={secciones.destacados}
-          storeSlug={storeSlug}
-          offersThumbs={rebajadosThumbs}
-          featuredThumbs={thumbnails}
-          favorites={favorites.ids}
-          onToggleFavorite={(productId) => void favorites.toggle(productId)}
-          onQuickView={(slug) => update('p', slug)}
-        />
-      )}
-
-      {catalogo || cargandoPortada ? null : (
-      <ContentBlocks
-        blocks={blocks}
-        storeSlug={storeSlug}
-        assets={assets}
-        images={images}
-        currency={store.currency}
-        leadingHeading={hasCmsHero}
-      />
-      )}
-
-{/* Las ofertas vigentes, ANTES del catálogo y pasando solas.
-          Salen del motor de promociones, no de un cartel escrito a mano: si
-          está descontando, se anuncia; si caduca, desaparece sola. */}
-      {promosVigentes.length > 0 && (
-        <PromoCarousel
-          promotions={promosVigentes}
-          storeSlug={storeSlug}
-          currency={store.currency}
-          assets={assetsPromos}
-        />
-      )}
+          Va DESPUÉS de la cabecera del catálogo porque en esa vista sobrevive
+          una sección, `promotions`, y su sitio es bajo el título, igual que
+          antes. En la portada esa cabecera no existe, así que aquí empieza
+          todo. */}
+      <HomeComposer layout={layoutAPintar} data={datosPortada} />
 
       {/* Dos formas de la misma lista, y la diferencia no es de adorno.
           En el CATÁLOGO son píldoras: ahí son un filtro, se comparan de un
@@ -610,60 +623,6 @@ export function StoreHomePage() {
           />
         </Stack>
       ) : null}
-
-      {/* Las marcas, al lado de las categorías: en una botica se compra por
-          marca tanto como por familia. Solo en la portada sin filtrar — con un
-          filtro puesto, la faceta se queda en la marca elegida y la fila
-          dejaría de ser una puerta para ser un espejo. */}
-      {catalogo || cargandoPortada ? null : (
-        <BrandRow
-          brands={brandOptions}
-          selected={brand}
-          onSelect={(code) => update('b', code)}
-          seeAllHref={`/s/${storeSlug}?ver=todo`}
-        />
-      )}
-
-      {/* Lo nuevo y lo de siempre, en filas cortas con su puerta al catálogo.
-          Una fila se recorre de un vistazo; una rejilla infinita, no. */}
-      {catalogo || cargandoPortada ? null : (
-        <>
-          <ProductRow
-            title={t('store.row.new')}
-            eyebrow={t('store.row.newEyebrow')}
-            subtitle={t('store.row.newSubtitle')}
-            products={secciones.novedades}
-            loading={novedadesPages.isPending}
-            storeSlug={storeSlug}
-            thumbnails={novedadesThumbs}
-            seeAllHref={`/s/${storeSlug}?ver=todo&sort=recent`}
-            onPrefetch={prefetchProduct}
-            onQuickView={(slug) => update('p', slug)}
-            favorites={favorites.ids}
-            onToggleFavorite={(productId) => void favorites.toggle(productId)}
-          />
-
-          {/* Solo si el comercio no compuso ya sus propias filas: repetir «Lo
-              más vendido» dos veces con productos distintos no es más tienda,
-              es una portada que se contradice. */}
-          {cmsTraeProductos ? null : (
-          <ProductRow
-            title={t('store.row.featured')}
-            eyebrow={t('store.row.featuredEyebrow')}
-            subtitle={t('store.row.featuredSubtitle')}
-            products={secciones.masVendido}
-            loading={results.isPending}
-            storeSlug={storeSlug}
-            thumbnails={thumbnails}
-            seeAllHref={`/s/${storeSlug}?ver=todo`}
-            onPrefetch={prefetchProduct}
-            onQuickView={(slug) => update('p', slug)}
-            favorites={favorites.ids}
-            onToggleFavorite={(productId) => void favorites.toggle(productId)}
-          />
-          )}
-        </>
-      )}
 
       {/* Una tienda sin catalogo publicado no puede quedarse en una portada
           muda: sin filas ni bloques, aqui no habria NADA, y una pantalla vacia
@@ -789,11 +748,6 @@ export function StoreHomePage() {
         </Box>
       </Stack>
       ) : null}
-
-      {/* Prueba social al cierre: quien duda de una botica en linea deja de
-          dudar cuando reconoce los nombres que ya compra en la farmacia de la
-          esquina. Va abajo porque es ahi donde se decide comprar o cerrar. */}
-      {catalogo || cargandoPortada ? null : <BrandTrustStrip brands={brandOptions} storeSlug={storeSlug} />}
 
       {/* El producto abierto vive en `?p=`: el boton de atras cierra el
           dialogo y el enlace se puede pegar en un chat. */}
