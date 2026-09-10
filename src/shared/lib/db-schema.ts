@@ -118,6 +118,12 @@ export const TENANT_FEATURE_FLAGS_TABLE = 'tenant_feature_flags'
 // que comprueba estos mismos nombres contra el esquema construido desde las
 // migraciones. Al aplicar: `npm run db:types` y añadir el `satisfies`.
 export const BRANDS_TABLE = 'brands'
+/**
+ * El listado de productos del backoffice, con `category_name` y `brand_name`
+ * aplanados para que el buscador general los alcance en el mismo `or=`.
+ * Sin `satisfies` hasta regenerar los tipos, como las de arriba.
+ */
+export const ADMIN_PRODUCTS_VIEW = 'admin_products'
 export const PRODUCT_FAMILIES_TABLE = 'product_families'
 export const ATTRIBUTES_TABLE = 'attributes'
 export const ATTRIBUTE_VALUES_TABLE = 'attribute_values'
@@ -379,6 +385,12 @@ export const PRICE_LIST_CONFLICTS_RPC = 'price_list_conflicts'
 // argumento a propósito: el vínculo usuario ↔ cuenta lo resuelve el servidor,
 // nunca un id declarado por el navegador (regla 8 de la fase).
 export const MY_BUSINESS_ACCOUNTS_RPC = 'my_business_accounts'
+/**
+ * En qué tiendas compra quien pregunta (migración 20260910200000). Sin
+ * argumentos, por lo mismo que la de arriba. Sin `satisfies` hasta regenerar
+ * los tipos: la red mientras tanto es `supabase/tests/my-stores.test.ts`.
+ */
+export const MY_STORES_RPC = 'my_stores'
 export const PURCHASE_APPROVAL_RPC = 'purchase_approval'
 export const CUSTOMER_ORDERS_RPC = 'customer_orders'
 export const CUSTOMER_USAGE_RPC = 'customer_deletion_usage'

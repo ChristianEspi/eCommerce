@@ -89,10 +89,16 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'nav.signOut': 'Sign out',
     'admin.dashboard.title': 'Overview',
     'admin.products.title': 'Products',
+    'catalog.products.sortBy': 'Sort by {campo}',
+    'catalog.products.filter.allCategories': 'All categories',
+    'catalog.products.filter.allBrands': 'All brands',
+    'catalog.products.filter.minStock': 'Minimum stock',
     'admin.products.search': 'Search by name, SKU or category',
     'admin.products.empty': 'You have not published any products yet',
     'admin.orders.title': 'Orders',
     'admin.orders.subtitle': 'Everything that came in through the storefront.',
+    'common.filters.apply': 'Filter',
+    'common.filters.reset': 'Clear',
     'common.filters.clear': 'Clear filters',
     'admin.orders.search': 'Search by number, customer or status',
     'admin.orders.empty': 'You have not received orders yet',
@@ -414,6 +420,9 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'auth.reset.mismatch': 'The two passwords do not match',
     'auth.reset.requestAgain': 'Request a new link',
     'tenant.unauthorized.title': 'Your account is not enabled for eCommerce',
+    // For a buyer who shops in more than one store. Nobody chooses for them:
+    // these are THEIR stores, not the SaaS customer list.
+    'tenant.buyer.pickStore': 'Yours is a buying account. Pick the store you want to enter.',
     'tenant.unauthorized.body':
       'Your session is valid but it does not carry the account and company this app needs. Ask your company administrator to enable eCommerce for you.',
     'admin.account': 'Your account',

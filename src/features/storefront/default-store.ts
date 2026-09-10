@@ -1,6 +1,44 @@
 import { useQuery } from '@tanstack/react-query'
+import { z } from 'zod'
+import { MY_STORES_RPC } from '@/shared/lib/db-schema'
 import { STOREFRONT_SLUG, isSupabaseConfigured } from '@/shared/lib/env'
+import { getSupabaseClient } from '@/shared/lib/supabase'
 import { fetchOnlyPublicStore } from './api'
+
+const miTiendaSchema = z.object({ slug: z.string().min(1), name: z.string().min(1) })
+export type MiTienda = z.infer<typeof miTiendaSchema>
+
+/**
+ * En qué tiendas compra la persona con sesión.
+ *
+ * Sale de `public.my_stores()`, que **no acepta argumentos**: el vínculo entre
+ * la persona y su empresa lo resuelve la base contra `business_account_users`,
+ * y de ahí a las tiendas de esa sociedad. Un navegador no puede preguntar por
+ * las tiendas de otro escribiendo un identificador.
+ *
+ * Puede devolver más de una y por eso devuelve lista: una cuenta B2B pertenece
+ * a una SOCIEDAD, y una sociedad puede tener varias tiendas. Quien elige entre
+ * ellas es la persona, no una regla que adivine por ella.
+ *
+ * Ante una respuesta que no encaja con el contrato devuelve lista vacía en vez
+ * de lanzar: quien llama es un guard, y dejar sin pantalla a alguien porque el
+ * servidor añadió un campo sería peor que enseñarle la salida genérica.
+ */
+export async function fetchMyStores(): Promise<MiTienda[]> {
+  const { data, error } = await getSupabaseClient().rpc(MY_STORES_RPC, {})
+  if (error) throw error
+  const parsed = miTiendaSchema.array().safeParse(data ?? [])
+  return parsed.success ? parsed.data : []
+}
+
+export function useMyStores(enabled = true) {
+  return useQuery({
+    queryKey: ['storefront', 'my-stores'],
+    queryFn: fetchMyStores,
+    enabled,
+    staleTime: 5 * 60 * 1000,
+  })
+}
 
 /**
  * A qué tienda lleva este despliegue, cuando la URL no lo dice.

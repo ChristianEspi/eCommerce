@@ -2,8 +2,7 @@ import { Button, Stack } from '@mui/material'
 import type { ReactNode } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useSessionContext } from '@/features/auth/session-context'
-import { useMyAccounts } from '@/features/customers/hooks'
-import { useDefaultStoreSlug } from '@/features/storefront/default-store'
+import { useDefaultStoreSlug, useMyStores } from '@/features/storefront/default-store'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { ErrorState, LoadingState, UnauthorizedState } from '@/shared/ui/states'
 import { useTenant } from './tenant-context'
@@ -27,16 +26,28 @@ import { useTenant } from './tenant-context'
  *    hub porque no es miembro de ningún tenant, así que ese cartel es un final
  *    del que no se sale. Es lo que se veía al entrar a `/app`.
  *
- * Lo que sí los distingue es un dato de servidor: el vínculo con una cuenta
- * B2B. `my_business_accounts()` no acepta argumentos —el vínculo lo resuelve la
- * base contra `business_account_users`— así que un navegador no puede hacerse
- * pasar por comprador de nadie. Con vínculo, se va a la tienda; sin él no se
- * adivina, porque mandar a la vitrina a un empleado mal configurado le esconde
- * su problema real: se le deja el cartel y, si hay tienda a la que ir, también
- * la puerta.
+ * Lo que sí los distingue es un dato de servidor: `my_stores()`, que no acepta
+ * argumentos y resuelve el vínculo contra `business_account_users` y de ahí a
+ * las tiendas de esa sociedad. Un navegador no puede hacerse pasar por
+ * comprador de nadie.
  *
- * Las dos consultas van con `enabled` atado a este estado: un miembro normal
- * del backoffice no paga dos llamadas por un caso que no es el suyo.
+ * ## A SU tienda, no a una cualquiera
+ *
+ * La primera versión de esto mandaba a la tienda por defecto del DESPLIEGUE —el
+ * slug declarado, o la única tienda activa del proyecto—. Con una sola tienda
+ * acierta por casualidad; con dos, manda al comprador de una empresa a la
+ * vitrina de otra. Ahora el destino sale del vínculo, y la del despliegue queda
+ * como último recurso para quien no es comprador de nadie.
+ *
+ * Con varias tiendas propias no se elige por la persona: se le enseñan las
+ * suyas. No es la lista de clientes del SaaS, son las tiendas donde ya compra.
+ *
+ * Sin ninguna no se adivina: mandar a la vitrina a un empleado mal configurado
+ * le esconde su problema real, así que se le deja el cartel y, si hay tienda a
+ * la que ir, también la puerta.
+ *
+ * Las consultas van con `enabled` atado a este estado: un miembro normal del
+ * backoffice no paga llamadas por un caso que no es el suyo.
  */
 export function RequireTenant({ children }: { children: ReactNode }) {
   const { status, error, refetch } = useTenant()
@@ -44,8 +55,8 @@ export function RequireTenant({ children }: { children: ReactNode }) {
   const { t } = useI18n()
 
   const sinJerarquia = status === 'unauthorized'
-  const compras = useMyAccounts(sinJerarquia)
-  const tienda = useDefaultStoreSlug(sinJerarquia)
+  const mias = useMyStores(sinJerarquia)
+  const porDefecto = useDefaultStoreSlug(sinJerarquia)
 
   if (status === 'loading') return <LoadingState />
   if (status === 'error') return <ErrorState error={error} onRetry={refetch} />
@@ -55,25 +66,39 @@ export function RequireTenant({ children }: { children: ReactNode }) {
     // Sin esperar, un comprador vería el cartel un instante antes de que se lo
     // cambien por la tienda. Un cartel que dice «no estás habilitado» y se va
     // solo es peor que no enseñarlo.
-    if (compras.isLoading || tienda.isLoading) return <LoadingState />
+    if (mias.isLoading || porDefecto.isLoading) return <LoadingState />
 
-    const esComprador = (compras.data ?? []).length > 0
-    if (esComprador && tienda.slug) return <Navigate to={`/s/${tienda.slug}`} replace />
+    const propias = mias.data ?? []
+    // Una sola: no hay nada que preguntar.
+    if (propias.length === 1 && propias[0]) {
+      return <Navigate to={`/s/${propias[0].slug}`} replace />
+    }
 
     return (
       <UnauthorizedState
         title={t('tenant.unauthorized.title')}
-        description={t('tenant.unauthorized.body')}
+        description={propias.length > 1 ? t('tenant.buyer.pickStore') : t('tenant.unauthorized.body')}
         action={
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-            {/* Solo si hay una tienda a la que ir. Con varias no se elige
-                ninguna: la lista de tiendas activas es la lista de clientes. */}
-            {tienda.slug && (
-              <Button variant="contained" component={Link} to={`/s/${tienda.slug}`}>
+            {/* Las SUYAS, con su nombre. No es la lista de clientes del SaaS:
+                son las tiendas donde esta persona ya compra. */}
+            {propias.map((tienda) => (
+              <Button key={tienda.slug} variant="contained" component={Link} to={`/s/${tienda.slug}`}>
+                {t('landing.visitNamed').replace('{store}', tienda.name)}
+              </Button>
+            ))}
+            {/* Último recurso, solo para quien no compra en ninguna: la tienda
+                del despliegue, si es que hay una sola y por tanto no hay que
+                elegir por nadie. */}
+            {propias.length === 0 && porDefecto.slug && (
+              <Button variant="contained" component={Link} to={`/s/${porDefecto.slug}`}>
                 {t('landing.visit')}
               </Button>
             )}
-            <Button variant={tienda.slug ? 'outlined' : 'contained'} onClick={() => void signOut()}>
+            <Button
+              variant={propias.length > 0 || porDefecto.slug ? 'outlined' : 'contained'}
+              onClick={() => void signOut()}
+            >
               {t('nav.signOut')}
             </Button>
           </Stack>

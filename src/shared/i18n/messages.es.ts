@@ -91,11 +91,17 @@ export const es = {
     'nav.signOut': 'Cerrar sesión',
     'admin.dashboard.title': 'Resumen',
     'admin.products.title': 'Productos',
+    'catalog.products.sortBy': 'Ordenar por {campo}',
+    'catalog.products.filter.allCategories': 'Todas las categorías',
+    'catalog.products.filter.allBrands': 'Todas las marcas',
+    'catalog.products.filter.minStock': 'Stock mínimo',
     'admin.products.search': 'Buscar por nombre, SKU o categoría',
     'admin.products.empty': 'Aún no publicaste productos',
     'admin.orders.title': 'Pedidos',
     'admin.orders.subtitle': 'Todo lo que ha entrado por la vitrina.',
     'common.filters.clear': 'Limpiar filtros',
+    'common.filters.apply': 'Filtrar',
+    'common.filters.reset': 'Limpiar',
     'admin.orders.search': 'Buscar por número, cliente o estado',
     'admin.orders.empty': 'Todavía no recibiste pedidos',
     'admin.settings.title': 'Configuración',
@@ -417,6 +423,9 @@ export const es = {
     'auth.reset.mismatch': 'Las dos contraseñas no coinciden',
     'auth.reset.requestAgain': 'Pedir un enlace nuevo',
     'tenant.unauthorized.title': 'Tu cuenta no está habilitada para eCommerce',
+    // Para el comprador que compra en más de una tienda. No se elige por él:
+    // son SUS tiendas, no la lista de clientes del SaaS.
+    'tenant.buyer.pickStore': 'Tu cuenta es de compras. Elige a qué tienda quieres entrar.',
     'tenant.unauthorized.body':
       'Tu sesión es válida pero no trae la cuenta ni la sociedad que esta app necesita. Pide al administrador de tu empresa que te habilite eCommerce.',
     'admin.account': 'Tu cuenta',
