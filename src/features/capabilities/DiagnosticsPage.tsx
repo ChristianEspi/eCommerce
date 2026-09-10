@@ -18,6 +18,7 @@ import {
 } from '@mui/material'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { CAPABILITIES, isCapabilityId, type CapabilityId } from '@/domain'
+import { AiSection } from '@/features/ai/AiSection'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
@@ -327,6 +328,14 @@ export function DiagnosticsPage() {
               id: 'capabilities',
               label: t('diagnostics.tab.capabilities'),
               content: <CapabilitiesSection context={context} />,
+            },
+            {
+              // La IA vive aquí y no en Ajustes porque sus dos mitades exigen
+              // `tenant.manage`, que es justo lo que esta pantalla ya pide: la
+              // traza lleva dentro texto que escribió una persona.
+              id: 'ai',
+              label: t('diagnostics.tab.ai'),
+              content: <AiSection />,
             },
           ]}
         />

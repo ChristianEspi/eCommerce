@@ -325,6 +325,28 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'ai.error.notEntitled': 'Your company has not activated AI assistance.',
     'ai.error.forbidden': 'You do not have permission for this.',
     'ai.error.generic': 'The AI request could not be completed.',
+    'ai.trace.title': 'Recent queries',
+    'ai.trace.subtitle':
+      'What was asked, what it cost and whether it helped. Text is stored trimmed and with personal data removed.',
+    'ai.trace.empty': 'AI has not been used yet',
+    'ai.trace.emptyHint': 'Every query will show up here with what it cost in tokens.',
+    // Heads off the most predictable support call: "I bought AI and the
+    // assistant answers exactly as before".
+    'ai.trace.allSearch':
+      'Every query was answered without the model. The provider key is missing from the Edge Function secrets.',
+    'ai.trace.when': 'When',
+    'ai.trace.feature': 'Feature',
+    'ai.trace.question': 'Query',
+    'ai.trace.status': 'Result',
+    // Input and output apart: output costs five times as much.
+    'ai.trace.tokens': 'Tokens in / out',
+    'ai.trace.useful': 'Helped',
+    'ai.trace.useless': 'Did not help',
+    'ai.trace.status.ai': 'With AI',
+    'ai.trace.status.search': 'No model',
+    'ai.trace.status.blocked': 'No quota',
+    'ai.trace.status.error': 'Error',
+    'diagnostics.tab.ai': 'AI',
     'capabilities.error.forbidden': 'Your account cannot read the configuration of this company.',
     'capabilities.error.generic': 'We could not read which modules your company has active.',
     'capabilities.error.hubMissing':

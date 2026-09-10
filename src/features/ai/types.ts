@@ -8,6 +8,9 @@ export {
   AI_FEEDBACK_RPC,
 } from '@/shared/lib/db-schema'
 
+/** Cuántas líneas de traza se traen. Es una bitácora, no un informe. */
+export const AI_TRACE_LIMIT = 50
+
 /**
  * La IA medida, en el CLIENTE.
  *
@@ -56,6 +59,38 @@ export const aiEntitlementSchema = z.object({
 })
 
 export type AiEntitlement = z.infer<typeof aiEntitlementSchema>
+
+/**
+ * Cómo salió una llamada. `search` no es un error: es el modo en el que el
+ * asistente funciona sin proveedor, y confundirlo con un fallo haría creer que
+ * algo se rompió cuando lo que pasa es que no hay clave configurada.
+ */
+export const AI_INTERACTION_STATUSES = ['ai', 'search', 'blocked', 'error'] as const
+export type AiInteractionStatus = (typeof AI_INTERACTION_STATUSES)[number]
+
+/**
+ * Una línea de la traza.
+ *
+ * El texto viene RECORTADO Y REDACTADO desde la base, no desde aquí: la
+ * frontera es `ebim.ai_record`, para que ninguna función futura pueda olvidarse
+ * de hacerlo. Lo que llega ya es seguro de pintar.
+ */
+export const aiInteractionSchema = z.object({
+  id: z.string().uuid(),
+  feature: z.string(),
+  model: z.string().nullable(),
+  status: z.enum(AI_INTERACTION_STATUSES),
+  prompt_excerpt: z.string().nullable(),
+  reply_excerpt: z.string().nullable(),
+  input_tokens: z.number().int().nonnegative(),
+  output_tokens: z.number().int().nonnegative(),
+  cache_read_tokens: z.number().int().nonnegative(),
+  latency_ms: z.number().int().nullable(),
+  feedback: z.number().int().nullable(),
+  created_at: z.string(),
+})
+
+export type AiInteraction = z.infer<typeof aiInteractionSchema>
 
 /** Saldo agotado: la acción no va a salir, y hay que decirlo antes de gastarla. */
 export function agotado(estado: AiEntitlement): boolean {

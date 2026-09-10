@@ -328,6 +328,28 @@ export const es = {
     'ai.error.notEntitled': 'Tu empresa no tiene activada la asistencia con IA.',
     'ai.error.forbidden': 'No tienes permiso para esto.',
     'ai.error.generic': 'No se pudo completar la consulta con IA.',
+    'ai.trace.title': 'Últimas consultas',
+    'ai.trace.subtitle':
+      'Qué se preguntó, qué costó y si sirvió. El texto se guarda recortado y sin datos personales.',
+    'ai.trace.empty': 'Todavía no se ha usado la IA',
+    'ai.trace.emptyHint': 'Aquí aparecerá cada consulta con lo que costó en tokens.',
+    // El aviso que evita la llamada de soporte más previsible: «contraté la IA
+    // y el asistente responde igual que antes».
+    'ai.trace.allSearch':
+      'Todas las consultas se respondieron sin modelo. Falta configurar la clave del proveedor en los secretos de las Edge Functions.',
+    'ai.trace.when': 'Cuándo',
+    'ai.trace.feature': 'Función',
+    'ai.trace.question': 'Consulta',
+    'ai.trace.status': 'Resultado',
+    // Entrada y salida por separado: la salida cuesta cinco veces más.
+    'ai.trace.tokens': 'Tokens ent. / sal.',
+    'ai.trace.useful': 'Sirvió',
+    'ai.trace.useless': 'No sirvió',
+    'ai.trace.status.ai': 'Con IA',
+    'ai.trace.status.search': 'Sin modelo',
+    'ai.trace.status.blocked': 'Sin cuota',
+    'ai.trace.status.error': 'Error',
+    'diagnostics.tab.ai': 'IA',
     'capabilities.error.forbidden': 'Tu cuenta no puede consultar la configuración de esta sociedad.',
     'capabilities.error.generic': 'No pudimos leer qué módulos tiene activos tu empresa.',
     'capabilities.error.hubMissing':

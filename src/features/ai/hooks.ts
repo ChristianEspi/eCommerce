@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
-import { fetchAiEntitlement, sendAiFeedback } from './api'
-import type { AiEntitlement } from './types'
+import { fetchAiEntitlement, fetchAiInteractions, sendAiFeedback } from './api'
+import type { AiEntitlement, AiInteraction } from './types'
 
 /**
  * El saldo de IA en el cliente.
@@ -24,11 +24,21 @@ export function useAiEntitlement(enabled = true): UseQueryResult<AiEntitlement> 
   })
 }
 
+export const aiInteractionsKey = () => [...AI_KEY, 'interactions'] as const
+
+export function useAiInteractions(enabled = true): UseQueryResult<AiInteraction[]> {
+  return useQuery({
+    queryKey: aiInteractionsKey(),
+    queryFn: fetchAiInteractions,
+    enabled,
+  })
+}
+
 export function useAiFeedback() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({ id, value }: { id: string; value: 1 | -1 }) => sendAiFeedback(id, value),
     // No invalida el saldo: opinar no gasta cuota.
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [...AI_KEY, 'interactions'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: aiInteractionsKey() }),
   })
 }
