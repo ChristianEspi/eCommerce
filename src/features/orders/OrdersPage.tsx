@@ -24,6 +24,7 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { useDebouncedValue } from '@/shared/lib/useDebouncedValue'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { formatDate, formatMoney, formatRelative, formatTime } from '@/shared/lib/format'
 import { STATUS_ICON, PAYMENT_ICON, FULFILLMENT_ICON } from './statusIcons'
@@ -110,7 +111,12 @@ export function OrdersPage() {
 
   const storeId = activeStore?.id ?? null
   const today = useMemo(todayKey, [])
-  const filter = { storeId, search, status, range, today, page }
+  // Igual que en Productos: el listado pregunta al servidor, así que el término
+  // se deja reposar antes de viajar. Sin esto, buscar un número de pedido son
+  // tantas peticiones como dígitos tiene.
+  const termino = useDebouncedValue(search, 300)
+
+  const filter = { storeId, search: termino, status, range, today, page }
   const orders = useOrders(filter)
   const rows = orders.data?.rows ?? []
   const total = orders.data?.total ?? 0
@@ -128,7 +134,7 @@ export function OrdersPage() {
   // página que ya no existe y una tabla vacía que parece un error.
   useEffect(() => {
     setPage(0)
-  }, [search, status, range, storeId])
+  }, [termino, status, range, storeId])
 
   async function exportCsv() {
     setExporting(true)

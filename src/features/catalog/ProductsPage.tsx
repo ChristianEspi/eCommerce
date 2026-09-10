@@ -19,10 +19,15 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,  TableRow,
+  TableHead,
+  TableRow,
+  TableSortLabel,
   Tabs,
+  TextField,
+  MenuItem,
+  LinearProgress,
 } from '@mui/material'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
@@ -33,12 +38,21 @@ import { SearchField } from '@/shared/ui/SearchField'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState, ErrorState } from '@/shared/ui/states'
-import { PRODUCTS_PAGE_SIZE, type ProductStatusFilter } from './api/products'
+import {
+  DEFAULT_PRODUCT_SORT,
+  PRODUCTS_PAGE_SIZE,
+  type ProductSort,
+  type ProductSortColumn,
+  type ProductStatusFilter,
+} from './api/products'
 import { CatalogError } from './api/errors'
 import { ProductDrawer } from './ProductDrawer'
 import { downloadCsv, productsToCsv } from './exportCsv'
+import { categoryDescendants, categoryTree } from './types'
 import type { Product, ProductKind, ProductStatus } from './types'
+import { CategoryPicker } from './CategoryPicker'
 import { useCategories } from './useCategories'
+import { useBrands } from './pim/hooks'
 import { useDeleteProduct, useProductUsage, useProducts, useSetProductStatus } from './useProducts'
 
 const STATUS_LABEL: Record<ProductStatus, MessageKey> = {
@@ -73,19 +87,67 @@ function errorKeyOf(error: unknown): MessageKey {
 /**
  * Listado de productos del backoffice.
  *
- * Un buscador general + tabs de estado + Exportar; sin paneles de filtros
- * multi-campo (contrato §8). La pantalla no toca Supabase: todo pasa por los
- * hooks de `useProducts`/`useCategories`.
+ * ## La excepción a la regla del buscador único
+ *
+ * La regla de suite es «un buscador general + tabs de estado, sin paneles de
+ * filtros multi-campo» (contrato §8), y esta pantalla la incumple a propósito
+ * y por encargo del operador: categoría, marca y stock mínimo son
+ * DESPLEGABLES, no texto.
+ *
+ * El motivo de la regla es que seis cajas obligan a adivinar cuál rellenar
+ * antes de saber si lo que buscas existe. Aquí ese motivo no aplica: las dos
+ * primeras son listas cerradas —se elige de lo que hay, no se teclea a
+ * ciegas— y el catálogo es la pantalla donde de verdad se cruzan dos
+ * criterios («qué de esta marca me queda por debajo de diez»). Ninguna otra
+ * pantalla hereda esta excepción.
+ *
+ * Nada consulta hasta pulsar **Filtrar**: con tres filtros que se combinan, lo
+ * que se espera es elegir los tres y buscar una vez, no tres búsquedas
+ * mientras se elige.
+ *
+ * La pantalla no toca Supabase: todo pasa por los hooks de
+ * `useProducts`/`useCategories`/`useBrands`.
  */
+
+/**
+ * Lo que acota la tabla. Todo texto, que es lo que devuelven los controles; la
+ * conversión a número vive en un solo sitio, al construir la consulta.
+ */
+interface Filtros {
+  search: string
+  categoryId: string
+  brandId: string
+  minStock: string
+}
+
+const SIN_FILTROS: Filtros = { search: '', categoryId: '', brandId: '', minStock: '' }
+
+/** El formulario de filtros, para que el botón de fuera pueda enviarlo. */
+const FORM_FILTROS = 'filtros-productos'
+
 export function ProductsPage() {
   const { t, locale } = useI18n()
   const { notify } = useFeedback()
   const { activeStore, activeCompanyId, tenant, status: tenantStatus, can } = useTenant()
   const canWrite = can('catalog.write')
 
-  const [search, setSearch] = useState('')
   const [status, setStatus] = useState<ProductStatusFilter>('all')
   const [page, setPage] = useState(0)
+  const [sort, setSort] = useState<ProductSort>(DEFAULT_PRODUCT_SORT)
+
+  /**
+   * Lo que se escribe y lo que se consulta son dos cosas distintas.
+   *
+   * El listado pagina en el servidor, así que mientras el término entraba
+   * directo en la consulta cada tecla era un viaje de ida y vuelta a PostgREST:
+   * escribir «acondicionador» eran catorce peticiones y la tabla se quedaba
+   * enseñando la respuesta de la letra anterior. Con un botón de por medio no
+   * sale ni una hasta que alguien lo pide, que además es lo que se espera
+   * cuando hay tres filtros que se combinan: se eligen los tres y se busca una
+   * vez, no tres veces mientras se elige.
+   */
+  const [borrador, setBorrador] = useState<Filtros>(SIN_FILTROS)
+  const [aplicados, setAplicados] = useState<Filtros>(SIN_FILTROS)
   const [drawer, setDrawer] = useState<{ open: boolean; product: Product | null }>({
     open: false,
     product: null,
@@ -94,15 +156,93 @@ export function ProductsPage() {
 
   const storeId = activeStore?.id ?? null
 
-  // Cambiar el filtro tiene que volver a la primera página: quedarse en la
+  function cambiar(campo: keyof Filtros, valor: string) {
+    setBorrador((actual) => ({ ...actual, [campo]: valor }))
+  }
+
+  function aplicar() {
+    setAplicados(borrador)
+    setPage(0)
+  }
+
+  function limpiar() {
+    setBorrador(SIN_FILTROS)
+    setAplicados(SIN_FILTROS)
+    setPage(0)
+  }
+
+  const categories = useCategories(storeId)
+  const brands = useBrands()
+
+  // El mismo árbol que usa el cajón de producto: agrupado por su raíz, con la
+  // ruta y buscable. Una lista plana de cuarenta nombres alfabéticos deja
+  // «Cuidado de la piel» y «Cuidado del cabello» a diez filas de distancia y
+  // sin decir de quién cuelgan.
+  const arbolCategorias = useMemo(() => categoryTree(categories.data ?? []), [categories.data])
+
+  /**
+   * La familia entera, no solo la categoría marcada.
+   *
+   * Los productos cuelgan de las hojas —«Antiinfecciosos», «Hematológicos»— y
+   * casi nunca de la raíz, así que filtrar por «Medicamentos» con una igualdad
+   * devolvía casi nada. Se ordena para que la clave de la consulta sea la misma
+   * ante la misma elección y no se pierda la caché por el orden del conjunto.
+   */
+  const familiaElegida = useMemo(() => {
+    if (!aplicados.categoryId) return null
+    return [...categoryDescendants(categories.data ?? [], aplicados.categoryId)].sort()
+  }, [aplicados.categoryId, categories.data])
+
+  const hayFiltros = Object.values(aplicados).some(Boolean)
+  const sinAplicar = JSON.stringify(borrador) !== JSON.stringify(aplicados)
+
+  // Cambiar de pestaña o de tienda vuelve a la primera página: quedarse en la
   // página 4 de un resultado que ahora tiene una sola es una tabla vacía que se
-  // lee como "no hay nada".
+  // lee como "no hay nada". Los filtros no hacen falta aquí — `aplicar` y
+  // `limpiar` ya la reinician, que es cuando de verdad cambia el resultado.
   useEffect(() => {
     setPage(0)
-  }, [search, status, storeId])
+  }, [status, storeId])
 
-  const products = useProducts({ storeId, search, status, page })
-  const categories = useCategories(storeId)
+  /**
+   * Pulsar una columna la ordena; volver a pulsarla la invierte.
+   *
+   * Y devuelve a la primera página, porque el orden cambia QUÉ hay en cada
+   * página: quedarse en la cuatro después de reordenar enseña un tramo del
+   * medio de una lista que ya no es la misma, y eso no se lee bien de ninguna
+   * manera.
+   */
+  function ordenarPor(column: ProductSortColumn) {
+    setSort((actual) =>
+      actual.column === column
+        ? { column, direction: actual.direction === 'asc' ? 'desc' : 'asc' }
+        : { column, direction: 'asc' },
+    )
+    setPage(0)
+  }
+
+  const products = useProducts({
+    storeId,
+    search: aplicados.search,
+    status,
+    page,
+    sort,
+    categoryIds: familiaElegida,
+    brandId: aplicados.brandId || null,
+    // Vacío no es cero: dejar el campo en blanco significa «no me importa el
+    // stock», y un cero significaría «solo los que tienen cero o más», que es
+    // todo el catálogo dicho de una forma rara.
+    minStock: aplicados.minStock === '' ? null : Number(aplicados.minStock),
+  })
+  /**
+   * Trabajando, pero con datos en pantalla.
+   *
+   * `isPending` es «todavía no hay nada que enseñar» —la primera carga— y
+   * `isFetching` es «hay algo, y estoy trayendo lo siguiente». Distinguirlas es
+   * lo que permite no tirar la tabla cada vez que alguien filtra.
+   */
+  const refrescando = products.isFetching && !products.isPending
+
   const usage = useProductUsage(deleteTarget?.id ?? null)
   const changeStatus = useSetProductStatus()
   const removeProduct = useDeleteProduct()
@@ -212,13 +352,106 @@ export function ProductsPage() {
           ))}
         </Tabs>
 
-        <FilterBar>
-          <Box sx={{ minWidth: { xs: '100%', sm: 280 } }}>
-            <SearchField value={search} onChange={setSearch} placeholder={t('admin.products.search')} />
+        {/* Un formulario de verdad: pulsar Intro en cualquiera de los campos
+            filtra, que es lo que hace todo el mundo antes de buscar el botón.
+            El botón vive fuera del formulario —la barra ancla las acciones a la
+            derecha— y lo envía por `form`, que para eso existe el atributo. */}
+        <FilterBar
+          actions={
+            <>
+              <Button
+                type="submit"
+                form={FORM_FILTROS}
+                variant="contained"
+                size="small"
+                disabled={!sinAplicar && !hayFiltros}
+              >
+                {t('common.filters.apply')}
+              </Button>
+              {(hayFiltros || sinAplicar) && (
+                <Button size="small" onClick={limpiar}>
+                  {t('common.filters.reset')}
+                </Button>
+              )}
+            </>
+          }
+        >
+          <Box
+            component="form"
+            id={FORM_FILTROS}
+            onSubmit={(event) => {
+              event.preventDefault()
+              aplicar()
+            }}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.25,
+              flexWrap: 'wrap',
+              rowGap: 1.25,
+            }}
+          >
+            <Box sx={{ minWidth: { xs: '100%', sm: 260 } }}>
+              <SearchField
+                value={borrador.search}
+                onChange={(next) => cambiar('search', next)}
+                placeholder={t('admin.products.search')}
+              />
+            </Box>
+
+            <Box sx={{ minWidth: { xs: '100%', sm: 260 } }}>
+              <CategoryPicker
+                label={t('catalog.field.category')}
+                nodes={arbolCategorias}
+                value={borrador.categoryId}
+                onChange={(next) => cambiar('categoryId', next)}
+                noneLabel={t('catalog.products.filter.allCategories')}
+                size="small"
+              />
+            </Box>
+
+            <TextField
+              select
+              size="small"
+              label={t('catalog.field.brand')}
+              value={borrador.brandId}
+              onChange={(event) => cambiar('brandId', event.target.value)}
+              sx={{ minWidth: 170 }}
+            >
+              <MenuItem value="">{t('catalog.products.filter.allBrands')}</MenuItem>
+              {(brands.data ?? []).map((brand) => (
+                <MenuItem key={brand.id} value={brand.id}>
+                  {brand.name}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              size="small"
+              type="number"
+              label={t('catalog.products.filter.minStock')}
+              value={borrador.minStock}
+              onChange={(event) => cambiar('minStock', event.target.value)}
+              inputProps={{ min: 0, step: 1 }}
+              sx={{ width: 130 }}
+            />
           </Box>
         </FilterBar>
 
-        <Card>
+        {/* El esqueleto es solo para la PRIMERA carga.
+            Al filtrar o al refrescar, la tabla se queda con lo que había y se
+            atenúa mientras llega lo nuevo: sustituirla por un esqueleto en cada
+            búsqueda hace que la página salte de alto y que se pierda de vista
+            la fila que uno estaba mirando. Lo que sí hace falta es que se NOTE
+            que está trabajando, y eso lo dice la barra de arriba. */}
+        <Card sx={{ position: 'relative', overflow: 'hidden' }}>
+          {refrescando && (
+            <LinearProgress
+              aria-label={t('common.loading')}
+              sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, zIndex: 1 }}
+            />
+          )}
+
           {products.isPending && <TableSkeleton columns={6} />}
 
           {products.isError && (
@@ -227,10 +460,10 @@ export function ProductsPage() {
 
           {isEmpty && (
             <EmptyState
-              title={search ? t('catalog.products.emptySearch') : t('admin.products.empty')}
+              title={hayFiltros ? t('catalog.products.emptySearch') : t('admin.products.empty')}
               icon={<Inventory2RoundedIcon fontSize="small" />}
               action={
-                canWrite && !search ? (
+                canWrite && !hayFiltros ? (
                   <Button variant="contained" onClick={() => setDrawer({ open: true, product: null })}>
                     {t('catalog.products.new')}
                   </Button>
@@ -240,15 +473,40 @@ export function ProductsPage() {
           )}
 
           {!products.isPending && !products.isError && list.length > 0 && (
+            <Box
+              sx={{
+                transition: 'opacity .15s ease',
+                '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
+                ...(refrescando
+                  ? // Atenuada y sin recibir pulsaciones: lo que se ve es la
+                    // respuesta ANTERIOR, y dejar pulsar «archivar» sobre una
+                    // fila que está a punto de cambiar de sitio es como se
+                    // archiva el producto equivocado.
+                    { opacity: 0.55, pointerEvents: 'none' }
+                  : {}),
+              }}
+            >
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>{t('catalog.field.sku')}</TableCell>
-                  <TableCell>{t('catalog.field.name')}</TableCell>
-                  <TableCell>{t('catalog.field.category')}</TableCell>
-                  <TableCell align="right">{t('common.price')}</TableCell>
-                  <TableCell align="right">{t('catalog.field.stock')}</TableCell>
-                  <TableCell>{t('common.status')}</TableCell>
+                  <Ordenable columna="sku" sort={sort} onSort={ordenarPor}>
+                    {t('catalog.field.sku')}
+                  </Ordenable>
+                  <Ordenable columna="name" sort={sort} onSort={ordenarPor}>
+                    {t('catalog.field.name')}
+                  </Ordenable>
+                  <Ordenable columna="category_name" sort={sort} onSort={ordenarPor}>
+                    {t('catalog.field.category')}
+                  </Ordenable>
+                  <Ordenable columna="price" sort={sort} onSort={ordenarPor} align="right">
+                    {t('common.price')}
+                  </Ordenable>
+                  <Ordenable columna="stock" sort={sort} onSort={ordenarPor} align="right">
+                    {t('catalog.field.stock')}
+                  </Ordenable>
+                  <Ordenable columna="status" sort={sort} onSort={ordenarPor}>
+                    {t('common.status')}
+                  </Ordenable>
                   <TableCell align="right">{t('common.actions')}</TableCell>
                 </TableRow>
               </TableHead>
@@ -352,6 +610,7 @@ export function ProductsPage() {
                 ))}
               </TableBody>
             </Table>
+            </Box>
           )}
 
           {!products.isError && total > 0 && (
@@ -408,5 +667,46 @@ export function ProductsPage() {
         isBusy={removeProduct.isPending || changeStatus.isPending}
       />
     </>
+  )
+}
+
+/**
+ * Una cabecera de columna que ordena la tabla.
+ *
+ * `TableSortLabel` y no un botón cualquiera porque trae lo que hace falta para
+ * que esto no sea solo un adorno: la flecha aparece únicamente en la columna
+ * activa, y `aria-sort` sobre la celda es lo que hace que un lector de pantalla
+ * anuncie por dónde está ordenada la tabla — sin eso, quien no ve la flecha no
+ * tiene forma de saberlo.
+ */
+function Ordenable({
+  columna,
+  sort,
+  onSort,
+  align,
+  children,
+}: {
+  columna: ProductSortColumn
+  sort: ProductSort
+  onSort: (columna: ProductSortColumn) => void
+  align?: 'right'
+  children: ReactNode
+}) {
+  const activa = sort.column === columna
+
+  return (
+    <TableCell
+      {...(align ? { align } : {})}
+      sortDirection={activa ? sort.direction : false}
+      aria-sort={activa ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
+      <TableSortLabel
+        active={activa}
+        direction={activa ? sort.direction : 'asc'}
+        onClick={() => onSort(columna)}
+      >
+        {children}
+      </TableSortLabel>
+    </TableCell>
   )
 }

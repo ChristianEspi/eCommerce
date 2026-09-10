@@ -542,6 +542,8 @@ export const CHECKOUT_FUNCTION = 'checkout'
  * precio, el stock y la foto los resuelve la vitrina contra el catálogo.
  */
 export const SHOPPING_ASSISTANT_FUNCTION = 'shopping-assistant'
+/** Redacta el borrador de la ficha de un producto (addon `ai.catalog.copy`). */
+export const CATALOG_COPY_FUNCTION = 'catalog-copy'
 export const UPDATE_ORDER_STATUS_FUNCTION = 'update-order-status'
 export const PLATFORM_CONTEXT_FUNCTION = 'platform-context'
 // P12: la puerta por la que un operador logístico dice dónde va el paquete. No

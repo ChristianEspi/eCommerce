@@ -59,6 +59,17 @@ function backend(role: 'admin' | 'viewer' = 'admin', products = defaultProducts(
         { id: TAX_DEFAULT_ID, code: 'igv18', name: 'IGV general (18%)', is_default: true },
         { id: TAX_EXEMPT_ID, code: 'exonerado', name: 'Exonerado', is_default: false },
       ],
+      brands: [
+        {
+          id: BRAND_ID,
+          organization_id: ORG,
+          company_id: COMPANY_A,
+          code: 'nordica',
+          name: 'Nordica',
+          description: null,
+          is_active: true,
+        },
+      ],
       categories: [
         {
           id: CATEGORY_ID,
@@ -69,8 +80,26 @@ function backend(role: 'admin' | 'viewer' = 'admin', products = defaultProducts(
           position: 0,
           is_active: true,
         },
+        {
+          id: SUBCATEGORY_ID,
+          store_id: STORE_A,
+          parent_id: CATEGORY_ID,
+          slug: 'sillas-de-oficina',
+          name: 'Sillas de oficina',
+          position: 0,
+          is_active: true,
+        },
       ],
       products,
+      // La VISTA que lee el listado. Añade dos columnas a la tabla: el nombre
+      // de la categoría y el de la marca, que es lo que permite buscar
+      // «Sillas» o «Nordica» en la misma caja. Se deriva de las mismas filas
+      // para que el doble no pueda contradecirse con la tabla.
+      admin_products: products.map((row) => ({
+        ...row,
+        category_name: NOMBRE_DE_CATEGORIA.get(String(row.category_id ?? '')) ?? null,
+        brand_name: row.brand_id === BRAND_ID ? 'Nordica' : null,
+      })),
       product_images: [],
     },
     rpc: {
@@ -82,6 +111,9 @@ function backend(role: 'admin' | 'viewer' = 'admin', products = defaultProducts(
   })
 }
 
+const BRAND_ID = '77777777-7777-4777-8777-777777777777'
+/** Una categoria HIJA: es la que demuestra que elegir la madre la incluye. */
+const SUBCATEGORY_ID = '88888888-8888-4888-8888-888888888888'
 const WAREHOUSE_ID = '66666666-6666-4666-8666-666666666666'
 
 /**
@@ -127,7 +159,14 @@ function conAlmacenes(): FakeSupabase {
   return fake
 }
 
-function defaultProducts() {
+const NOMBRE_DE_CATEGORIA = new Map([
+  [CATEGORY_ID, 'Sillas'],
+  [SUBCATEGORY_ID, 'Sillas de oficina'],
+])
+
+type FilaDeProducto = Record<string, unknown>
+
+function defaultProducts(): FilaDeProducto[] {
   return [
     {
       id: PRODUCT_ID,
@@ -135,6 +174,7 @@ function defaultProducts() {
       company_id: COMPANY_A,
       store_id: STORE_A,
       category_id: CATEGORY_ID,
+      brand_id: BRAND_ID,
       sku: 'A-1',
       name: 'Silla A',
       slug: 'silla-a',
@@ -146,6 +186,63 @@ function defaultProducts() {
       stock: 4,
       published_at: null,
       updated_at: '2026-08-27T00:00:00.000Z',
+    },
+  ]
+}
+
+/**
+ * Dos productos, para poder comprobar que un filtro DEJA FUERA algo.
+ *
+ * Va aparte del catálogo por defecto a propósito: los tests de borrado cuentan
+ * las filas de la tabla y el del listado cuenta los chips de estado, así que
+ * meter aquí un segundo producto los rompería sin que tenga nada que ver con
+ * lo que ellos comprueban.
+ *
+ * El segundo no tiene categoría ni marca: es el que demuestra que el listado no
+ * lo esconde y que ordenar por categoría lo manda al final en vez de llenar con
+ * él la primera pantalla.
+ */
+function catalogoAmplio(): FilaDeProducto[] {
+  return [
+    ...defaultProducts(),
+    {
+      id: '99999999-9999-4999-8999-999999999999',
+      organization_id: ORG,
+      company_id: COMPANY_A,
+      store_id: STORE_A,
+      category_id: null,
+      brand_id: null,
+      sku: 'Z-9',
+      name: 'Mesa Z',
+      slug: 'mesa-z',
+      description: null,
+      status: 'draft',
+      price: '850.00',
+      compare_at_price: null,
+      currency: 'PEN',
+      stock: 40,
+      published_at: null,
+      updated_at: '2026-08-28T00:00:00.000Z',
+    },
+    // Cuelga de la HIJA de «Sillas»: elegir la madre tiene que traerlo.
+    {
+      id: '11111111-2222-4333-8444-555555555555',
+      organization_id: ORG,
+      company_id: COMPANY_A,
+      store_id: STORE_A,
+      category_id: SUBCATEGORY_ID,
+      brand_id: null,
+      sku: 'O-1',
+      name: 'Banqueta O',
+      slug: 'banqueta-o',
+      description: null,
+      status: 'draft',
+      price: '120.00',
+      compare_at_price: null,
+      currency: 'PEN',
+      stock: 12,
+      published_at: null,
+      updated_at: '2026-08-29T00:00:00.000Z',
     },
   ]
 }
@@ -226,6 +323,134 @@ describe('ProductsPage — listado', () => {
     renderPage(backend())
     await screen.findByText('Silla A')
     expect(screen.getAllByRole('searchbox')).toHaveLength(1)
+  })
+
+  /**
+   * El buscador alcanza lo que se VE en la tabla.
+   *
+   * Miraba nombre, SKU y slug —las tres columnas propias de `products`— y la
+   * categoría y la marca viven en otras tablas. O sea que escribir en la caja
+   * lo que uno está leyendo en la columna de al lado no devolvía nada, que es
+   * la peor respuesta que puede dar un buscador.
+   */
+  it('busca tambien por categoria y por marca, no solo por nombre', async () => {
+    const user = userEvent.setup()
+    renderPage(backend('admin', catalogoAmplio()))
+    await screen.findByText('Silla A')
+
+    await user.type(screen.getByRole('searchbox'), 'Sillas')
+    await user.click(screen.getByRole('button', { name: 'Filtrar' }))
+
+    expect(await screen.findByText('Silla A')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('Mesa Z')).not.toBeInTheDocument())
+  })
+
+  /**
+   * Escribir no consulta.
+   *
+   * El listado pagina en el servidor, así que mientras el término entraba
+   * directo en la consulta cada tecla era una petición. Con el botón de por
+   * medio, teclear no cuesta ni un viaje: la tabla sigue enseñando lo de antes
+   * hasta que alguien pide el cambio.
+   */
+  it('escribir no consulta: la tabla no cambia hasta pulsar Filtrar', async () => {
+    const user = userEvent.setup()
+    renderPage(backend('admin', catalogoAmplio()))
+    await screen.findByText('Mesa Z')
+
+    await user.type(screen.getByRole('searchbox'), 'Silla')
+
+    // Sigue estando: nadie ha pedido filtrar todavía.
+    expect(screen.getByText('Mesa Z')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Filtrar' }))
+    await waitFor(() => expect(screen.queryByText('Mesa Z')).not.toBeInTheDocument())
+  })
+
+  it('el desplegable de marca acota a esa marca', async () => {
+    const user = userEvent.setup()
+    renderPage(backend('admin', catalogoAmplio()))
+    await screen.findByText('Mesa Z')
+
+    await user.click(screen.getByRole('combobox', { name: 'Marca' }))
+    await user.click(await screen.findByRole('option', { name: 'Nordica' }))
+    await user.click(screen.getByRole('button', { name: 'Filtrar' }))
+
+    expect(await screen.findByText('Silla A')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('Mesa Z')).not.toBeInTheDocument())
+  })
+
+  it('el stock minimo deja fuera lo que no llega', async () => {
+    const user = userEvent.setup()
+    renderPage(backend('admin', catalogoAmplio()))
+    await screen.findByText('Silla A')
+
+    await user.type(screen.getByLabelText('Stock mínimo'), '10')
+    await user.click(screen.getByRole('button', { name: 'Filtrar' }))
+
+    // Mesa Z tiene 40; Silla A tiene 4.
+    expect(await screen.findByText('Mesa Z')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('Silla A')).not.toBeInTheDocument())
+  })
+
+  /**
+   * Elegir una familia enseña lo que hay DENTRO.
+   *
+   * Los productos cuelgan de las hojas y casi nunca de la raíz, así que filtrar
+   * por «Sillas» con una igualdad devolvía solo lo que alguien colgó
+   * directamente de ella y dejaba fuera toda su descendencia. Quien abre una
+   * familia quiere lo que hay dentro.
+   */
+  it('elegir una categoria madre incluye a sus hijas', async () => {
+    const user = userEvent.setup()
+    renderPage(backend('admin', catalogoAmplio()))
+    await screen.findByText('Banqueta O')
+
+    await user.click(screen.getByRole('combobox', { name: 'Categoría' }))
+    await user.click(await screen.findByRole('option', { name: 'Sillas' }))
+    await user.click(screen.getByRole('button', { name: 'Filtrar' }))
+
+    // La madre trae lo suyo y lo de su hija.
+    expect(await screen.findByText('Silla A')).toBeInTheDocument()
+    expect(screen.getByText('Banqueta O')).toBeInTheDocument()
+    // Y deja fuera lo que no cuelga de ella.
+    await waitFor(() => expect(screen.queryByText('Mesa Z')).not.toBeInTheDocument())
+  })
+
+  it('Limpiar devuelve la tabla entera y vacia los controles', async () => {
+    const user = userEvent.setup()
+    renderPage(backend('admin', catalogoAmplio()))
+    await screen.findByText('Silla A')
+
+    await user.type(screen.getByLabelText('Stock mínimo'), '10')
+    await user.click(screen.getByRole('button', { name: 'Filtrar' }))
+    await waitFor(() => expect(screen.queryByText('Silla A')).not.toBeInTheDocument())
+
+    await user.click(screen.getByRole('button', { name: 'Limpiar' }))
+
+    expect(await screen.findByText('Silla A')).toBeInTheDocument()
+    expect(screen.getByText('Mesa Z')).toBeInTheDocument()
+    expect(screen.getByLabelText('Stock mínimo')).toHaveValue(null)
+  })
+
+  it('pulsar una columna ordena, y volver a pulsarla invierte', async () => {
+    const user = userEvent.setup()
+    renderPage(backend('admin', catalogoAmplio()))
+    await screen.findByText('Silla A')
+
+    const precio = screen.getByRole('button', { name: 'Precio' })
+    await user.click(precio)
+
+    // La celda de la cabecera anuncia el orden: sin `aria-sort`, quien no ve la
+    // flecha no tiene forma de saber por donde esta ordenada la tabla.
+    await waitFor(() =>
+      expect(precio.closest('th')).toHaveAttribute('aria-sort', 'ascending'),
+    )
+
+    await user.click(precio)
+    await waitFor(() =>
+      expect(precio.closest('th')).toHaveAttribute('aria-sort', 'descending'),
+    )
   })
 
   it('las pestanas de estado son las tres del enum mas "Todos"', async () => {

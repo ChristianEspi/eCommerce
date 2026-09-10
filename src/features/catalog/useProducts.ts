@@ -7,25 +7,39 @@ import {
   setProductStatus,
   type ProductPage,
   type ProductQuery,
-  type ProductStatusFilter,
 } from './api/products'
 import type { ProductFormValues, ProductStatus, ProductUsage } from './types'
 
 export const CATALOG_KEY = ['catalog'] as const
 
-export const productsKey = (
-  storeId: string | null,
-  status: ProductStatusFilter,
-  search: string,
-  page: number,
-) => [...CATALOG_KEY, 'products', storeId, status, search, page] as const
+/**
+ * La clave lleva la consulta ENTERA.
+ *
+ * Antes eran cuatro trozos sueltos y cada filtro nuevo obligaba a acordarse de
+ * añadirlo aquí; olvidarse no rompe nada visible, simplemente devuelve la
+ * página anterior en caché y el filtro parece que no funciona. Con el objeto
+ * completo, un filtro nuevo entra en la clave el día que nace.
+ */
+export const productsKey = (query: ProductQuery) =>
+  [
+    ...CATALOG_KEY,
+    'products',
+    query.storeId,
+    query.status,
+    query.search,
+    query.page,
+    query.sort ?? null,
+    query.categoryIds ?? null,
+    query.brandId ?? null,
+    query.minStock ?? null,
+  ] as const
 
 export const productUsageKey = (productId: string | null) =>
   [...CATALOG_KEY, 'product-usage', productId] as const
 
 export function useProducts(query: ProductQuery) {
   return useQuery<ProductPage>({
-    queryKey: productsKey(query.storeId, query.status, query.search, query.page),
+    queryKey: productsKey(query),
     queryFn: () => fetchProducts(query),
     enabled: Boolean(query.storeId),
     // Mantener la tabla anterior mientras se teclea —o mientras se pasa de

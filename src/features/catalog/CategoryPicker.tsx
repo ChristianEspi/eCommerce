@@ -39,6 +39,7 @@ export function CategoryPicker({
   disabled = false,
   error = false,
   helperText,
+  size = 'medium',
 }: {
   label: string
   /** Ya aplanado por `categoryTree`, en orden de lectura. */
@@ -51,6 +52,13 @@ export function CategoryPicker({
   disabled?: boolean
   error?: boolean
   helperText?: string
+  /**
+   * `medium` en un cajón de edición, donde todos los campos miden lo mismo;
+   * `small` en una barra de filtros, por el mismo motivo. Un control más alto
+   * que los de al lado no se lee como un control distinto, se lee como algo
+   * descuadrado.
+   */
+  size?: 'small' | 'medium'
 }) {
   const elegido = nodes.find((node) => node.category.id === value) ?? null
 
@@ -62,6 +70,7 @@ export function CategoryPicker({
       options={nodes as CategoryNode[]}
       value={elegido}
       onChange={(_, node) => onChange(node?.category.id ?? '')}
+      size={size}
       groupBy={raizDe}
       // La RUTA, no el nombre: es lo que se enseña al cerrar y contra lo que
       // busca el filtro, así que escribir «medicamentos» saca a toda su rama.

@@ -167,6 +167,81 @@ afterAll(async () => {
   await db?.close()
 })
 
+/**
+ * `admin_products`: el listado del backoffice con la categoria y la marca al
+ * lado.
+ *
+ * La vista existe para una cosa muy concreta: que el buscador general pueda
+ * mirar `category_name` y `brand_name` dentro del mismo `or=` que ya mira
+ * nombre y SKU. PostgREST sabe filtrar por una tabla relacionada, pero no sabe
+ * meter esa condicion dentro de un OR junto a columnas propias.
+ *
+ * Lo que hay que demostrar de una vista con `security_invoker` es justo lo que
+ * la haria peligrosa si estuviera mal: que NO amplia un permiso. Una vista sin
+ * eso se ejecuta con los privilegios de quien la creo y se convierte en una
+ * puerta de atras al catalogo del tenant de al lado.
+ */
+describe('el listado del backoffice', () => {
+  let brandA: string
+
+  beforeAll(async () => {
+    await asRole(db, 'service_role', null, async () => {
+      brandA = String(
+        (
+          await sql(
+            `insert into public.brands (organization_id, company_id, code, name)
+             values ($1, $2, 'nordica', 'Nordica') returning id`,
+            [TENANT_A.organizationId, TENANT_A.companyId],
+          )
+        )[0]?.id,
+      )
+      await sql(`update public.products set brand_id = $1 where id = $2`, [brandA, productA])
+    })
+  })
+
+  it('trae el nombre de la categoria y el de la marca junto al producto', async () => {
+    const rows = await asRole(db, 'authenticated', claimsFor(TENANT_A), () =>
+      sql(`select sku, category_name, brand_name from public.admin_products where id = $1`, [
+        productA,
+      ]),
+    )
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.category_name).toBe('Sillas')
+    expect(rows[0]?.brand_name).toBe('Nordica')
+  })
+
+  /**
+   * Con `join` a secas en vez de `left join`, dar de alta un producto y no
+   * elegirle marca lo haria desaparecer de su propia tabla. Es la forma mas
+   * rapida de que alguien crea que no se guardo.
+   */
+  it('un producto sin categoria ni marca sigue apareciendo, con los nombres nulos', async () => {
+    const rows = await asRole(db, 'authenticated', claimsFor(TENANT_B), () =>
+      sql(`select sku, category_name, brand_name from public.admin_products`),
+    )
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.sku).toBe('B-1')
+    expect(rows[0]?.category_name).toBeNull()
+    expect(rows[0]?.brand_name).toBeNull()
+  })
+
+  it('el tenant de al lado no ve ni una fila: la vista no amplia la RLS', async () => {
+    const rows = await asRole(db, 'authenticated', claimsFor(TENANT_B), () =>
+      sql(`select id from public.admin_products where id = $1`, [productA]),
+    )
+    expect(rows).toHaveLength(0)
+  })
+
+  it('el comprador anonimo no entra: esto es backoffice, no vitrina', async () => {
+    const message = await expectFailure(() =>
+      asRole(db, 'anon', null, () => sql(`select id from public.admin_products`)),
+    )
+    expect(message).toMatch(/permission denied/i)
+  })
+})
+
 describe('imagen principal', () => {
   it('la primera imagen del producto queda como principal sin pedirlo', async () => {
     const rows = await imagesOf(productA)

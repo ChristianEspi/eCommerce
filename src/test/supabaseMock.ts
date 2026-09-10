@@ -262,6 +262,45 @@ class FakeQuery implements PromiseLike<QueryResult> {
     return this
   }
 
+  /** `lt`/`lte`: el reverso de `gt`, con la misma regla numerica. Los usa el
+   *  buscador de productos para `stock:<10`, que es como se pregunta «que se
+   *  esta acabando» sin salir de la caja de busqueda. */
+  lt(column: string, value: string | number): this {
+    this.rows =
+      typeof value === 'number'
+        ? this.rows.filter((row) => Number(row[column] ?? 0) < value)
+        : this.rows.filter((row) => String(row[column] ?? '') < value)
+    return this
+  }
+
+  lte(column: string, value: string | number): this {
+    this.rows =
+      typeof value === 'number'
+        ? this.rows.filter((row) => Number(row[column] ?? 0) <= value)
+        : this.rows.filter((row) => String(row[column] ?? '') <= value)
+    return this
+  }
+
+  /**
+   * `ilike` suelto, que no es lo mismo que el de dentro de un `or=`.
+   *
+   * El `or=` es «alguna de estas columnas»; este es una condicion mas que se
+   * suma con Y a las demas. Los prefijos del buscador de productos —`cat:`,
+   * `marca:`, `sku:`— son exactamente eso: acotan, no amplian.
+   *
+   * Una celda nula NO coincide con nada, ni siquiera con el patron vacio: un
+   * producto sin marca no es «todas las marcas».
+   */
+  ilike(column: string, pattern: string): this {
+    const needle = pattern.replace(/^%|%$/g, '').toLowerCase()
+    this.rows = this.rows.filter((row) => {
+      const cell = row[column]
+      if (cell === null || cell === undefined) return false
+      return String(cell).toLowerCase().includes(needle)
+    })
+    return this
+  }
+
   /**
    * `or=` de PostgREST, en la forma que usa la app: `col.ilike.%texto%`
    * separado por comas. Se implementa de verdad (y no como un no-op) porque el
@@ -313,11 +352,26 @@ class FakeQuery implements PromiseLike<QueryResult> {
     return this
   }
 
-  /** Ordena por tipo: los booleanos y los números no se comparan como texto. */
-  order(column: string, options?: { ascending?: boolean }): this {
+  /**
+   * Ordena por tipo: los booleanos y los números no se comparan como texto.
+   *
+   * `nullsFirst` se implementa de verdad porque cambia QUÉ sale en la primera
+   * página: al ordenar por categoría, los productos sin categoría son nulos, y
+   * si se van arriba la primera pantalla se llena de celdas vacías. Postgres
+   * pone los nulos al final en ascendente y al principio en descendente salvo
+   * que se le diga otra cosa; el doble hace lo mismo.
+   */
+  order(column: string, options?: { ascending?: boolean; nullsFirst?: boolean }): this {
     const ascending = options?.ascending ?? true
-    this.rows.sort((a, b) => compareCells(a[column], b[column]))
-    if (!ascending) this.rows.reverse()
+    const nullsFirst = options?.nullsFirst ?? !ascending
+
+    const vacia = (value: unknown) => value === null || value === undefined
+    const ordenadas = [...this.rows].sort((a, b) => compareCells(a[column], b[column]))
+    if (!ascending) ordenadas.reverse()
+
+    const nulas = ordenadas.filter((row) => vacia(row[column]))
+    const llenas = ordenadas.filter((row) => !vacia(row[column]))
+    this.rows = nullsFirst ? [...nulas, ...llenas] : [...llenas, ...nulas]
     return this
   }
 

@@ -8,7 +8,11 @@ import {
   type ProductStatus,
   type ProductUsage,
 } from '../types'
-import { CATALOG_PRODUCT_FUNCTION, PRODUCT_USAGE_RPC } from '@/shared/lib/db-schema'
+import {
+  ADMIN_PRODUCTS_VIEW,
+  CATALOG_PRODUCT_FUNCTION,
+  PRODUCT_USAGE_RPC,
+} from '@/shared/lib/db-schema'
 import { PRODUCT_IMAGES_BUCKET } from './images'
 import { buildTextSearchFilter } from '@/shared/lib/search'
 import { catalogClient } from './client'
@@ -45,6 +49,33 @@ const PRODUCT_SELECT = [
 
 export type ProductStatusFilter = ProductStatus | 'all'
 
+/**
+ * Por qué columnas se puede ordenar el listado.
+ *
+ * Cerrado a propósito: el nombre de columna viaja tal cual a PostgREST, y una
+ * lista abierta convierte el `order=` en un parámetro que decide el cliente.
+ * Son las mismas seis que se ven en la cabecera de la tabla — ordenar por algo
+ * que no está en pantalla no se puede ni pedir ni entender.
+ */
+export const PRODUCT_SORT_COLUMNS = [
+  'name',
+  'sku',
+  'category_name',
+  'price',
+  'stock',
+  'status',
+] as const
+
+export type ProductSortColumn = (typeof PRODUCT_SORT_COLUMNS)[number]
+
+export interface ProductSort {
+  readonly column: ProductSortColumn
+  readonly direction: 'asc' | 'desc'
+}
+
+/** Alfabético por nombre: como estaba antes de que se pudiera ordenar. */
+export const DEFAULT_PRODUCT_SORT: ProductSort = { column: 'name', direction: 'asc' }
+
 /** Tamaño de página del listado del backoffice. */
 export const PRODUCTS_PAGE_SIZE = 25
 
@@ -54,6 +85,22 @@ export interface ProductQuery {
   status: ProductStatusFilter
   /** Página empezando en 0. */
   page: number
+  sort?: ProductSort
+  /**
+   * La categoría elegida Y SU DESCENDENCIA, ya expandida.
+   *
+   * Expandida por quien llama y no aquí porque el árbol vive en el cliente —la
+   * pantalla ya lo tiene cargado para pintar el desplegable— y esta función no
+   * tiene por qué saber que las categorías anidan.
+   *
+   * Elegir «Medicamentos» y no ver los antiinfecciosos es la respuesta que
+   * nadie espera: quien abre una familia quiere lo que hay dentro, no solo lo
+   * que alguien colgó directamente de ella.
+   */
+  categoryIds?: readonly string[] | null
+  brandId?: string | null
+  /** Deja solo lo que tiene AL MENOS esta cantidad. */
+  minStock?: number | null
 }
 
 export interface ProductPage {
@@ -80,22 +127,61 @@ export async function fetchProducts({
   search,
   status,
   page,
+  sort,
+  categoryIds,
+  brandId,
+  minStock,
 }: ProductQuery): Promise<ProductPage> {
   if (!storeId) return { rows: [], total: 0 }
   const supabase = catalogClient()
 
+  // Se lee de la VISTA y no de la tabla: es la que trae `category_name` y
+  // `brand_name` al lado, que es lo que permite buscar «cabello» o «eucerin»
+  // en la misma caja. `security_invoker`, o sea la misma RLS de siempre.
   let query = supabase
-    .from(PRODUCTS_TABLE)
+    .from(ADMIN_PRODUCTS_VIEW)
     .select(PRODUCT_SELECT, { count: 'exact' })
     .eq('store_id', storeId)
   if (status !== 'all') query = query.eq('status', status)
 
-  const filter = buildTextSearchFilter(search, ['name', 'sku', 'slug'])
+  // El texto libre busca en las cinco columnas que el usuario VE. Antes eran
+  // tres —nombre, SKU y slug— y las dos que faltaban son justo las que están
+  // escritas en la tabla: escribir lo que uno lee en pantalla y no encontrar
+  // nada es la peor respuesta posible de un buscador.
+  const filter = buildTextSearchFilter(search, [
+    'name',
+    'sku',
+    'slug',
+    'category_name',
+    'brand_name',
+  ])
   if (filter) query = query.or(filter)
 
+  // Categoría y marca por IDENTIFICADOR y no por nombre: salen de un
+  // desplegable, así que no hay nada que interpretar. Dos categorías con
+  // nombres parecidos —«Cuidado de la piel» y «Cuidado del cabello»— se
+  // distinguen sin ambigüedad, cosa que un `ilike` sobre el nombre no puede
+  // prometer.
+  //
+  // `in` y no `eq`: la lista ya trae la familia entera, así que elegir la madre
+  // enseña también lo que cuelga de ella.
+  if (categoryIds && categoryIds.length > 0) query = query.in('category_id', [...categoryIds])
+  if (brandId) query = query.eq('brand_id', brandId)
+  // Mínimo, no exacto: la pregunta real es «qué me queda por encima de», y para
+  // «lo que se está acabando» se pone 1 y se ordena por stock.
+  if (typeof minStock === 'number' && Number.isFinite(minStock)) {
+    query = query.gte('stock', minStock)
+  }
+
+  const orden = sort ?? DEFAULT_PRODUCT_SORT
   const from = Math.max(0, page) * PRODUCTS_PAGE_SIZE
   const { data, error, count } = await query
-    .order('name')
+    // `nullsFirst: false` para que los productos sin categoría o sin marca
+    // queden al final y no ocupen la primera página al ordenar por ellas.
+    .order(orden.column, { ascending: orden.direction === 'asc', nullsFirst: false })
+    // Desempate estable: dos productos con el mismo precio saltarían de página
+    // entre consultas, y al pasar a la siguiente uno se repite y otro no sale.
+    .order('id', { ascending: true })
     .range(from, from + PRODUCTS_PAGE_SIZE - 1)
 
   if (error) throw catalogErrorFromDb(error)
