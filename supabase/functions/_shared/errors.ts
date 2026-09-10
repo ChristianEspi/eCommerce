@@ -37,6 +37,14 @@ export const unauthorized = (message = 'Credenciales ausentes o invalidas') =>
   new AppError('NO_AUTENTICADO', message, 401)
 export const forbidden = (message = 'Sin permiso para esta operacion') =>
   new AppError('SIN_PERMISO', message, 403)
+/**
+ * 402 — la accion es legitima pero no queda saldo.
+ *
+ * Separado de 403 a proposito: «no puedes» y «no te queda» llevan a sitios
+ * distintos, y devolver 403 por una cuota agotada manda a revisar permisos a
+ * quien solo tiene que ampliar el plan.
+ */
+export const paymentRequired = (code: string, message: string) => new AppError(code, message, 402)
 export const notFound = (code: string, message: string) => new AppError(code, message, 404)
 export const methodNotAllowed = (method: string) =>
   new AppError('METODO_NO_PERMITIDO', `Metodo ${method} no permitido`, 405)

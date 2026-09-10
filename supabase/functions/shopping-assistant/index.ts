@@ -32,13 +32,34 @@
  * externo esté disponible, y una tienda cuyo buscador se cae porque expiró una
  * clave de IA es peor que una tienda sin IA. Lo mismo si el proveedor tarda,
  * falla o responde algo que no se entiende: se degrada, nunca se rompe.
+ *
+ * ## Cuesta dinero, así que se mide
+ *
+ * Es la única función del producto que cualquiera en internet puede disparar en
+ * bucle y que gasta por llamada. Cada consulta que llega al modelo descuenta una
+ * acción de la cuota de la sociedad —resuelta por el slug de la tienda, porque
+ * aquí no hay JWT— y deja su traza con los tokens que costó
+ * (`20260910100000_ai_metering.sql`). Agotada la cuota se responde igual, en
+ * modo búsqueda: el comprador no es quien contrató la IA y no tiene por qué
+ * encontrarse un muro de pago ajeno.
  */
 import { assertNoTenantInPayload } from '../_shared/auth.ts'
 import { parseAllowedOrigins } from '../_shared/cors.ts'
 import { badRequest, fromDatabaseError } from '../_shared/errors.ts'
 import { serveJson } from '../_shared/http.ts'
 import { rejectUnknownFields, requireSlug, requireText } from '../_shared/validation.ts'
-import { anonClient } from '../_runtime/clients.ts'
+import {
+  ESQUEMA_SUGERENCIA,
+  SISTEMA_ASISTENTE,
+  filtrarPermitidos,
+  listarCandidatos,
+  recortarRespuesta,
+  type AiStatus,
+  type CandidatoIA,
+} from '../_shared/ai.ts'
+import { anonClient, serviceClient } from '../_runtime/clients.ts'
+import type { Trace } from '../_shared/observability/index.ts'
+import { hayProveedorIA, pedirJson } from '../_runtime/anthropic.ts'
 
 const ALLOWED_FIELDS = ['store_slug', 'message'] as const
 
@@ -51,8 +72,6 @@ const MAX_MENSAJE = 400
 
 /** Si el proveedor no contesta en este tiempo, se responde sin él. */
 const TIMEOUT_MS = 9000
-
-const MODELO = Deno.env.get('EBIM_AI_MODEL') ?? 'claude-haiku-4-5-20251001'
 
 /**
  * De la frase a los filtros, sin modelo.
@@ -106,96 +125,84 @@ function interpretar(mensaje: string): { query: string; filters: Record<string, 
   return { query, filters }
 }
 
-interface Candidato {
-  product_id: string
-  name: string
-  brand_name: string | null
-  category_name: string | null
-  price: string | null
-  currency: string | null
-  in_stock: boolean
-}
+type Candidato = CandidatoIA & { in_stock: boolean }
 
 /**
  * Le pide al modelo que elija dentro de la lista, y desconfía de la respuesta.
  *
- * Devuelve `null` ante cualquier duda —sin clave, error, tiempo agotado, JSON
- * ilegible, cero elegidos válidos— y quien llama se queda con la búsqueda. No
- * hay ninguna ruta por la que un fallo del proveedor deje al comprador sin
- * respuesta.
+ * Devuelve `null` ante cualquier duda —sin clave, sin cuota, error del
+ * proveedor, tiempo agotado, cero elegidos válidos— y quien llama se queda con
+ * la búsqueda. No hay ninguna ruta por la que un fallo del proveedor deje al
+ * comprador sin respuesta.
+ *
+ * ## Cuándo se descuenta la cuota
+ *
+ * ANTES de llamar al proveedor, nunca después. Descontar al volver significa
+ * que una cuota agotada se descubre cuando la llamada ya está pagada, que es
+ * justo lo que la cuota existía para evitar.
+ *
+ * ## Por qué agotarse NO devuelve un 402 aquí
+ *
+ * Quien pregunta es un comprador, no el cliente que contrató la IA. Enseñarle
+ * un muro de pago por una cuota que no es suya sería incomprensible: se degrada
+ * al buscador, que sigue siendo una respuesta útil, y el tenant se entera por
+ * su medidor.
  */
 async function recomendar(
+  storeSlug: string,
   mensaje: string,
   candidatos: Candidato[],
-): Promise<{ reply: string; ids: string[] } | null> {
-  const clave = Deno.env.get('EBIM_AI_API_KEY')
-  if (!clave || candidatos.length === 0) return null
+  trace: Trace,
+): Promise<{ reply: string; ids: string[]; status: AiStatus } | null> {
+  // Ni se mira la cuota si no hay proveedor o no hay entre qué elegir: gastar
+  // una acción para no llamar a nadie es cobrar por nada.
+  if (!hayProveedorIA() || candidatos.length === 0) return null
 
-  // Al modelo se le da lo justo para razonar: qué es cada cosa y cuánto cuesta.
-  // El precio entra como TEXTO y solo para que pueda ordenar y comparar; lo que
-  // devuelva no se usa para pintar ningún importe.
-  const lista = candidatos
-    .map(
-      (c, i) =>
-        `${i + 1}. id=${c.product_id} · ${c.name}` +
-        (c.brand_name ? ` · ${c.brand_name}` : '') +
-        (c.category_name ? ` · ${c.category_name}` : '') +
-        (c.price ? ` · ${c.currency ?? ''} ${c.price}` : '') +
-        (c.in_stock ? ' · con stock' : ' · sin stock'),
-    )
-    .join('\n')
+  // `serviceClient` y no `anonClient`: las funciones de medición son de
+  // servidor a propósito, porque llevan la sociedad como argumento y no
+  // comprueban pertenencia. La clave de servicio vive en los secretos de esta
+  // función y no sale de aquí.
+  const servicio = serviceClient(trace)
 
-  const sistema = [
-    'Eres el asistente de compra de una tienda. Respondes en español, en dos frases como máximo.',
-    'Elige entre 1 y 4 productos EXCLUSIVAMENTE de la lista que se te da.',
-    'No inventes productos, precios, stock ni envíos. No prometas plazos ni descuentos.',
-    'Si nada encaja, dilo y no elijas ninguno.',
-    'Responde SOLO con JSON: {"reply": "...", "ids": ["uuid", ...]}',
-  ].join(' ')
+  const { data: cuota } = await servicio.rpc('ai_consume_for_store', {
+    p_store_slug: storeSlug,
+    p_feature: 'assistant',
+    p_units: 1,
+  })
+  if (!cuota?.allowed) return null
 
-  const control = new AbortController()
-  const alarma = setTimeout(() => control.abort(), TIMEOUT_MS)
+  const respuesta = await pedirJson<{ reply?: unknown; ids?: unknown }>({
+    system: SISTEMA_ASISTENTE,
+    user: `Consulta: ${mensaje}\n\nProductos:\n${listarCandidatos(candidatos)}`,
+    schema: ESQUEMA_SUGERENCIA,
+    maxTokens: 400,
+    timeoutMs: TIMEOUT_MS,
+  })
 
-  try {
-    const respuesta = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': clave,
-        'anthropic-version': '2023-06-01',
-      },
-      signal: control.signal,
-      body: JSON.stringify({
-        model: MODELO,
-        max_tokens: 400,
-        system: sistema,
-        messages: [{ role: 'user', content: `Consulta: ${mensaje}\n\nProductos:\n${lista}` }],
-      }),
-    })
-    if (!respuesta.ok) return null
+  const permitidos = new Set(candidatos.map((c) => c.product_id))
+  // La barrera se mantiene AUNQUE la respuesta venga con esquema: el esquema
+  // garantiza que `ids` son cadenas, no que nombren algo que existe.
+  const ids = filtrarPermitidos(respuesta.data?.ids, permitidos)
+  const reply = recortarRespuesta(respuesta.data?.reply)
+  const salioBien = Boolean(respuesta.data) && Boolean(reply) && ids.length > 0
 
-    const cuerpo = await respuesta.json()
-    const texto: string = cuerpo?.content?.[0]?.text ?? ''
-    // El modelo a veces envuelve el JSON en prosa o en un bloque de código.
-    const recorte = texto.slice(texto.indexOf('{'), texto.lastIndexOf('}') + 1)
-    if (!recorte) return null
+  // La traza se deja SIEMPRE, también cuando falló: una llamada que no
+  // respondió cuesta lo mismo y es la que más interesa mirar después.
+  await servicio.rpc('ai_record_for_store', {
+    p_store_slug: storeSlug,
+    p_feature: 'assistant',
+    p_status: salioBien ? 'ai' : respuesta.motivo === 'proveedor' ? 'error' : 'search',
+    p_model: respuesta.model,
+    p_prompt: mensaje,
+    p_reply: reply || null,
+    p_input_tokens: respuesta.usage.inputTokens,
+    p_output_tokens: respuesta.usage.outputTokens,
+    p_cache_read_tokens: respuesta.usage.cacheReadTokens,
+    p_latency_ms: respuesta.latencyMs,
+  })
 
-    const elegido = JSON.parse(recorte) as { reply?: unknown; ids?: unknown }
-    const permitidos = new Set(candidatos.map((c) => c.product_id))
-    // La barrera: lo que no estaba en la lista no sale de aquí.
-    const ids = Array.isArray(elegido.ids)
-      ? elegido.ids.filter((id): id is string => typeof id === 'string' && permitidos.has(id))
-      : []
-    const reply = typeof elegido.reply === 'string' ? elegido.reply.slice(0, 600) : ''
-
-    if (!reply || ids.length === 0) return null
-    return { reply, ids: ids.slice(0, 4) }
-  } catch {
-    // Tiempo agotado, red caída o JSON ilegible: da igual cuál. Se degrada.
-    return null
-  } finally {
-    clearTimeout(alarma)
-  }
+  if (!salioBien) return null
+  return { reply, ids, status: 'ai' }
 }
 
 const handler = serveJson(
@@ -282,7 +289,7 @@ const handler = serveJson(
       in_stock: Boolean(item.in_stock),
     }))
 
-    const sugerido = await recomendar(mensaje, candidatos)
+    const sugerido = await recomendar(storeSlug, mensaje, candidatos, trace)
 
     return {
       status: 200,
