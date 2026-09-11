@@ -9416,14 +9416,17 @@ export type Database = {
           font_family: string | null
           hero_subtitle: string | null
           hero_title: string | null
+          home_layout: Json
           logo_url: string | null
           organization_id: string
           require_payment_before_dispatch: boolean
           store_id: string
+          storefront_style: Json
           support_email: string | null
           tax_category_id: string | null
           tax_inclusive: boolean
           tax_rate: number
+          theme_preset: string
           ui_density: string | null
           ui_radius: string | null
           updated_at: string
@@ -9449,14 +9452,17 @@ export type Database = {
           font_family?: string | null
           hero_subtitle?: string | null
           hero_title?: string | null
+          home_layout?: Json
           logo_url?: string | null
           organization_id: string
           require_payment_before_dispatch?: boolean
           store_id: string
+          storefront_style?: Json
           support_email?: string | null
           tax_category_id?: string | null
           tax_inclusive?: boolean
           tax_rate?: number
+          theme_preset?: string
           ui_density?: string | null
           ui_radius?: string | null
           updated_at?: string
@@ -9482,14 +9488,17 @@ export type Database = {
           font_family?: string | null
           hero_subtitle?: string | null
           hero_title?: string | null
+          home_layout?: Json
           logo_url?: string | null
           organization_id?: string
           require_payment_before_dispatch?: boolean
           store_id?: string
+          storefront_style?: Json
           support_email?: string | null
           tax_category_id?: string | null
           tax_inclusive?: boolean
           tax_rate?: number
+          theme_preset?: string
           ui_density?: string | null
           ui_radius?: string | null
           updated_at?: string
@@ -11250,11 +11259,14 @@ export type Database = {
           font_family: string | null
           hero_subtitle: string | null
           hero_title: string | null
+          home_layout: Json | null
           logo_url: string | null
           name: string | null
           slug: string | null
           store_id: string | null
+          storefront_style: Json | null
           support_email: string | null
+          theme_preset: string | null
           ui_density: string | null
           ui_radius: string | null
           white_label: boolean | null

@@ -4,13 +4,14 @@ Fecha: 2026-09-10 · Rama `dev` · **Sin push y sin desplegar** · 19 commits lo
 
 ## Veredicto
 
-**GO_WITH_GAPS.**
+**GO.**
 
-El motor está completo, probado y es reversible. Los huecos son de despliegue y
-de alcance declarado, no de funcionamiento: **la migración no está aplicada en
-dev**, y hasta que lo esté el comercio no puede guardar un tema. La vitrina
-mientras tanto se ve exactamente como antes, que es lo que el contrato de
-compatibilidad promete.
+El motor está completo, probado, desplegado en dev y es reversible. La
+migración se aplicó el 2026-09-10 y la tienda real siguió viéndose igual: el
+contrato de compatibilidad se cumple en producción, no solo en los tests.
+
+Los huecos que quedan son de alcance declarado —dos secciones sin componente
+todavía y el modelo de producto sin SKU—, ninguno impide usar lo entregado.
 
 ## Qué se puede hacer al terminar
 
@@ -165,11 +166,12 @@ se pagó difiriendo el diálogo de vista rápida.
 
 ## Huecos conocidos
 
-1. **La migración no está desplegada.** Hasta que se aplique, guardar un tema
-   fallará con «columna desconocida». La vitrina no se entera: se ve como antes.
-2. **`npm run db:types` lee del proyecto dev enlazado**, no de las migraciones
-   locales, así que los tipos generados todavía no tienen las tres columnas. Se
-   resuelve solo el día del despliegue.
+1. ~~La migración no está desplegada.~~ **Cerrado el 2026-09-10.** Aplicada a
+   dev con `supabase db push`. Comprobado en la tienda real: sigue resolviendo
+   `universal` con tarjeta cómoda y barra completa —el aspecto de siempre— y sin
+   una sola petición fallida.
+2. ~~Los tipos generados no tienen las tres columnas.~~ **Cerrado.**
+   `npm run db:types` regenerado tras aplicar la migración.
 3. **`business-info` y `newsletter`** están declaradas y apagadas: no tienen
    componente. Se enseñan en el editor, desactivadas y rotuladas.
 4. **`categories` en la portada** devuelve nada: hoy las categorías se pintan en
