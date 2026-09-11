@@ -544,3 +544,82 @@ describe('K · el tema no depende de content.white_label', () => {
     expect(fila?.theme_preset).toBe('retail')
   })
 })
+
+// ---------------------------------------------------------------------------
+// L · Todo lo que la pantalla envía se puede escribir
+// ---------------------------------------------------------------------------
+
+describe('L · el formulario de Configuración puede guardar lo que enseña', () => {
+  /**
+   * El fallo que esto impide, y que ya ocurrió DOS VECES.
+   *
+   * `store_settings` no tiene GRANT de UPDATE a nivel de tabla desde la
+   * migración de white-label: tiene una lista explícita de columnas, para dejar
+   * fuera el token de verificación del dominio. Perfecto, salvo por una cosa:
+   * cada columna nueva hay que ACORDARSE de añadirla, y dos no se añadieron
+   * —`checkout_requires_account` y `require_payment_before_dispatch`—.
+   *
+   * Como el formulario las envía siempre, TODO guardado chocaba con un 42501 y
+   * la pantalla decía «Tu rol no puede cambiar la configuración de la tienda».
+   * El mensaje señalaba al rol y el problema era un permiso de columna: un
+   * `owner` chocaba exactamente igual.
+   *
+   * Las policies de RLS no lo cubren —el GRANT por columna es otra capa— y las
+   * pruebas de aislamiento tampoco: comprueban que un tenant no toque al otro,
+   * no que el propio pueda guardar lo suyo. Por eso hace falta esta.
+   */
+  const EDITABLES = [
+    ['accent_color', `'#123456'`],
+    ['hero_title', `'Hola'`],
+    ['hero_subtitle', `'Qué tal'`],
+    ['support_email', `'hola@tienda.demo'`],
+    ['contact_phone', `'+51 999 111 222'`],
+    ['contact_address', `'Av. Siempre Viva 742'`],
+    ['default_locale', `'es'`],
+    ['ui_radius', `'soft'`],
+    ['ui_density', `'compacta'`],
+    ['business_display_name', `'Tienda S.A.C.'`],
+    ['checkout_requires_account', 'true'],
+    ['require_payment_before_dispatch', 'true'],
+    ['theme_preset', `'retail'`],
+    ['storefront_style', `'{}'::jsonb`],
+    ['home_layout', `'{"version": 1, "sections": []}'::jsonb`],
+  ] as const
+
+  it.each(EDITABLES)('un owner puede escribir %s', async (columna, valor) => {
+    const filas = await comoAdmin(TENANT_A, () =>
+      svc<{ store_id: string }>(
+        `update public.store_settings set ${columna} = ${valor}
+          where store_id = $1 returning store_id`,
+        [tiendaA],
+      ),
+    )
+
+    expect(filas).toHaveLength(1)
+  })
+
+  it('y sigue SIN poder tocar el estado del dominio propio', async () => {
+    // La razón por la que la lista es explícita. Marcarse el dominio como
+    // verificado desde el navegador sería saltarse la única prueba de que ese
+    // dominio es suyo.
+    const error = await expectFailure(() =>
+      comoAdmin(TENANT_A, () =>
+        svc(`update public.store_settings set custom_domain_status = 'verified'
+              where store_id = $1`, [tiendaA]),
+      ),
+    )
+
+    expect(error).toMatch(/permission denied|denegado/i)
+  })
+
+  it('ni el token que prueba esa propiedad', async () => {
+    const error = await expectFailure(() =>
+      comoAdmin(TENANT_A, () =>
+        svc(`update public.store_settings set custom_domain_token = repeat('a', 32)
+              where store_id = $1`, [tiendaA]),
+      ),
+    )
+
+    expect(error).toMatch(/permission denied|denegado/i)
+  })
+})
