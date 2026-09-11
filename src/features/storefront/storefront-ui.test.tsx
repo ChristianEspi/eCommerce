@@ -406,25 +406,29 @@ describe('resolución del tenant por slug', () => {
     )
   })
 
-  it('el contacto del tenant sigue sin pintarse, aunque el pie haya vuelto', async () => {
+  it('el contacto del tenant vuelve al pie, y sin inventar nada alrededor', async () => {
     /**
-     * Constancia de una pérdida, no de una mejora.
+     * Este test estaba INVERTIDO, y dejarlo así habría sido un error.
      *
-     * El correo, el teléfono y la dirección solo vivían en el pie ANTIGUO, que
-     * era un bloque entero con contacto y lockup. El pie que volvió es una
-     * línea: la firma del comercio y sus páginas legales, que es lo que no
-     * podía vivir en la cabecera.
+     * Dejó constancia de una pérdida: el correo, el teléfono y la dirección
+     * vivían en el pie ANTIGUO —un bloque entero con contacto y lockup— y el
+     * pie que volvió era una línea con la firma y las páginas legales. La nota
+     * decía que un bloque del CMS podía pintarlos «donde el comercio quiera»,
+     * pero eso había que hacerlo y no ocurría solo: en la práctica, una tienda
+     * publicaba su correo en la configuración y no salía en ninguna parte.
      *
-     * El contacto sigue en `store_settings` y sigue llegando en
-     * `public_stores`: un bloque de contenido del CMS puede pintarlo donde el
-     * comercio quiera, pero eso hay que hacerlo, no ocurre solo. El test se
-     * queda invertido para que la ausencia sea deliberada.
+     * El pie de P13 los recupera, con la condición que los hacía peligrosos
+     * resuelta: **solo lo que el comercio escribió**. Lo que no configuró no
+     * aparece, ni como bloque vacío ni como marcador.
      */
     renderStorefront(backend(), '/s/casa-nordica')
-    await screen.findByRole('banner')
+    const pie = await screen.findByRole('contentinfo')
 
-    expect(screen.queryByText('hola@casanordica.demo')).not.toBeInTheDocument()
-    expect(screen.queryByText('+51 999 111 222')).not.toBeInTheDocument()
+    expect(within(pie).getByRole('link', { name: 'hola@casanordica.demo' })).toHaveAttribute(
+      'href',
+      'mailto:hola@casanordica.demo',
+    )
+    expect(within(pie).getByText('+51 999 111 222')).toBeInTheDocument()
   })
 
   it('una tienda sin contacto ni hero se ve igual, con los fallbacks neutrales', async () => {

@@ -11,8 +11,6 @@ import {
   Button,
   Container,
   Fab,
-  Link as MuiLink,
-  Stack,
   Toolbar,
   Typography,
   useMediaQuery,
@@ -32,6 +30,7 @@ import { StorefrontNotFoundError } from './api'
 import { notFoundMeta } from './seo'
 import { initials } from './branding'
 import { StoreCategoryNav } from './components/StoreCategoryNav'
+import { StoreFooter } from './components/StoreFooter'
 import { StoreQuickSearch } from './components/StoreQuickSearch'
 import { AssistantDrawer } from './components/AssistantDrawer'
 import { CartDrawer } from './cart/CartDrawer'
@@ -42,7 +41,6 @@ import {
   useCatalogPages,
   usePublicCategories,
   usePublicStore,
-  useStoreNavigation,
   type StorefrontOutlet,
 } from './hooks'
 import { useFavorites } from './useFavorites'
@@ -186,10 +184,7 @@ export function StorefrontLayout() {
               Aquí van, en una línea al pie del contenido, dentro del mismo
               contenedor que el catálogo: sin banda de fondo propia y sin ancho
               propio, que es lo que arrastraba la página en horizontal. */}
-          <StorePagesFooter
-            storeSlug={storeSlug as string}
-            storeName={store.business_display_name ?? store.name}
-          />
+          <StoreFooter store={store} storeSlug={storeSlug as string} />
 
           <CartDrawer storeSlug={storeSlug as string} />
 
@@ -490,70 +485,6 @@ function StoreCategories({ storeSlug, storeId }: { storeSlug: string; storeId: s
   if (!data || data.length === 0) return null
   return (
     <StoreCategoryNav storeSlug={storeSlug} categories={data} showOffers={hayRebajas} />
-  )
-}
-
-function StorePagesFooter({ storeSlug, storeName }: { storeSlug: string; storeName: string }) {
-  const { data } = useStoreNavigation(storeSlug)
-  // El pie comparte ancho con el contenido a propósito: es una línea DENTRO del
-  // mismo contenedor, no una banda con ancho propio. Cuando lo tenía, la página
-  // se arrastraba en horizontal.
-  const { style } = useStorefrontTheme()
-
-  return (
-    <Container maxWidth={style.contentWidth} component="footer" sx={{ pb: 3, pt: 1 }}>
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        sx={{
-          gap: { xs: 1, sm: 3 },
-          alignItems: { xs: 'flex-start', sm: 'center' },
-          flexWrap: 'wrap',
-          pt: 2,
-          borderTop: '1px solid var(--sf-line)',
-        }}
-      >
-        <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>
-          {`© ${new Date().getFullYear()} ${storeName}`}
-        </Typography>
-        {data && data.length > 0 ? <StorePagesNav storeSlug={storeSlug} pages={data} /> : null}
-      </Stack>
-    </Container>
-  )
-}
-
-function StorePagesNav({
-  storeSlug,
-  pages,
-}: {
-  storeSlug: string
-  pages: readonly { slug: string; title: string }[]
-}) {
-  const { t } = useI18n()
-
-  return (
-    <Stack
-      component="nav"
-      direction="row"
-      aria-label={t('store.footer.pages')}
-      sx={{ gap: { xs: 1.5, sm: 3 }, flexWrap: 'wrap' }}
-    >
-      {pages.slice(0, 6).map((item) => (
-        <MuiLink
-          key={item.slug}
-          component={Link}
-          to={`/s/${storeSlug}/p/${item.slug}`}
-          sx={{
-            fontSize: TS.body,
-            fontWeight: 700,
-            color: 'var(--muted)',
-            textDecoration: 'none',
-            '&:hover': { color: 'var(--accent-deep)', textDecoration: 'underline' },
-          }}
-        >
-          {item.title}
-        </MuiLink>
-      ))}
-    </Stack>
   )
 }
 
