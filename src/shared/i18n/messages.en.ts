@@ -224,6 +224,8 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'settings.design.preview.tablet': 'Tablet',
     'settings.design.preview.mobile': 'Mobile',
     'settings.design.preview.empty': 'No section is turned on.',
+    'settings.design.unavailable':
+      'Storefront design will be available once the latest database update is applied. In the meantime your store looks exactly as it did and the rest of the settings work as usual.',
     'admin.settings.appearance.mode': 'Mode',
     'admin.settings.appearance.density': 'Density',
     'admin.settings.appearance.modeHelp': 'Light or dark, for your session only.',

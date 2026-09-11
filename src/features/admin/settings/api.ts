@@ -57,7 +57,7 @@ function settingsErrorFromDb(error: PostgrestLike): SettingsError {
   return new SettingsError(mapSettingsCode(code), code)
 }
 
-const SETTINGS_SELECT = [
+const SETTINGS_COLUMNS = [
   'store_id',
   'organization_id',
   'company_id',
@@ -82,10 +82,57 @@ const SETTINGS_SELECT = [
   'email_reply_to',
   'custom_domain_status',
   'custom_domain_verified_at',
-  'theme_preset',
-  'storefront_style',
-  'home_layout',
-].join(', ')
+]
+
+/**
+ * Las tres columnas del Theme Engine, aparte.
+ *
+ * ## Por qué no van en la lista de arriba sin más
+ *
+ * Porque PostgREST no ignora una columna que no existe: responde 400 con
+ * `42703` y **la consulta entera se cae**. Con las tres dentro de la lista, una
+ * base a la que todavía no se le ha aplicado la migración no deja abrir
+ * Configuración: ni General, ni Marca, ni Impuestos. Una pantalla de ajustes
+ * que muere porque una migración va por detrás es exactamente el fallo que un
+ * despliegue en dos pasos produce, y no puede costar el backoffice entero.
+ *
+ * ## Por qué aquí no vale el `*` que usa la vitrina
+ *
+ * La vitrina pide `public_stores` con `*` porque esa VISTA es la frontera:
+ * enumera a mano lo publicable y todo lo que hay dentro ya es público. Esto es
+ * la TABLA `store_settings`, que además guarda `config`, `tax_rate` y el token
+ * de verificación del dominio. La lista explícita es lo que mantiene esos tres
+ * fuera del navegador, así que se queda.
+ */
+const THEME_COLUMNS = ['theme_preset', 'storefront_style', 'home_layout'] as const
+
+const SETTINGS_SELECT = [...SETTINGS_COLUMNS, ...THEME_COLUMNS].join(', ')
+const SETTINGS_SELECT_SIN_TEMA = SETTINGS_COLUMNS.join(', ')
+
+/** `undefined_column`: la columna pedida no existe todavía en esta base. */
+const COLUMNA_INEXISTENTE = '42703'
+
+/**
+ * ¿Tiene esta base las columnas del tema?
+ *
+ * `null` mientras no se sabe. Lo resuelve la primera lectura de ajustes y se
+ * recuerda para lo que queda de sesión: no tiene sentido volver a pagar una
+ * consulta que ya se sabe que falla.
+ *
+ * Es estado de DESPLIEGUE, no de aplicación: describe qué versión del esquema
+ * hay enfrente, y deja de importar en cuanto la migración se aplica.
+ */
+let temaEnLaBase: boolean | null = null
+
+/** Para la pantalla de diseño, que no puede ofrecer lo que no se va a guardar. */
+export function themeColumnsReady(): boolean {
+  return temaEnLaBase !== false
+}
+
+/** Para las pruebas: cada una parte sin saber nada de la base. */
+export function resetThemeColumnsProbe(): void {
+  temaEnLaBase = null
+}
 
 function client(): SupabaseClient {
   const supabase = tryGetSupabaseClient()
@@ -95,13 +142,23 @@ function client(): SupabaseClient {
 
 export async function fetchStoreSettings(storeId: string | null): Promise<StoreSettings | null> {
   if (!storeId) return null
-  const { data, error } = await client()
-    .from(STORE_SETTINGS_TABLE)
-    .select(SETTINGS_SELECT)
-    .eq('store_id', storeId)
-    .maybeSingle()
+
+  const leer = (select: string) =>
+    client().from(STORE_SETTINGS_TABLE).select(select).eq('store_id', storeId).maybeSingle()
+
+  let { data, error } = await leer(
+    temaEnLaBase === false ? SETTINGS_SELECT_SIN_TEMA : SETTINGS_SELECT,
+  )
+
+  // La base va por detrás del código: se relee sin las columnas del tema y la
+  // pantalla de Configuración sigue sirviendo para todo lo demás.
+  if (error && temaEnLaBase !== false && error.code === COLUMNA_INEXISTENTE) {
+    temaEnLaBase = false
+    ;({ data, error } = await leer(SETTINGS_SELECT_SIN_TEMA))
+  }
 
   if (error) throw settingsErrorFromDb(error)
+  if (data && temaEnLaBase === null) temaEnLaBase = true
   return data ? storeSettingsSchema.parse(data) : null
 }
 
@@ -173,9 +230,18 @@ export async function saveStoreSettings(input: SaveSettingsInput): Promise<void>
     // propósito: elegir entre cuatro disposiciones de los mismos componentes no
     // quita el lockup de la suite, y cobrar por ello sería vender una casilla en
     // vez de una capacidad. La policy no lo gatea; esto no lo gatea tampoco.
-    theme_preset: values.theme_preset,
-    storefront_style: values.storefront_style,
-    home_layout: values.home_layout,
+    //
+    // La condición NO es de permisos: es de esquema. Si la base todavía no
+    // tiene las tres columnas, enviarlas devuelve 400 y se pierde también el
+    // teléfono que la persona acababa de escribir. La pantalla de diseño está
+    // apagada en ese caso, así que aquí no hay nada que guardar.
+    ...(temaEnLaBase === false
+      ? {}
+      : {
+          theme_preset: values.theme_preset,
+          storefront_style: values.storefront_style,
+          home_layout: values.home_layout,
+        }),
     // PREMIUM. Igual que `white_label` desde P02: sin la capacidad el campo NO
     // se envía, en vez de enviarse vacío. Guardar el teléfono de contacto no
     // puede apagar de paso una tipografía que el tenant tenía. Si alguien lo

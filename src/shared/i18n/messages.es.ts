@@ -227,6 +227,8 @@ export const es = {
     'settings.design.preview.tablet': 'Tableta',
     'settings.design.preview.mobile': 'Móvil',
     'settings.design.preview.empty': 'No hay ninguna sección encendida.',
+    'settings.design.unavailable':
+      'El diseño de tienda estará disponible en cuanto se aplique la última actualización de la base de datos. Mientras tanto tu tienda se ve como siempre y el resto de la configuración funciona con normalidad.',
     'admin.settings.appearance.mode': 'Modo',
     'admin.settings.appearance.density': 'Densidad',
     'admin.settings.appearance.modeHelp': 'Claro u oscuro, solo para tu sesión.',

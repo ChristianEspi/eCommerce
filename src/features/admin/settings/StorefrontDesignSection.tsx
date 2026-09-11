@@ -1,4 +1,4 @@
-import { Box, Button, MenuItem, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, MenuItem, Stack, TextField, Typography } from '@mui/material'
 import type { UseFormReturn } from 'react-hook-form'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
@@ -15,6 +15,7 @@ import {
   type StorefrontStyle,
   type ThemePreset,
 } from '@/features/storefront/theme/types'
+import { themeColumnsReady } from './api'
 import { HomeLayoutEditor } from './HomeLayoutEditor'
 import { StorefrontPreview } from './StorefrontPreview'
 import type { StoreFormValues } from './types'
@@ -109,6 +110,23 @@ export function StorefrontDesignSection({
   const { t } = useI18n()
   const preset = form.watch('theme_preset')
   const estilo = form.watch('storefront_style')
+
+  /**
+   * La base puede ir por detrás del código.
+   *
+   * Entre que se publica esta pantalla y se aplica su migración hay una ventana
+   * —a veces de minutos, a veces de días— en la que las tres columnas no
+   * existen. Enseñar los controles ahí sería peor que no enseñarlos: alguien
+   * elegiría su tema, pulsaría Guardar y no pasaría nada. Un formulario que no
+   * guarda es una mentira más cara que una sección que avisa.
+   */
+  if (!themeColumnsReady()) {
+    return (
+      <Alert severity="info" icon={false}>
+        {t('settings.design.unavailable')}
+      </Alert>
+    )
+  }
 
   function elegirTema(nuevo: ThemePreset) {
     form.setValue('theme_preset', nuevo, { shouldDirty: true })

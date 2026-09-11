@@ -24,7 +24,8 @@ vi.mock('@/shared/lib/supabase', () => ({
   getStorefrontClient: () => holder.client,
 }))
 
-const { saveStoreSettings } = await import('./api')
+const { saveStoreSettings, fetchStoreSettings, themeColumnsReady, resetThemeColumnsProbe } =
+  await import('./api')
 
 const TIENDA = '11111111-1111-4111-8111-111111111111'
 const ORG = '22222222-2222-4222-8222-222222222222'
@@ -71,6 +72,149 @@ async function guardar(canWhiteLabel: boolean, valores: Partial<ReturnType<typeo
 
 beforeEach(() => {
   holder.client = null
+  resetThemeColumnsProbe()
+})
+
+// ---------------------------------------------------------------------------
+// La base puede ir por detrás del código
+// ---------------------------------------------------------------------------
+
+/** Cliente que responde según las columnas pedidas, apuntando cada `select`. */
+function baseSinColumnasDeTema(fila: Record<string, unknown>) {
+  const selects: string[] = []
+  const client = {
+    from: () => ({
+      select: (select: string) => {
+        selects.push(select)
+        const falta = select.includes('theme_preset')
+        const eslabon = {
+          eq: () => eslabon,
+          maybeSingle: () =>
+            Promise.resolve(
+              falta
+                ? {
+                    data: null,
+                    error: {
+                      code: '42703',
+                      message: 'column store_settings.theme_preset does not exist',
+                    },
+                  }
+                : { data: fila, error: null },
+            ),
+        }
+        return eslabon
+      },
+      update: (patch: Record<string, unknown>) => {
+        escriturasDeLaBaseVieja.push(patch)
+        const eslabon = {
+          eq: () => eslabon,
+          select: () => eslabon,
+          maybeSingle: () => Promise.resolve({ data: { store_id: TIENDA }, error: null }),
+        }
+        return eslabon
+      },
+    }),
+  }
+  return { selects, client }
+}
+
+let escriturasDeLaBaseVieja: Array<Record<string, unknown>> = []
+
+const FILA_SIN_TEMA = {
+  store_id: TIENDA,
+  organization_id: ORG,
+  company_id: SOCIEDAD,
+  accent_color: '#5AA97F',
+}
+
+describe('cuando la migración del tema todavía no está aplicada', () => {
+  /**
+   * Es el fallo que se vio en producción: la pantalla de Configuración ENTERA
+   * —General, Marca, Usuarios, Impuestos— moría con «Algo salió mal · 42703»
+   * porque la lectura pedía tres columnas que esa base no tenía. Una pantalla
+   * de ajustes no puede caerse porque una migración vaya por detrás.
+   */
+  it('la configuración se lee igual, sin las columnas del tema', async () => {
+    const falso = baseSinColumnasDeTema(FILA_SIN_TEMA)
+    holder.client = falso.client
+
+    const ajustes = await fetchStoreSettings(TIENDA)
+
+    expect(ajustes?.accent_color).toBe('#5AA97F')
+    // Primero se pide con las tres; al ver que no están, se relee sin ellas.
+    expect(falso.selects).toHaveLength(2)
+    expect(falso.selects[0]).toContain('theme_preset')
+    expect(falso.selects[1]).not.toContain('theme_preset')
+  })
+
+  it('no se vuelve a pagar la consulta fallida', async () => {
+    const falso = baseSinColumnasDeTema(FILA_SIN_TEMA)
+    holder.client = falso.client
+
+    await fetchStoreSettings(TIENDA)
+    await fetchStoreSettings(TIENDA)
+
+    expect(falso.selects.filter((s) => s.includes('theme_preset'))).toHaveLength(1)
+  })
+
+  it('la sección de diseño queda apagada en vez de mentir', async () => {
+    const falso = baseSinColumnasDeTema(FILA_SIN_TEMA)
+    holder.client = falso.client
+
+    expect(themeColumnsReady()).toBe(true)
+    await fetchStoreSettings(TIENDA)
+
+    expect(themeColumnsReady()).toBe(false)
+  })
+
+  it('y guardar el resto sigue funcionando', async () => {
+    // Lo importante: el teléfono que la persona acaba de escribir se guarda.
+    // Enviar las tres columnas ausentes habría devuelto 400 y lo habría perdido.
+    const falso = baseSinColumnasDeTema(FILA_SIN_TEMA)
+    holder.client = falso.client
+    escriturasDeLaBaseVieja = []
+    await fetchStoreSettings(TIENDA)
+
+    await saveStoreSettings({
+      storeId: TIENDA,
+      organizationId: ORG,
+      companyId: SOCIEDAD,
+      currentName: 'Botica',
+      values: { ...toForm('Botica', null), contact_phone: '+51 999 111 222' },
+      canWhiteLabel: false,
+    })
+
+    const patch = escriturasDeLaBaseVieja.at(-1) ?? {}
+    expect(patch.contact_phone).toBe('+51 999 111 222')
+    for (const campo of ['theme_preset', 'storefront_style', 'home_layout']) {
+      expect(patch).not.toHaveProperty(campo)
+    }
+  })
+})
+
+describe('cuando la base sí tiene las columnas', () => {
+  it('se piden una sola vez y el diseño queda disponible', async () => {
+    const selects: string[] = []
+    holder.client = {
+      from: () => ({
+        select: (select: string) => {
+          selects.push(select)
+          const eslabon = {
+            eq: () => eslabon,
+            maybeSingle: () =>
+              Promise.resolve({ data: { ...FILA_SIN_TEMA, theme_preset: 'retail' }, error: null }),
+          }
+          return eslabon
+        },
+      }),
+    }
+
+    const ajustes = await fetchStoreSettings(TIENDA)
+
+    expect(selects).toHaveLength(1)
+    expect(ajustes?.theme_preset).toBe('retail')
+    expect(themeColumnsReady()).toBe(true)
+  })
 })
 
 // ---------------------------------------------------------------------------
