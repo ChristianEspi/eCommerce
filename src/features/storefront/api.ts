@@ -100,45 +100,31 @@ export function storefrontClient(): SupabaseClient {
   return storefront()
 }
 
-const STORE_COLUMNS = [
-  'store_id',
-  'slug',
-  'name',
-  'currency',
-  'accent_color',
-  'logo_url',
-  'white_label',
-  'default_locale',
-  'support_email',
-  'banner_url',
-  'hero_title',
-  'hero_subtitle',
-  'contact_phone',
-  'contact_address',
-  'favicon_url',
-  'font_family',
-  'ui_radius',
-  'ui_density',
-  'business_display_name',
-  'checkout_requires_account',
-]
-
 /**
- * Las tres columnas del Theme Engine, aparte y por un motivo operativo.
+ * La tienda se pide con `*`, y es deliberado.
+ *
+ * ## Qué problema resuelve
  *
  * PostgREST no ignora una columna que no existe: devuelve 400 y la consulta
- * ENTERA se cae. Durante un despliegue en el que la app sale antes que la
- * migración —que es exactamente lo que pasa cuando el front se publica solo—,
- * pedirlas en el mismo `select` dejaría la vitrina sin tienda, no sin tema.
+ * ENTERA se cae. Con una lista explícita, el día que la app se despliega antes
+ * que su migración —que es lo que pasa cuando el front se publica solo— la
+ * vitrina se queda sin tienda, no sin tema. Se probó con una lista y un
+ * reintento sin las columnas nuevas; funcionaba, pero dejaba un 400 en el
+ * registro de cada primera carga y una petición de más. Un navegador de verdad
+ * lo cantó en P17.
  *
- * Por eso van separadas: si la respuesta dice que no existen, se repite la
- * consulta sin ellas y la tienda se pinta con el tema por defecto. Un despliegue
- * a medias degrada la presentación; no cierra el comercio.
+ * Con `*` no hay nada que pueda faltar: llega lo que la vista tenga.
+ *
+ * ## Por qué esto NO abre nada
+ *
+ * `public_stores` ES la frontera pública. Es una vista `security_invoker` que
+ * enumera a mano lo publicable y deja fuera `organization_id`, `company_id`,
+ * `tax_rate`, `config` y el estado del dominio; el GRANT de `anon` es sobre
+ * ella. Todo lo que hay ahí dentro ya es público por definición, así que pedir
+ * una lista era documentación, no una defensa. Y `publicStoreSchema` descarta lo
+ * que no conoce, así que una columna nueva tampoco llega a la pantalla sola.
  */
-export const THEME_COLUMNS = ['theme_preset', 'storefront_style', 'home_layout'] as const
-
-const STORE_SELECT = [...STORE_COLUMNS, ...THEME_COLUMNS].join(', ')
-const STORE_SELECT_SIN_TEMA = STORE_COLUMNS.join(', ')
+const STORE_SELECT = '*'
 
 const CATEGORY_SELECT = 'category_id, store_id, parent_id, slug, name, position'
 
@@ -245,39 +231,12 @@ export async function fetchOnlyPublicStore(): Promise<{ slug: string; name: stri
   return store ?? null
 }
 
-/**
- * `undefined_column` de Postgres: la columna pedida no existe.
- *
- * Se mira el CÓDIGO y nunca el texto. Es la regla del repositorio —el `message`
- * de PostgREST lleva dentro nombres de tabla y de policy, y ramificar por él se
- * rompe en cuanto el servidor cambia una palabra— y aquí además basta: en esta
- * consulta las únicas columnas que pueden faltar son las tres del tema, porque
- * el resto lleva desplegado desde hace fases.
- */
-const COLUMNA_INEXISTENTE = '42703'
-
-/**
- * Se recuerda entre llamadas: una vez sabido que la base va por detrás, no
- * tiene sentido pagar la consulta fallida en cada navegación.
- */
-let baseSinTema = false
-
-/** Vuelve a intentar con las columnas del tema. Para las pruebas y para el día
- *  en que la migración sí esté aplicada sin haber recargado la pestaña. */
-export function resetStorefrontThemeProbe(): void {
-  baseSinTema = false
-}
-
 export async function fetchPublicStore(slug: string): Promise<PublicStore> {
-  const consultar = (select: string) =>
-    storefront().from(PUBLIC_STORES_VIEW).select(select).eq('slug', slug).maybeSingle()
-
-  let { data, error } = await consultar(baseSinTema ? STORE_SELECT_SIN_TEMA : STORE_SELECT)
-
-  if (error && !baseSinTema && error.code === COLUMNA_INEXISTENTE) {
-    baseSinTema = true
-    ;({ data, error } = await consultar(STORE_SELECT_SIN_TEMA))
-  }
+  const { data, error } = await storefront()
+    .from(PUBLIC_STORES_VIEW)
+    .select(STORE_SELECT)
+    .eq('slug', slug)
+    .maybeSingle()
 
   if (error) throw new StorefrontError(error)
   if (!data) throw new StorefrontNotFoundError(slug)

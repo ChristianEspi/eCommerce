@@ -43,8 +43,14 @@ export function SkipToContentLink({ label }: { label: string }) {
         left: 8,
         top: 8,
         zIndex: 10,
-        width: 1,
-        height: 1,
+        // `'1px'` y NO `1`: en `sx`, un número entre 0 y 1 es un PORCENTAJE,
+        // así que `width: 1` valía «100 %». El enlace escondido medía el ancho
+        // entero de la pantalla y, colocado a 8 px del borde, sobresalía esos
+        // 8 px: la tienda se arrastraba de lado en un teléfono por un enlace
+        // que nadie veía. Lo encontró la prueba de 320 px en un navegador de
+        // verdad; en jsdom no se podía ver, porque jsdom no calcula el diseño.
+        width: '1px',
+        height: '1px',
         overflow: 'hidden',
         clip: 'rect(0 0 0 0)',
         clipPath: 'inset(50%)',

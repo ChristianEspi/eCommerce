@@ -815,7 +815,9 @@ describe('ficha de producto', () => {
     renderStorefront(backend(), '/s/casa-nordica?ver=todo&p=silla-roble')
 
     const dialogo = await screen.findByRole('dialog')
-    expect(within(dialogo).getByText('Roble macizo con acabado al aceite.')).toBeInTheDocument()
+    // `findBy` y no `getBy`: la vista rápida se carga aparte desde P17, así que
+    // el diálogo aparece un instante antes que la ficha del producto.
+    expect(await within(dialogo).findByText('Roble macizo con acabado al aceite.')).toBeInTheDocument()
     expect(
       within(dialogo).queryByRole('button', { name: 'Leer la descripción completa' }),
     ).not.toBeInTheDocument()

@@ -1,7 +1,8 @@
 import { Box, Breadcrumbs, Button, Card, Link as MuiLink, Stack, Typography } from '@mui/material'
 import { visuallyHidden } from '@mui/utils'
-import { useEffect, useMemo, useRef } from 'react'
+import { Suspense, useEffect, useMemo, useRef } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { lazyPage } from '@/app/lazyPage'
 import type { SearchQuery, SearchSort } from '@/domain'
 import type { PublicProduct } from './types'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -13,7 +14,6 @@ import { TS } from '@/theme/tokens'
 import { BackToTop } from './components/BackToTop'
 import { CategoryBar } from './components/CategoryBar'
 import { ProductGrid, ProductGridSkeleton } from './components/ProductGrid'
-import { ProductQuickView } from './components/ProductQuickView'
 import { useFavorites } from './useFavorites'
 import { StoreFilterPanel } from './components/StoreFilterPanel'
 import { StoreLandingSkeleton } from './components/StoreLandingSkeleton'
@@ -36,6 +36,22 @@ import {
 import { categoryBarItems, categoryTrail, rollUpCategoryCounts } from './categoryTree'
 import { hitToPublicProduct } from './search'
 import { homeMeta } from './seo'
+
+/**
+ * La vista rápida se carga APARTE.
+ *
+ * Es un diálogo de cuatrocientas líneas —galería, variantes, cantidad, añadir
+ * al carrito— que solo existe cuando alguien pulsa una tarjeta o llega con
+ * `?p=` en la URL. Traerlo en la primera descarga de la portada es pagar por
+ * adelantado algo que la mayoría de las visitas no abre nunca.
+ *
+ * `lazyPage` y no `lazy` a secas: si el trozo desaparece por un despliegue
+ * mientras la pestaña está abierta, reintenta y recarga una vez en lugar de
+ * enseñar «Failed to fetch dynamically imported module».
+ */
+const ProductQuickView = lazyPage(() =>
+  import('./components/ProductQuickView').then((m) => ({ default: m.ProductQuickView })),
+)
 
 /** Cuántos resultados por página. El «ver más» suma otra tanda. */
 const PAGE_SIZE = 24
@@ -753,12 +769,19 @@ export function StoreHomePage() {
           dialogo y el enlace se puede pegar en un chat. */}
       <BackToTop anchorId={CONTENT_ANCHOR} />
 
-      <ProductQuickView
-        storeId={store.store_id}
-        storeSlug={storeSlug}
-        slug={params.get('p')}
-        onClose={() => update('p', null)}
-      />
+      {/* Solo se monta —y solo se descarga— cuando hay un producto abierto. El
+          `Suspense` no pinta nada mientras llega: un diálogo que aún no existe
+          no deja hueco, y el catálogo de debajo se sigue usando igual. */}
+      {params.get('p') && (
+        <Suspense fallback={null}>
+          <ProductQuickView
+            storeId={store.store_id}
+            storeSlug={storeSlug}
+            slug={params.get('p')}
+            onClose={() => update('p', null)}
+          />
+        </Suspense>
+      )}
     </Stack>
   )
 }

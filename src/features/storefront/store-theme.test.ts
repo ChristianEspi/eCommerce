@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { publicStoreSchema } from './types'
 import { DEFAULT_HOME_LAYOUT, THEME_PRESETS } from './theme/presets'
 import { resolveStoreTheme } from './theme/resolve'
@@ -26,7 +26,7 @@ vi.mock('@/shared/lib/supabase', () => ({
   getStorefrontClient: () => holder.client,
 }))
 
-const { fetchPublicStore, resetStorefrontThemeProbe, THEME_COLUMNS } = await import('./api')
+const { fetchPublicStore } = await import('./api')
 
 /** Fila mínima que `publicStoreSchema` acepta: lo de antes del Theme Engine. */
 const FILA_ANTIGUA = {
@@ -160,48 +160,39 @@ function clienteQue(responder: (select: string) => RespuestaFalsa) {
 }
 
 describe('cuando la base todavía no tiene las columnas del tema', () => {
-  beforeEach(() => {
-    resetStorefrontThemeProbe()
+  it('pide la vista entera, sin nombrar columnas que pueden no existir', async () => {
+    const falso = clienteQue(() => ({ data: FILA_ANTIGUA, error: null }))
+    holder.client = falso.client
+
+    await fetchPublicStore('botica')
+
+    // Una lista explícita convierte una columna que falta en un 400 que tumba
+    // la consulta ENTERA: la vitrina se quedaría sin tienda, no sin tema. La
+    // frontera de lo publicable es la vista, no esta lista.
+    expect(falso.selects).toEqual(['*'])
   })
 
-  it('reintenta sin ellas y la tienda se pinta igual', async () => {
-    const falso = clienteQue((select) =>
-      select.includes('theme_preset')
-        ? {
-            data: null,
-            error: {
-              code: '42703',
-              message: 'column public_stores.theme_preset does not exist',
-            },
-          }
-        : { data: FILA_ANTIGUA, error: null },
-    )
+  it('una sola petición: no hay reintento que pagar', async () => {
+    const falso = clienteQue(() => ({ data: FILA_ANTIGUA, error: null }))
+    holder.client = falso.client
+
+    await fetchPublicStore('botica')
+    await fetchPublicStore('botica')
+
+    expect(falso.selects).toHaveLength(2)
+  })
+
+  it('la respuesta sin los campos nuevos se pinta como universal', async () => {
+    const falso = clienteQue(() => ({ data: FILA_ANTIGUA, error: null }))
     holder.client = falso.client
 
     const tienda = await fetchPublicStore('botica')
 
     expect(tienda.slug).toBe('botica')
     expect(resolveStoreTheme(tienda).preset).toBe('universal')
-    expect(falso.selects).toHaveLength(2)
   })
 
-  it('no vuelve a pagar la consulta fallida en la siguiente navegación', async () => {
-    const falso = clienteQue((select) =>
-      select.includes('theme_preset')
-        ? { data: null, error: { code: '42703', message: 'column theme_preset does not exist' } }
-        : { data: FILA_ANTIGUA, error: null },
-    )
-    holder.client = falso.client
-
-    await fetchPublicStore('botica')
-    await fetchPublicStore('botica')
-
-    expect(falso.selects.filter((s) => s.includes('theme_preset'))).toHaveLength(1)
-  })
-
-  it('un error que NO es de columna se reporta, no se degrada en silencio', async () => {
-    // La condición que evita que este mecanismo se coma cualquier fallo de
-    // esquema: sin ella, un problema real de RLS se vería como «tienda sin tema».
+  it('un fallo de verdad se reporta, no se degrada en silencio', async () => {
     const falso = clienteQue(() => ({
       data: null,
       error: { code: '42501', message: 'permission denied for view public_stores' },
@@ -209,20 +200,15 @@ describe('cuando la base todavía no tiene las columnas del tema', () => {
     holder.client = falso.client
 
     await expect(fetchPublicStore('botica')).rejects.toThrow()
-    expect(falso.selects).toHaveLength(1)
   })
 
-  it('pide las tres columnas cuando la base sí las tiene', async () => {
+  it('cuando la base sí los tiene, llegan', async () => {
     const falso = clienteQue(() => ({
       data: { ...FILA_ANTIGUA, theme_preset: 'premium' },
       error: null,
     }))
     holder.client = falso.client
 
-    const tienda = await fetchPublicStore('botica')
-
-    expect(falso.selects).toHaveLength(1)
-    for (const columna of THEME_COLUMNS) expect(falso.selects[0]).toContain(columna)
-    expect(resolveStoreTheme(tienda).preset).toBe('premium')
+    expect(resolveStoreTheme(await fetchPublicStore('botica')).preset).toBe('premium')
   })
 })
