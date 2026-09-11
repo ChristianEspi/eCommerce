@@ -2,6 +2,7 @@ import { StatusChip } from '@/shared/ui/StatusChip'
 import ScienceRoundedIcon from '@mui/icons-material/ScienceRounded'
 import {
   Alert,
+  Box,
   Button,
   Card,
   Divider,
@@ -234,12 +235,17 @@ export function SimulatorSection() {
       <Card sx={{ p: 2 }}>
         <Stack spacing={2}>
           {lines.map((line, index) => (
-            <Stack key={line.id} direction="row" spacing={1} alignItems="center">
-              <ProductoDeLinea
-                storeId={activeStore?.id ?? null}
-                disabled={simulate.isPending}
-                onPick={(productId) => update(index, { productId })}
-              />
+            <Stack key={line.id} direction="row" spacing={1} alignItems="flex-start">
+              {/* `flex: 1` con `minWidth: 0`: el buscador se queda con el hueco
+                  que deja la cantidad, y puede encogerse por debajo de su
+                  contenido en una pantalla estrecha en vez de desbordar. */}
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <ProductoDeLinea
+                  storeId={activeStore?.id ?? null}
+                  disabled={simulate.isPending}
+                  onPick={(productId) => update(index, { productId })}
+                />
+              </Box>
               <TextField
                 size="small"
                 label={t('promotions.simulator.quantity')}
@@ -266,26 +272,41 @@ export function SimulatorSection() {
 
           <Divider />
 
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <EntityPicker
-              label={t('promotions.simulator.customer')}
-              placeholder={t('promotions.hint.simulatorCustomer')}
-              term={customerTerm}
-              onTermChange={setCustomerTerm}
-              options={customerOptions}
-              value={customer}
-              loading={customers.isFetching}
-              disabled={simulate.isPending}
-              helperText={t('promotions.hint.simulatorCustomer')}
-              onPick={(option) => {
-                setCustomer(option)
-                setCustomerTerm(option.primary)
-              }}
-              onClear={() => {
-                setCustomer(null)
-                setCustomerTerm('')
-              }}
-            />
+          {/* Los tres reparten la fila a partes iguales.
+              Los otros dos campos llevan `fullWidth`, que en una fila flexible
+              significa «el 100 % del contenedor»: entre los dos se llevaban
+              todo el ancho y el buscador de cliente quedaba aplastado a cero,
+              con su desplegable partiendo «Escribe al menos 2 letras» palabra
+              por palabra encima del campo de al lado. */}
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={2}
+            sx={{ '& > *': { flex: 1, minWidth: 0 } }}
+          >
+            {/* El marcador dice QUÉ escribir y la ayuda PARA QUÉ sirve. Antes
+                los dos decían la misma frase larga: el marcador salía cortado
+                en «Opcional. Hace f…» y la ayuda ocupaba tres líneas. */}
+            <Box>
+              <EntityPicker
+                label={t('promotions.simulator.customer')}
+                placeholder={t('promotions.hint.simulatorCustomerPlaceholder')}
+                term={customerTerm}
+                onTermChange={setCustomerTerm}
+                options={customerOptions}
+                value={customer}
+                loading={customers.isFetching}
+                disabled={simulate.isPending}
+                helperText={t('promotions.hint.simulatorCustomer')}
+                onPick={(option) => {
+                  setCustomer(option)
+                  setCustomerTerm(option.primary)
+                }}
+                onClear={() => {
+                  setCustomer(null)
+                  setCustomerTerm('')
+                }}
+              />
+            </Box>
             <TextField
               size="small"
               label={t('promotions.simulator.coupons')}

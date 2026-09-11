@@ -2374,8 +2374,8 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'promotions.simulator.customer': 'Customer',
     'promotions.simulator.unitPrice': 'Unit price',
     'promotions.simulator.amount': 'Amount',
-    'promotions.hint.simulatorCustomer':
-      'Optional. Needed for coupons with a per-customer cap and for their price list.',
+    'promotions.hint.simulatorCustomer': 'Optional. Needed for coupons with a per-customer cap.',
+    'promotions.hint.simulatorCustomerPlaceholder': 'Name or email',
 
     'promotions.reason.fuera_de_publico': 'The buyer is not in its audience',
     'promotions.reason.minimo_no_alcanzado': 'Below the minimum purchase',

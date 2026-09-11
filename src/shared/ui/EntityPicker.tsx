@@ -123,6 +123,16 @@ export function EntityPicker({
 
   return (
     <Autocomplete<PickerOption, false, false, false>
+      /**
+       * Ocupa el ancho que le den.
+       *
+       * Sin esto, el buscador se encoge al tamaño de su contenido en cuanto
+       * vive en una fila: en el simulador salía un campo de cuatro letras con
+       * el texto de ayuda cortado en «Esc…», y no había forma de leer lo que
+       * pedía. En una columna no se notaba —los hijos de un `Stack` vertical ya
+       * se estiran—, y por eso llevaba tiempo así sin que se viera.
+       */
+      fullWidth
       options={visibles}
       value={value}
       inputValue={term}

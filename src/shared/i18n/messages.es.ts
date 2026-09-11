@@ -2386,8 +2386,8 @@ export const es = {
     'promotions.simulator.customer': 'Cliente',
     'promotions.simulator.unitPrice': 'Precio unitario',
     'promotions.simulator.amount': 'Importe',
-    'promotions.hint.simulatorCustomer':
-      'Opcional. Hace falta para los cupones con tope por cliente y para su lista de precios.',
+    'promotions.hint.simulatorCustomer': 'Opcional. Necesario para cupones con tope por cliente.',
+    'promotions.hint.simulatorCustomerPlaceholder': 'Nombre o correo',
 
     'promotions.reason.fuera_de_publico': 'El comprador no está en su público',
     'promotions.reason.minimo_no_alcanzado': 'No llega a la compra mínima',
