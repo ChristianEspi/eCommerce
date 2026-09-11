@@ -41,8 +41,6 @@ const ROL_LABEL: Record<string, MessageKey> = {
   viewer: 'settings.members.role.viewer',
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
 /**
  * Quién entra a este backoffice.
  *
@@ -53,9 +51,18 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
  * lo que faltaba era la pantalla.
  *
  * Administra la MEMBRESÍA, no la identidad. El correo y la contraseña son de la
- * plataforma; aquí se le da acceso a alguien que ya existe. Por eso el alta pide
- * el identificador de usuario, y por eso el diálogo explica dónde sacarlo en vez
- * de fingir que puede crearlo.
+ * plataforma; aquí se le da acceso a alguien que YA existe.
+ *
+ * El alta pide solo el correo. Pedía además un «id de usuario» —un uuid que no
+ * se enseña en ninguna pantalla de esta aplicación—, así que la única forma de
+ * rellenarlo era entrar al panel de la base de datos: la pantalla existía y no
+ * se podía usar. Ahora la traducción de correo a identidad la hace el servidor
+ * en `add_tenant_member`, que además comprueba quién pregunta.
+ *
+ * Si ese correo todavía no tiene cuenta, se dice tal cual. Crear una cuenta
+ * desde aquí exigiría enviar un correo, y esta aplicación aún no envía correo:
+ * fabricar una fila «invitada» sin forma de avisar a nadie dejaría un acceso
+ * concedido a alguien que no se ha enterado.
  */
 export function MembersSection({
   organizationId,
@@ -80,14 +87,12 @@ export function MembersSection({
 
   const [abierto, setAbierto] = useState(false)
   const [email, setEmail] = useState('')
-  const [userId, setUserId] = useState('')
   const [rol, setRol] = useState<MemberRole>('viewer')
   const [error, setError] = useState<string | null>(null)
 
   function cerrar() {
     setAbierto(false)
     setEmail('')
-    setUserId('')
     setRol('viewer')
     setError(null)
   }
@@ -95,17 +100,10 @@ export function MembersSection({
   async function agregar() {
     if (!organizationId || !companyId) return
     if (!email.includes('@')) return setError(t('settings.members.error.email'))
-    if (!UUID.test(userId.trim())) return setError(t('settings.members.error.userId'))
 
     setError(null)
     try {
-      await add.mutateAsync({
-        organizationId,
-        companyId,
-        userId: userId.trim(),
-        email,
-        role: rol,
-      })
+      await add.mutateAsync({ email, role: rol })
       notify(t('settings.members.added'), 'success')
       cerrar()
     } catch (fallo) {
@@ -246,13 +244,11 @@ export function MembersSection({
               value={email}
               onChange={(event) => setEmail(event.target.value)}
             />
-            <TextField
-              label={t('settings.members.userId')}
-              fullWidth
-              value={userId}
-              onChange={(event) => setUserId(event.target.value)}
-              helperText={t('settings.members.userIdHelp')}
-            />
+            {/* Aquí había un campo «Id de usuario» que pedía pegar un uuid.
+                Ese identificador no se enseña en ninguna pantalla de esta
+                aplicación, así que la única forma de rellenarlo era entrar al
+                panel de Supabase. La pantalla existía y no se podía usar.
+                Ahora basta el correo: lo resuelve el servidor. */}
             <TextField
               select
               label={t('settings.members.role')}

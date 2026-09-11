@@ -527,10 +527,17 @@ export const locationFormSchema = z.object({
 export type LocationFormValues = z.infer<typeof locationFormSchema>
 
 export const accountUserFormSchema = z.object({
-  // El `sub` del usuario en el hub. Se teclea porque la invitación por correo
-  // es de la fase de identidad: hasta entonces, vincular exige conocer el id
-  // que emite el hub, que es justo lo que impide vincular a alguien de oído.
-  user_id: z.string().trim().uuid('customers.error.userId'),
+  /**
+   * Se conserva por las filas YA vinculadas —editarlas no reabre el vínculo—
+   * pero el alta ya no lo pide: se dejó de teclear.
+   *
+   * Era el `sub` del hub, y el hub no está conectado. La ayuda decía «pega el
+   * identificador que emite el hub» y no había de dónde sacarlo, así que la
+   * pantalla se abría y no se podía usar. Ahora se vincula por CORREO y lo
+   * resuelve el servidor en `add_business_account_user`, que es lo que la
+   * propia pantalla ya prometía: «el vínculo lo decide el servidor».
+   */
+  user_id: z.string().trim(),
   email: z
     .string()
     .trim()

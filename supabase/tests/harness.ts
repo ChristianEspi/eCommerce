@@ -39,6 +39,23 @@ const SUPABASE_PRELUDE = `
   create role supabase_auth_admin nologin noinherit;
 
   create schema auth;
+
+  -- La tabla de usuarios de Supabase, con lo justo que este proyecto mira.
+  --
+  -- No es decoración del banco de pruebas: hay funciones que traducen un correo
+  -- a una identidad leyendo de aquí (dar de alta a alguien por su correo en vez
+  -- de por un uuid que nadie tiene a mano). Sin esta tabla, esas migraciones no
+  -- aplican y la suite entera se queda sin arrancar.
+  --
+  -- Sigue sin ser legible para \`authenticated\`, igual que en Supabase: quien
+  -- la consulta lo hace desde una funcion \`security definer\` que ya comprobo
+  -- quien pregunta.
+  create table auth.users (
+    id    uuid primary key,
+    email text unique,
+    created_at timestamptz not null default now()
+  );
+
   create or replace function auth.jwt() returns jsonb
   language sql stable as $$
     select coalesce(

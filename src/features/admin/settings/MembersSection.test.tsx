@@ -158,7 +158,14 @@ describe('quien entra al backoffice', () => {
    * una invitación. Esta pantalla administra la MEMBRESÍA, no la identidad, y
    * callarlo dejaría a alguien rellenando un formulario que no hace lo que cree.
    */
-  it('el alta avisa de que no crea cuentas y valida el identificador', async () => {
+  it('el alta avisa de que no crea cuentas y solo pide el correo', async () => {
+    /**
+     * Antes esta prueba escribía un identificador de usuario y comprobaba que se
+     * validara su forma. Ese campo ya no existe: era un uuid que no se enseña en
+     * ninguna pantalla, así que la única manera de rellenarlo era entrar al
+     * panel de la base de datos. Lo que se comprueba ahora es que el correo
+     * basta, y que un correo mal escrito no llega al servidor.
+     */
     const user = userEvent.setup()
     const fake = backend()
     pintar(fake)
@@ -167,11 +174,13 @@ describe('quien entra al backoffice', () => {
     await user.click(screen.getByRole('button', { name: 'Dar acceso' }))
     expect(await screen.findByText(/no crea cuentas/i)).toBeInTheDocument()
 
-    await user.type(screen.getByLabelText('Correo'), 'nuevo@negocio.com')
-    await user.type(screen.getByLabelText('Identificador de usuario'), 'no-es-un-uuid')
+    // Ya no hay dónde pegar un identificador.
+    expect(screen.queryByLabelText('Identificador de usuario')).not.toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('Correo'), 'sin-arroba')
     await user.click(screen.getByRole('button', { name: 'Añadir' }))
 
-    expect(await screen.findByText(/no tiene la forma esperada/i)).toBeInTheDocument()
+    expect(await screen.findByText('Escribe un correo válido.')).toBeInTheDocument()
     // Y no se ha escrito nada.
     expect(fake.state.tables.tenant_members).toHaveLength(3)
   })

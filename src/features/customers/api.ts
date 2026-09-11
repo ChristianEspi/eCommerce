@@ -496,14 +496,22 @@ export async function saveAccountUser(input: {
     default_location_id: nullable(input.values.default_location_id),
   }
 
+  // Editar una fila ya vinculada se queda como estaba: la identidad no cambia,
+  // solo el rol, el límite o la sucursal.
+  //
+  // El ALTA, en cambio, ya no inserta desde aquí. Necesitaba el `user_id` —el
+  // uuid del usuario— y ese dato no se enseña en ninguna pantalla, así que el
+  // formulario pedía pegarlo y nadie tenía de dónde. Ahora lo resuelve el
+  // servidor a partir del correo, que además es quien comprueba que quien
+  // pregunta administra esa sociedad.
   const { error } = input.id
     ? await supabase.from(BUSINESS_ACCOUNT_USERS_TABLE).update(fields).eq('id', input.id)
-    : await supabase.from(BUSINESS_ACCOUNT_USERS_TABLE).insert({
-        organization_id: input.scope.organizationId,
-        company_id: input.scope.companyId,
-        business_account_id: input.accountId,
-        user_id: input.values.user_id,
-        ...fields,
+    : await supabase.rpc('add_business_account_user', {
+        p_account_id: input.accountId,
+        p_email: fields.email,
+        p_role: input.values.role,
+        p_spending_limit: fields.spending_limit,
+        p_location_id: fields.default_location_id,
       })
 
   if (error) throw customersErrorFromDb(error)

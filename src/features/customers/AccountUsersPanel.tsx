@@ -131,16 +131,12 @@ export function AccountUsersPanel({
               value={values.email}
               onChange={(event) => set('email', event.target.value)}
             />
-            <TextField
-              size="small"
-              fullWidth
-              label={t('customers.field.userId')}
-              value={values.user_id}
-              disabled={Boolean(editing)}
-              onChange={(event) => set('user_id', event.target.value)}
-              helperText={t('customers.field.userIdHint')}
-              inputProps={{ spellCheck: false }}
-            />
+            {/* Aquí había un campo que pedía pegar «el identificador que emite
+                el hub». El hub no está conectado y ese identificador no se
+                enseña en ninguna pantalla: no había de dónde sacarlo, así que
+                esta pantalla se abría y no se podía usar. El vínculo lo resuelve
+                el servidor a partir del correo, que es lo que el texto de arriba
+                ya prometía. */}
           </Stack>
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>

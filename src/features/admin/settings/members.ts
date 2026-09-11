@@ -81,26 +81,33 @@ function useInvalidateMembers() {
  * solo el correo dejaría una fila que parece dar acceso y no lo da, que es peor
  * que no poder crearla.
  */
+/**
+ * Dar acceso al backoffice por CORREO.
+ *
+ * Antes se insertaba la fila desde aquí, y para eso hacía falta el `user_id`
+ * —un uuid que no se enseña en ninguna pantalla—. Ahora lo resuelve el
+ * servidor: `add_tenant_member` comprueba quién pregunta, traduce el correo a
+ * una identidad y crea el vínculo. No devuelve el identificador, y esa ausencia
+ * es deliberada: devolverlo sería una forma de averiguar qué correos tienen
+ * cuenta en el proyecto, uno a uno.
+ */
 export function useAddMember() {
   const invalidate = useInvalidateMembers()
   return useMutation({
-    mutationFn: async (input: {
-      organizationId: string
-      companyId: string
-      userId: string
-      email: string
-      role: MemberRole
-    }) => {
-      const { error } = await getSupabaseClient()
-        .from(TENANT_MEMBERS_TABLE)
-        .insert({
-          organization_id: input.organizationId,
-          company_id: input.companyId,
-          user_id: input.userId,
-          email: input.email.trim().toLowerCase(),
-          role: input.role,
-          status: 'active',
-        })
+    /**
+     * Ni la organización ni la sociedad viajan en la llamada.
+     *
+     * Las toma el servidor del token, y no por elegancia: la regla del proyecto
+     * prohíbe que el tenant llegue por parámetro a algo que alcanza el cliente
+     * (lección esupplier-030), y hay una prueba que recorre el catálogo de
+     * funciones buscando justo eso. Además evita una discrepancia: pedir el alta
+     * en una sociedad distinta de la que se está mirando en pantalla.
+     */
+    mutationFn: async (input: { email: string; role: MemberRole }) => {
+      const { error } = await getSupabaseClient().rpc('add_tenant_member', {
+        p_email: input.email.trim().toLowerCase(),
+        p_role: input.role,
+      })
       if (error) throw error
     },
     onSuccess: invalidate,

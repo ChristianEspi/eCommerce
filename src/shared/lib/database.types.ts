@@ -11395,6 +11395,23 @@ export type Database = {
       }
     }
     Functions: {
+      add_business_account_user: {
+        Args: {
+          p_account_id: string
+          p_email: string
+          p_location_id?: string
+          p_role: Database["public"]["Enums"]["business_role"]
+          p_spending_limit?: number
+        }
+        Returns: string
+      }
+      add_tenant_member: {
+        Args: {
+          p_email: string
+          p_role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: string
+      }
       adjust_inventory: {
         Args: {
           p_external_ref?: string

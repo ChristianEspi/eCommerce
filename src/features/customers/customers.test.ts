@@ -212,22 +212,32 @@ describe('formulario de cuenta B2B y de sus reglas', () => {
     ).toBe(true)
   })
 
-  it('el vínculo exige el id que emite el hub, no un correo cualquiera', () => {
+  it('el vínculo se pide por CORREO: ya no hay que pegar un identificador', () => {
+    /**
+     * Este test estaba invertido, y con razón en su momento.
+     *
+     * Exigía un uuid en `user_id` porque el vínculo se creaba insertando la
+     * fila desde el navegador, y para eso hacía falta el identificador. El
+     * problema es que ese identificador no se enseña en ninguna pantalla y el
+     * hub que iba a emitirlo no está conectado: la ayuda decía «pega el
+     * identificador que emite el hub» y no había de dónde sacarlo.
+     *
+     * Ahora la traducción de correo a identidad la hace el servidor, que además
+     * comprueba quién pregunta. El formulario ya no necesita el uuid, y exigirlo
+     * dejaría la pantalla inservible otra vez.
+     */
     const base = {
-      user_id: 'no-es-un-uuid',
+      user_id: '',
       email: 'compras@acme.com',
       role: 'buyer' as const,
       spending_limit: '',
       status: 'invited' as const,
       default_location_id: '',
     }
-    expect(accountUserFormSchema.safeParse(base).success).toBe(false)
-    expect(
-      accountUserFormSchema.safeParse({
-        ...base,
-        user_id: '33333333-3333-4333-8333-333333333333',
-      }).success,
-    ).toBe(true)
+    expect(accountUserFormSchema.safeParse(base).success).toBe(true)
+
+    // Y el correo sigue siendo obligatorio: es lo único que identifica ahora.
+    expect(accountUserFormSchema.safeParse({ ...base, email: 'no-es-correo' }).success).toBe(false)
   })
 
   /** Contrato §13: la suite no compra en nombre de un cliente. */
