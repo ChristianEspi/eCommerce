@@ -7,6 +7,10 @@ import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded'
 import {
   Alert,
   Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   MenuItem,
   Stack,
   Table,
@@ -20,6 +24,12 @@ import {
 import { useState } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
+import {
+  mapCreateAccountCode,
+  useCreateAccount,
+  type CuentaCreada,
+} from '@/features/auth/createAccount'
+import { TemporaryCredentials } from '@/features/auth/TemporaryCredentials'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState } from '@/shared/ui/states'
 import type { TenantScope } from './api'
@@ -71,10 +81,15 @@ export function AccountUsersPanel({
   const locations = useLocations(account.id)
   const save = useSaveAccountUser()
   const remove = useDeleteAccountUser()
+  const crearCuenta = useCreateAccount()
 
   const [editing, setEditing] = useState<BusinessAccountUser | null>(null)
   const [values, setValues] = useState<AccountUserFormValues>(EMPTY)
   const [error, setError] = useState<MessageKey | null>(null)
+  /** Solo se ofrece crear la cuenta cuando el servidor ha dicho que no la hay. */
+  const [faltaCuenta, setFaltaCuenta] = useState(false)
+  /** La contraseña se ve una vez; hasta que se confirme, no se cierra sola. */
+  const [credenciales, setCredenciales] = useState<CuentaCreada | null>(null)
 
   function set<K extends keyof AccountUserFormValues>(key: K, value: AccountUserFormValues[K]) {
     setValues((current) => ({ ...current, [key]: value }))
@@ -84,6 +99,22 @@ export function AccountUsersPanel({
     setEditing(null)
     setValues(EMPTY)
     setError(null)
+    setFaltaCuenta(false)
+  }
+
+  /**
+   * Guarda el vínculo. Devuelve si salió bien, porque el alta de cuenta encadena
+   * este mismo paso justo después y necesita saberlo.
+   */
+  async function guardarVinculo(values: AccountUserFormValues): Promise<boolean> {
+    try {
+      await save.mutateAsync({ id: editing?.id ?? null, scope, accountId: account.id, values })
+      return true
+    } catch (caught) {
+      setError(caught instanceof CustomersError ? caught.key : 'customers.error.generic')
+      setFaltaCuenta(caught instanceof CustomersError && caught.code === 'SIN_CUENTA')
+      return false
+    }
   }
 
   async function submit() {
@@ -93,17 +124,39 @@ export function AccountUsersPanel({
       return
     }
     setError(null)
-    try {
-      await save.mutateAsync({
-        id: editing?.id ?? null,
-        scope,
-        accountId: account.id,
-        values: parsed.data,
-      })
+    setFaltaCuenta(false)
+    if (await guardarVinculo(parsed.data)) {
       notify(t('customers.toast.saved'))
       cancel()
+    }
+  }
+
+  /**
+   * Crear la cuenta de esa persona y, acto seguido, vincularla.
+   *
+   * Quien pulsa esto no quería crear una cuenta suelta: quería vincular a
+   * alguien y se encontró con que no existía. Por eso el alta arrastra el
+   * segundo paso. Si el alta funciona y el vínculo no, las credenciales se
+   * enseñan igual —la cuenta ya existe y la contraseña no se puede volver a
+   * consultar— y el motivo del segundo fallo se queda a la vista.
+   */
+  async function crearYVincular() {
+    const parsed = accountUserFormSchema.safeParse(values)
+    if (!parsed.success) {
+      setError((parsed.error.issues[0]?.message as MessageKey) ?? 'customers.error.invalid')
+      return
+    }
+    setError(null)
+    try {
+      const cuenta = await crearCuenta.mutateAsync(parsed.data.email)
+      setFaltaCuenta(false)
+      setCredenciales(cuenta)
+      if (await guardarVinculo(parsed.data)) notify(t('account.create.created'))
     } catch (caught) {
-      setError(caught instanceof CustomersError ? caught.key : 'customers.error.generic')
+      const code = (caught as { code?: string })?.code ?? ''
+      setError(mapCreateAccountCode(code))
+      // Si ya existía, lo que falta es el vínculo, no la cuenta.
+      setFaltaCuenta(code !== 'CUENTA_YA_EXISTE')
     }
   }
 
@@ -121,7 +174,32 @@ export function AccountUsersPanel({
 
       {canWrite && (
         <Stack spacing={1.5}>
-          {error && <Alert severity="error">{t(error)}</Alert>}
+          {/* Cuando lo que falta es la CUENTA, el aviso trae el botón que la
+              crea. Decirlo sin ofrecerlo era una pared: no hay pantalla de
+              registro a la que mandar a esa persona. */}
+          {error && (
+            <Alert
+              severity={faltaCuenta ? 'warning' : 'error'}
+              action={
+                faltaCuenta ? (
+                  <Button
+                    size="small"
+                    onClick={() => void crearYVincular()}
+                    disabled={crearCuenta.isPending}
+                  >
+                    {t('account.create.action')}
+                  </Button>
+                ) : undefined
+              }
+            >
+              {t(error)}
+              {faltaCuenta && (
+                <Typography variant="body2" sx={{ mt: 0.5 }}>
+                  {t('account.create.offer')}
+                </Typography>
+              )}
+            </Alert>
+          )}
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
             <TextField
@@ -285,6 +363,31 @@ export function AccountUsersPanel({
           onPageChange={pager.setPage}
         />
       )}
+
+      {/* Sin `onClose`: la contraseña no se guarda en ningún sitio, así que un
+          clic fuera del diálogo la perdería para siempre. Se sale por el botón,
+          que dice lo que confirma. */}
+      <Dialog open={credenciales !== null} fullWidth maxWidth="sm">
+        <DialogTitle>{t('account.create.title')}</DialogTitle>
+        <DialogContent>
+          {credenciales && (
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <TemporaryCredentials cuenta={credenciales} />
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            variant="contained"
+            onClick={() => {
+              setCredenciales(null)
+              if (!error) cancel()
+            }}
+          >
+            {t('account.create.done')}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   )
 }

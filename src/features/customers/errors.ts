@@ -24,8 +24,11 @@ export function mapCustomersCode(code: string): MessageKey {
      * Vincular exige que esa persona YA tenga cuenta: la identidad es de la
      * plataforma y esta pantalla solo le da acceso a una cuenta de empresa. Sin
      * este caso, el intento respondía «No pudimos completar la operación», que
-     * no dice qué hacer — y lo que hay que hacer es concreto: que entre a la
-     * tienda y se registre.
+     * no dice qué hacer.
+     *
+     * Y decirlo tampoco bastaba: no hay pantalla de registro a la que mandar a
+     * nadie, así que el aviso era una pared. Ahora el panel acompaña este
+     * código con el botón que crea la cuenta ahí mismo.
      */
     case 'SIN_CUENTA':
       return 'customers.error.noAccount'

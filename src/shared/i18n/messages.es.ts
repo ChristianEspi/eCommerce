@@ -139,6 +139,29 @@ export const es = {
     'settings.members.status.active': 'Activo',
     'settings.members.status.invited': 'Invitado',
     'settings.members.status.revoked': 'Sin acceso',
+    // Crear la cuenta de acceso de alguien. Lo comparten la pantalla de
+    // usuarios del backoffice y la de compradores de una cuenta B2B: las dos
+    // chocaban con el mismo muro —«ese correo no tiene cuenta»— y ninguna tenía
+    // adónde mandar a nadie, porque no hay pantalla de registro.
+    'account.create.action': 'Crear la cuenta',
+    'account.create.offer':
+      'Puedes crearle la cuenta ahora mismo. Te damos una contraseña temporal para que se la pases; la cambia cuando entre.',
+    'account.create.title': 'Cuenta creada',
+    'account.create.email': 'Correo',
+    'account.create.password': 'Contraseña temporal',
+    'account.create.once':
+      'Apunta esta contraseña ahora: no se guarda en ningún sitio y no vas a poder volver a verla. Si se pierde, la persona puede recuperarla desde «Olvidé mi contraseña».',
+    'account.create.copy': 'Copiar',
+    'account.create.copied': 'Copiada',
+    'account.create.next': 'Pásasela por donde ya hablas con esa persona y que la cambie al entrar.',
+    'account.create.done': 'Listo, ya la guardé',
+    'account.create.created': 'Cuenta creada y acceso concedido',
+    'account.create.error.exists': 'Ese correo ya tiene una cuenta. Vuelve a intentar darle acceso.',
+    'account.create.error.suite':
+      'Ese correo es de la suite EBIM y no se da de alta desde aquí.',
+    'account.create.error.forbidden': 'Solo el propietario o un administrador pueden crear cuentas.',
+    'account.create.error.email': 'Escribe un correo válido.',
+    'account.create.error.generic': 'No se pudo crear la cuenta. Inténtalo de nuevo.',
     'admin.settings.tab.taxes': 'Impuestos',
     'taxes.title': 'Categorías fiscales',
     'taxes.help': 'La tasa se aplica por categoría, no por tienda: puedes tener IVA general y productos exentos en el mismo catálogo. Al cambiar una tasa se archiva la anterior, para que un pedido antiguo siga cuadrando.',

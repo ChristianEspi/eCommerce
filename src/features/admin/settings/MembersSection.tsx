@@ -23,6 +23,12 @@ import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { codeFromDbError, type PostgrestLike } from '@/shared/lib/appError'
 import { mapSettingsCode } from './api'
+import {
+  mapCreateAccountCode,
+  useCreateAccount,
+  type CuentaCreada,
+} from '@/features/auth/createAccount'
+import { TemporaryCredentials } from '@/features/auth/TemporaryCredentials'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
 import {
@@ -61,10 +67,17 @@ const ROL_LABEL: Record<string, MessageKey> = {
  * se podía usar. Ahora la traducción de correo a identidad la hace el servidor
  * en `add_tenant_member`, que además comprueba quién pregunta.
  *
- * Si ese correo todavía no tiene cuenta, se dice tal cual. Crear una cuenta
- * desde aquí exigiría enviar un correo, y esta aplicación aún no envía correo:
- * fabricar una fila «invitada» sin forma de avisar a nadie dejaría un acceso
- * concedido a alguien que no se ha enterado.
+ * ## Y si ese correo todavía no tiene cuenta
+ *
+ * Antes la pantalla se limitaba a decirlo, y ahí se acababa el camino: no hay
+ * pantalla de registro a la que mandar a nadie, así que «esa persona no tiene
+ * cuenta» era una pared. Ahora el mismo aviso trae el botón que la crea.
+ *
+ * La cuenta nace CONFIRMADA y con una contraseña temporal que se enseña una
+ * sola vez. Es la alternativa a un correo de invitación que esta aplicación
+ * todavía no puede enviar, y es mejor que fabricar una fila «invitada» sin
+ * forma de avisar a nadie: ahí el acceso quedaba concedido a alguien que no se
+ * había enterado.
  */
 export function MembersSection({
   organizationId,
@@ -83,6 +96,7 @@ export function MembersSection({
   const { notify } = useFeedback()
   const members = useMembers(organizationId, companyId)
   const add = useAddMember()
+  const crearCuenta = useCreateAccount()
   const changeRole = useChangeMemberRole()
   const revoke = useRevokeMember()
   const restore = useRestoreMember()
@@ -91,12 +105,18 @@ export function MembersSection({
   const [email, setEmail] = useState('')
   const [rol, setRol] = useState<MemberRole>('viewer')
   const [error, setError] = useState<string | null>(null)
+  /** Se ofrece crear la cuenta solo cuando la base ha dicho que no la hay. */
+  const [faltaCuenta, setFaltaCuenta] = useState(false)
+  /** Mientras haya credenciales a la vista, el diálogo no enseña otra cosa. */
+  const [credenciales, setCredenciales] = useState<CuentaCreada | null>(null)
 
   function cerrar() {
     setAbierto(false)
     setEmail('')
     setRol('viewer')
     setError(null)
+    setFaltaCuenta(false)
+    setCredenciales(null)
   }
 
   async function agregar() {
@@ -104,6 +124,7 @@ export function MembersSection({
     if (!email.includes('@')) return setError(t('settings.members.error.email'))
 
     setError(null)
+    setFaltaCuenta(false)
     try {
       await add.mutateAsync({ email, role: rol })
       notify(t('settings.members.added'), 'success')
@@ -114,7 +135,39 @@ export function MembersSection({
       // de restricción, y aquí además el caso frecuente tiene una respuesta
       // concreta que dar —«esa persona todavía no tiene cuenta»— en vez de un
       // «algo salió mal» que no dice qué hacer.
-      setError(t(mapSettingsCode(codeFromDbError(fallo as PostgrestLike))))
+      const code = codeFromDbError(fallo as PostgrestLike)
+      setError(t(mapSettingsCode(code)))
+      setFaltaCuenta(code === 'SIN_CUENTA')
+    }
+  }
+
+  /**
+   * Crear la cuenta y, acto seguido, dar el acceso que se estaba pidiendo.
+   *
+   * Son dos operaciones y dos permisos distintos en el servidor, y aquí se
+   * encadenan a propósito: el que las separó nunca quiso crear una cuenta
+   * suelta, quiso dar acceso y se encontró con que la persona no existía. Si el
+   * alta sale bien y el acceso falla, las credenciales se enseñan igual —la
+   * cuenta ya existe y la contraseña no se puede volver a consultar— y el
+   * motivo del segundo fallo se queda a la vista.
+   */
+  async function crearYDarAcceso() {
+    setError(null)
+    try {
+      const cuenta = await crearCuenta.mutateAsync(email)
+      setFaltaCuenta(false)
+      setCredenciales(cuenta)
+      try {
+        await add.mutateAsync({ email, role: rol })
+        notify(t('account.create.created'), 'success')
+      } catch (fallo) {
+        setError(t(mapSettingsCode(codeFromDbError(fallo as PostgrestLike))))
+      }
+    } catch (fallo) {
+      const code = (fallo as { code?: string })?.code ?? ''
+      setError(t(mapCreateAccountCode(code)))
+      // Si resulta que ya existía, lo que falta es el acceso, no la cuenta.
+      setFaltaCuenta(code !== 'CUENTA_YA_EXISTE')
     }
   }
 
@@ -232,15 +285,54 @@ export function MembersSection({
         </Box>
       )}
 
-      <Dialog open={abierto} onClose={cerrar} fullWidth maxWidth="sm">
-        <DialogTitle>{t('settings.members.add')}</DialogTitle>
+      {/* Con las credenciales a la vista el diálogo no se cierra al pinchar
+          fuera: la contraseña no se guarda en ningún sitio y un clic distraído
+          la perdería para siempre. Se sale por el botón, que dice lo que
+          confirma. */}
+      <Dialog
+        open={abierto}
+        onClose={credenciales ? undefined : cerrar}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>
+          {credenciales ? t('account.create.title') : t('settings.members.add')}
+        </DialogTitle>
         <DialogContent>
+          {credenciales ? (
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              {error && <Alert severity="error">{error}</Alert>}
+              <TemporaryCredentials cuenta={credenciales} />
+            </Stack>
+          ) : (
           <Stack spacing={2} sx={{ mt: 1 }}>
             {/* Se explica lo que esta pantalla NO hace, porque es lo primero que
                 se intenta: escribir un correo nuevo y esperar que llegue una
                 invitación. */}
             <Alert severity="info">{t('settings.members.addHelp')}</Alert>
-            {error && <Alert severity="error">{error}</Alert>}
+            {error && (
+              <Alert
+                severity={faltaCuenta ? 'warning' : 'error'}
+                action={
+                  faltaCuenta ? (
+                    <Button
+                      size="small"
+                      onClick={() => void crearYDarAcceso()}
+                      disabled={crearCuenta.isPending}
+                    >
+                      {t('account.create.action')}
+                    </Button>
+                  ) : undefined
+                }
+              >
+                {error}
+                {faltaCuenta && (
+                  <Typography variant="body2" sx={{ mt: 0.5 }}>
+                    {t('account.create.offer')}
+                  </Typography>
+                )}
+              </Alert>
+            )}
 
             <TextField
               label={t('settings.members.email')}
@@ -268,12 +360,21 @@ export function MembersSection({
               ))}
             </TextField>
           </Stack>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={cerrar}>{t('common.cancel')}</Button>
-          <Button variant="contained" onClick={() => void agregar()} disabled={add.isPending}>
-            {t('common.add')}
-          </Button>
+          {credenciales ? (
+            <Button variant="contained" onClick={cerrar}>
+              {t('account.create.done')}
+            </Button>
+          ) : (
+            <>
+              <Button onClick={cerrar}>{t('common.cancel')}</Button>
+              <Button variant="contained" onClick={() => void agregar()} disabled={add.isPending}>
+                {t('common.add')}
+              </Button>
+            </>
+          )}
         </DialogActions>
       </Dialog>
     </Stack>

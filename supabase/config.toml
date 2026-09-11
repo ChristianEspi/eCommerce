@@ -56,3 +56,10 @@ verify_jwt = true
 # unico borde del repositorio donde una peticion suelta cuesta dinero.
 [functions.shopping-assistant]
 verify_jwt = true
+
+# Crear la cuenta de acceso de una persona. Usa `service_role`, asi que ademas
+# de este flag verifica la firma del token a mano (`_runtime/verify.ts`) y
+# consulta el rol del que llama CON SU PROPIO token antes de tocar la Admin API.
+# El flag de la plataforma no puede quedarse como unica defensa de ese camino.
+[functions.create-user]
+verify_jwt = true

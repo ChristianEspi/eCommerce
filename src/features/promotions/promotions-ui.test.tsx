@@ -550,7 +550,10 @@ describe('Simulador', () => {
     await elegirProducto(usuario)
     await usuario.click(screen.getByRole('button', { name: 'Simular' }))
 
-    expect(await screen.findByText('Se aplicaron')).toBeInTheDocument()
+    // Con el mismo margen que el buscador de arriba, y por lo mismo: simular es
+    // una consulta más, y el segundo por defecto alcanza en una máquina
+    // tranquila pero no cuando la suite entera corre en paralelo.
+    expect(await screen.findByText('Se aplicaron', {}, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.getByText('Rebajas de verano')).toBeInTheDocument()
     // Aparece dos veces a proposito —en la linea y en el desglose de la campana
     // que lo hizo— y que coincidan ES la propiedad que se quiere.
@@ -571,7 +574,7 @@ describe('Simulador', () => {
     await elegirProducto(usuario)
     await usuario.click(screen.getByRole('button', { name: 'Simular' }))
 
-    expect(await screen.findByText('100.00 PEN')).toBeInTheDocument()
+    expect(await screen.findByText('100.00 PEN', {}, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.getByText('−15.00 PEN')).toBeInTheDocument()
     expect(screen.getByText('15.30 PEN')).toBeInTheDocument()
     expect(screen.getByText('100.30 PEN')).toBeInTheDocument()

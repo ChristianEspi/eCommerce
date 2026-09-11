@@ -66,6 +66,51 @@ base de forma interactiva:
 **Lección para tablas con GRANT por columna:** añadir una columna es añadirla también al GRANT. No hay
 linter que lo recuerde, y el síntoma —un 403 con rol de administrador— no apunta a la causa.
 
+## Crear cuentas desde el backoffice (2026-09-11)
+
+Cierra un callejón sin salida que tenían dos pantallas: **usuarios del backoffice**
+(`MembersSection`) y **compradores de una cuenta B2B** (`AccountUsersPanel`). Las dos reparten
+acceso, las dos exigen que la persona ya tenga cuenta, y no había ningún sitio donde pasara a
+tenerla — esta aplicación no tiene pantalla de registro, y el alta directa de Supabase deja la cuenta
+sin sesión esperando un correo de confirmación que todavía no se envía. El aviso «esa persona no
+tiene cuenta» era una pared.
+
+| Pieza | Qué hace |
+|---|---|
+| `supabase/functions/create-user/index.ts` | Encadena el orden, y el orden ES la defensa (abajo) |
+| `supabase/functions/_shared/userProvisioning.ts` | Toda la decisión: quién puede, qué correo vale, cómo se genera la contraseña, cuándo el fallo es «ya existe» |
+| `src/features/auth/createAccount.ts` | La llamada, el esquema de la respuesta y la traducción de códigos a i18n |
+| `src/features/auth/TemporaryCredentials.tsx` | Enseña las credenciales, que se ven **una vez** |
+
+**El orden dentro de la función, que es lo único que evita un agujero:**
+
+1. `verifyHubToken` — verifica la **firma** contra el servidor de auth. `decodeClaims` no verifica
+   nada, y aquí el paso siguiente usa `service_role` y salta la RLS. Mismo razonamiento que en
+   `bootstrap-tenant`.
+2. Consulta `tenant_members` **con el token de quien llama**: la RLS solo le devuelve su propia
+   membresía, así que el rol no se puede inflar desde el cuerpo. Hace falta `owner` o `admin`.
+3. Solo entonces la Admin API, y solo para crear el usuario de Auth. No escribe ninguna tabla de
+   negocio: repartir el acceso lo siguen haciendo `add_tenant_member` y `add_business_account_user`.
+
+**Decisiones que no son obvias:**
+- La cuenta nace **confirmada** (`email_confirm: true`). La alternativa es un correo que no se envía
+  y una cuenta que nadie puede usar.
+- La contraseña se genera con `crypto.getRandomValues` sobre un alfabeto **sin `I l 1 O 0`** —va a
+  dictarse por teléfono— y **no se guarda en ninguna parte**, ni en tabla ni en log. El diálogo que
+  la enseña no se cierra al pulsar fuera.
+- Un correo que **ya tiene cuenta** no se toca: se responde 409. Cambiarle la contraseña a alguien
+  porque otro escribió su correo sería un secuestro de cuenta con formulario.
+- Un `@ebim.pe` se rechaza con código propio (`CORREO_DE_SUITE`) y no con el genérico `SIN_PERMISO`:
+  la pantalla tiene algo distinto que decir.
+
+Verificación: `supabase/tests/create-user.test.ts` (29) sobre la lógica y el orden leído del
+`index.ts`; `src/features/auth/createAccount.test.tsx` (10) sobre la pantalla. Gates completos en
+verde: `typecheck`, `lint`, `build`, `bundle:report` y **183 archivos / 3594 tests**.
+
+> **Falta desplegar.** La función NO está desplegada; hasta que lo esté, el botón «Crear la cuenta»
+> responde error. Requiere `supabase functions deploy create-user` y que el proyecto tenga
+> `SUPABASE_SERVICE_ROLE_KEY` en el entorno de funciones. No se hizo: no hay orden de despliegue.
+
 ## Recuperación de la ejecución interrumpida (2026-08-30)
 
 Segunda parada del runner (`claude-saas-opus`), otra vez con `phase: RECOVERY` en
