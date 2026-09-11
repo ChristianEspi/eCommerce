@@ -281,6 +281,24 @@
   --sf-card-price: 20px;
 }
 
+/* ---------------------------------------------------------------------------
+   LO QUE UN TEMA NO TOCA: LA PROFUNDIDAD
+   ---------------------------------------------------------------------------
+   `--sf-line`, `--sf-shadow` y `--sf-media-bg` se quedan FUERA de los bloques de
+   tema, y no por falta de ganas: una tarjeta editorial pide una sombra mas
+   contenida y una rejilla de seis columnas pide una linea mas firme.
+
+   El motivo es la cascada. Esos tres valores se redefinen por modo —hay un
+   bloque para oscuro y otro para claro explicito, los dos con mas peso que
+   `.sf-scope[data-store-theme=...]`—, asi que un tema que los pisara solo se
+   notaria con el modo del sistema sin elegir, y en cuanto alguien tocara el
+   interruptor de claro/oscuro su tienda cambiaria de canto. Subir el peso del
+   selector para ganar esa pelea la ganaria tambien en oscuro, y ahi las sombras
+   de claro no separan nada: todo es oscuro sobre oscuro.
+
+   Asi que la division queda limpia: el MODO manda en color y profundidad; el
+   TEMA, en geometria y escala. Cada pixel con un solo dueno. */
+
 /* EDITORIAL (premium): la foto manda y el texto acompana. Mas aire dentro de la
    tarjeta y un nombre que se lee, no que se escanea. */
 .sf-scope[data-store-theme='premium'] {

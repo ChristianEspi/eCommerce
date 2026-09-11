@@ -33,13 +33,27 @@ const CSS = readFileSync(
   'utf8',
 )
 
-/** Los bloques de la hoja que cuelgan de un atributo de tema. */
-function bloquesDeTema(): string[] {
+function cuerpos(re: RegExp): string[] {
   const bloques: string[] = []
-  const re = /\.sf-scope\[data-store-[^\]]+\][^{]*\{([^}]*)\}/g
   let match: RegExpExecArray | null
   while ((match = re.exec(CSS)) !== null) bloques.push(match[1] ?? '')
   return bloques
+}
+
+/** Todo lo que cuelga de un atributo de tema, incluidos los descendientes. */
+function bloquesDeTema(): string[] {
+  return cuerpos(/\.sf-scope\[data-store-[^\]]+\][^{]*\{([^}]*)\}/g)
+}
+
+/**
+ * Solo lo que se declara SOBRE la propia frontera.
+ *
+ * La distinción importa: ahí es donde un tema competiría con las reglas de modo
+ * claro/oscuro, que declaran sobre ese mismo elemento y con más peso. Una regla
+ * que apunta a un descendiente —la cabecera, por ejemplo— no compite con nadie.
+ */
+function bloquesDeLaFrontera(): string[] {
+  return cuerpos(/\.sf-scope\[data-store-[^\]]+\]\s*\{([^}]*)\}/g)
 }
 
 // ---------------------------------------------------------------------------
@@ -85,10 +99,24 @@ describe('universal es el suelo, no un tema más', () => {
 // ---------------------------------------------------------------------------
 
 describe('ningún tema le quita el color al comercio', () => {
+  /**
+   * Los tres últimos no son colores de marca y aun así están vetados, por un
+   * motivo de CASCADA: se redefinen por modo claro/oscuro con selectores de más
+   * peso, así que un tema que los pisara solo se notaría con el modo del
+   * sistema sin elegir. El modo manda en profundidad; el tema, en geometría.
+   */
   const COLORES_AJENOS = ['--accent:', '--accent-deep:', '--accent-soft:', '--text:', '--muted:', '--card:', '--bg:']
 
-  it.each(COLORES_AJENOS)('no redefine %s', (variable) => {
+  it.each(COLORES_AJENOS)('no redefine %s en ninguna regla de tema', (variable) => {
     for (const bloque of bloquesDeTema()) {
+      expect(bloque).not.toContain(variable)
+    }
+  })
+
+  const PROFUNDIDAD = ['--sf-line:', '--sf-shadow:', '--sf-shadow-hover:', '--sf-media-bg:']
+
+  it.each(PROFUNDIDAD)('no pisa %s sobre la propia frontera', (variable) => {
+    for (const bloque of bloquesDeLaFrontera()) {
       expect(bloque).not.toContain(variable)
     }
   })

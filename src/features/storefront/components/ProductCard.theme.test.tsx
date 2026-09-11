@@ -167,6 +167,35 @@ describe.each(THEME_PRESET_IDS)('con el tema %s', (preset) => {
   })
 })
 
+describe.each(THEME_PRESET_IDS)('lo incómodo, con el tema %s', (preset) => {
+  it('un producto SIN foto sigue siendo una tarjeta, no un hueco', () => {
+    // Es el caso normal, no el raro: un catálogo recién importado no trae
+    // fotos. Un tema que presuma imagen deja la tienda llena de agujeros justo
+    // el día que el comercio la estrena.
+    pintar(preset, producto({ primary_image_path: null }))
+
+    expect(screen.getByRole('heading', { level: 3, name: 'Silla de roble' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Agregar al carrito' })).toBeInTheDocument()
+  })
+
+  it('un nombre larguísimo no empuja el precio fuera de la tarjeta', () => {
+    const largo =
+      'Silla de roble macizo con respaldo ergonómico tapizado en lino natural y acabado mate resistente al agua'
+    pintar(preset, producto({ name: largo }))
+
+    // El nombre se recorta a dos líneas y el precio sigue estando: lo que no
+    // puede pasar es que el argumento de compra desaparezca por un título.
+    expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent(largo)
+    expect(screen.getByText(/389/)).toBeInTheDocument()
+  })
+
+  it('un producto sin categoría no deja una etiqueta vacía', () => {
+    pintar(preset, producto({ category_name: null }))
+
+    expect(screen.getByRole('heading', { level: 3, name: 'Silla de roble' })).toBeInTheDocument()
+  })
+})
+
 describe('la rejilla toma sus columnas del tema', () => {
   it('no cablea el número de columnas', () => {
     renderWithProviders(
