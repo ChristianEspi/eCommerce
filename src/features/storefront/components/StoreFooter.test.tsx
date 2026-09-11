@@ -34,9 +34,16 @@ const { StorefrontLayout } = await import('../StorefrontLayout')
 
 const STORE = 'aaaa1111-1111-4111-8111-111111111111'
 
+interface CategoriaDePrueba {
+  slug: string
+  name: string
+  parent_id?: string
+}
+
 function backend(
   tienda: Record<string, unknown> = {},
   paginas: Array<{ slug: string; title: string }> = [],
+  categorias: CategoriaDePrueba[] = [],
 ): FakeSupabase {
   return createFakeSupabase({
     tables: {
@@ -60,7 +67,17 @@ function backend(
           ...tienda,
         },
       ],
-      public_categories: [],
+      // Los identificadores son uuid de verdad: `publicCategorySchema` los
+      // valida, y con un `id-medicamentos` la consulta falla entera y el pie se
+      // queda sin categorías sin decir por qué.
+      public_categories: categorias.map((c, i) => ({
+        category_id: `bbbb${i + 1}111-1111-4111-8111-111111111111`,
+        store_id: STORE,
+        slug: c.slug,
+        name: c.name,
+        parent_id: c.parent_id ?? null,
+        position: i + 1,
+      })),
       public_products: [],
       public_product_images: [],
     },
@@ -71,8 +88,9 @@ function backend(
 async function pintar(
   tienda: Record<string, unknown> = {},
   paginas: Array<{ slug: string; title: string }> = [],
+  categorias: CategoriaDePrueba[] = [],
 ) {
-  holder.client = backend(tienda, paginas)
+  holder.client = backend(tienda, paginas, categorias)
   renderWithProviders(
     <Routes>
       <Route path="/s/:storeSlug" element={<StorefrontLayout />}>
@@ -120,7 +138,43 @@ describe('lo que el comercio escribió, sale', () => {
     // Rodríguez S.A.C.» en la factura y en el copyright.
     const pie = await pintar({ business_display_name: 'Boticas Rodríguez S.A.C.' })
 
-    expect(within(pie).getByText(/Boticas Rodríguez S\.A\.C\./)).toBeInTheDocument()
+    // Dos veces a propósito: firma la identidad arriba y el aviso legal abajo.
+    expect(within(pie).getAllByText(/Boticas Rodríguez S\.A\.C\./)).toHaveLength(2)
+  })
+
+  it('la descripción de la tienda cierra la página', async () => {
+    const pie = await pintar({ hero_subtitle: 'Medicamentos y cuidado personal desde 1998' })
+
+    expect(
+      within(pie).getByText('Medicamentos y cuidado personal desde 1998'),
+    ).toBeInTheDocument()
+  })
+
+  it('las familias del catálogo se pueden abrir desde el final', async () => {
+    // Al final de un catálogo largo, volver arriba para cambiar de familia es
+    // el motivo más común para cerrar la pestaña.
+    const pie = await pintar({}, [], [{ slug: 'medicamentos', name: 'Medicamentos' }])
+
+    const nav = await within(pie).findByRole('navigation', { name: 'Categorías' })
+    expect(within(nav).getByRole('link', { name: 'Medicamentos' })).toHaveAttribute(
+      'href',
+      '/s/botica?c=medicamentos',
+    )
+  })
+
+  it('solo las familias, no las subcategorías', async () => {
+    const pie = await pintar({}, [], [
+      { slug: 'medicamentos', name: 'Medicamentos' },
+      {
+        slug: 'antibioticos',
+        name: 'Antibióticos',
+        parent_id: 'bbbb1111-1111-4111-8111-111111111111',
+      },
+    ])
+
+    const nav = await within(pie).findByRole('navigation', { name: 'Categorías' })
+    expect(within(nav).getByRole('link', { name: 'Medicamentos' })).toBeInTheDocument()
+    expect(within(nav).queryByRole('link', { name: 'Antibióticos' })).not.toBeInTheDocument()
   })
 
   it('las condiciones de venta se alcanzan desde el pie', async () => {
@@ -140,8 +194,8 @@ describe('lo que el comercio NO escribió, no se inventa', () => {
 
     expect(within(pie).queryByText(/contacto/i)).not.toBeInTheDocument()
     expect(within(pie).queryByRole('navigation')).not.toBeInTheDocument()
-    // Y sigue habiendo pie: el aviso de copyright no depende de nada.
-    expect(within(pie).getByText(/Botica del Centro/)).toBeInTheDocument()
+    // Y sigue habiendo pie: la identidad y el aviso legal no dependen de nada.
+    expect(within(pie).getAllByText(/Botica del Centro/)).toHaveLength(2)
   })
 
   it('no aparece ni un método de pago, ni una red social, ni un horario', async () => {

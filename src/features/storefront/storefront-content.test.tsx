@@ -425,7 +425,9 @@ describe('white-label: la marca del tenant, no la de casa', () => {
     renderStorefront(backend(), '/s/casa-verde')
 
     const footer = await screen.findByRole('contentinfo')
-    expect(within(footer).getByText(/Casa Verde S\.A\.C\./)).toBeInTheDocument()
+    // Dos veces desde que el pie firma también la identidad, arriba: la razón
+    // social manda en las dos, que es de lo que va esta prueba.
+    expect(within(footer).getAllByText(/Casa Verde S\.A\.C\./)).toHaveLength(2)
   })
 
   it('la densidad de la tienda se aplica a quien llega sin preferencia', async () => {

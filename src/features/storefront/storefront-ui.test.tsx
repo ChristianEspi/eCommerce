@@ -330,7 +330,11 @@ describe('resolución del tenant por slug', () => {
     expect(
       await screen.findByRole('heading', { name: 'Muebles que duran', level: 1 }),
     ).toBeInTheDocument()
-    expect(screen.getByText('Fabricación propia')).toBeInTheDocument()
+    // La descripción de la tienda sale en la portada Y en el pie, que también
+    // la usa para presentar al comercio. Lo que aquí importa es que la portada
+    // la tenga, así que se busca dentro de ella.
+    const portada = screen.getByRole('main')
+    expect(within(portada).getByText('Fabricación propia')).toBeInTheDocument()
   })
 
   it('un slug que no resuelve da 404 de tienda, no una pantalla en blanco', async () => {
