@@ -43,6 +43,7 @@ import { GhostButton, PrimaryButton } from '@/shared/ui/buttons'
 import GroupRoundedIcon from '@mui/icons-material/GroupRounded'
 import { useSessionContext } from '@/features/auth/session-context'
 import { MembersSection } from './settings/MembersSection'
+import { StorefrontDesignSection } from './settings/StorefrontDesignSection'
 import { TaxesSection } from './settings/TaxesSection'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState, ErrorState, LoadingState, UnauthorizedState } from '@/shared/ui/states'
@@ -830,6 +831,26 @@ export function SettingsPage() {
                     />
                   </CardContent>
                 </Card>
+              </ManagedSection>
+            ),
+          },
+          {
+            id: 'design',
+            label: t('admin.settings.tab.design'),
+            content: (
+              <ManagedSection>
+                {gate ?? (
+                  <Card>
+                    <CardContent>
+                      {/* Va en su propia pestaña y no dentro de «Marca»: son dos
+                          decisiones distintas. La marca es quién eres —logo,
+                          color, nombre—; el diseño es cómo se presenta lo que
+                          vendes. Mezclarlas obliga a bajar por un color para
+                          llegar al orden de la portada. */}
+                      <StorefrontDesignSection form={form} busy={busy} />
+                    </CardContent>
+                  </Card>
+                )}
               </ManagedSection>
             ),
           },
