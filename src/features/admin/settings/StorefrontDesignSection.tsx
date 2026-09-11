@@ -16,6 +16,7 @@ import {
   type ThemePreset,
 } from '@/features/storefront/theme/types'
 import { HomeLayoutEditor } from './HomeLayoutEditor'
+import { StorefrontPreview } from './StorefrontPreview'
 import type { StoreFormValues } from './types'
 
 /**
@@ -243,6 +244,16 @@ export function StorefrontDesignSection({
       </Stack>
 
       <HomeLayoutEditor form={form} busy={busy} />
+
+      {/* La vista previa va al final y lee el formulario SIN guardar: se cambia
+          el tema arriba y se ve aquí antes de decidir. La tienda pública no se
+          entera hasta pulsar Guardar. */}
+      <StorefrontPreview
+        storeName={form.watch('name') || form.watch('business_display_name')}
+        themePreset={preset}
+        style={estilo}
+        layout={form.watch('home_layout')}
+      />
     </Stack>
   )
 }

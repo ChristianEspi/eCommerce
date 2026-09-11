@@ -270,6 +270,74 @@ describe('ordenar la portada', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Vista previa
+// ---------------------------------------------------------------------------
+
+describe('la vista previa', () => {
+  const marco = () => screen.getByTestId('preview-frame')
+
+  it('arranca en escritorio y con el tema puesto', () => {
+    pintar()
+
+    expect(marco()).toHaveAttribute('data-viewport', 'desktop')
+    expect(marco()).toHaveAttribute('data-store-theme', 'universal')
+  })
+
+  it('cambiar de tema la cambia al momento, sin guardar', async () => {
+    const user = userEvent.setup()
+    pintar()
+
+    await user.click(tema('catálogo'))
+
+    expect(marco()).toHaveAttribute('data-store-theme', 'catalog')
+    expect(marco()).toHaveAttribute('data-store-header', 'compact')
+  })
+
+  it('refleja un ajuste sin guardar', async () => {
+    const user = userEvent.setup()
+    pintar()
+
+    await user.click(screen.getByLabelText('Aire entre secciones'))
+    await user.click(screen.getByRole('option', { name: 'Amplio' }))
+
+    expect(marco()).toHaveAttribute('data-store-spacing', 'spacious')
+  })
+
+  it('refleja el orden de la portada sin guardar', async () => {
+    const user = userEvent.setup()
+    pintar()
+
+    await user.click(screen.getByRole('checkbox', { name: 'Mostrar: Marcas' }))
+
+    // La sección apagada desaparece de la vista previa igual que desaparecería
+    // de la tienda.
+    expect(within(marco()).queryByText('Marcas')).not.toBeInTheDocument()
+  })
+
+  it('se cambia de tamaño con el teclado', async () => {
+    const user = userEvent.setup()
+    pintar()
+
+    screen.getByRole('button', { name: 'Móvil' }).focus()
+    await user.keyboard('{Enter}')
+
+    expect(marco()).toHaveAttribute('data-viewport', 'mobile')
+  })
+
+  it('mirar la vista previa no guarda nada', async () => {
+    const user = userEvent.setup()
+    pintar()
+
+    await user.click(screen.getByRole('button', { name: 'Tableta' }))
+
+    // El tamaño de la vista previa es de quien mira, no de la tienda: no
+    // ensucia el formulario ni acaba en la base.
+    expect(screen.getByTestId('sucio')).toHaveTextContent('false')
+    expect(screen.getByTestId('valores').textContent).not.toContain('viewport')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Lo que se guarda
 // ---------------------------------------------------------------------------
 
