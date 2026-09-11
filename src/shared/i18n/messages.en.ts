@@ -2371,6 +2371,11 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'promotions.simulator.emptyBody':
       'Write a test cart and hit Simulate to see which campaigns come in and which do not.',
     'promotions.simulator.needLines': 'Add at least one line with a product and a quantity.',
+    'promotions.simulator.customer': 'Customer',
+    'promotions.simulator.unitPrice': 'Unit price',
+    'promotions.simulator.amount': 'Amount',
+    'promotions.hint.simulatorCustomer':
+      'Optional. Needed for coupons with a per-customer cap and for their price list.',
 
     'promotions.reason.fuera_de_publico': 'The buyer is not in its audience',
     'promotions.reason.minimo_no_alcanzado': 'Below the minimum purchase',

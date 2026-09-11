@@ -905,6 +905,96 @@ describe('limites de uso', () => {
     expect(result.discount_total).toBe('0.00')
     expect(skipped(result)['uno-por-cliente']).toBe('sin_identidad')
   })
+
+  /**
+   * El simulador recibia el cliente y tiraba su correo.
+   *
+   * Se vio probando el cupon MIQ006 (Bienvenida 10 %, tope 1 por cliente) contra
+   * el proyecto de demostracion: respondia `sin_identidad` SIEMPRE, incluso
+   * llamando a la funcion a mano con un cliente valido. Un cupon con tope por
+   * cliente no se podia comprobar sin hacer un pedido de verdad, que es justo lo
+   * que el simulador existe para evitar.
+   */
+  it('simular a nombre de un cliente SI permite comprobar un cupon con tope', async () => {
+    const promo = await createPromotion({
+      code: 'bienvenida-sim', percent: '10', requiresCoupon: true,
+    })
+    await addScope({ promotion: promo, kind: 'all' })
+    await addCoupon({ promotion: promo, code: 'SIMBIENVENIDA', usageLimitPerCustomer: 1 })
+
+    const cliente = await id(
+      `insert into public.customers (organization_id, company_id, kind, code, name, email)
+       values ($1, $2, 'person', 'CLI-SIM', 'Cliente Simulado', 'sim@cliente.demo')
+       returning id`,
+      [TENANT_A.organizationId, TENANT_A.companyId],
+    )
+
+    const correr = async (customer: string | null) => {
+      const [row] = await simulate(
+        `select public.promotion_simulate($1, $2::jsonb, $3::text[], null, null, $4) as q`,
+        [storeA, payload([{ product: toalla, quantity: 1 }]), ['SIMBIENVENIDA'], customer],
+      )
+      return row?.q as Json
+    }
+
+    // Sin cliente sigue negandose, y debe seguir haciendolo: un tope por
+    // cliente no se puede cumplir sin saber de quien.
+    const anonimo = await correr(null)
+    expect(coupons(anonimo)['SIMBIENVENIDA']).toBe('sin_identidad')
+    expect(anonimo.discount_total).toBe('0.00')
+
+    // Con cliente, el motor ya sabe a quien contarle el uso: el cupon entra.
+    const conCliente = await correr(cliente)
+    expect(coupons(conCliente)['SIMBIENVENIDA']).toBe('aplicado')
+    expect(conCliente.discount_total).toBe('2.50')
+  })
+
+  it('y si ese cliente ya lo canjeo, el simulador lo dice', async () => {
+    const promo = await createPromotion({
+      code: 'bienvenida-gastada', percent: '10', requiresCoupon: true,
+    })
+    await addScope({ promotion: promo, kind: 'all' })
+    const cupon = await addCoupon({
+      promotion: promo, code: 'SIMGASTADA', usageLimitPerCustomer: 1,
+    })
+    const cliente = await id(
+      `insert into public.customers (organization_id, company_id, kind, code, name, email)
+       values ($1, $2, 'person', 'CLI-GASTO', 'Cliente Repetidor', 'repite@cliente.demo')
+       returning id`,
+      [TENANT_A.organizationId, TENANT_A.companyId],
+    )
+
+    // Un canje previo de ESE cliente. Hace falta un pedido porque el canje
+    // cuelga de uno: un descuento que no se aplicó a nada no se canjeó.
+    const pedido = await id(
+      `insert into public.orders
+         (organization_id, company_id, store_id, channel_id, order_number, status,
+          currency, customer_email, subtotal, discount_total, tax_total, grand_total)
+       values ($1, $2, $3, $4, 'SIM-0001', 'pending', 'PEN',
+               'repite@cliente.demo', '25.00', '2.50', '0.00', '22.50')
+       returning id`,
+      [TENANT_A.organizationId, TENANT_A.companyId, storeA, channelB2b],
+    )
+
+    await svc(
+      `insert into public.promotion_redemptions
+         (organization_id, company_id, store_id, promotion_id, coupon_id, order_id,
+          customer_id, customer_email, discount_amount, currency)
+       values ($1, $2, $3, $4, $5, $6, $7, 'repite@cliente.demo', '2.50', 'PEN')`,
+      [TENANT_A.organizationId, TENANT_A.companyId, storeA, promo, cupon, pedido, cliente],
+    )
+
+    const [row] = await simulate(
+      `select public.promotion_simulate($1, $2::jsonb, $3::text[], null, null, $4) as q`,
+      [storeA, payload([{ product: toalla, quantity: 1 }]), ['SIMGASTADA'], cliente],
+    )
+    const result = row?.q as Json
+
+    // Esto es lo que resuelve el ticket de soporte: no «no pasa nada», sino
+    // «esta persona ya lo usó».
+    expect(coupons(result)['SIMGASTADA']).toBe('agotado_para_ti')
+    expect(result.discount_total).toBe('0.00')
+  })
 })
 
 // ===========================================================================

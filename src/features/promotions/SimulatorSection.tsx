@@ -19,15 +19,114 @@ import { useState } from 'react'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
+import { EntityPicker, type PickerOption } from '@/shared/ui/EntityPicker'
+import { useDebouncedValue } from '@/shared/lib/useDebouncedValue'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState } from '@/shared/ui/states'
 import { PromotionsError } from './errors'
-import { useSimulate } from './hooks'
+import { useCustomerOptions } from '@/features/customers/hooks'
+import { useScopeTargets, useSimulate } from './hooks'
 import type { Simulation } from './types'
 
+/**
+ * El producto de una línea, BUSCÁNDOLO por nombre o código.
+ *
+ * ## Por qué es un componente y no un campo más
+ *
+ * Porque cada línea necesita su propia consulta, y un hook dentro de un bucle
+ * cambia de número cuando se añade o se quita una línea — que es justo lo que
+ * React no admite. Con un componente por línea, cada una tiene su búsqueda y
+ * quitar la de en medio no descoloca a las demás.
+ *
+ * ## Qué arregla
+ *
+ * El campo era un cuadro de texto cuyo contenido se enviaba TAL CUAL como
+ * `product_id`, que es un uuid. La ayuda decía «escribe el nombre o el código»
+ * y eso no podía funcionar: nadie tiene a mano el uuid de un producto, no se
+ * enseña en ninguna pantalla, y escribir «Pañales» devolvía un error de tipo.
+ * El simulador estaba, se veía bien y no se podía usar.
+ *
+ * Es el mismo buscador que ya usa el cajón de campañas para elegir el alcance,
+ * y lo es a propósito: dos formas distintas de elegir un producto en la misma
+ * pantalla de promociones serían dos cosas que aprender para la misma.
+ */
+function ProductoDeLinea({
+  storeId,
+  disabled,
+  onPick,
+}: {
+  storeId: string | null
+  disabled: boolean
+  onPick: (productId: string) => void
+}) {
+  const { t } = useI18n()
+  const [term, setTerm] = useState('')
+  const [picked, setPicked] = useState<PickerOption | null>(null)
+  const debounced = useDebouncedValue(term, 300)
+
+  // Con algo ya elegido y el texto igual a su nombre no hay nada que buscar: la
+  // consulta devolvería justo lo que ya está elegido.
+  const yaElegido = picked !== null && picked.primary === debounced
+  const targets = useScopeTargets(storeId, 'product', debounced, !yaElegido)
+
+  const options: PickerOption[] = (targets.data ?? []).map((fila) => ({
+    id: fila.id,
+    primary: fila.name,
+    secondary: fila.code,
+  }))
+
+  return (
+    <EntityPicker
+      label={t('promotions.simulator.product')}
+      placeholder={t('promotions.hint.target')}
+      term={term}
+      onTermChange={setTerm}
+      options={options}
+      value={picked}
+      loading={targets.isFetching}
+      disabled={disabled}
+      onPick={(option) => {
+        setPicked(option)
+        // El campo pasa a decir lo ELEGIDO, no lo tecleado.
+        setTerm(option.primary)
+        onPick(option.id)
+      }}
+      onClear={() => {
+        setPicked(null)
+        setTerm('')
+        onPick('')
+      }}
+    />
+  )
+}
+
 interface Line {
+  /** Estable: quitar la línea de en medio no puede descolocar a las de abajo. */
+  id: string
   productId: string
   quantity: string
+}
+
+function lineaVacia(): Line {
+  return { id: crypto.randomUUID(), productId: '', quantity: '1' }
+}
+
+/**
+ * Las descartadas, agrupadas por el motivo.
+ *
+ * Se conserva el orden en el que llegaron: el motor las devuelve por prioridad,
+ * y reordenarlas alfabéticamente escondería cuál pesa más.
+ */
+function agruparPorMotivo(
+  skipped: ReadonlyArray<{ code: string; reason: string }>,
+): Array<[string, string[]]> {
+  const grupos = new Map<string, string[]>()
+  for (const entry of skipped) {
+    const codigos = grupos.get(entry.reason)
+    if (codigos) codigos.push(entry.code)
+    else grupos.set(entry.reason, [entry.code])
+  }
+  return [...grupos.entries()]
 }
 
 /**
@@ -52,10 +151,35 @@ export function SimulatorSection() {
   const { notify } = useFeedback()
   const { activeStore } = useTenant()
 
-  const [lines, setLines] = useState<Line[]>([{ productId: '', quantity: '1' }])
+  const [lines, setLines] = useState<Line[]>([lineaVacia()])
   const [coupons, setCoupons] = useState('')
   const [at, setAt] = useState('')
   const [result, setResult] = useState<Simulation | null>(null)
+
+  /**
+   * A nombre de QUIÉN se simula.
+   *
+   * Opcional, y aun así imprescindible: un cupón con tope por cliente —«uno por
+   * persona», que es el caso normal de un cupón de bienvenida— no se puede
+   * evaluar sin saber quién lo usa. El motor responde `sin_identidad` y la
+   * pantalla decía «falta el correo» sin ofrecer dónde ponerlo.
+   *
+   * También cambia el precio: un cliente con lista de precios acordada no paga
+   * lo mismo que el mostrador, y simular sin él responde por otro carrito.
+   */
+  const [customerTerm, setCustomerTerm] = useState('')
+  const [customer, setCustomer] = useState<PickerOption | null>(null)
+  const customerDebounced = useDebouncedValue(customerTerm, 300)
+  const customerYaElegido = customer !== null && customer.primary === customerDebounced
+  const customers = useCustomerOptions({
+    term: customerDebounced,
+    enabled: !customerYaElegido && customerDebounced.trim().length >= 2,
+  })
+  const customerOptions: PickerOption[] = (customers.data ?? []).map((fila) => ({
+    id: fila.id,
+    primary: fila.name,
+    secondary: fila.email ?? fila.code,
+  }))
 
   const simulate = useSimulate()
 
@@ -91,7 +215,7 @@ export function SimulatorSection() {
             .filter((code) => code !== ''),
           channelId: null,
           segmentId: null,
-          customerId: null,
+          customerId: customer?.id ?? null,
           at: at === '' ? null : at,
         }),
       )
@@ -110,14 +234,11 @@ export function SimulatorSection() {
       <Card sx={{ p: 2 }}>
         <Stack spacing={2}>
           {lines.map((line, index) => (
-            <Stack key={index} direction="row" spacing={1} alignItems="center">
-              <TextField
-                size="small"
-                label={t('promotions.simulator.product')}
-                value={line.productId}
-                onChange={(event) => update(index, { productId: event.target.value })}
-                helperText={index === 0 ? t('promotions.hint.target') : undefined}
-                fullWidth
+            <Stack key={line.id} direction="row" spacing={1} alignItems="center">
+              <ProductoDeLinea
+                storeId={activeStore?.id ?? null}
+                disabled={simulate.isPending}
+                onPick={(productId) => update(index, { productId })}
               />
               <TextField
                 size="small"
@@ -137,7 +258,7 @@ export function SimulatorSection() {
           ))}
           <Button
             size="small"
-            onClick={() => setLines((previous) => [...previous, { productId: '', quantity: '1' }])}
+            onClick={() => setLines((previous) => [...previous, lineaVacia()])}
             sx={{ alignSelf: 'flex-start' }}
           >
             {t('promotions.simulator.addLine')}
@@ -146,6 +267,25 @@ export function SimulatorSection() {
           <Divider />
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+            <EntityPicker
+              label={t('promotions.simulator.customer')}
+              placeholder={t('promotions.hint.simulatorCustomer')}
+              term={customerTerm}
+              onTermChange={setCustomerTerm}
+              options={customerOptions}
+              value={customer}
+              loading={customers.isFetching}
+              disabled={simulate.isPending}
+              helperText={t('promotions.hint.simulatorCustomer')}
+              onPick={(option) => {
+                setCustomer(option)
+                setCustomerTerm(option.primary)
+              }}
+              onClear={() => {
+                setCustomer(null)
+                setCustomerTerm('')
+              }}
+            />
             <TextField
               size="small"
               label={t('promotions.simulator.coupons')}
@@ -199,7 +339,13 @@ export function SimulatorSection() {
                 <TableRow>
                   <TableCell>{t('promotions.simulator.line')}</TableCell>
                   <TableCell align="right">{t('promotions.simulator.quantity')}</TableCell>
-                  <TableCell align="right">{t('common.price')}</TableCell>
+                  {/* Dos columnas y no una. La de «precio» enseñaba el importe
+                      de la línea, así que cuatro unidades a 50 se leían como
+                      «4 × 200» y el subtotal parecía mal calculado. El unitario
+                      es lo que se compara con la lista; el importe es lo que
+                      suma. Juntarlos obligaba a dividir de cabeza. */}
+                  <TableCell align="right">{t('promotions.simulator.unitPrice')}</TableCell>
+                  <TableCell align="right">{t('promotions.simulator.amount')}</TableCell>
                   <TableCell align="right">{t('promotions.field.discount')}</TableCell>
                 </TableRow>
               </TableHead>
@@ -208,8 +354,13 @@ export function SimulatorSection() {
                   <TableRow key={`${line.product_id}-${line.name}`}>
                     <TableCell>{line.name}</TableCell>
                     <TableCell align="right">{line.quantity}</TableCell>
+                    <TableCell align="right">{line.unit_price}</TableCell>
                     <TableCell align="right">{line.net_amount}</TableCell>
-                    <TableCell align="right">−{line.discount}</TableCell>
+                    {/* Una raya y no «−0»: un cero con signo menos delante se
+                        lee como un descuento diminuto, y es que no hay. */}
+                    <TableCell align="right">
+                      {Number(line.discount) > 0 ? `−${line.discount}` : '—'}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -259,12 +410,26 @@ export function SimulatorSection() {
             {result.promotions.skipped.length > 0 && (
               <Stack spacing={1}>
                 <Typography variant="subtitle2">{t('promotions.simulator.skipped')}</Typography>
-                {result.promotions.skipped.map((entry) => (
-                  <Stack key={entry.code} direction="row" spacing={1} alignItems="center">
-                    <StatusChip label={entry.code} />
-                    <Typography sx={{ color: 'var(--muted)' }}>
-                      {t(`promotions.reason.${entry.reason}` as MessageKey)}
+                {/* Agrupadas POR MOTIVO, no una fila por campaña.
+                    Una tienda con veinte campañas activas producía veinte
+                    líneas repitiendo «No alcanza ninguna línea del carrito», y
+                    entre ellas se perdía la única que decía algo distinto —que
+                    es justo la que se venía a buscar—. El motivo manda; los
+                    códigos van a su lado. */}
+                {agruparPorMotivo(result.promotions.skipped).map(([reason, codes]) => (
+                  <Stack
+                    key={reason}
+                    direction="row"
+                    spacing={1}
+                    alignItems="center"
+                    sx={{ flexWrap: 'wrap', rowGap: 0.5 }}
+                  >
+                    <Typography sx={{ color: 'var(--muted)', minWidth: 0 }}>
+                      {t(`promotions.reason.${reason}` as MessageKey)}
                     </Typography>
+                    {codes.map((code) => (
+                      <StatusChip key={code} label={code} />
+                    ))}
                   </Stack>
                 ))}
               </Stack>

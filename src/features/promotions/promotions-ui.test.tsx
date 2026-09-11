@@ -497,13 +497,51 @@ describe('Tarjetas regalo', () => {
   })
 })
 
+/**
+ * Elige el producto como lo elige una persona: escribiendo parte del nombre y
+ * pulsando el resultado.
+ *
+ * El campo era un cuadro de texto y lo tecleado se enviaba tal cual como
+ * `product_id`. Escribir «p1» valía para la prueba y no valía para nadie más:
+ * el uuid de un producto no se enseña en ninguna pantalla. Ahora hay que
+ * ELEGIR, y la prueba tiene que hacer lo mismo que hará quien lo use.
+ */
+async function elegirProducto(usuario: ReturnType<typeof userEvent.setup>) {
+  await usuario.type(screen.getByLabelText('Producto'), 'Alitraq')
+  await usuario.click(await screen.findByText('Alitraq Polvo Oral'))
+}
+
 describe('Simulador', () => {
+  it('el producto se busca por nombre, no se escribe su identificador', async () => {
+    renderPromotions(backend())
+    const usuario = userEvent.setup()
+    await usuario.click(await screen.findByRole('tab', { name: 'Simulador' }))
+
+    await usuario.type(screen.getByLabelText('Producto'), 'Alitraq')
+
+    // El código se enseña junto al nombre: es lo que el comercio reconoce.
+    expect(await screen.findByText('Alitraq Polvo Oral')).toBeInTheDocument()
+    expect(screen.getByText('QS-565341')).toBeInTheDocument()
+  })
+
+  it('sin elegir producto no simula: avisa en vez de mandar basura', async () => {
+    renderPromotions(backend())
+    const usuario = userEvent.setup()
+    await usuario.click(await screen.findByRole('tab', { name: 'Simulador' }))
+
+    await usuario.type(screen.getByLabelText('Producto'), 'Alitraq')
+    await usuario.click(screen.getByRole('button', { name: 'Simular' }))
+
+    // Escribir no es elegir. Antes, lo tecleado viajaba como `product_id`.
+    expect(await screen.findByText('Añade al menos una línea con producto y cantidad.')).toBeInTheDocument()
+  })
+
   it('enseña lo aplicado Y lo descartado con su motivo', async () => {
     renderPromotions(backend())
     const usuario = userEvent.setup()
     await usuario.click(await screen.findByRole('tab', { name: 'Simulador' }))
 
-    await usuario.type(screen.getByLabelText('Producto'), 'p1')
+    await elegirProducto(usuario)
     await usuario.click(screen.getByRole('button', { name: 'Simular' }))
 
     expect(await screen.findByText('Se aplicaron')).toBeInTheDocument()
@@ -524,7 +562,7 @@ describe('Simulador', () => {
     renderPromotions(backend())
     const usuario = userEvent.setup()
     await usuario.click(await screen.findByRole('tab', { name: 'Simulador' }))
-    await usuario.type(screen.getByLabelText('Producto'), 'p1')
+    await elegirProducto(usuario)
     await usuario.click(screen.getByRole('button', { name: 'Simular' }))
 
     expect(await screen.findByText('100.00 PEN')).toBeInTheDocument()
