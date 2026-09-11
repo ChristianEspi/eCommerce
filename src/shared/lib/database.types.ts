@@ -11402,6 +11402,7 @@ export type Database = {
           p_location_id?: string
           p_role: Database["public"]["Enums"]["business_role"]
           p_spending_limit?: number
+          p_status?: Database["public"]["Enums"]["member_status"]
         }
         Returns: string
       }

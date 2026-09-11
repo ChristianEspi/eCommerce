@@ -512,6 +512,10 @@ export async function saveAccountUser(input: {
         p_role: input.values.role,
         p_spending_limit: fields.spending_limit,
         p_location_id: fields.default_location_id,
+        // El estado que se eligió, no «activo» por costumbre: el portal del
+        // comprador exige `active` para dejar entrar, así que forzarlo daría
+        // acceso a quien se marcó como invitado.
+        p_status: fields.status,
       })
 
   if (error) throw customersErrorFromDb(error)

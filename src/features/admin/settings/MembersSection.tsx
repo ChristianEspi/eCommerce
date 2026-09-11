@@ -21,6 +21,8 @@ import {
 import { useState } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
+import { codeFromDbError, type PostgrestLike } from '@/shared/lib/appError'
+import { mapSettingsCode } from './api'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
 import {
@@ -107,9 +109,12 @@ export function MembersSection({
       notify(t('settings.members.added'), 'success')
       cerrar()
     } catch (fallo) {
-      // La base es la autoridad: si rechaza, se dice lo que dijo en vez de
-      // inventar un motivo. Duplicar a alguien que ya está es el caso normal.
-      setError(fallo instanceof Error ? fallo.message : t('common.error.title'))
+      // La base es la autoridad, pero su MENSAJE no llega a la pantalla: se
+      // traduce su código. Un texto de Postgres lleva dentro nombres de tabla y
+      // de restricción, y aquí además el caso frecuente tiene una respuesta
+      // concreta que dar —«esa persona todavía no tiene cuenta»— en vez de un
+      // «algo salió mal» que no dice qué hacer.
+      setError(t(mapSettingsCode(codeFromDbError(fallo as PostgrestLike))))
     }
   }
 

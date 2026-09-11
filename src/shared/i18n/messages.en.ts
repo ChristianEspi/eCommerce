@@ -125,6 +125,10 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'settings.members.restore': 'Restore access',
     'settings.members.restored': 'Access restored',
     'settings.members.error.email': 'Enter a valid email address.',
+    'settings.members.error.noAccount':
+      'That email does not have an account yet. Ask them to sign up first; then you can grant access here.',
+    'settings.members.error.ownerRole':
+      'The owner role is not granted from here: it is born with the account.',
     'settings.members.error.userId': 'That identifier does not have the expected shape.',
     'settings.members.role.owner': 'Owner',
     'settings.members.role.admin': 'Administrator',
@@ -1804,6 +1808,8 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'customers.error.approver': 'A viewer cannot approve',
     'customers.error.userId': 'Paste the user identifier issued by the hub',
     'customers.error.suiteEmail': 'A suite account cannot buy on behalf of a customer',
+    'customers.error.noAccount':
+      'That email does not have an account yet. Ask them to sign up in your store; then you can link them here.',
     'customers.error.thresholdNeedsControl': 'Turn on “requires approval” to set a threshold',
     'customers.error.customerRequired': 'Pick the company customer for this account',
     'customers.error.duplicate': 'A record with that value already exists.',

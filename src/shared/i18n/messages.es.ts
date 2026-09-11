@@ -127,6 +127,10 @@ export const es = {
     'settings.members.restore': 'Devolver acceso',
     'settings.members.restored': 'Acceso devuelto',
     'settings.members.error.email': 'Escribe un correo válido.',
+    'settings.members.error.noAccount':
+      'Ese correo todavía no tiene cuenta. Pídele que entre y se registre; después podrás darle acceso aquí.',
+    'settings.members.error.ownerRole':
+      'El rol de propietario no se otorga desde aquí: nace con la cuenta.',
     'settings.members.error.userId': 'El identificador no tiene la forma esperada.',
     'settings.members.role.owner': 'Propietario',
     'settings.members.role.admin': 'Administrador',
@@ -1814,6 +1818,8 @@ export const es = {
     'customers.error.approver': 'Un observador no puede aprobar',
     'customers.error.userId': 'Pega el identificador de usuario que emite el hub',
     'customers.error.suiteEmail': 'Una cuenta de la suite no puede comprar en nombre de un cliente',
+    'customers.error.noAccount':
+      'Ese correo todavía no tiene cuenta. Pídele que entre a tu tienda y se registre; después podrás vincularlo aquí.',
     'customers.error.thresholdNeedsControl': 'Enciende «exige aprobación» para fijar un umbral',
     'customers.error.customerRequired': 'Elige el cliente empresa de esta cuenta',
     'customers.error.duplicate': 'Ya existe un registro con ese dato.',

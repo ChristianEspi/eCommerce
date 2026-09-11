@@ -18,6 +18,21 @@ export class CustomersError extends UiError {
 
 export function mapCustomersCode(code: string): MessageKey {
   switch (code) {
+    /**
+     * El caso más común al vincular a alguien, y el que más caro sale callar.
+     *
+     * Vincular exige que esa persona YA tenga cuenta: la identidad es de la
+     * plataforma y esta pantalla solo le da acceso a una cuenta de empresa. Sin
+     * este caso, el intento respondía «No pudimos completar la operación», que
+     * no dice qué hacer — y lo que hay que hacer es concreto: que entre a la
+     * tienda y se registre.
+     */
+    case 'SIN_CUENTA':
+      return 'customers.error.noAccount'
+    case 'CORREO_DE_SUITE':
+      return 'customers.error.suiteEmail'
+    case 'CORREO_INVALIDO':
+      return 'customers.error.email'
     case 'DUPLICADO':
     case '23505':
       return 'customers.error.duplicate'

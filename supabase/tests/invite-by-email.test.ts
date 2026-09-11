@@ -221,22 +221,53 @@ describe('quién entra al backoffice', () => {
 // ---------------------------------------------------------------------------
 
 describe('quién compra a nombre de una cuenta', () => {
-  const alta = (email: string, rol = 'buyer', limite: number | null = null) =>
+  const alta = (
+    email: string,
+    rol = 'buyer',
+    limite: number | null = null,
+    estado = 'invited',
+  ) =>
     comoAdmin(TENANT_A, () =>
       svc(
-        `select public.add_business_account_user($1, $2, $3::public.business_role, $4, null)`,
-        [cuentaA, email, rol, limite],
+        `select public.add_business_account_user(
+           $1, $2, $3::public.business_role, $4, null, $5::public.member_status)`,
+        [cuentaA, email, rol, limite, estado],
       ),
     )
 
   it('basta el correo, igual que en el backoffice', async () => {
     await alta('compradora@cliente.com')
 
-    const [fila] = await svc<{ user_id: string; role: string; status: string }>(
-      `select user_id, role, status from public.business_account_users
+    const [fila] = await svc<{ user_id: string; role: string }>(
+      `select user_id, role from public.business_account_users
         where email = 'compradora@cliente.com'`,
     )
     expect(fila?.user_id).toBe(COMPRADORA)
+    expect(fila?.role).toBe('buyer')
+  })
+
+  /**
+   * El estado NO es decorativo: el portal del comprador exige `active` para
+   * dejar entrar. Una versión anterior de esta función escribía `active`
+   * siempre, así que marcar a alguien como «invitado» y darle acceso inmediato
+   * a comprar a nombre de la empresa eran la misma acción — con la pantalla
+   * diciendo lo contrario.
+   */
+  it('vincular como INVITADO no da acceso a comprar', async () => {
+    await alta('compradora@cliente.com', 'buyer', null, 'invited')
+
+    const [fila] = await svc<{ status: string }>(
+      `select status from public.business_account_users where email = 'compradora@cliente.com'`,
+    )
+    expect(fila?.status).toBe('invited')
+  })
+
+  it('y activarlo es una decisión explícita', async () => {
+    await alta('compradora@cliente.com', 'buyer', null, 'active')
+
+    const [fila] = await svc<{ status: string }>(
+      `select status from public.business_account_users where email = 'compradora@cliente.com'`,
+    )
     expect(fila?.status).toBe('active')
   })
 
@@ -263,7 +294,7 @@ describe('quién compra a nombre de una cuenta', () => {
   it('el admin de otra sociedad no toca esta cuenta', async () => {
     const error = await expectFailure(() =>
       comoAdmin(TENANT_B, () =>
-        svc(`select public.add_business_account_user($1, 'compradora@cliente.com', 'buyer', null, null)`, [
+        svc(`select public.add_business_account_user($1, 'compradora@cliente.com', 'buyer', null, null, 'invited')`, [
           cuentaA,
         ]),
       ),

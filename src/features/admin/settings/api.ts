@@ -37,6 +37,13 @@ export class SettingsError extends UiError {
 
 export function mapSettingsCode(code: string): MessageKey {
   switch (code) {
+    // Dar acceso exige que esa persona YA tenga cuenta: la identidad es de la
+    // plataforma y esta pantalla solo reparte membresía. Decirlo evita el
+    // «algo salió mal» que no indica qué hacer.
+    case 'SIN_CUENTA':
+      return 'settings.members.error.noAccount'
+    case 'ROL_NO_ASIGNABLE':
+      return 'settings.members.error.ownerRole'
     case 'SIN_PERMISO':
     case 'NO_AUTENTICADO':
     case '42501':

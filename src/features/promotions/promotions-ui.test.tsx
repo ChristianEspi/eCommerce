@@ -508,7 +508,11 @@ describe('Tarjetas regalo', () => {
  */
 async function elegirProducto(usuario: ReturnType<typeof userEvent.setup>) {
   await usuario.type(screen.getByLabelText('Producto'), 'Alitraq')
-  await usuario.click(await screen.findByText('Alitraq Polvo Oral'))
+  // Con margen: entre teclear y ver la opción hay un rebote de 300 ms y una
+  // consulta. El segundo por defecto alcanza en una máquina tranquila y no
+  // cuando la suite entera corre en paralelo — y una prueba que solo falla
+  // cuando hay prisa es peor que una que falla siempre.
+  await usuario.click(await screen.findByText('Alitraq Polvo Oral', {}, { timeout: 5000 }))
 }
 
 describe('Simulador', () => {
@@ -520,7 +524,9 @@ describe('Simulador', () => {
     await usuario.type(screen.getByLabelText('Producto'), 'Alitraq')
 
     // El código se enseña junto al nombre: es lo que el comercio reconoce.
-    expect(await screen.findByText('Alitraq Polvo Oral')).toBeInTheDocument()
+    expect(
+      await screen.findByText('Alitraq Polvo Oral', {}, { timeout: 5000 }),
+    ).toBeInTheDocument()
     expect(screen.getByText('QS-565341')).toBeInTheDocument()
   })
 
