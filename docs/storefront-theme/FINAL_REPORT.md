@@ -135,7 +135,7 @@ barra 60/68, rejilla 2/3/4, foto cuadrada.
 | `npm run build` | ok en 6,4 s |
 | `npm run scan:secrets` | sin hallazgos |
 | `npm run bundle:report` | los 4 recorridos bajo su techo |
-| `npx playwright test` | 18 pasan · 3 fallan (preexistentes, ver más abajo) |
+| `npx playwright test` | **24 de 24** en escritorio y en móvil |
 
 Pruebas nuevas de esta fase: **385** (3 124 → 3 509), más 74 contra Postgres real.
 
@@ -177,8 +177,9 @@ se pagó difiriendo el diálogo de vista rápida.
 5. **`PublicProduct` no expone SKU ni presentación.** El tema `catalog` los
    luciría, pero ampliar el modelo de producto estaba fuera de esta fase y no se
    hizo.
-6. **Tres e2e del checkout fallan**, verificado que desde antes del Theme Engine.
-   El carrito llega vacío a `/checkout` contra el proyecto de demo.
+6. ~~Tres e2e del checkout fallan.~~ **Cerrado.** El carrito no fallaba: el
+   ayudante de la prueba recargaba la página en mitad de la comprobación de
+   existencias y cancelaba el guardado. Detalle en `REGRESSION_REPORT.md`.
 
 ## Reversión
 

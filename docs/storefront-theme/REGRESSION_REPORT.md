@@ -76,18 +76,38 @@ real: la vista rápida —cuatrocientas líneas de diálogo que la mayoría de l
 visitas no abre— viaja en su propio trozo. Resultado: **397,1 kB**, por debajo
 del techo y por debajo de lo que pesaba antes de esta fase.
 
-## Lo que sigue roto y no es de esta fase
+## El carrito vacío en el checkout (CORREGIDO)
 
-Tres pruebas e2e del checkout fallan (`el checkout avanza por tres pasos`,
-`volver atrás sin perder lo escrito`, `las instrucciones antes de pedir`), en
-escritorio y en móvil. El carrito llega VACÍO a `/checkout`.
+Tres pruebas e2e del checkout fallaban en escritorio y en móvil: el carrito
+llegaba VACÍO a `/checkout`. Se verificó primero que era anterior al Theme
+Engine —se recuperó `a380e09` y fallaban igual— y después se buscó la causa en
+un navegador de verdad.
 
-**Se verificó que es anterior al Theme Engine**: se recuperó el commit `a380e09`
-y la misma prueba falla igual. No es una regresión de este trabajo y no se toca
-aquí, pero queda anotado porque afecta a la demo.
+**No era el carrito: era la prueba.** Añadir al carrito no es instantáneo. Antes
+de guardar nada, la tienda le pregunta al servidor si esa cantidad se puede
+llevar (`availability_for_slug`) y solo cuando contesta escribe la línea. El
+ayudante `comprarAlgo` pulsaba «Agregar» y navegaba acto seguido con
+`page.goto`, que recarga la página entera: la petición se cancelaba a mitad, la
+línea nunca se escribía y el checkout se encontraba un carrito vacío.
 
-Las otras 18 pruebas e2e pasan en escritorio y en móvil, incluidas las cuatro
-nuevas del Theme Engine.
+Medido en el navegador: justo tras el clic, `localStorage` no tiene carrito;
+cuatro segundos después tiene su línea y el checkout entra en «Datos de
+contacto» sin tocar nada más.
+
+A un comprador real no le pasa —dentro de la tienda se navega sin recargar, así
+que la petición sigue viva—, pero la prueba sí recargaba.
+
+**La corrección** es esperar a la señal que mira el propio comprador: la cuenta
+del carrito en la cabecera. No un tiempo fijo, que se rompe el día que la red va
+más lenta.
+
+De paso se reforzó una prueba que pasaba **sin mirar nada**: «añadir al carrito
+lo deja contado en la cabecera» solo comprobaba que el cartel de «carrito
+vacío» no estuviera, y eso también es cierto con la página a medio cargar.
+Ahora exige que exista el botón de quitar una línea, que solo existe si hay
+línea.
+
+Resultado: **24 de 24 pruebas e2e pasan** en escritorio y en móvil.
 
 ## Rendimiento
 

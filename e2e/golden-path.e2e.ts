@@ -22,7 +22,25 @@ import type { Page } from '@playwright/test'
  */
 const FICHA = 'a[href*="/product/"]'
 
-/** Deja el carrito con una línea, recorriendo la tienda como se recorre. */
+/**
+ * Deja el carrito con una línea, recorriendo la tienda como se recorre.
+ *
+ * ## Por qué espera a la cuenta de la cabecera
+ *
+ * Añadir NO es instantáneo: antes de guardar nada, la tienda le pregunta al
+ * servidor si esa cantidad se puede llevar (`availability_for_slug`), y solo
+ * cuando contesta escribe la línea. Entre el clic y la respuesta hay un viaje
+ * de ida y vuelta.
+ *
+ * Mientras esta función no esperaba, quien la usaba para después navegar con
+ * `page.goto` recargaba la página en mitad de esa pregunta: la petición se
+ * cancelaba, la línea no llegaba a escribirse y el checkout se encontraba un
+ * carrito vacío. Tres pruebas fallaban por eso, y la culpa no era del carrito.
+ *
+ * Se espera a la CUENTA de la cabecera y no a un tiempo fijo: es la señal que
+ * el propio comprador mira para saber que su producto entró, y no se rompe el
+ * día que la red vaya más lenta.
+ */
 async function comprarAlgo(page: Page) {
   await page.goto(TIENDA)
   await esperarCatalogo(page)
@@ -30,6 +48,10 @@ async function comprarAlgo(page: Page) {
   await expect(page).toHaveURL(/\/product\//)
 
   await page.getByRole('button', { name: /agregar al carrito|añadir al carrito/i }).first().click()
+
+  await expect(page.getByRole('button', { name: /carrito \(\d+\)/i })).toBeVisible({
+    timeout: 20_000,
+  })
 }
 
 test.describe('la vitrina', () => {
@@ -74,8 +96,17 @@ test.describe('la vitrina', () => {
     await comprarAlgo(page)
 
     await page.goto(`${TIENDA}/cart`)
-    // El carrito ya no está vacío: es la única forma de saber que «agregar»
-    // agregó algo, y no solo movió un botón.
+
+    // Se afirma lo que SÍ tiene que haber, no solo lo que no.
+    //
+    // Antes se comprobaba únicamente que el cartel de «carrito vacío» no
+    // estuviera, y eso pasaba también con la página a medio cargar: mientras
+    // llega la cotización no hay ni líneas ni cartel, así que la prueba daba
+    // verde sin haber mirado nada. Un botón de quitar solo existe si hay una
+    // línea que quitar.
+    await expect(page.getByRole('button', { name: /quitar|eliminar/i }).first()).toBeVisible({
+      timeout: 20_000,
+    })
     await expect(page.getByText(/Tu carrito está vacío/i)).toHaveCount(0)
   })
 
