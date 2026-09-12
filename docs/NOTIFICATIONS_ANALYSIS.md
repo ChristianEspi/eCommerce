@@ -1,6 +1,11 @@
 # Notificaciones — análisis previo a codificar
 
-Estado: **propuesta, sin código.** Fecha: 2026-09-12.
+Estado: **entregas 1 y 2 construidas** el 2026-09-12 —núcleo y avisos P1—, con las decisiones de la
+sección 7 tomadas como se proponen: buzón `ecommerce@grupoebim.com`, remitente «eCommerce by EBIM»
+con la marca de la tienda dentro del correo, y la lista P1 completa. El correo queda bloqueado hasta
+que el operador cargue los secretos `MS_*`. Detalle y pendientes en `docs/STATE.md`.
+
+Propuesta original, del mismo día:
 Pedido del operador: avisar a los usuarios de lo que les afecta, en el backoffice y en la tienda,
 empezando por el sugerido de pedido. Este documento dice qué existe, qué regla de suite manda, qué
 se podría notificar y en qué orden construirlo.

@@ -107,29 +107,48 @@ Verificación: `supabase/tests/create-user.test.ts` (29) sobre la lógica y el o
 `index.ts`; `src/features/auth/createAccount.test.tsx` (10) sobre la pantalla. Gates completos en
 verde: `typecheck`, `lint`, `build`, `bundle:report` y **183 archivos / 3594 tests**.
 
-> **Falta desplegar.** La función NO está desplegada; hasta que lo esté, el botón «Crear la cuenta»
-> responde error. Requiere `supabase functions deploy create-user` y que el proyecto tenga
-> `SUPABASE_SERVICE_ROLE_KEY` en el entorno de funciones. No se hizo: no hay orden de despliegue.
+**Desplegada en DEV** el 2026-09-12 por orden del operador. Para las demos, `EBIM_DEMO_PASSWORD` está
+puesta en el proyecto y todas las cuentas nuevas nacen con esa contraseña, conforme al aviso de suite
+`gmao-037`. La parte B de ese aviso —poner la misma contraseña a las cuentas **existentes**— no se
+ha ejecutado.
 
-## Correo de Auth por Resend (2026-09-12)
+## Notificaciones y correo (2026-09-12)
 
-Plantillas en español versionadas en `supabase/templates/` y aplicadas con
-`node scripts/configurar-correo.mjs`, que toca solo los campos de correo de Auth y lee la clave de
-`SMTP_PASS` en `.env`.
+Análisis y decisiones: [`docs/NOTIFICATIONS_ANALYSIS.md`](NOTIFICATIONS_ANALYSIS.md).
 
-| Ajuste | Estado |
-|---|---|
-| Servidor | `smtp.resend.com`, conexión y clave comprobadas |
-| Remitente | `onboarding@resend.dev`, el de pruebas de Resend |
-| Límite de envíos | subido de 2 a 30 por hora |
-| Dominio `grupoebim.com` en Resend | **sin verificar**: los registros no están en el DNS, que sirve BanaHosting |
+**Corrección previa.** Ese mismo día se había configurado el correo de Auth por Resend con
+`onboarding@resend.dev`. El contrato de plataforma §14 lo prohíbe: la suite envía por Microsoft
+Graph con un buzón dedicado por app. Se retiró el SMTP del proyecto y las líneas de `.env`. La clave de
+Resend que se usó quedó escrita en una conversación: **debe revocarse en Resend**.
 
-**Limitación vigente.** Con el remitente de pruebas, Resend solo entrega a la dirección dueña de la
-cuenta de Resend. A cualquier otra responde 550 y Auth devuelve 500 en `/recover`: la
-recuperación de contraseña falla para todos los demás. Se comprobó así, leyendo el registro de Auth.
+| Pieza | Dónde | Estado en DEV |
+|---|---|---|
+| Avisos por persona y cola de correo, reparto desde `domain_events` | migración `20260912110000` | aplicada |
+| Hechos nuevos: acceso al backoffice, vínculo B2B, integración caída, sugerido | misma migración | aplicada |
+| Programación cada minuto con `pg_cron` + `pg_net`, destino en Vault | migración `20260912120000` | aplicada, sin destino |
+| Vínculos B2B pendientes para el comprador | migración `20260912100000` | aplicada |
+| Sugerido visible y decidible por el comprador | migración `20260912130000` | aplicada |
+| `notifications-dispatch`, `auth-email-hook`, `notifications-test` | Edge Functions | desplegadas |
+| Campanita, pestañas Avisos y Sugeridos, Configuración → Correo | pantallas | en `dev` |
 
-**Para cerrarlo:** añadir en BanaHosting los tres registros que muestra Resend, esperar a que el
-dominio figure como verificado, quitar `SMTP_ADMIN_EMAIL` de `.env` y volver a ejecutar el script.
+Verificación en vivo, dentro de una transacción deshecha: cambiar el estado de un vínculo real generó
+dos avisos y dos correos en cola sin incidentes, y después no quedó ningún rastro.
+
+**Bloqueado por el operador (contrato §14).** Sin esto no sale ningún correo:
+1. Crear el buzón `ecommerce@grupoebim.com` y añadirlo al grupo de la Application Access Policy de
+   la App Registration de suite.
+2. Cargar `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_SENDER_EMAIL`, `MS_SENDER_NAME` en
+   los secretos de Edge Functions del proyecto.
+3. Ejecutar `node scripts/configurar-correo.mjs`: activa el hook de Auth, genera la clave del envío y
+   deja el destino del planificador en Vault. Probar desde Configuración → Correo.
+
+Mientras tanto los avisos en pantalla funcionan, los correos quedan en cola y caducan a las 24 horas,
+y la recuperación de contraseña sigue saliendo por el remitente por defecto de Supabase.
+
+**No incluido en esta entrega:** avisos P2 y P3 del análisis, que dependen en su mayoría del
+planificador de tareas por tiempo; aviso al vendedor cuando el cliente acepta un sugerido; enlazar
+el pedido resultante con `order_suggestions.order_id`; preferencias por persona.
+
 
 ## Recuperación de la ejecución interrumpida (2026-08-30)
 
