@@ -1897,6 +1897,9 @@ export const es = {
     'account.signedOutBody':
       'El catálogo se navega sin sesión; el contexto de tu empresa necesita que sepamos quién eres.',
     'account.noAccounts': 'Tu usuario no está vinculado a ninguna empresa',
+    'account.pendingAccounts': 'Tu acceso a {names} está pendiente de activación',
+    'account.pendingAccountsBody':
+      'Quien administra la tienda ya te vinculó como invitado. Cuando active tu acceso podrás comprar a nombre de la empresa; hasta entonces puedes comprar como cualquier visitante.',
     'account.noAccountsBody':
       'El vínculo lo crea quien administra la tienda. Hasta entonces puedes comprar como cualquier visitante.',
     'account.needsApproval': 'Con aprobación',

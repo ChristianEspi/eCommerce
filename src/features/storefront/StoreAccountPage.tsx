@@ -16,7 +16,7 @@ import {
 } from '@mui/material'
 import { Link } from 'react-router-dom'
 import { useSessionContext } from '@/features/auth/session-context'
-import { useMyAccounts } from '@/features/customers/hooks'
+import { useMyAccounts, useMyPendingAccounts } from '@/features/customers/hooks'
 import { formatAddress } from '@/features/customers/types'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { useDocumentMeta } from '@/shared/seo/useDocumentMeta'
@@ -83,6 +83,11 @@ export function StoreAccountPage() {
 
   const authenticated = status === 'authenticated'
   const query = useMyAccounts(authenticated)
+  // Solo hace falta cuando no hay ningún vínculo activo: es el único caso en el
+  // que cambia lo que se le dice al comprador.
+  const pending = useMyPendingAccounts(
+    authenticated && query.isSuccess && (query.data ?? []).length === 0,
+  )
 
   if (status === 'loading') return <LoadingState />
 
@@ -103,6 +108,29 @@ export function StoreAccountPage() {
   const accounts = query.data ?? []
 
   if (accounts.length === 0) {
+    if (pending.isPending) return <LoadingState />
+
+    /**
+     * Vinculado, pero sin activar.
+     *
+     * Antes caía en «no estás vinculado a ninguna empresa», que era falso y
+     * dejaba a la persona sin saber qué hacer. Lo que le falta es concreto
+     * —que activen su acceso— y la empresa tiene nombre, así que se dice.
+     */
+    const pendientes = pending.data ?? []
+    if (pendientes.length > 0) {
+      return (
+        <EmptyState
+          title={t('account.pendingAccounts').replace(
+            '{names}',
+            pendientes.map((cuenta) => cuenta.name).join(', '),
+          )}
+          description={t('account.pendingAccountsBody')}
+          icon={<ApartmentRoundedIcon fontSize="small" />}
+        />
+      )
+    }
+
     return (
       <EmptyState
         title={t('account.noAccounts')}

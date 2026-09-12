@@ -385,6 +385,8 @@ export const PRICE_LIST_CONFLICTS_RPC = 'price_list_conflicts'
 // argumento a propósito: el vínculo usuario ↔ cuenta lo resuelve el servidor,
 // nunca un id declarado por el navegador (regla 8 de la fase).
 export const MY_BUSINESS_ACCOUNTS_RPC = 'my_business_accounts'
+/** Vínculos B2B del usuario pendientes de activación. Solo el nombre de la cuenta. */
+export const MY_PENDING_BUSINESS_ACCOUNTS_RPC = 'my_pending_business_accounts'
 /**
  * En qué tiendas compra quien pregunta (migración 20260910200000). Sin
  * argumentos, por lo mismo que la de arriba. Sin `satisfies` hasta regenerar

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { z } from 'zod'
 import { buildTextSearchFilter } from '@/shared/lib/search'
 import { tryGetSupabaseClient } from '@/shared/lib/supabase'
 import { CustomersError, customersErrorFromDb } from './errors'
@@ -14,6 +15,7 @@ import {
   CUSTOMER_ORDERS_RPC,
   CUSTOMER_USAGE_RPC,
   MY_BUSINESS_ACCOUNTS_RPC,
+  MY_PENDING_BUSINESS_ACCOUNTS_RPC,
   PURCHASE_APPROVAL_RPC,
   accountContextSchema,
   approvalDecisionSchema,
@@ -585,6 +587,23 @@ export async function fetchMyAccounts(): Promise<AccountContext[]> {
   const { data, error } = await client().rpc(MY_BUSINESS_ACCOUNTS_RPC, {})
   if (error) throw customersErrorFromDb(error)
   return accountContextSchema.array().parse(data ?? [])
+}
+
+const pendingAccountSchema = z.object({ name: z.string(), invited_at: z.string() })
+export type PendingAccount = z.infer<typeof pendingAccountSchema>
+
+/**
+ * Las empresas que vincularon a este usuario y todavía no lo activaron.
+ *
+ * Existe para que la tienda no diga «no estás vinculado a ninguna empresa» a
+ * quien sí lo está y solo espera la activación: sin distinguirlo, esa persona
+ * no sabe que tiene que pedirla. Devuelve solo el nombre, porque un vínculo
+ * pendiente no da derecho a ver nada más de la empresa.
+ */
+export async function fetchMyPendingAccounts(): Promise<PendingAccount[]> {
+  const { data, error } = await client().rpc(MY_PENDING_BUSINESS_ACCOUNTS_RPC, {})
+  if (error) throw customersErrorFromDb(error)
+  return pendingAccountSchema.array().parse(data ?? [])
 }
 
 /**

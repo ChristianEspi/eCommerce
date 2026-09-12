@@ -256,8 +256,35 @@ describe('Área de cuenta del comprador', () => {
   })
 
   it('con sesión y sin vínculo lo dice claro: no es un problema de la sesión', async () => {
-    renderAccount(backend({ rpc: { my_business_accounts: () => [] } }))
+    renderAccount(
+      backend({ rpc: { my_business_accounts: () => [], my_pending_business_accounts: () => [] } }),
+    )
     expect(await screen.findByText('Tu usuario no está vinculado a ninguna empresa')).toBeInTheDocument()
+  })
+
+  /**
+   * Vinculado como invitado, todavía sin activar.
+   *
+   * Antes esta persona leía «no estás vinculado a ninguna empresa», que era
+   * falso, y no sabía que solo le faltaba pedir la activación. Pasó de verdad
+   * probando la demo.
+   */
+  it('vinculado pero sin activar, nombra la empresa y dice qué falta', async () => {
+    renderAccount(
+      backend({
+        rpc: {
+          my_business_accounts: () => [],
+          my_pending_business_accounts: () => [
+            { name: 'Policlinico Andino SAC', invited_at: '2026-09-12T04:38:42.000Z' },
+          ],
+        },
+      }),
+    )
+
+    expect(
+      await screen.findByText('Tu acceso a Policlinico Andino SAC está pendiente de activación'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Tu usuario no está vinculado a ninguna empresa')).not.toBeInTheDocument()
   })
 
   it('con vínculo enseña rol, sucursales y direcciones — todo de UNA llamada sin argumentos', async () => {

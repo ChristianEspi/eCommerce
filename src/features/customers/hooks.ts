@@ -22,6 +22,7 @@ import {
   fetchExternalIds,
   fetchLocations,
   fetchMyAccounts,
+  fetchMyPendingAccounts,
   saveAccountUser,
   saveAddress,
   saveApprovalRule,
@@ -193,6 +194,18 @@ export function useMyAccounts(enabled = true) {
   return useQuery<AccountContext[]>({
     queryKey: myAccountsKey(),
     queryFn: fetchMyAccounts,
+    enabled,
+  })
+}
+
+/**
+ * Vínculos pendientes de activación. Solo se pide cuando no hay ninguno activo,
+ * que es el único momento en que cambia lo que se le dice al comprador.
+ */
+export function useMyPendingAccounts(enabled = true) {
+  return useQuery({
+    queryKey: [...myAccountsKey(), 'pending'] as const,
+    queryFn: fetchMyPendingAccounts,
     enabled,
   })
 }

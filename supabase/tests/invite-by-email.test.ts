@@ -1,7 +1,7 @@
 // @vitest-environment node
 import type { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { asRole, claimsFor, createTestDatabase, expectFailure, TENANT_A, TENANT_B } from './harness'
+import { asRole, claimsFor, createTestDatabase, expectFailure, TENANT_A, TENANT_B, type JwtClaims } from './harness'
 
 /**
  * Dar de alta a alguien por su CORREO.
@@ -31,6 +31,12 @@ const COMPRADORA = '0a000000-0000-4000-8000-0000000000e3'
 async function svc<T = Record<string, unknown>>(query: string, params: unknown[] = []) {
   return (await db.query<T>(query, params)).rows
 }
+
+/**
+ * Un comprador de la tienda: tiene sesión pero ningún claim de tenant, porque
+ * no es miembro de la sociedad que vende. Por eso el tipo se fuerza aquí.
+ */
+const comprador = (sub: string, email: string) => ({ sub, email }) as unknown as JwtClaims
 
 async function comoAdmin<T>(tenant: typeof TENANT_A, run: () => Promise<T>): Promise<T> {
   return asRole(db, 'authenticated', claimsFor(tenant), run)
@@ -289,6 +295,63 @@ describe('quién compra a nombre de una cuenta', () => {
     await crearUsuario('0a000000-0000-4000-8000-0000000000e9', 'operador@ebim.pe')
 
     expect(await expectFailure(() => alta('operador@ebim.pe'))).toContain('CORREO_DE_SUITE')
+  })
+
+  /**
+   * Lo que ve la propia persona mientras espera la activación.
+   *
+   * Antes la tienda le decía «no estás vinculado a ninguna empresa», que era
+   * falso. Ahora puede saber a cuál sí, y solo eso: el nombre.
+   */
+  describe('mientras el vínculo está pendiente', () => {
+    const comoCompradora = <T,>(run: () => Promise<T>) =>
+      asRole(db, 'authenticated', comprador(COMPRADORA, 'compradora@cliente.com'), run)
+
+    it('la invitada ve el nombre de la empresa que la vinculó', async () => {
+      await alta('compradora@cliente.com', 'buyer', 500, 'invited')
+
+      const [fila] = await comoCompradora(() =>
+        svc<{ r: Array<Record<string, unknown>> }>(
+          `select public.my_pending_business_accounts() as r`,
+        ),
+      )
+      expect(fila?.r).toHaveLength(1)
+      expect(fila?.r[0]?.name).toBe('Cuenta 1')
+      // Y nada más: ni límite, ni ids. Un vínculo pendiente no da acceso.
+      expect(Object.keys(fila?.r[0] ?? {}).sort()).toEqual(['invited_at', 'name'])
+    })
+
+    it('una vez activa deja de estar pendiente, y pasa a las cuentas con acceso', async () => {
+      await alta('compradora@cliente.com', 'buyer', null, 'active')
+
+      const [pendientes] = await comoCompradora(() =>
+        svc<{ r: unknown[] }>(`select public.my_pending_business_accounts() as r`),
+      )
+      const [activas] = await comoCompradora(() =>
+        svc<{ r: unknown[] }>(`select public.my_business_accounts() as r`),
+      )
+      expect(pendientes?.r).toEqual([])
+      expect(activas?.r).toHaveLength(1)
+    })
+
+    it('nadie ve los vínculos pendientes de otra persona', async () => {
+      await alta('compradora@cliente.com', 'buyer', null, 'invited')
+
+      const [fila] = await asRole(
+        db,
+        'authenticated',
+        comprador(NUEVA, 'nueva@tenant-a.com'),
+        () => svc<{ r: unknown[] }>(`select public.my_pending_business_accounts() as r`),
+      )
+      expect(fila?.r).toEqual([])
+    })
+
+    it('anon no puede preguntarlo', async () => {
+      const error = await expectFailure(() =>
+        asRole(db, 'anon', null, () => svc(`select public.my_pending_business_accounts()`)),
+      )
+      expect(error).toMatch(/permission denied/i)
+    })
   })
 
   it('el admin de otra sociedad no toca esta cuenta', async () => {

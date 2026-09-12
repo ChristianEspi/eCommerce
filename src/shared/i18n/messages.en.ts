@@ -1879,6 +1879,9 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'account.signedOutBody':
       'The catalog needs no session; your company context needs us to know who you are.',
     'account.noAccounts': 'Your user is not linked to any company',
+    'account.pendingAccounts': 'Your access to {names} is waiting for activation',
+    'account.pendingAccountsBody':
+      'The store has already linked you as an invited user. Once your access is activated you can buy on behalf of the company; until then you can buy like any visitor.',
     'account.noAccountsBody':
       'The link is created by whoever runs the store. Until then you can buy like any visitor.',
     'account.needsApproval': 'Approval needed',
