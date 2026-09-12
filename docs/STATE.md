@@ -111,6 +111,26 @@ verde: `typecheck`, `lint`, `build`, `bundle:report` y **183 archivos / 3594 tes
 > responde error. Requiere `supabase functions deploy create-user` y que el proyecto tenga
 > `SUPABASE_SERVICE_ROLE_KEY` en el entorno de funciones. No se hizo: no hay orden de despliegue.
 
+## Correo de Auth por Resend (2026-09-12)
+
+Plantillas en español versionadas en `supabase/templates/` y aplicadas con
+`node scripts/configurar-correo.mjs`, que toca solo los campos de correo de Auth y lee la clave de
+`SMTP_PASS` en `.env`.
+
+| Ajuste | Estado |
+|---|---|
+| Servidor | `smtp.resend.com`, conexión y clave comprobadas |
+| Remitente | `onboarding@resend.dev`, el de pruebas de Resend |
+| Límite de envíos | subido de 2 a 30 por hora |
+| Dominio `grupoebim.com` en Resend | **sin verificar**: los registros no están en el DNS, que sirve BanaHosting |
+
+**Limitación vigente.** Con el remitente de pruebas, Resend solo entrega a la dirección dueña de la
+cuenta de Resend. A cualquier otra responde 550 y Auth devuelve 500 en `/recover`: la
+recuperación de contraseña falla para todos los demás. Se comprobó así, leyendo el registro de Auth.
+
+**Para cerrarlo:** añadir en BanaHosting los tres registros que muestra Resend, esperar a que el
+dominio figure como verificado, quitar `SMTP_ADMIN_EMAIL` de `.env` y volver a ejecutar el script.
+
 ## Recuperación de la ejecución interrumpida (2026-08-30)
 
 Segunda parada del runner (`claude-saas-opus`), otra vez con `phase: RECOVERY` en
