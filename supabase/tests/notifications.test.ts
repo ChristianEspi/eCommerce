@@ -409,6 +409,101 @@ describe('hechos que antes no se publicaban', () => {
 })
 
 // ---------------------------------------------------------------------------
+// El sugerido, del lado del comprador
+// ---------------------------------------------------------------------------
+
+describe('el comprador ve y decide su sugerido', () => {
+  const comoCompradora = <T,>(run: () => Promise<T>) =>
+    asRole(db, 'authenticated', comprador(COMPRADORA, 'compradora@cliente.com'), run)
+
+  async function sugeridoEnviado(): Promise<string> {
+    const [producto] = await svc<{ id: string }>(
+      `insert into public.products
+         (organization_id, company_id, store_id, sku, slug, name, price, currency, stock, status)
+       values ($1, $2, $3, $4, lower($4), 'Alitraq Polvo Oral', '10.00', 'PEN', 100, 'draft')
+       returning id`,
+      [TENANT_A.organizationId, TENANT_A.companyId, storeA, `QS-${Math.floor(Math.random() * 1e6)}`],
+    )
+    const [sugerido] = await svc<{ id: string }>(
+      `insert into public.order_suggestions (organization_id, company_id, store_id, customer_id)
+       values ($1, $2, $3, $4) returning id`,
+      [TENANT_A.organizationId, TENANT_A.companyId, storeA, clienteA],
+    )
+    await svc(
+      `insert into public.order_suggestion_items
+         (organization_id, company_id, suggestion_id, product_id, suggested_quantity, reason)
+       values ($1, $2, $3, $4, 12, 'Compró 12 en los últimos 30 días')`,
+      [TENANT_A.organizationId, TENANT_A.companyId, sugerido?.id, producto?.id],
+    )
+    await svc(`update public.order_suggestions set status = 'sent' where id = $1`, [sugerido?.id])
+    return String(sugerido?.id)
+  }
+
+  it('ve los sugeridos enviados a su empresa, con el motivo de cada línea', async () => {
+    const id = await sugeridoEnviado()
+
+    const [fila] = await comoCompradora(() =>
+      svc<{ r: Array<{ id: string; items: Array<{ quantity: string; reason: string }> }> }>(
+        `select public.my_order_suggestions() as r`,
+      ),
+    )
+    const visto = fila?.r.find((s) => s.id === id)
+    expect(visto?.items[0]?.quantity).toBe('12.000')
+    expect(visto?.items[0]?.reason).toBe('Compró 12 en los últimos 30 días')
+  })
+
+  it('un borrador no se ve: todavía no se lo mandaron', async () => {
+    const [borrador] = await svc<{ id: string }>(
+      `insert into public.order_suggestions (organization_id, company_id, store_id, customer_id)
+       values ($1, $2, $3, $4) returning id`,
+      [TENANT_A.organizationId, TENANT_A.companyId, storeA, clienteA],
+    )
+    const [fila] = await comoCompradora(() =>
+      svc<{ r: Array<{ id: string }> }>(`select public.my_order_suggestions() as r`))
+    expect(fila?.r.map((s) => s.id)).not.toContain(borrador?.id)
+  })
+
+  it('aceptarlo devuelve las líneas para el carrito y NO crea un pedido', async () => {
+    const id = await sugeridoEnviado()
+    const pedidosAntes = await svc(`select 1 from public.orders`)
+
+    const [fila] = await comoCompradora(() =>
+      svc<{ r: Array<{ product_id: string; quantity: string }> }>(
+        `select public.accept_order_suggestion($1) as r`, [id],
+      ),
+    )
+    expect(fila?.r).toHaveLength(1)
+    expect(fila?.r[0]?.quantity).toBe('12.000')
+
+    const [estado] = await svc<{ status: string }>(`select status from public.order_suggestions where id = $1`, [id])
+    expect(estado?.status).toBe('accepted')
+    expect(await svc(`select 1 from public.orders`)).toHaveLength(pedidosAntes.length)
+  })
+
+  it('no se decide dos veces', async () => {
+    const id = await sugeridoEnviado()
+    await comoCompradora(() => svc(`select public.discard_order_suggestion($1)`, [id]))
+
+    const error = await expectFailure(() =>
+      comoCompradora(() => svc(`select public.accept_order_suggestion($1)`, [id])))
+    expect(error).toContain('SUGERIDO_YA_DECIDIDO')
+  })
+
+  it('quien no es de esa empresa recibe el mismo error que si no existiera', async () => {
+    const id = await sugeridoEnviado()
+    const ajeno = await expectFailure(() =>
+      asRole(db, 'authenticated', comprador(INVITADO_B2C, 'invitado@b2c.com'), () =>
+        svc(`select public.accept_order_suggestion($1)`, [id])))
+    const inexistente = await expectFailure(() =>
+      comoCompradora(() =>
+        svc(`select public.accept_order_suggestion('0a000000-0000-4000-8000-00000000dead')`)))
+
+    expect(ajeno).toContain('SUGERIDO_NO_DISPONIBLE')
+    expect(inexistente).toContain('SUGERIDO_NO_DISPONIBLE')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // 3. Lo que la persona puede hacer con sus avisos
 // ---------------------------------------------------------------------------
 

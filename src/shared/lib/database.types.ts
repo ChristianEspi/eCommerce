@@ -4554,6 +4554,142 @@ export type Database = {
           },
         ]
       }
+      notification_emails: {
+        Row: {
+          attempts: number
+          claimed_at: string | null
+          company_id: string
+          created_at: string
+          dedupe_key: string
+          expires_at: string
+          id: string
+          kind: string
+          last_error: string | null
+          locale: string
+          max_attempts: number
+          next_attempt_at: string
+          organization_id: string
+          params: Json
+          provider_reference: string | null
+          sent_at: string | null
+          status: string
+          store_id: string | null
+          to_address: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          claimed_at?: string | null
+          company_id: string
+          created_at?: string
+          dedupe_key: string
+          expires_at?: string
+          id?: string
+          kind: string
+          last_error?: string | null
+          locale?: string
+          max_attempts?: number
+          next_attempt_at?: string
+          organization_id: string
+          params?: Json
+          provider_reference?: string | null
+          sent_at?: string | null
+          status?: string
+          store_id?: string | null
+          to_address: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          claimed_at?: string | null
+          company_id?: string
+          created_at?: string
+          dedupe_key?: string
+          expires_at?: string
+          id?: string
+          kind?: string
+          last_error?: string | null
+          locale?: string
+          max_attempts?: number
+          next_attempt_at?: string
+          organization_id?: string
+          params?: Json
+          provider_reference?: string | null
+          sent_at?: string | null
+          status?: string
+          store_id?: string | null
+          to_address?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_emails_store_fk"
+            columns: ["store_id", "organization_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id", "organization_id", "company_id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          archived_at: string | null
+          audience: string
+          company_id: string
+          created_at: string
+          dedupe_key: string
+          id: string
+          kind: string
+          link: string | null
+          organization_id: string
+          params: Json
+          read_at: string | null
+          recipient_user_id: string
+          source_event_id: string | null
+          store_id: string | null
+        }
+        Insert: {
+          archived_at?: string | null
+          audience: string
+          company_id: string
+          created_at?: string
+          dedupe_key: string
+          id?: string
+          kind: string
+          link?: string | null
+          organization_id: string
+          params?: Json
+          read_at?: string | null
+          recipient_user_id: string
+          source_event_id?: string | null
+          store_id?: string | null
+        }
+        Update: {
+          archived_at?: string | null
+          audience?: string
+          company_id?: string
+          created_at?: string
+          dedupe_key?: string
+          id?: string
+          kind?: string
+          link?: string | null
+          organization_id?: string
+          params?: Json
+          read_at?: string | null
+          recipient_user_id?: string
+          source_event_id?: string | null
+          store_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_store_fk"
+            columns: ["store_id", "organization_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id", "organization_id", "company_id"]
+          },
+        ]
+      }
       ops_events: {
         Row: {
           code: string
@@ -11395,6 +11531,10 @@ export type Database = {
       }
     }
     Functions: {
+      accept_order_suggestion: {
+        Args: { p_suggestion_id: string }
+        Returns: Json
+      }
       add_business_account_user: {
         Args: {
           p_account_id: string
@@ -11855,6 +11995,10 @@ export type Database = {
         Args: { p_address: Json; p_items: Json; p_store_slug: string }
         Returns: Json
       }
+      discard_order_suggestion: {
+        Args: { p_suggestion_id: string }
+        Returns: undefined
+      }
       effective_capabilities: { Args: { p_company_id?: string }; Returns: Json }
       expire_carts: { Args: never; Returns: number }
       expire_gift_cards: { Args: { p_store_id?: string }; Returns: number }
@@ -12008,6 +12152,8 @@ export type Database = {
         Returns: Json
       }
       my_coupons: { Args: { p_store_id: string }; Returns: Json }
+      my_order_suggestions: { Args: never; Returns: Json }
+      my_pending_business_accounts: { Args: never; Returns: Json }
       my_product_favorites: {
         Args: { p_store_id: string }
         Returns: {
@@ -12015,6 +12161,25 @@ export type Database = {
         }[]
       }
       my_stores: { Args: never; Returns: Json }
+      notification_email_claim: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          id: string
+          kind: string
+          locale: string
+          params: Json
+          to_address: string
+        }[]
+      }
+      notification_email_complete: {
+        Args: { p_id: string; p_reference?: string }
+        Returns: undefined
+      }
+      notification_email_fail: {
+        Args: { p_error: string; p_id: string; p_retryable?: boolean }
+        Returns: undefined
+      }
       ops_health: { Args: { p_store_id?: string }; Returns: Json }
       ops_record_event: {
         Args: {

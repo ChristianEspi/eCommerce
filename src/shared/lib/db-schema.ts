@@ -34,6 +34,10 @@ type FunctionName = keyof Schema['Functions']
 // --- Tablas ----------------------------------------------------------------
 export const TENANTS_TABLE = 'tenants' satisfies TableName
 export const TENANT_MEMBERS_TABLE = 'tenant_members' satisfies TableName
+/** Avisos por persona: campanita del backoffice y «Tu cuenta» de la tienda. */
+export const NOTIFICATIONS_TABLE = 'notifications' satisfies TableName
+/** Cola de correo. Solo lectura para owner y admin, para ver si sale. */
+export const NOTIFICATION_EMAILS_TABLE = 'notification_emails' satisfies TableName
 export const STORES_TABLE = 'stores' satisfies TableName
 export const STORE_SETTINGS_TABLE = 'store_settings' satisfies TableName
 export const PRODUCTS_TABLE = 'products' satisfies TableName

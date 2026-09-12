@@ -22,6 +22,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { useDebouncedValue } from '@/shared/lib/useDebouncedValue'
@@ -38,7 +39,7 @@ import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState, ErrorState } from '@/shared/ui/states'
 import { OrderDrawer } from './OrderDrawer'
-import { fetchOrdersForExport } from './api'
+import { fetchOrder, fetchOrdersForExport } from './api'
 import { downloadCsv, ordersToCsv } from './exportCsv'
 import {
   FULFILLMENT_COLOR,
@@ -108,6 +109,38 @@ export function OrdersPage() {
   const [page, setPage] = useState(0)
   const [selected, setSelected] = useState<Order | null>(null)
   const [exporting, setExporting] = useState(false)
+  const [params, setParams] = useSearchParams()
+  const pedidoEnlazado = params.get('order')
+
+  /**
+   * Abrir un pedido desde un aviso.
+   *
+   * La campanita enlaza a `/app/orders?order=<id>`. El pedido puede no estar en
+   * la página que se está viendo —es nuevo, o está en otra tienda del filtro—,
+   * así que se pide por id en vez de buscarlo en la tabla. La RLS decide si se
+   * puede ver: un id ajeno no devuelve nada y no se abre nada.
+   */
+  useEffect(() => {
+    if (!pedidoEnlazado || selected?.id === pedidoEnlazado) return
+    let vigente = true
+    void fetchOrder(pedidoEnlazado)
+      .then((order) => {
+        if (vigente && order) setSelected(order)
+      })
+      .catch(() => undefined)
+    return () => {
+      vigente = false
+    }
+  }, [pedidoEnlazado, selected?.id])
+
+  function cerrarPedido() {
+    setSelected(null)
+    if (pedidoEnlazado) {
+      const siguiente = new URLSearchParams(params)
+      siguiente.delete('order')
+      setParams(siguiente, { replace: true })
+    }
+  }
 
   const storeId = activeStore?.id ?? null
   const today = useMemo(todayKey, [])
@@ -433,7 +466,7 @@ export function OrdersPage() {
         order={selected}
         open={selected !== null}
         canWrite={canWrite}
-        onClose={() => setSelected(null)}
+        onClose={cerrarPedido}
       />
     </>
   )

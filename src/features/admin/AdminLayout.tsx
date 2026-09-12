@@ -31,6 +31,7 @@ import { RequireTenant } from '@/features/tenant/RequireTenant'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { R, T } from '@/theme/tokens'
 import { GlobalSearch } from '@/features/search/GlobalSearch'
+import { NotificationBell } from '@/features/notifications/NotificationBell'
 import { AppIcon } from '@/shared/ui/AppIcon'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { AppBreadcrumbs } from '@/shared/ui/AppBreadcrumbs'
@@ -411,6 +412,7 @@ function AdminChrome() {
             <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
               <StoreSwitcher />
             </Box>
+            <NotificationBell />
             <IconButton
               onClick={toggleMode}
               aria-label={appearance.mode === 'dark' ? t('common.theme.light') : t('common.theme.dark')}

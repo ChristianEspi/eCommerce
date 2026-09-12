@@ -43,6 +43,7 @@ import { GhostButton, PrimaryButton } from '@/shared/ui/buttons'
 import GroupRoundedIcon from '@mui/icons-material/GroupRounded'
 import { useSessionContext } from '@/features/auth/session-context'
 import { MembersSection } from './settings/MembersSection'
+import { MailSettingsSection } from '@/features/notifications/MailSettingsSection'
 import { StorefrontDesignSection } from './settings/StorefrontDesignSection'
 import { TaxesSection } from './settings/TaxesSection'
 import { useFeedback } from '@/shared/ui/feedback-context'
@@ -811,6 +812,26 @@ export function SettingsPage() {
                         canManage={canManage}
                         currentUserId={session?.user?.id ?? null}
                       />
+                    </SectionCard>
+                  </CardContent>
+                </Card>
+              </ManagedSection>
+            ),
+          },
+          {
+            id: 'correo',
+            label: t('admin.settings.tab.mail'),
+            content: (
+              <ManagedSection>
+                <Card>
+                  <CardContent>
+                    <SectionCard
+                      icon={<MailOutlineRoundedIcon />}
+                      title={t('mail.title')}
+                      subtitle={t('mail.subtitle')}
+                      padded
+                    >
+                      <MailSettingsSection />
                     </SectionCard>
                   </CardContent>
                 </Card>

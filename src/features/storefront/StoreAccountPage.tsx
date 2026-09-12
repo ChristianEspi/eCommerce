@@ -17,6 +17,7 @@ import {
 import { Link } from 'react-router-dom'
 import { useSessionContext } from '@/features/auth/session-context'
 import { useMyAccounts, useMyPendingAccounts } from '@/features/customers/hooks'
+import { StoreNotificationsSection } from '@/features/notifications/StoreNotificationsSection'
 import { formatAddress } from '@/features/customers/types'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { useDocumentMeta } from '@/shared/seo/useDocumentMeta'
@@ -25,6 +26,7 @@ import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
 import { AccountStatementSection } from './account/AccountStatementSection'
 import { MyCouponsSection } from './account/MyCouponsSection'
 import { MyOrdersSection } from './account/MyOrdersSection'
+import { MySuggestionsSection } from './account/MySuggestionsSection'
 import { useStorefrontOptional } from './hooks'
 import { privateMeta } from './seo'
 
@@ -118,25 +120,34 @@ export function StoreAccountPage() {
      * —que activen su acceso— y la empresa tiene nombre, así que se dice.
      */
     const pendientes = pending.data ?? []
-    if (pendientes.length > 0) {
-      return (
-        <EmptyState
-          title={t('account.pendingAccounts').replace(
-            '{names}',
-            pendientes.map((cuenta) => cuenta.name).join(', '),
-          )}
-          description={t('account.pendingAccountsBody')}
-          icon={<ApartmentRoundedIcon fontSize="small" />}
-        />
-      )
-    }
 
+    // Sin cuenta de empresa activa también hay avisos que leer: el de «te
+    // vincularon», o el de un pedido hecho como visitante con este correo.
     return (
-      <EmptyState
-        title={t('account.noAccounts')}
-        description={t('account.noAccountsBody')}
-        icon={<ApartmentRoundedIcon fontSize="small" />}
-      />
+      <Stack spacing={3}>
+        {pendientes.length > 0 ? (
+          <EmptyState
+            title={t('account.pendingAccounts').replace(
+              '{names}',
+              pendientes.map((cuenta) => cuenta.name).join(', '),
+            )}
+            description={t('account.pendingAccountsBody')}
+            icon={<ApartmentRoundedIcon fontSize="small" />}
+          />
+        ) : (
+          <EmptyState
+            title={t('account.noAccounts')}
+            description={t('account.noAccountsBody')}
+            icon={<ApartmentRoundedIcon fontSize="small" />}
+          />
+        )}
+        <Stack spacing={1}>
+          <Typography variant="h6" component="h2">
+            {t('account.tab.notifications')}
+          </Typography>
+          <StoreNotificationsSection />
+        </Stack>
+      </Stack>
     )
   }
 
@@ -300,6 +311,14 @@ export function StoreAccountPage() {
           ...(storefront
             ? [{ id: 'cupones', label: t('account.tab.coupons'), content: <MyCouponsSection storeId={storefront.store.store_id} /> }]
             : []),
+          // `sugeridos` es el ancla a la que lleva el aviso «tienes un pedido
+          // sugerido»: cambiar el id rompe ese enlace.
+          {
+            id: 'sugeridos',
+            label: t('account.tab.suggestions'),
+            content: <MySuggestionsSection storeId={storefront?.store.store_id ?? null} />,
+          },
+          { id: 'avisos', label: t('account.tab.notifications'), content: <StoreNotificationsSection /> },
           { id: 'cuenta', label: t('account.tab.summary'), content: resumen },
         ]}
       />

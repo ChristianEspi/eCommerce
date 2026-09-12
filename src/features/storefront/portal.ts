@@ -134,3 +134,51 @@ export const myStatementKey = () => ['storefront', 'my-statement'] as const
 export const myCouponsKey = (storeId: string) => ['storefront', 'my-coupons', storeId] as const
 export const myOrderDetailKey = (orderId: string) =>
   ['storefront', 'my-order', orderId] as const
+
+// ---------------------------------------------------------------------------
+// Sugeridos de pedido, del lado del comprador
+// ---------------------------------------------------------------------------
+
+export const MY_SUGGESTIONS_RPC = 'my_order_suggestions'
+export const ACCEPT_SUGGESTION_RPC = 'accept_order_suggestion'
+export const DISCARD_SUGGESTION_RPC = 'discard_order_suggestion'
+
+export interface MySuggestionItem {
+  product_id: string
+  variant_id: string | null
+  name: string
+  sku: string
+  /** Decimal como texto, tal como lo guarda la base. */
+  quantity: string
+  reason: string
+}
+
+export interface MySuggestion {
+  id: string
+  store_id: string
+  generated_at: string
+  customer_name: string
+  items: MySuggestionItem[]
+}
+
+/** Los sugeridos ENVIADOS a la empresa del comprador. Sin argumentos: sale del token. */
+export async function fetchMySuggestions(): Promise<MySuggestion[]> {
+  return rpc<MySuggestion[]>(MY_SUGGESTIONS_RPC)
+}
+
+/**
+ * Aceptar marca el sugerido y devuelve las líneas para el CARRITO.
+ *
+ * No crea un pedido, y es la regla de la frontera de planificación: el pedido
+ * lo confirma el comprador en el checkout de siempre, con el precio y el stock
+ * de ese momento.
+ */
+export async function acceptSuggestion(
+  suggestionId: string,
+): Promise<Array<{ product_id: string; variant_id: string | null; quantity: string }>> {
+  return rpc(ACCEPT_SUGGESTION_RPC, { p_suggestion_id: suggestionId })
+}
+
+export async function discardSuggestion(suggestionId: string): Promise<void> {
+  await rpc(DISCARD_SUGGESTION_RPC, { p_suggestion_id: suggestionId })
+}

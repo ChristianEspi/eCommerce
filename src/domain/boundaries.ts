@@ -320,7 +320,9 @@ export const BOUNDARIES: readonly Boundary[] = [
     state: 'implemented',
     responsibility:
       'Hablar con sistemas de terceros por un contrato canónico, en los dos sentidos: catálogo de proveedores, outbox, inbox, disyuntor, webhooks salientes y la API de socio con sus credenciales y permisos.',
-    paths: ['features/integrations'],
+    // `features/notifications` vive aquí porque el correo es la implementación
+    // del `NotificationProvider` de esta frontera (Microsoft Graph, contrato §14).
+    paths: ['features/integrations', 'features/notifications'],
     port: 'ErpProvider · InvoicingProvider · NotificationProvider',
     serverSide: [
       'integration_providers, tenant_integrations, outbox, inbox, messages y circuito (150000, 150100)',
@@ -329,6 +331,7 @@ export const BOUNDARIES: readonly Boundary[] = [
       'api_clients, api_access_tokens, api_requests, api_idempotency y el grant client_credentials (170300)',
       'los recursos de /v1: pedidos, productos, existencia y clientes (170400)',
       'integration_monitor, webhook_monitor, integration_health, detalle sanitizado, retry y replay (170500)',
+      'notifications y notification_emails, el reparto desde domain_events y el envío por Microsoft Graph (20260912110000, 120000)',
       'supabase/functions/api — la puerta versionada de la API de socio',
       'supabase/functions/integration-worker — el que vacía la cola y firma los webhooks',
       'supabase/functions/_shared/api y _shared/webhooks — contrato, rutas, OpenAPI y firma',
