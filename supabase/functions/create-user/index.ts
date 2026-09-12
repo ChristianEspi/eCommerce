@@ -27,7 +27,7 @@ import { AppError, fromDatabaseError } from '../_shared/errors.ts'
 import { serveJson } from '../_shared/http.ts'
 import {
   assertPuedeDarDeAlta,
-  contrasenaTemporal,
+  contrasenaParaAlta,
   emailParaAlta,
   esCuentaExistente,
 } from '../_shared/userProvisioning.ts'
@@ -58,7 +58,10 @@ const handler = serveJson(
     if (error) throw fromDatabaseError(error)
     assertPuedeDarDeAlta(miembro?.role as string | null)
 
-    const password = contrasenaTemporal()
+    // Aleatoria, salvo que el entorno imponga una fija para demostrar el
+    // producto. Sin la variable, el comportamiento es el seguro; ponerla es una
+    // decisión consciente de ese entorno y no debe hacerse en producción.
+    const password = contrasenaParaAlta(Deno.env.get('EBIM_DEMO_PASSWORD'))
     const { data: creado, error: fallo } = await serviceClient(trace).auth.admin.createUser({
       email,
       password,

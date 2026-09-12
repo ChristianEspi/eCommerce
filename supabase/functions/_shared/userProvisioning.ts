@@ -61,6 +61,45 @@ export function contrasenaTemporal(
   return Array.from(bytes, (b) => ALFABETO_SIN_CONFUSOS[b % ALFABETO_SIN_CONFUSOS.length]).join('')
 }
 
+/** Mínimo de la contraseña fija. Por debajo, Auth la rechaza y el alta muere. */
+export const MINIMO_CONTRASENA_FIJA = 8
+
+/**
+ * La contraseña con la que nace la cuenta.
+ *
+ * ## Por qué existe la variante fija
+ *
+ * En una demostración, una contraseña distinta por cada cuenta es un obstáculo
+ * sin ninguna ventaja: quien enseña el producto crea tres usuarios en directo y
+ * tiene que ir copiando tres cadenas de dieciséis caracteres mientras habla.
+ * Con `EBIM_DEMO_PASSWORD` puesta, todas las cuentas nacen con esa.
+ *
+ * ## Y por qué es una variable de entorno y no una constante
+ *
+ * Escrita en el código viajaría al repositorio y, peor, a producción: cualquiera
+ * que leyera este archivo podría entrar como cualquier cuenta creada desde la
+ * pantalla. Como variable, el entorno que no la define sigue generando una
+ * contraseña aleatoria, que es el comportamiento seguro, y el que la define
+ * asume lo que asume. **No debe definirse en producción.**
+ *
+ * Si está puesta pero es demasiado corta, esto falla en voz alta en vez de
+ * volver a la aleatoria por lo bajo: el alta funcionaría y nadie entendería por
+ * qué la contraseña no es la esperada.
+ */
+export function contrasenaParaAlta(fija?: string | null): string {
+  const elegida = (fija ?? '').trim()
+  if (elegida.length === 0) return contrasenaTemporal()
+
+  if (elegida.length < MINIMO_CONTRASENA_FIJA) {
+    throw new AppError(
+      'CONFIG_INCOMPLETA',
+      `EBIM_DEMO_PASSWORD tiene menos de ${MINIMO_CONTRASENA_FIJA} caracteres`,
+      500,
+    )
+  }
+  return elegida
+}
+
 /**
  * El correo del alta: normalizado, válido, y nunca de la suite.
  *

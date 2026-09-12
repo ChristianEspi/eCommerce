@@ -28,8 +28,10 @@ import {
   ALFABETO_SIN_CONFUSOS,
   CREATE_USER_FIELDS,
   LARGO_CONTRASENA,
+  MINIMO_CONTRASENA_FIJA,
   ROLES_QUE_DAN_DE_ALTA,
   assertPuedeDarDeAlta,
+  contrasenaParaAlta,
   contrasenaTemporal,
   emailParaAlta,
   esCuentaExistente,
@@ -183,6 +185,60 @@ describe('la contraseña temporal', () => {
     const password = contrasenaTemporal((bytes) => bytes.fill(255))
     expect(password).toHaveLength(LARGO_CONTRASENA)
     expect(ALFABETO_SIN_CONFUSOS).toContain(password[0])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// La contraseña fija de las demostraciones
+// ---------------------------------------------------------------------------
+
+describe('la contraseña fija del entorno', () => {
+  /**
+   * Sin la variable, el comportamiento es el de siempre. Es la mitad que
+   * importa: un entorno que no pide nada no puede acabar con una contraseña
+   * conocida por descuido.
+   */
+  it('sin variable, sigue siendo aleatoria', () => {
+    for (const vacio of [undefined, null, '', '   ']) {
+      const password = contrasenaParaAlta(vacio)
+      expect(password).toHaveLength(LARGO_CONTRASENA)
+      expect(password).not.toBe(contrasenaParaAlta(vacio))
+    }
+  })
+
+  it('con variable, todas las cuentas nacen con esa', () => {
+    expect(contrasenaParaAlta('Demo2026!')).toBe('Demo2026!')
+    expect(contrasenaParaAlta('  Demo2026!  ')).toBe('Demo2026!')
+  })
+
+  /**
+   * Falla en voz alta en vez de volver a la aleatoria por lo bajo. Degradar en
+   * silencio dejaría el alta funcionando y a nadie entendiendo por qué la
+   * contraseña no es la que la demostración esperaba.
+   */
+  it('una demasiado corta no se ignora: se avisa', () => {
+    const error = catchError(() => contrasenaParaAlta('corta'))
+    expect(error.status).toBe(500)
+    expect(error.code).toBe('CONFIG_INCOMPLETA')
+    expect(MINIMO_CONTRASENA_FIJA).toBe(8)
+  })
+
+  /**
+   * Escrita en el código viajaría al repositorio y a producción, y cualquiera
+   * que leyera el archivo podría entrar como cualquier cuenta creada desde la
+   * pantalla. Solo puede llegar por el entorno.
+   */
+  it('no hay ninguna contraseña escrita en el código', () => {
+    const compartido = soloCodigo(
+      readFileSync(join(HERE, '..', 'functions', '_shared', 'userProvisioning.ts'), 'utf8'),
+    )
+    const funcion = soloCodigo(readFileSync(INDEX, 'utf8'))
+
+    expect(compartido).not.toMatch(/Demo\d/i)
+    expect(funcion).not.toMatch(/Demo\d/i)
+    // La única vía es la variable, y se lee en el borde y no aquí dentro.
+    expect(funcion).toContain("Deno.env.get('EBIM_DEMO_PASSWORD')")
+    expect(compartido).not.toContain('Deno.env')
   })
 })
 
