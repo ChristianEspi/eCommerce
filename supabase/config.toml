@@ -63,3 +63,19 @@ verify_jwt = true
 # El flag de la plataforma no puede quedarse como unica defensa de ese camino.
 [functions.create-user]
 verify_jwt = true
+
+# Vaciar la cola de correo. La llama el planificador de la base cada minuto con
+# una clave dedicada en cabecera (patron de integration-worker): no hay JWT de
+# usuario que verificar.
+[functions.notifications-dispatch]
+verify_jwt = false
+
+# Correos de Supabase Auth por Microsoft Graph (contrato §14). La llama Auth, no
+# un usuario: la autenticacion es la firma Standard Webhooks del hook, y el flag
+# de la plataforma pediria un token que Auth no manda.
+[functions.auth-email-hook]
+verify_jwt = false
+
+# Boton «Probar» del correo en Configuracion. Owner o admin, con su sesion.
+[functions.notifications-test]
+verify_jwt = true
