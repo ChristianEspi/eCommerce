@@ -27,7 +27,7 @@ export function useQuotedCart(
 ): {
   quote: ReturnType<typeof useCartQuote>
   quoted: PriceQuote | null
-  /** Alguna línea sale de una lista de precios: hay acuerdo aplicado. */
+  /** Alguna línea sale de un acuerdo del comprador (segmento o cliente). */
   discounted: boolean
 } {
   const { cart, currency } = useCart()
@@ -52,6 +52,14 @@ export function useQuotedCart(
   return {
     quote,
     quoted,
-    discounted: quoted?.lines.some((line) => line.source === 'price_list') ?? false,
+    // Solo un acuerdo DE ESTE COMPRADOR —lista asignada a su cliente o a su
+    // segmento— es «precio especial». La lista base de la tienda también sale
+    // como `price_list`, y con ella cualquier visitante anónimo leía «precio
+    // especial» en un precio que es el de todo el mundo (hallazgo A3 de la
+    // auditoría H01). Es presentación: el importe no cambia en nada.
+    discounted:
+      quoted?.lines.some(
+        (line) => line.source === 'price_list' && (line.scope === 'segment' || line.scope === 'customer'),
+      ) ?? false,
   }
 }

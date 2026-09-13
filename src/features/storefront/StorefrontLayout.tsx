@@ -29,6 +29,7 @@ import { R, TS } from '@/theme/tokens'
 import { StorefrontNotFoundError } from './api'
 import { notFoundMeta } from './seo'
 import { initials } from './branding'
+import { CommerceContextBar } from './commerce/CommerceContextBar'
 import { StoreCategoryNav } from './components/StoreCategoryNav'
 import { StoreFooter } from './components/StoreFooter'
 import { StoreQuickSearch } from './components/StoreQuickSearch'
@@ -170,6 +171,9 @@ export function StorefrontLayout() {
           <StoreHeader store={store} storeSlug={storeSlug as string} />
 
           <StoreMain>
+            {/* Para quién se compra, cuando hay una cuenta de empresa activa en
+                esta sociedad (H05-H06). Para el consumidor no pinta nada. */}
+            <CommerceContextBar storeSlug={storeSlug as string} />
             <ErrorBoundary>
               <Outlet context={context} />
             </ErrorBoundary>
