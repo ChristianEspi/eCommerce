@@ -94,6 +94,7 @@ export function StorefrontLayout() {
   // Antes de cualquier retorno temprano: el orden de los hooks no puede
   // depender de si la tienda cargo.
   const [asistenteAbierto, setAsistenteAbierto] = useState(false)
+  const enCheckout = /\/checkout\/?$/.test(pathname)
   // La sesión no cambia NADA de lo que se ve del catálogo —la vitrina se lee
   // siempre con el cliente anónimo— pero sí decide de quién es el carrito: con
   // sesión, el del comprador; sin ella, el del token del navegador.
@@ -200,6 +201,11 @@ export function StorefrontLayout() {
               contenedor que el catálogo: sin banda de fondo propia y sin ancho
               propio, que es lo que arrastraba la página en horizontal. */}
           <StoreFooter store={store} storeSlug={storeSlug as string} />
+          {/* N07 · Holgura bajo el pie en el teléfono: al final del scroll, lo
+              último de la página tiene que poder quedar POR ENCIMA de los dos
+              botones flotantes (asistente y «volver arriba»), incluida la
+              franja segura de un iPhone con barra de gestos. */}
+          <Box aria-hidden sx={{ display: { xs: 'block', md: 'none' }, height: 'calc(72px + env(safe-area-inset-bottom, 0px))' }} />
 
           <CartDrawer storeSlug={storeSlug as string} />
 
@@ -210,6 +216,9 @@ export function StorefrontLayout() {
           Se coloca POR ENCIMA de «volver arriba», que ocupa la misma esquina
           en la portada. Apilados y no superpuestos: dos botones peleandose el
           mismo pixel es un boton que no se puede pulsar. */}
+      {/* N07 · En el checkout NO flota: tapaba «Siguiente» y el campo de orden
+          de compra en el teléfono, justo donde se cierra la venta. */}
+      {!enCheckout && (
       <Fab
         color="primary"
         aria-label={t('store.assistant.open')}
@@ -217,12 +226,13 @@ export function StorefrontLayout() {
         sx={{
           position: 'fixed',
           right: { xs: 16, md: 24 },
-          bottom: { xs: 76, md: 88 },
+          bottom: { xs: 'calc(76px + env(safe-area-inset-bottom, 0px))', md: 88 },
           zIndex: 4,
         }}
       >
         <AutoAwesomeRoundedIcon />
       </Fab>
+      )}
 
       <AssistantDrawer
         open={asistenteAbierto}

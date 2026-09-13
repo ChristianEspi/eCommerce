@@ -155,3 +155,20 @@ Bundle: PASS · portada 402,3/405 (+0,3, claves ES). Se evitaron dos chunks ansi
 (`AddRounded` y `useMediaQuery` partidos por Rollup): sin icono en «Agregar» y diálogo a pantalla completa por CSS.
 Notes: guardar desde el checkout NO se implementó (opcional); se guarda desde «Mis direcciones», incluida la acción
 «Guardar en mi libreta» sobre una dirección ya usada.
+
+## N07
+Status: PASS
+Commit: (ver `git log --grep "asistente flotante"`)
+Files: `StorefrontLayout.tsx` (el asistente no flota en `/checkout`; `bottom` con `env(safe-area-inset-bottom)`;
+holgura bajo el pie en xs), `BackToTop.tsx` (safe-area), `checkout-ui.test.tsx` (+1).
+Revisión (script de Playwright fuera del repo, 390×844, pila local): se midió qué elementos quedan bajo el botón del
+asistente. Al final del scroll, ninguno; pero **en el checkout tapaba «Siguiente» (paso 1) y el campo de orden de
+compra (paso 3)** — defecto real, corregido quitando el botón en esa ruta. En portal y catálogo solo cubre filas de
+paso mientras se desplaza (propio de un botón flotante; al final del scroll todo queda libre).
+Revisado sin cambios necesarios: selector multi-cuenta con nombre largo (menú a dos líneas, botón recortado con
+`title`), tarjeta con precio comercial + tachado + etiqueta en 2 columnas, OC en móvil (ancho completo), libreta
+(diálogo a pantalla completa), registro. Desbordamiento horizontal medido: 0 px en registro, portada, catálogo y portal.
+Tests: `checkout-ui` 56/56, `storefront-ui` + `layout-theme` verdes.
+Typecheck: PASS · Lint: PASS
+E2E: `theme-engine` + `responsive` (escritorio, móvil, comercio-*) 20/20 → los 4 temas siguen verdes.
+Bundle: portada 402,3/405 (sin cambio).

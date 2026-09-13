@@ -56,7 +56,7 @@ export function BackToTop({ anchorId }: { anchorId: string }) {
         sx={{
           position: 'fixed',
           right: { xs: 16, md: 24 },
-          bottom: { xs: 16, md: 24 },
+          bottom: { xs: 'calc(16px + env(safe-area-inset-bottom, 0px))', md: 24 },
           zIndex: 3,
           bgcolor: 'var(--card)',
           color: 'var(--accent-deep)',

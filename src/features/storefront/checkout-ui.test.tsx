@@ -1632,3 +1632,21 @@ describe('orden de compra (N05)', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Escribe el número de orden de compra')
   })
 })
+
+/**
+ * N07 · El asistente flotante no tapa el cierre de la compra en el teléfono:
+ * en el checkout no se pinta; en el resto de la tienda sigue.
+ */
+const ASISTENTE = 'Abrir asistente de compra'
+describe('botón flotante del asistente (N07)', () => {
+  it('no flota en el checkout y sí en el carrito', async () => {
+    sembrarCarrito([LINEA_SILLA])
+    const { unmount } = renderStorefront(backend(), '/s/casa-nordica/checkout')
+    expect(await screen.findByLabelText(/Nombre y apellido/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: ASISTENTE })).not.toBeInTheDocument()
+    unmount()
+
+    renderStorefront(backend(), '/s/casa-nordica/cart')
+    expect(await screen.findByRole('button', { name: ASISTENTE })).toBeInTheDocument()
+  })
+})
