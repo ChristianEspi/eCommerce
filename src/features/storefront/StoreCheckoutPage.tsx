@@ -49,6 +49,7 @@ import {
   type CheckoutStage,
   type CheckoutValues,
 } from './checkout'
+import { useCommerceContext } from './commerce/context'
 import { formatSavedAddress, type SavedAddress } from './consumer'
 import { useStorefront } from './hooks'
 import { privateMeta } from './seo'
@@ -130,7 +131,7 @@ const PASOS = [
 const CAMPOS: ReadonlyArray<ReadonlyArray<keyof CheckoutValues>> = [
   ['customerName', 'customerEmail', 'customerPhone'],
   ['address', 'city', 'region', 'postalCode', 'country', 'reference', 'couponCode'],
-  ['paymentMethodCode'],
+  ['paymentMethodCode', 'purchaseOrderNumber'],
 ]
 
 export function StoreCheckoutPage() {
@@ -140,6 +141,10 @@ export function StoreCheckoutPage() {
   const { cart, subtotal, currency, cartToken, clear, forgetServerCart } = useCart()
   const { status: sessionStatus } = useSessionContext()
   const authenticated = sessionStatus === 'authenticated'
+  // N05 · ¿La cuenta con la que se compra exige orden de compra? Lo dice el
+  // servidor (el mismo contexto que la barra); sin sesión o sin cuenta, no.
+  const ordenDeCompraObligatoria =
+    useCommerceContext(storeSlug, authenticated).context?.purchase_order_required === true
 
   // Carrito, checkout, cuenta y seguimiento NO se indexan (P15-SaaS). No es
   // pudor: son estado de una sesión, no contenido. `robots.txt` pide que no se
@@ -199,6 +204,7 @@ export function StoreCheckoutPage() {
       deliveryMethodCode: '',
       pickupPointId: '',
       paymentMethodCode: '',
+      purchaseOrderNumber: '',
     },
   })
 
@@ -346,6 +352,9 @@ export function StoreCheckoutPage() {
     if (indice === 2) {
       if (paymentMethods.length > 0 && !values.paymentMethodCode) {
         return 'store.checkout.error.payment.method'
+      }
+      if (ordenDeCompraObligatoria && !(values.purchaseOrderNumber ?? '').trim()) {
+        return 'store.checkout.error.purchaseOrderRequired'
       }
       // Luhn en el navegador no valida una tarjeta —eso lo dice el emisor—:
       // evita gastar una llamada a la pasarela por un digito mal tecleado.
@@ -834,6 +843,28 @@ export function StoreCheckoutPage() {
                     un numero de tarjeta a quien va a pagar por transferencia es
                     pedir un dato que nadie va a usar. */}
                 {pideTarjeta && <CardFields datos={tarjeta} onCambio={setTarjeta} error={null} />}
+
+                {/* N05 · Solo si la cuenta con la que se compra la EXIGE. Sin esa
+                    exigencia no hay campo: una casilla opcional más en el paso
+                    que cierra la compra es ruido para casi todos. */}
+                {ordenDeCompraObligatoria && (
+                  <TextField
+                    id="checkout-purchase-order"
+                    label={t('store.checkout.purchaseOrder')}
+                    required
+                    fullWidth
+                    autoComplete="off"
+                    placeholder="OC-2026-00125"
+                    error={Boolean(errors.purchaseOrderNumber) || errorKey === 'store.checkout.error.purchaseOrderRequired'}
+                    helperText={
+                      errors.purchaseOrderNumber
+                        ? t(errors.purchaseOrderNumber.message as MessageKey)
+                        : t('store.checkout.purchaseOrderHelp')
+                    }
+                    slotProps={{ htmlInput: { maxLength: 60 } }}
+                    {...register('purchaseOrderNumber')}
+                  />
+                )}
               </>
             )}
           </Stack>

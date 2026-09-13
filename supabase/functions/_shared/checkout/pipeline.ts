@@ -413,6 +413,19 @@ export async function runCheckout(
         }
       }
 
+      // N05 · Orden de compra obligatoria, dicha ANTES de tocar la pasarela o
+      // una tarjeta regalo: descubrirlo en `create_order` obligaría a anular un
+      // cobro ya autorizado. No es la autoridad —`create_order` lo vuelve a
+      // exigir con la fila de la cuenta delante, aunque esta pregunta falle—,
+      // es el aviso temprano.
+      if (approval?.purchaseOrderRequired === true && !input.purchaseOrderNumber) {
+        throw new CheckoutStageError({
+          stage: 'authorize_payment',
+          code: 'ORDEN_COMPRA_REQUERIDA',
+          message: 'Esta cuenta exige un numero de orden de compra',
+        })
+      }
+
       // ---- 8a · La tarjeta regalo, ANTES de la pasarela -------------------
       //
       // Es un medio de pago, no un descuento: no ha tocado el subtotal ni el

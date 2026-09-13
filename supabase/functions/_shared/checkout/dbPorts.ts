@@ -527,6 +527,9 @@ export function createDbPorts(options: DbPortOptions): CheckoutPorts {
                       }
                     : null,
                 },
+          // N05 · la orden de compra tecleada. `create_order` la valida y, si la
+          // cuenta la exige y no llegó, no crea el pedido.
+          p_purchase_order_number: input.request.purchaseOrderNumber ?? null,
         }),
       )
       const orderId = text(raw, 'order_id')
@@ -606,6 +609,7 @@ export function createDbPorts(options: DbPortOptions): CheckoutPorts {
         grandTotal: text(raw, 'grand_total', '0.00'),
         items: Array.isArray(raw.items) ? (raw.items as Record<string, unknown>[]) : [],
         delivery: raw.delivery === null || raw.delivery === undefined ? null : record(raw.delivery),
+        purchaseOrderNumber: nullableText(raw, 'purchase_order_number'),
         replay: raw.replay === true,
       }
     },

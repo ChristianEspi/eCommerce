@@ -102,6 +102,8 @@ export interface MyOrderDetail {
     unit_price: string
     total: string
   }>
+  /** N05 · Solo en el detalle del portal B2B: la orden de compra del pedido. */
+  purchase_order_number?: string | null
   /** Solo en el detalle del consumidor (H03). El portal B2B no la devuelve. */
   shipping_address?: Record<string, unknown> | null
   deliveries?: Array<{ method_name: string | null; state: string | null }>

@@ -811,7 +811,9 @@ describe('la aprobacion B2B', () => {
       placeOrder: place as unknown as CheckoutPorts['placeOrder'],
     })
 
-    await runCheckout(p, input())
+    // Desde N05 una cuenta con `purchaseOrderRequired` no llega a la
+    // transacción sin orden de compra (ver el bloque de abajo): se manda una.
+    await runCheckout(p, { ...input(), purchaseOrderNumber: 'OC-1' })
 
     const arg = (place.mock.calls as unknown as unknown[][])[0]?.[0] as {
       account: { accountId: string | null }
@@ -819,6 +821,37 @@ describe('la aprobacion B2B', () => {
     }
     expect(arg.account.accountId).toBe(ACCOUNT)
     expect(arg.approval).toMatchObject({ required: true, reason: 'rule' })
+  })
+
+  it('N05 · cuenta con OC obligatoria y sin OC: se detiene ANTES de cobrar y de crear el pedido', async () => {
+    const place = vi.fn(() => Promise.resolve(ORDER_RESULT))
+    const pay = vi.fn()
+    const { ports: p } = withAccount({
+      resolveApproval: () => Promise.resolve({ required: false, reason: null, purchaseOrderRequired: true }),
+      placeOrder: place as unknown as CheckoutPorts['placeOrder'],
+      authorizePayment: pay as unknown as CheckoutPorts['authorizePayment'],
+    })
+
+    await expect(runCheckout(p, input())).rejects.toMatchObject({
+      code: 'ORDEN_COMPRA_REQUERIDA',
+      stage: 'authorize_payment',
+      status: 422,
+    })
+    expect(pay).not.toHaveBeenCalled()
+    expect(place).not.toHaveBeenCalled()
+  })
+
+  it('N05 · con OC, la orden de compra llega tal cual a la transacción del pedido', async () => {
+    const place = vi.fn(() => Promise.resolve(ORDER_RESULT))
+    const { ports: p } = withAccount({
+      resolveApproval: () => Promise.resolve({ required: false, reason: null, purchaseOrderRequired: true }),
+      placeOrder: place as unknown as CheckoutPorts['placeOrder'],
+    })
+
+    await runCheckout(p, { ...input(), purchaseOrderNumber: 'OC-2026-00125' })
+
+    const arg = (place.mock.calls as unknown as unknown[][])[0]?.[0] as { request: { purchaseOrderNumber?: string | null } }
+    expect(arg.request.purchaseOrderNumber).toBe('OC-2026-00125')
   })
 
   it('un comprador SIN cuenta no entra al circuito: no se pregunta nada', async () => {

@@ -89,6 +89,9 @@ const STAGE_CODE_STATUS: Record<string, ErrorStatus> = {
   CADUCIDAD_INVALIDA: 400,
   // --- Entrega ---
   DIRECCION_NO_ENTREGABLE: 422,
+  // N05: le falta (o sobra formato a) la orden de compra que la cuenta exige.
+  ORDEN_COMPRA_REQUERIDA: 422,
+  ORDEN_COMPRA_INVALIDA: 422,
   // --- Pago ---
   PAGO_RECHAZADO: 402,
   PAGO_NO_DISPONIBLE: 503,

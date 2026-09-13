@@ -9,7 +9,8 @@
  *  · un COMERCIO (trade): cliente «Bodega E2E» en el segmento `mayorista`, con
  *    una cuenta sin controles corporativos y su comprador activo;
  *  · una EMPRESA (enterprise): cliente «Corporativo E2E» en el segmento
- *    `clinicas` (lista `convenio`), con crédito a 30 días y su comprador activo;
+ *    `clinicas` (lista `convenio`), con crédito a 30 días, ORDEN DE COMPRA
+ *    obligatoria (N05) y su comprador activo;
  *  · un comprador con DOS cuentas (N01): «E2E Multi Andina» (segmento
  *    `mayorista`, la más antigua) y «E2E Multi Boreal» (convenio de cliente
  *    propio sobre el producto de los E2E), para el selector «Comprando para».
@@ -183,7 +184,7 @@ await compradorDeEmpresa({
   segmentCode: 'clinicas',
   cuentaExtra: {
     requires_approval: false,
-    purchase_order_required: false,
+    purchase_order_required: true,
     credit_limit: 50000,
     payment_terms_days: 30,
   },

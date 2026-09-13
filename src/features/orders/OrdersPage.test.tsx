@@ -133,6 +133,7 @@ function backend(role: 'admin' | 'viewer' = 'admin'): FakeSupabase {
             account_name: 'Acme',
             tax_id: '20123456789',
           },
+          purchase_order_number: 'OC-ACME-2026-77',
         }),
       ],
       order_items: [
@@ -432,6 +433,16 @@ describe('OrdersPage — detalle en panel lateral', () => {
 
     expect(within(drawer).getByText('Acme')).toBeInTheDocument()
     expect(within(drawer).getByText('20123456789')).toBeInTheDocument()
+    // N05: y la orden de compra con la que firmó.
+    expect(within(drawer).getByText('Orden de compra')).toBeInTheDocument()
+    expect(within(drawer).getByText('OC-ACME-2026-77')).toBeInTheDocument()
+  })
+
+  it('un pedido sin orden de compra no pinta la fila vacía (N05)', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    const drawer = await openDrawer(user, 'MI-000001')
+    expect(within(drawer).queryByText('Orden de compra')).not.toBeInTheDocument()
   })
 
   it('solo ofrece las transiciones que la base permite desde el estado actual', async () => {

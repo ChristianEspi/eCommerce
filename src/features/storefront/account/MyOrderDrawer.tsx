@@ -171,6 +171,11 @@ export function MyOrderDrawer({
               <Typography sx={{ fontSize: TS.label, color: 'var(--muted)', mt: 0.25 }}>
                 {formatDate(new Date(detail.placed_at), locale)}
               </Typography>
+              {detail.purchase_order_number && (
+                <Typography sx={{ fontSize: TS.label, color: 'var(--muted)', mt: 0.25 }}>
+                  {t('store.checkout.purchaseOrder')}: <strong>{detail.purchase_order_number}</strong>
+                </Typography>
+              )}
               {/* El estado también aquí: se abre el detalle justo para saber si
                   ya salió, y obligar a cerrarlo para leerlo en la lista es
                   hacer trabajar al comprador por nada. */}

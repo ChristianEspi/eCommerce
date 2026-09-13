@@ -484,6 +484,9 @@ export function OrderDrawer({
         {current.customer_snapshot?.tax_id && (
           <Field label={t('orders.customer.taxId')} value={current.customer_snapshot.tax_id} />
         )}
+        {current.purchase_order_number && (
+          <Field label={t('orders.customer.purchaseOrder')} value={current.purchase_order_number} />
+        )}
       </Section>
 
       <Section title={t('orders.delivery')}>

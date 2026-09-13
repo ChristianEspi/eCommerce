@@ -1493,3 +1493,108 @@ describe('país por defecto del checkout (H08)', () => {
     expect(screen.getByLabelText(/País/)).toHaveValue('')
   })
 })
+
+/**
+ * N05 · La orden de compra obligatoria en la pantalla.
+ *
+ * La autoridad es la base (`purchase-order.test.ts`); aquí se fija que la
+ * pantalla la pide SOLO cuando la cuenta la exige, que no deja enviar sin ella,
+ * que viaja como un campo del pedido (nunca en una línea) y que sin exigencia
+ * el cuerpo no cambia.
+ */
+describe('orden de compra (N05)', () => {
+  const CONTEXTO_EMPRESA = {
+    account_name: 'Corporación Andina SAC',
+    account_code: 'CORP',
+    customer_name: 'Corporación Andina SAC',
+    requires_approval: false,
+    purchase_order_required: true,
+    has_spending_limit: false,
+    has_credit_terms: false,
+    locations_count: 0,
+    has_commercial_pricing: false,
+    accounts_in_store: 1,
+  }
+
+  function conSesion(contexto: unknown) {
+    const session = makeSession({ withTenantClaims: false })
+    const fake = backend({ session })
+    fake.state.rpc.my_commerce_context = () => contexto
+    fake.state.rpc.cart_open = () =>
+      carritoServidor([
+        {
+          product_id: P_SILLA,
+          variant_id: null,
+          uom_code: null,
+          quantity: 2,
+          slug: 'silla-roble',
+          name: 'Silla de roble',
+          unit_price: '100.00',
+          unit_price_snapshot: '100.00',
+        },
+      ])
+    renderStorefront(fake, '/s/casa-nordica/checkout', session)
+    return fake
+  }
+
+  async function rellenarConSesion(user: ReturnType<typeof userEvent.setup>) {
+    const nombre = await screen.findByLabelText(/Nombre y apellido/)
+    if ((nombre as HTMLInputElement).value === '') await user.type(nombre, 'Ana Pérez')
+    const correo = screen.getByLabelText(/Correo/)
+    if ((correo as HTMLInputElement).value === '') await user.type(correo, 'ana@compradora.com')
+    await user.type(screen.getByLabelText(/Teléfono/), '+51 999 888 777')
+    await user.click(screen.getByRole('button', { name: 'Siguiente' }))
+    await user.type(await screen.findByLabelText(/Dirección de entrega/), 'Av. Primavera 120')
+  }
+
+  it('la cuenta la exige: campo obligatorio, no deja confirmar sin OC y luego viaja en el pedido', async () => {
+    const user = userEvent.setup()
+    const fake = conSesion(CONTEXTO_EMPRESA)
+    await rellenarConSesion(user)
+    await irAPagar(user)
+
+    const campo = await screen.findByLabelText(/Orden de compra/)
+    expect(campo).toBeRequired()
+
+    await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Escribe el número de orden de compra')
+    expect(fake.state.invocations).toHaveLength(0)
+
+    await user.type(campo, 'OC-2026-00125')
+    await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
+    await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
+    const { body } = fake.state.invocations[0]!
+    expect(body.purchase_order_number).toBe('OC-2026-00125')
+    // Del pedido, no de una línea; y sin identidad comercial ni importes.
+    for (const linea of body.items as Array<Record<string, unknown>>) {
+      expect(Object.keys(linea)).not.toContain('purchase_order_number')
+    }
+    for (const prohibida of CLAVES_PROHIBIDAS) expect(todasLasClaves(body)).not.toContain(prohibida)
+  })
+
+  it('sin exigencia no hay campo y el cuerpo no lleva la clave', async () => {
+    const user = userEvent.setup()
+    const fake = conSesion({ ...CONTEXTO_EMPRESA, purchase_order_required: false })
+    await rellenarConSesion(user)
+    await irAPagar(user)
+    expect(screen.queryByLabelText(/Orden de compra/)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
+    await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
+    expect(Object.keys(fake.state.invocations[0]!.body)).not.toContain('purchase_order_number')
+  })
+
+  it('si el servidor la exige igualmente, el aviso dice qué falta', async () => {
+    const user = userEvent.setup()
+    const fake = backend({
+      onCheckout: () => {
+        throw new FunctionsHttpErrorLike(422, 'ORDEN_COMPRA_REQUERIDA', { stage: 'authorize_payment', retryable: false })
+      },
+    })
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(fake, '/s/casa-nordica/checkout')
+    await rellenarContacto(user)
+    await irAPagar(user)
+    await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Escribe el número de orden de compra')
+  })
+})

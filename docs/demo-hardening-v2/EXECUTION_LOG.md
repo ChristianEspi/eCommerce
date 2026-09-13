@@ -98,3 +98,34 @@ Bundle: sin cambios de frontend
 Notes: la cotización no conoce el correo del checkout; los topes por cliente contados por correo siguen
 decidiéndose al crear el pedido (comportamiento previo, documentado en la migración). `create_order` y los
 cerrojos no se tocan.
+
+## N05
+Status: PASS
+Commit: (ver `git log --grep "orden de compra obligatoria"`)
+Files: migración `20260913150000_purchase_order_number.sql` (`orders.purchase_order_number` con CHECK e inmutable;
+`create_order` y `checkout_place_order` recreadas con `p_purchase_order_number`; `purchase_order_number` en la lista
+negra de líneas; `my_business_order_detail` la devuelve); borde: `request.ts` (campo permitido, validado, en el
+resumen de idempotencia), `orders.ts` (prohibido en líneas), `pipeline.ts` (aviso temprano antes de cobrar),
+`errors.ts` (422), `dbPorts.ts`, `checkout/index.ts` (respuesta); vitrina: campo obligatorio en el paso de pago solo
+si la cuenta lo exige, confirmación, portal B2B; backoffice: `OrderDrawer`.
+Tests: `purchase-order.test.ts` 13 (sin OC → `ORDEN_COMPRA_REQUERIDA` antes de cobrar y sin pedido; OC en blanco =
+ninguna; `create_order` directo también la exige; con OC se guarda normalizada y vuelve en la respuesta y en el
+portal; >60/controles → `ORDEN_COMPRA_INVALIDA` en borde y base; inmutable; cuenta sin exigencia, consumidor e invitado
+intactos; OC en línea → `CAMPO_NO_PERMITIDO`; misma clave + otra OC → `IDEMPOTENCIA_EN_CONFLICTO`; cuerpo sigue
+rechazando identidad comercial; 422). `checkout-orchestrator` +2 (se detiene antes de `authorizePayment`/`placeOrder`;
+la OC llega a la transacción). `checkout-ui` +3, `OrdersPage` +1, `portal-orders` +1.
+Tests modificados: `checkout-orchestrator` «lo que responde llega a la transacción» manda ahora una OC (su cuenta
+simulada tiene `purchaseOrderRequired: true`, que desde N05 exige OC; la aserción no cambia).
+`checkout-order` «una tasa caducada no se aplica»: **flake de reloj previo** — fallaba 3/3 aislado también en
+`65fe4f1` (N02) porque alta y cierre de la tasa caían en el mismo instante (`valid_to = valid_from`, CHECK
+`tax_rates_period`). La tasa ahora empieza ayer; la aserción (`tax_total = 5.00`) no cambia.
+Typecheck: PASS
+Lint: PASS
+DB: 86 archivos · 2 235 ✓
+Unit (src): 1 648 · 1 642 ✓ · 6 ✗ (= los 6 de baseline)
+E2E: enterprise 4/4 (con OC obligatoria: sin OC la pantalla no deja confirmar y lo dice; con OC pedido, confirmación y
+portal la enseñan; llamada directa al checkout sin OC → 422 `ORDEN_COMPRA_REQUERIDA`) + multi-cuenta y trade 6/6.
+El E2E encontró un defecto real antes de commitear: el borde respondía 500 para `ORDEN_COMPRA_REQUERIDA` (código sin
+status); corregido a 422.
+Bundle: PASS · portada 402,0/405 · checkout 404,0/430
+Notes: el fixture local pone `purchase_order_required = true` en la cuenta E2E-CORP (escenario enterprise con OC).

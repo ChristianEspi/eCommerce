@@ -161,7 +161,10 @@ export async function anadirDesdeFicha(page: Page, slug: string, cantidad: numbe
  * Lo que se rellena solo se rellena si está vacío: con sesión el checkout ya
  * propone nombre y correo (H04), y el país lo trae la tienda (H08).
  */
-export async function comprar(page: Page): Promise<{ respuesta: Response; cuerpoEnviado: Record<string, unknown> }> {
+export async function comprar(
+  page: Page,
+  opciones: { ordenDeCompra?: string } = {},
+): Promise<{ respuesta: Response; cuerpoEnviado: Record<string, unknown> }> {
   await page.goto(`${TIENDA}/checkout`)
 
   const nombre = page.getByLabel(/nombre y apellido/i)
@@ -191,6 +194,16 @@ export async function comprar(page: Page): Promise<{ respuesta: Response; cuerpo
 
   await expect(page.getByRole('heading', { name: /^pago$/i })).toBeVisible()
   await page.getByRole('radio', { name: /transferencia bancaria/i }).click({ timeout: 20_000 })
+
+  // N05 · Si la cuenta exige orden de compra, primero se comprueba que sin ella
+  // NO deja confirmar y lo dice; luego se escribe.
+  if (opciones.ordenDeCompra !== undefined) {
+    const campo = page.getByLabel(/orden de compra/i)
+    await expect(campo).toBeVisible({ timeout: 20_000 })
+    await page.getByRole('button', { name: 'Confirmar pedido' }).click()
+    await expect(page.getByRole('alert').filter({ hasText: 'orden de compra' })).toContainText('Escribe el número de orden de compra')
+    await campo.fill(opciones.ordenDeCompra)
+  }
 
   const [respuesta] = await Promise.all([
     page.waitForResponse((r) => r.url().includes('/functions/v1/checkout') && r.request().method() === 'POST', {
