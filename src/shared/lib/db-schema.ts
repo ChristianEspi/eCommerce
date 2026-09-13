@@ -434,6 +434,14 @@ export const CART_ABANDON_RPC = 'cart_abandon'
 export const ORDER_TRANSITION_RPC = 'order_transition'
 export const ORDER_APPROVAL_DECIDE_RPC = 'order_approval_decide'
 export const MY_BUSINESS_ORDERS_RPC = 'my_business_orders'
+// Cuenta del CONSUMIDOR registrado (hardening H02-H04, migración 20260913100000).
+// Las tres reciben el slug público de la tienda y nada más: el usuario sale del
+// JWT y los pedidos, del vínculo que escribe el checkout (`order_buyers`). Sin
+// `satisfies` hasta regenerar los tipos: la red es `consumer-account.test.ts`.
+// `checkout_link_order_buyer` NO está aquí a propósito: es de `service_role`.
+export const MY_CONSUMER_ORDERS_RPC = 'my_consumer_orders'
+export const MY_CONSUMER_ORDER_DETAIL_RPC = 'my_consumer_order_detail'
+export const MY_CHECKOUT_PROFILE_RPC = 'my_checkout_profile'
 
 // Pagos (P09-SaaS). Las TRES que puede llamar el navegador con sesión, y su
 // autorización vive dentro de cada una. Las del servidor —`payment_intent_open`,

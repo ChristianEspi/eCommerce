@@ -555,6 +555,29 @@ export function createDbPorts(options: DbPortOptions): CheckoutPorts {
         }
       }
 
+      // Hardening H02 · quién compró, cuando compró con sesión.
+      //
+      // `orders` no guarda al usuario, y «Mis pedidos» del consumidor no puede
+      // salir de filtrar por correo (un correo no prueba nada). El vínculo se
+      // escribe AQUÍ, igual que el cobro y la tarjeta regalo: después del
+      // pedido y sin poder tumbarlo.
+      //
+      // El usuario es el VERIFICADO: el de la etapa 2 si ya se comprobó, o el
+      // que devuelve `current_buyer()` con el token del llamante, que PostgREST
+      // valida antes de ejecutar. `hasSession` solo decide si merece la pena
+      // preguntar; un token con la firma falsa no llega a responder.
+      if (orderId !== '' && hasSession) {
+        try {
+          const buyer =
+            input.account.userId ?? nullableText(record(await caller('current_buyer', {})), 'user_id')
+          if (buyer) {
+            await service('checkout_link_order_buyer', { p_order_id: orderId, p_user_id: buyer })
+          }
+        } catch (error) {
+          console.error('[checkout] no se pudo vincular el pedido con su comprador', error)
+        }
+      }
+
       return {
         orderId,
         orderNumber: text(raw, 'order_number'),
