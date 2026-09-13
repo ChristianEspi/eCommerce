@@ -81,6 +81,7 @@ function datos(overrides: Partial<HomeSectionData> = {}): HomeSectionData {
     cmsTraeProductos: false,
     promociones: [],
     promoAssets: {},
+    categorias: [],
     brands: [{ code: 'genfar', name: 'Genfar', count: 4 }],
     brandSelected: null,
     favorites: new Set<string>(),
@@ -206,11 +207,33 @@ describe('una sección sin datos se omite sola', () => {
       layout([
         { id: 'business-info', enabled: true },
         { id: 'newsletter', enabled: true },
-        { id: 'categories', enabled: true },
       ]),
     )
 
     expect(container.textContent).toBe('')
+  })
+
+  it('categories sin familias no pinta nada: no inventa categorías', () => {
+    const { container } = pintar(layout([{ id: 'categories', enabled: true }]), datos({ categorias: [] }))
+
+    expect(container.textContent).toBe('')
+  })
+
+  it('categories pinta las familias del catálogo como puertas, en su orden y con su tope', () => {
+    const familias = [
+      { category_id: 'c1', name: 'Zapatillas', slug: 'zapatillas' },
+      { category_id: 'c2', name: 'Botas', slug: 'botas' },
+      { category_id: 'c3', name: 'Sandalias', slug: 'sandalias' },
+    ]
+    pintar(layout([{ id: 'categories', enabled: true, maxItems: 2 }]), datos({ categorias: familias }))
+
+    const seccion = screen.getByRole('region', { name: 'store.categories.shopBy' })
+    const puertas = seccion.querySelectorAll('a')
+    expect([...puertas].map((a) => a.getAttribute('href'))).toEqual([
+      '/s/botica?c=zapatillas',
+      '/s/botica?c=botas',
+    ])
+    expect(screen.queryByText('Sandalias')).not.toBeInTheDocument()
   })
 })
 

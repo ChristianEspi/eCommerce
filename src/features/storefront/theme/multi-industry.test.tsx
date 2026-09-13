@@ -106,7 +106,10 @@ const ESCENARIOS: readonly Escenario[] = [
   },
 ]
 
-function backend(e: Escenario): FakeSupabase {
+function backend(
+  e: Escenario,
+  extra: { store?: Record<string, unknown>; categorias?: Array<{ slug: string; name: string }> } = {},
+): FakeSupabase {
   const producto = {
     product_id: 'cccc1111-1111-4111-8111-111111111111',
     store_id: STORE,
@@ -145,17 +148,27 @@ function backend(e: Escenario): FakeSupabase {
           contact_phone: null,
           contact_address: null,
           theme_preset: e.tema,
+          ...extra.store,
         },
       ],
-      public_categories: [
-        {
-          category_id: producto.category_id,
-          store_id: STORE,
-          slug: 'familia',
-          name: e.categoria,
-          position: 1,
-        },
-      ],
+      public_categories: extra.categorias
+        ? extra.categorias.map((c, i) => ({
+            category_id: `bbbb${String(i + 2).padStart(4, '0')}-1111-4111-8111-111111111111`,
+            store_id: STORE,
+            parent_id: null,
+            slug: c.slug,
+            name: c.name,
+            position: i + 1,
+          }))
+        : [
+            {
+              category_id: producto.category_id,
+              store_id: STORE,
+              slug: 'familia',
+              name: e.categoria,
+              position: 1,
+            },
+          ],
       public_products: [producto],
       public_product_images: [],
     },
@@ -191,8 +204,8 @@ function backend(e: Escenario): FakeSupabase {
   })
 }
 
-async function abrir(e: Escenario, ruta = '/s/tienda') {
-  holder.client = backend(e)
+async function abrir(e: Escenario, ruta = '/s/tienda', extra: Parameters<typeof backend>[1] = {}) {
+  holder.client = backend(e, extra)
   renderWithProviders(
     <Routes>
       <Route path="/s/:storeSlug" element={<StorefrontLayout />}>
@@ -294,5 +307,47 @@ describe('el rubro no existe para el programa', () => {
 
     expect(huellas.size).toBe(4)
     expect(estructuras.size).toBe(1)
+  })
+})
+
+/**
+ * H07 · La sección `categories` de la portada, en ocho rubros y los cuatro temas.
+ *
+ * Es una tabla por la misma razón que el resto del archivo: si pintar las
+ * familias de una ferretería necesitara una rama distinta que las de una tienda
+ * de tecnología, esto no podría escribirse como datos. El comercio enciende la
+ * sección en su `home_layout`; lo que aparece son SUS familias, con enlace al
+ * catálogo filtrado por cada una.
+ */
+const RUBROS: ReadonlyArray<{ rubro: string; tema: string; familias: string[] }> = [
+  { rubro: 'moda', tema: 'premium', familias: ['Vestidos', 'Abrigos', 'Accesorios'] },
+  { rubro: 'calzado', tema: 'universal', familias: ['Zapatillas', 'Botas', 'Sandalias'] },
+  { rubro: 'farmacia', tema: 'retail', familias: ['Medicamentos', 'Dermocosmética', 'Bebé y mamá'] },
+  { rubro: 'abarrotes', tema: 'catalog', familias: ['Abarrotes', 'Bebidas', 'Limpieza'] },
+  { rubro: 'tecnología', tema: 'universal', familias: ['Celulares', 'Computadoras', 'Audio'] },
+  { rubro: 'ferretería', tema: 'catalog', familias: ['Herramientas', 'Pinturas', 'Electricidad'] },
+  { rubro: 'belleza', tema: 'premium', familias: ['Maquillaje', 'Cuidado capilar', 'Fragancias'] },
+  {
+    rubro: 'retail general',
+    tema: 'retail',
+    familias: ['Hogar', 'Juguetes', 'Deportes', 'Mascotas', 'Oficina y papelería con un nombre muy largo'],
+  },
+]
+
+describe.each(RUBROS)('portada de $rubro con la sección de familias ($tema)', ({ tema, familias }) => {
+  it('pinta SUS familias como puertas al catálogo filtrado', async () => {
+    const base = ESCENARIOS[0] as Escenario
+    const slugs = familias.map((nombre, i) => ({ slug: `familia-${i + 1}`, name: nombre }))
+    await abrir({ ...base, tema }, '/s/tienda', {
+      store: { home_layout: { version: 1, sections: [{ id: 'categories', enabled: true }] } },
+      categorias: slugs,
+    })
+
+    const seccion = await screen.findByRole('region', { name: 'Compra por categoría' })
+    for (const { slug, name } of slugs) {
+      const puertas = within(seccion).getAllByRole('link', { name: new RegExp(name) })
+      expect(puertas.length).toBeGreaterThan(0)
+      expect(puertas[0]).toHaveAttribute('href', `/s/tienda?c=${slug}`)
+    }
   })
 })
