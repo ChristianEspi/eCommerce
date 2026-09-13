@@ -8,7 +8,6 @@ import { useSessionContext } from '@/features/auth/session-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { useFeedback } from '@/shared/ui/feedback-context'
-import { TS } from '@/theme/tokens'
 import { profileFromSession } from '../consumer'
 
 const schema = z.object({
@@ -106,9 +105,6 @@ export function ConsumerProfileSection() {
                 {t('account.consumer.profile.save')}
               </Button>
             </Stack>
-            <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>
-              {t('account.consumer.profile.usedAtCheckout')}
-            </Typography>
           </Stack>
         </Box>
       </CardContent>

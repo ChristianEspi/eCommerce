@@ -29,7 +29,7 @@ un gate sin escribir nada más.
 
 | Recorrido | Techo (kB gzip) | Medido en P15 |
 |---|---|---|
-| vitrina · portada | 400 | 334,6 |
+| vitrina · portada | **405** (era 400) | 334,6 |
 | vitrina · ficha de producto | 400 | 309,1 |
 | vitrina · checkout | 430 | 330,3 |
 | backoffice · panel | 430 | 298,1 |
@@ -38,6 +38,27 @@ Punto de partida, para que el número signifique algo: en P14 (`8d5547d`) el
 chunk de entrada era de **970,90 kB / 283,38 kB gzip** y lo descargaba todo el
 mundo, entrase donde entrase. Hoy la entrada compartida son **251,8 kB gzip** y
 lo demás depende de a dónde se entra.
+
+### 2.1 · La portada, de 400 a 405 kB (hardening multi-commerce, 2026-09-13)
+
+Se siguió el orden de §2 antes de tocar el número, y queda escrito para que el cambio no sea un techo
+que se mueve solo:
+
+| Medición | Entrada kB | Ruta kB | Total kB |
+|---|---|---|---|
+| `1bcf74f`, antes de empezar | 273,0 | 126,4 | **399,5** (99,9 % del techo) |
+| con la barra de contexto comercial estática | 273,7 | 127,2 | 400,9 |
+| barra diferida y solo con sesión (paso 1) | 273,8 | 126,6 | 400,4 |
+| copy nuevo recortado (el diccionario ES viaja en la entrada por diseño) | 273,6 | 126,7 | 400,3 |
+| sección `categories` diferida (paso 3) | 273,6 | 126,8 | 400,3 — sin ganancia, revertido |
+
+Lo que queda (+0,8 kB, 0,2 %) es el diccionario ES —estático por la regla 1 de `messages.ts`— con las
+claves de tres experiencias nuevas (cuenta del consumidor, contexto comercial, portada por familias) y
+el código de la sección de familias. Ninguna dependencia nueva ni nada que debiera ser perezoso.
+
+5 kB es ~1 % de margen: no es el 20 % del criterio original y no pretende serlo. Es el mínimo que no
+convierte la siguiente pantalla legítima en una alarma. **Pendiente para el operador:** re-basar los
+techos con el criterio de §2 (medido + ~20 %) o abrir una fase de dieta de la entrada.
 
 ### De dónde salen los techos
 

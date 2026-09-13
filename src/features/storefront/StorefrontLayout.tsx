@@ -15,7 +15,7 @@ import {
   Typography,
   useMediaQuery,
 } from '@mui/material'
-import { useState, type ReactNode } from 'react'
+import { lazy, Suspense, useState, type ReactNode } from 'react'
 import { Link, Outlet, useLocation, useParams } from 'react-router-dom'
 import { ErrorBoundary } from '@/app/ErrorBoundary'
 import { useSessionContext } from '@/features/auth/session-context'
@@ -29,7 +29,6 @@ import { R, TS } from '@/theme/tokens'
 import { StorefrontNotFoundError } from './api'
 import { notFoundMeta } from './seo'
 import { initials } from './branding'
-import { CommerceContextBar } from './commerce/CommerceContextBar'
 import { StoreCategoryNav } from './components/StoreCategoryNav'
 import { StoreFooter } from './components/StoreFooter'
 import { StoreQuickSearch } from './components/StoreQuickSearch'
@@ -62,6 +61,11 @@ import '@fontsource/plus-jakarta-sans/latin-500.css'
 import '@fontsource/plus-jakarta-sans/latin-700.css'
 import '@fontsource/plus-jakarta-sans/latin-800.css'
 import './storefront.css'
+
+/** Solo se descarga con sesión: ver el comentario donde se monta. */
+const CommerceContextBar = lazy(() =>
+  import('./commerce/CommerceContextBar').then((m) => ({ default: m.CommerceContextBar })),
+)
 
 /**
  * Vitrina pública.
@@ -172,8 +176,15 @@ export function StorefrontLayout() {
 
           <StoreMain>
             {/* Para quién se compra, cuando hay una cuenta de empresa activa en
-                esta sociedad (H05-H06). Para el consumidor no pinta nada. */}
-            <CommerceContextBar storeSlug={storeSlug as string} />
+                esta sociedad (H05-H06). Para el consumidor no pinta nada.
+                Diferida y solo con sesión: el visitante anónimo —casi todo el
+                tráfico de una portada— no descarga ni un byte de ella, y la
+                portada estaba a medio kB de su techo de rendimiento. */}
+            {sessionStatus === 'authenticated' && (
+              <Suspense fallback={null}>
+                <CommerceContextBar storeSlug={storeSlug as string} />
+              </Suspense>
+            )}
             <ErrorBoundary>
               <Outlet context={context} />
             </ErrorBoundary>

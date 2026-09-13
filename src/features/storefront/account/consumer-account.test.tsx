@@ -149,7 +149,7 @@ describe('Mis pedidos del consumidor', () => {
     // El producto que entra es el del catálogo actual (15.00), no una línea
     // armada con el 12.50 del pedido.
     expect(add).toHaveBeenCalledWith(expect.objectContaining({ product_id: PRODUCTO, price: '15.00' }), 2, null)
-    expect(await screen.findByText('1 producto(s) al carrito; 1 ya no están disponibles.')).toBeInTheDocument()
+    expect(await screen.findByText('1 añadidos; 1 no disponibles.')).toBeInTheDocument()
     expect(openCart).toHaveBeenCalled()
     // Volver a comprar no crea nada en el servidor.
     expect(fake.state.invocations).toEqual([])
@@ -162,7 +162,7 @@ describe('Mis pedidos del consumidor', () => {
 
   it('si la base todavía no tiene la función, dice «no activada» y no «error»', async () => {
     pintar({ my_consumer_orders: missing })
-    expect(await screen.findByText('Esta sección todavía no está activada en la tienda')).toBeInTheDocument()
+    expect(await screen.findByText('Aún no disponible en esta tienda')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /reintentar/i })).not.toBeInTheDocument()
   })
 })
@@ -199,7 +199,7 @@ describe('Mis datos', () => {
     await user.type(await screen.findByLabelText('Teléfono'), 'llámame')
     await user.click(screen.getByRole('button', { name: 'Guardar' }))
 
-    expect(await screen.findByText(/Escribe un teléfono válido/)).toBeInTheDocument()
+    expect(await screen.findByText(/Teléfono no válido/)).toBeInTheDocument()
     expect(update).not.toHaveBeenCalled()
   })
 })
@@ -223,7 +223,7 @@ describe('Mis direcciones', () => {
 
     expect(await screen.findByText('Jr. Lampa 55')).toBeInTheDocument()
     expect(screen.getByText('Av. Primavera 120')).toBeInTheDocument()
-    expect(screen.getByText('Última usada')).toBeInTheDocument()
+    expect(screen.getByText('Última')).toBeInTheDocument()
     expect(fake.state.rpcCalls.find((c) => c.name === 'my_checkout_profile')?.args).toEqual({
       p_store_slug: 'tienda-a',
     })

@@ -73,9 +73,6 @@ export function ConsumerAddressesSection({ storeSlug }: { storeSlug: string }) {
           </CardContent>
         </Card>
       ))}
-      <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>
-        {t('account.consumer.addresses.hint')}
-      </Typography>
     </Stack>
   )
 }
