@@ -23,6 +23,26 @@ import type { Page } from '@playwright/test'
 const FICHA = 'a[href*="/product/"]'
 
 /**
+ * Abre la FICHA del primer producto de la portada, por su dirección.
+ *
+ * Pulsar la tarjeta no siempre navega: según la sección donde caiga, abre la
+ * vista rápida (`?p=`) en vez de la ficha. Con listas de precio activas la
+ * primera tarjeta pasa a ser una oferta del hero, que abre la vista rápida, y
+ * estas pruebas —que necesitan la ficha— dependían de qué producto saliera
+ * primero (visto en el hardening H14, igual con el código de antes). El `href`
+ * es la dirección de la ficha en cualquier sección; ir a él prueba lo mismo sin
+ * depender del catálogo del día.
+ */
+async function abrirPrimeraFicha(page: Page) {
+  const tarjeta = page.locator(FICHA).first()
+  await expect(tarjeta).toBeVisible({ timeout: 20_000 })
+  const ficha = await tarjeta.getAttribute('href')
+  expect(ficha).toMatch(/\/product\//)
+  await page.goto(ficha as string)
+  await expect(page).toHaveURL(/\/product\//)
+}
+
+/**
  * Deja el carrito con una línea, recorriendo la tienda como se recorre.
  *
  * ## Por qué espera a la cuenta de la cabecera
@@ -44,8 +64,7 @@ const FICHA = 'a[href*="/product/"]'
 async function comprarAlgo(page: Page) {
   await page.goto(TIENDA)
   await esperarCatalogo(page)
-  await page.locator(FICHA).first().click()
-  await expect(page).toHaveURL(/\/product\//)
+  await abrirPrimeraFicha(page)
 
   await page.getByRole('button', { name: /agregar al carrito|añadir al carrito/i }).first().click()
 
@@ -84,9 +103,8 @@ test.describe('la vitrina', () => {
   test('la ficha enseña el reaseguro junto al botón de compra', async ({ page }) => {
     await page.goto(TIENDA)
     await esperarCatalogo(page)
-    await page.locator(FICHA).first().click()
+    await abrirPrimeraFicha(page)
 
-    await expect(page).toHaveURL(/\/product\//)
     // El reaseguro tiene que estar en la ficha, no al final de la portada: es
     // donde se frena la compra.
     await expect(page.getByText(/Entrega calculada al comprar/i)).toBeVisible({ timeout: 20_000 })
