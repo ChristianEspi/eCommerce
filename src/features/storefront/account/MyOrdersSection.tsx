@@ -88,71 +88,76 @@ export function MyOrdersSection({
 
   return (
     <Card sx={{ borderRadius: 'var(--sf-radius)', border: '1px solid var(--sf-line)', overflow: 'hidden' }}>
-      <Table size="small">
-        <TableHead>
-          <TableRow>
-            <TableCell>{t('account.orders.number')}</TableCell>
-            <TableCell>{t('account.orders.date')}</TableCell>
-            <TableCell>{t('account.orders.state')}</TableCell>
-            <TableCell align="right">{t('account.orders.total')}</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {orders.map((order) => (
-            <TableRow
-              key={order.order_id}
-              hover
-              // La fila entera abre el detalle: el objetivo mas grande de la
-              // pantalla es el que se pulsa, y un enlace de dos palabras en la
-              // ultima columna se falla en movil.
-              role="button"
-              tabIndex={0}
-              aria-label={`${t('account.orders.detail')}: ${order.order_number}`}
-              onClick={() => setAbierto(order)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault()
-                  setAbierto(order)
-                }
-              }}
-              sx={{ cursor: 'pointer' }}
-            >
-              <TableCell>
-                <Typography sx={{ fontSize: TS.body, fontWeight: 800 }}>
-                  {order.order_number}
-                </Typography>
-                {/* De qué empresa es. Solo dice algo cuando se compra para más
-                    de una, pero cuando lo dice es lo primero que se mira. Un
-                    consumidor compra para sí: no hay empresa que nombrar. */}
-                {order.account_name && (
-                  <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>
-                    {order.account_name}
-                  </Typography>
-                )}
-              </TableCell>
-              <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                {formatDate(new Date(order.placed_at), locale)}
-              </TableCell>
-              <TableCell>
-                <Stack direction="row" sx={{ gap: 0.75, flexWrap: 'wrap' }}>
-                  <EstadoChip valor={order.status} clave="orders.status" />
-                  <EstadoChip valor={order.payment_status} clave="orders.payment" />
-                  {order.approval_status === 'pending' && (
-                    <Chip
-                      size="small"
-                      label={t('account.needsApproval')}
-                      sx={{ bgcolor: 'var(--amber-soft)', color: 'var(--text)', fontWeight: 700 }}
-                    />
-                  )}
-                </Stack>
-              </TableCell>
-              <TableCell align="right" className="tnum" sx={{ fontWeight: 800, whiteSpace: 'nowrap' }}>
-                {formatMoney(Number(order.grand_total), order.currency, locale)}
-              </TableCell>
+      {/* La tabla se desplaza DENTRO de su caja: a 390 px el total quedaba
+          cortado por el borde de la tarjeta (H12), y el importe es justo lo que
+          no se puede recortar. */}
+      <Box sx={{ overflowX: 'auto' }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>{t('account.orders.number')}</TableCell>
+              <TableCell>{t('account.orders.date')}</TableCell>
+              <TableCell>{t('account.orders.state')}</TableCell>
+              <TableCell align="right">{t('account.orders.total')}</TableCell>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHead>
+          <TableBody>
+            {orders.map((order) => (
+              <TableRow
+                key={order.order_id}
+                hover
+                // La fila entera abre el detalle: el objetivo mas grande de la
+                // pantalla es el que se pulsa, y un enlace de dos palabras en la
+                // ultima columna se falla en movil.
+                role="button"
+                tabIndex={0}
+                aria-label={`${t('account.orders.detail')}: ${order.order_number}`}
+                onClick={() => setAbierto(order)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    setAbierto(order)
+                  }
+                }}
+                sx={{ cursor: 'pointer' }}
+              >
+                <TableCell>
+                  <Typography sx={{ fontSize: TS.body, fontWeight: 800 }}>
+                    {order.order_number}
+                  </Typography>
+                  {/* De qué empresa es. Solo dice algo cuando se compra para más
+                      de una, pero cuando lo dice es lo primero que se mira. Un
+                      consumidor compra para sí: no hay empresa que nombrar. */}
+                  {order.account_name && (
+                    <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>
+                      {order.account_name}
+                    </Typography>
+                  )}
+                </TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                  {formatDate(new Date(order.placed_at), locale)}
+                </TableCell>
+                <TableCell>
+                  <Stack direction="row" sx={{ gap: 0.75, flexWrap: 'wrap' }}>
+                    <EstadoChip valor={order.status} clave="orders.status" />
+                    <EstadoChip valor={order.payment_status} clave="orders.payment" />
+                    {order.approval_status === 'pending' && (
+                      <Chip
+                        size="small"
+                        label={t('account.needsApproval')}
+                        sx={{ bgcolor: 'var(--amber-soft)', color: 'var(--text)', fontWeight: 700 }}
+                      />
+                    )}
+                  </Stack>
+                </TableCell>
+                <TableCell align="right" className="tnum" sx={{ fontWeight: 800, whiteSpace: 'nowrap' }}>
+                  {formatMoney(Number(order.grand_total), order.currency, locale)}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Box>
       <Box sx={{ px: 2, py: 1.25, borderTop: '1px solid var(--sf-line)' }}>
         <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>
           {t('account.orders.tracking').replace('{store}', storeSlug)}

@@ -37,14 +37,25 @@ export function SectionTabs({ items, ariaLabel }: { items: SectionTabItem[]; ari
 
   return (
     <Box>
+      {/* Centradas cuando caben y desplazables cuando no.
+          `centered` de MUI no admite desplazamiento: con seis pestañas a 390 px
+          las de los extremos quedaban FUERA de la pantalla y no había forma de
+          llegar a ellas (visto en el portal B2B en móvil, hardening H12). Con
+          `scrollable` y márgenes automáticos en la primera y la última, el
+          grupo se centra mientras sobra sitio y, cuando falta, los márgenes
+          valen cero y todo se alcanza deslizando. */}
       <Tabs
         value={current?.id ?? false}
         onChange={(_, value: string) => select(value)}
-        centered
+        variant="scrollable"
+        scrollButtons="auto"
+        allowScrollButtonsMobile
         aria-label={ariaLabel}
         sx={{
           borderBottom: '1px solid var(--border)',
           '& .MuiTab-root': { fontWeight: 700, textTransform: 'none', minHeight: 44 },
+          '& .MuiTabs-flexContainer > :first-of-type': { ml: 'auto' },
+          '& .MuiTabs-flexContainer > :last-of-type': { mr: 'auto' },
         }}
       >
         {items.map((item) => (
