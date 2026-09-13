@@ -18,3 +18,41 @@ E2E: pila local reconstruida · ejecución 1: 43/44 · ejecución 2: 44/44
 Bundle: PASS (portada 400,3/405)
 Notes: el fallo E2E de la ejecución 1 es un defecto previo real (caché de `my_checkout_profile` tras la
 primera compra); se corrige en N06. Secret scan PASS. Build 1 691 módulos.
+
+## N01
+Status: PASS
+Commit: `41451ec`
+Files: migración `20260913130000_effective_business_account.sql`; `_shared/checkout/{dbPorts,pipeline,ports}.ts`;
+`storefront/commerce/{accounts.ts,CommerceContextBar.tsx}`; `StoreAccountPage.tsx`; i18n; `db-schema.ts`;
+`scripts/e2e-local-fixtures.mjs` (usuario MULTI con dos cuentas); `e2e/commerce/multi-account.e2e.ts`.
+Tests: `effective-business-account.test.ts` 23/23 (los 10 casos pedidos + superficie; checkout = `runCheckout`
+con `createDbPorts` sobre PGlite); `commerce-context-bar.test.tsx` 11/11 (+4). Unit storefront/customers/pricing/shared:
+781 · 780 ✓ · 1 ✗ (= baseline #6).
+Typecheck: PASS
+Lint: PASS
+DB: 83 archivos · 2 208 ✓ (N00: 2 185)
+E2E: multi-cuenta + trade + enterprise, escritorio y móvil: 6/6 en pila local
+Bundle: PASS · portada 400,5/405 (+0,2: claves ES del selector y reparto de chunks). Se midió chunk a chunk contra
+`6b30dad`; `ListItemIcon`/`ListItemText` salían a un chunk ansioso nuevo (+0,5) y se sustituyeron por `Box`.
+Notes: `commerce-audience-guard` intacto (el cuerpo sigue rechazando `business_account_id`, `customer_id`,
+`segment_id`, `price_list_id`, `audience`). `my_commerce_context` conserva exactamente su forma de respuesta.
+
+## N02
+Status: PASS
+Commit: (ver `git log --grep "registro publico de consumidor"`)
+Files: `StoreRegisterPage.tsx` (ruta `/s/:storeSlug/register`), `auth/{authApi,returnTo,passwordPolicy}.ts`,
+`LoginPage`/`ForgotPasswordPage`/`ResetPasswordPage` store-aware, `StoreAccountPage` (Entrar + Crear cuenta con
+vuelta), i18n; test helpers `supabaseMock` (`signUp`, `resetPasswordForEmail` espiables) y `render` (`liveSession`).
+Tests: `returnTo.test.ts` 12, `store-register.test.tsx` 9, `store-aware-auth.test.tsx` 12,
+`consumer-signup.test.ts` 4 (Postgres real: sin triggers en `auth.users`, alta sin tenant/membresía/cuenta/cliente),
+`routes.test.tsx` (inventario de rutas: +`/register`, documentado en el test).
+Typecheck: PASS
+Lint: PASS
+DB: `consumer-signup` 4/4 · `security-baseline` + `schema-invariants` verdes
+E2E: `signup.e2e.ts` escritorio y móvil 2/2 (registro → tienda → Mi cuenta; salir → /account → Entrar → /account;
+por servicio en local: sin `tenant_members` ni `business_account_users`, metadatos solo nombre y teléfono)
+Bundle: PASS · portada 400,9/405 (+0,4: claves ES del registro)
+Notes: el redirect de confirmación (`emailRedirectTo`) y el de recuperación (`/nueva-clave?returnTo=`) exigen que
+Supabase Auth de QAS admita `https://<host>/**` en Redirect URLs (anotado en el plan de despliegue). Primera pasada
+E2E tras añadir iconos nuevos: Vite re-optimiza dependencias a mitad de sesión («Invalid hook call»); se repite y pasa
+(artefacto del servidor de desarrollo, se aborda en N08/N09).

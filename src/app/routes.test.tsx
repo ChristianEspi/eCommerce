@@ -106,6 +106,9 @@ describe('rutas base', () => {
     // La lista de favoritos NO cuelga de `/account` a proposito: guardar no
     // exige sesion —sin ella los favoritos viven en el navegador— y meterla en
     // el area de cuenta la dejaria fuera del alcance de quien no ha entrado.
+    //
+    // N02 anade `/register`: el alta de CONSUMIDOR vive dentro de la tienda y
+    // no en el backoffice (el alta de empresa sigue siendo `/onboarding`).
     expect(paths(storefront?.children ?? [], '/s/:storeSlug').sort()).toEqual([
       '/s/:storeSlug',
       '/s/:storeSlug/account',
@@ -115,6 +118,7 @@ describe('rutas base', () => {
       '/s/:storeSlug/order/:orderNumber',
       '/s/:storeSlug/p/:pageSlug',
       '/s/:storeSlug/product/:productSlug',
+      '/s/:storeSlug/register',
     ])
     expect(paths(admin?.children ?? [], '/app')).not.toContain('/app/cart')
   })

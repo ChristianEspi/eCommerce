@@ -16,11 +16,11 @@ import { Link as RouterLink, Navigate, useLocation } from 'react-router-dom'
 import { z } from 'zod'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
-import { internalPathOr } from '@/domain/href'
 import { LoadingState } from '@/shared/ui/states'
 import { R } from '@/theme/tokens'
 import { AuthShell, CTA_SX, FieldLabel, ROUNDED_FIELD_SX } from './AuthShell'
 import { AuthActionError, signInWithPassword } from './authApi'
+import { returnPathFrom, storefrontSlugOf } from './returnTo'
 import { useSessionContext } from './session-context'
 
 const schema = z.object({
@@ -30,14 +30,17 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-interface LocationState {
-  from?: string
-}
-
 /**
  * Login de suite. La pantalla no decide a dónde va el usuario después: fija la
  * sesión y deja que el guard de tenant resuelva backoffice u onboarding, que es
  * lo único que sabe si esa cuenta ya tiene espacio.
+ *
+ * **Desde una tienda (N02).** Si se llegó con un `from` de vitrina
+ * (`/s/:slug/...`, por estado de navegación o por `?from=`), la vuelta es ESA
+ * ruta y no `/app`; la acción secundaria deja de ser «crea la tienda de tu
+ * empresa» —que no es lo que busca quien compra— y pasa a «crea tu cuenta» en
+ * esa tienda. «¿Olvidaste tu contraseña?» conserva la vuelta. Todo `from` pasa
+ * por el guard de rutas internas: ni otro dominio ni `/\otro.com`.
  */
 export function LoginPage() {
   const { t } = useI18n()
@@ -57,13 +60,12 @@ export function LoginPage() {
 
   if (status === 'loading') return <LoadingState />
   if (status === 'recovery') return <Navigate to="/nueva-clave" replace />
-  if (status === 'authenticated') {
-    // `startsWith('/')` no basta: `/\evil.com` empieza por `/` y el navegador
-    // la resuelve a OTRO DOMINIO (P16-SaaS). `internalPathOr` hace la misma
-    // pregunta bien y trae el suelo consigo.
-    const from = (location.state as LocationState | null)?.from
-    return <Navigate to={internalPathOr(from, '/app')} replace />
-  }
+  // `startsWith('/')` no basta: `/\evil.com` empieza por `/` y el navegador
+  // la resuelve a OTRO DOMINIO (P16-SaaS). `returnPathFrom` hace la misma
+  // pregunta bien, para el estado y para la URL.
+  const from = returnPathFrom(location.state, location.search)
+  const storeSlug = storefrontSlugOf(from)
+  if (status === 'authenticated') return <Navigate to={from ?? '/app'} replace />
 
   async function onSubmit(values: FormValues) {
     setServerError(null)
@@ -84,9 +86,20 @@ export function LoginPage() {
       title={t('auth.title')}
       subtitle={t('auth.subtitle')}
       secondary={
-        <Box component={RouterLink} to="/onboarding" sx={{ fontWeight: 600, color: 'var(--accent-deep)' }}>
-          {t('auth.secondary')}
-        </Box>
+        storeSlug ? (
+          <Box
+            component={RouterLink}
+            to={`/s/${storeSlug}/register`}
+            state={{ from }}
+            sx={{ fontWeight: 600, color: 'var(--accent-deep)' }}
+          >
+            {t('auth.secondaryStore')}
+          </Box>
+        ) : (
+          <Box component={RouterLink} to="/onboarding" sx={{ fontWeight: 600, color: 'var(--accent-deep)' }}>
+            {t('auth.secondary')}
+          </Box>
+        )
       }
     >
       <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
@@ -144,6 +157,7 @@ export function LoginPage() {
               <Box
                 component={RouterLink}
                 to="/recuperar"
+                state={storeSlug ? { from } : undefined}
                 sx={{ fontSize: 12.5, fontWeight: 600, color: 'var(--accent-deep)' }}
               >
                 {t('auth.forgot')}

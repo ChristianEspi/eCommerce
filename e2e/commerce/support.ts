@@ -110,6 +110,23 @@ export async function sesionApi(request: APIRequestContext, rol: Rol) {
   }
 }
 
+/**
+ * Lectura con la clave de SERVICIO, solo para comprobar lo que la pantalla no
+ * puede enseñar (p. ej. que un registro no creó membresías). Se niega a correr
+ * fuera de localhost: contra DEV/QAS esta puerta no existe.
+ */
+export async function lecturaLocalDeServicio(request: APIRequestContext, path: string): Promise<unknown[]> {
+  const url = (process.env.E2E_SUPABASE_URL ?? '').replace(/\/$/, '')
+  const key = process.env.E2E_SERVICE_ROLE_KEY
+  if (!url || !key) throw new Error('Faltan E2E_SUPABASE_URL / E2E_SERVICE_ROLE_KEY (solo pila local)')
+  if (!['127.0.0.1', 'localhost', '::1'].includes(new URL(url).hostname)) {
+    throw new Error('lecturaLocalDeServicio solo corre contra una pila local')
+  }
+  const res = await request.get(`${url}${path}`, { headers: { apikey: key, Authorization: `Bearer ${key}` } })
+  expect(res.ok(), `${path}: ${res.status()}`).toBe(true)
+  return (await res.json()) as unknown[]
+}
+
 /** Un importe tal como lo escribe la vitrina en es-PE, tolerante al separador. */
 export function importe(valor: number): RegExp {
   return new RegExp(valor.toFixed(2).replace('.', '[.,]'))

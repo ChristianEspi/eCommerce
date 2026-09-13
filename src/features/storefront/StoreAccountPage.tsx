@@ -14,7 +14,7 @@ import {
   TableRow,
   Typography,
 } from '@mui/material'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useSessionContext } from '@/features/auth/session-context'
 import { useMyAccounts, useMyPendingAccounts } from '@/features/customers/hooks'
 import { StoreNotificationsSection } from '@/features/notifications/StoreNotificationsSection'
@@ -65,6 +65,7 @@ export function StoreAccountPage() {
   // comprador vea su cuenta.
   const storefront = useStorefrontOptional()
   const { status } = useSessionContext()
+  const location = useLocation()
 
   // Carrito, checkout, cuenta y seguimiento NO se indexan (P15-SaaS). No es
   // pudor: son estado de una sesión, no contenido, y el seguimiento además
@@ -108,7 +109,26 @@ export function StoreAccountPage() {
         title={t('account.signedOut')}
         description={t('account.signedOutBody')}
         icon={<ApartmentRoundedIcon fontSize="small" />}
-        action={<Link to="/login">{t('auth.submit')}</Link>}
+        action={
+          // Vuelve AQUÍ al entrar (N02), y quien no tiene cuenta puede crearla en
+          // esta tienda sin pasar por el alta de empresas.
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <Button component={Link} to="/login" state={{ from: location.pathname }} variant="contained" size="small">
+              {t('auth.submit')}
+            </Button>
+            {storefront && (
+              <Button
+                component={Link}
+                to={`/s/${storefront.storeSlug}/register`}
+                state={{ from: location.pathname }}
+                variant="outlined"
+                size="small"
+              >
+                {t('store.register.submit')}
+              </Button>
+            )}
+          </Stack>
+        }
       />
     )
   }
