@@ -354,6 +354,7 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.checkout.emailHint': 'We will send the order confirmation there.',
     'store.checkout.phone': 'Phone',
     'store.checkout.address': 'Delivery address',
+    'store.checkout.savedAddresses': 'Use an address from your orders',
     'store.checkout.reference': 'Landmark (optional)',
     'store.checkout.referenceHint': 'Anything that helps find the address.',
     'store.checkout.submit': 'Place order',

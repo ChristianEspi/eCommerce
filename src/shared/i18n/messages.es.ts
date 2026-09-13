@@ -363,6 +363,7 @@ export const es = {
     'store.checkout.emailHint': 'Ahí te llegará la confirmación del pedido.',
     'store.checkout.phone': 'Teléfono',
     'store.checkout.address': 'Dirección de entrega',
+    'store.checkout.savedAddresses': 'Usar una dirección de tus pedidos',
     'store.checkout.reference': 'Referencia (opcional)',
     'store.checkout.referenceHint': 'Un detalle que ayude a encontrar la dirección.',
     'store.checkout.submit': 'Confirmar pedido',

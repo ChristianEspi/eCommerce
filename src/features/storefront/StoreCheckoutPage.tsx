@@ -49,8 +49,10 @@ import {
   type CheckoutStage,
   type CheckoutValues,
 } from './checkout'
+import { formatSavedAddress, type SavedAddress } from './consumer'
 import { useStorefront } from './hooks'
 import { privateMeta } from './seo'
+import { useCheckoutPrefill } from './useCheckoutPrefill'
 
 /**
  * Checkout: nombre, correo, teléfono, dirección y una referencia opcional.
@@ -197,6 +199,35 @@ export function StoreCheckoutPage() {
       paymentMethodCode: '',
     },
   })
+
+  /**
+   * H04 · Lo que ya sabemos de quien compra con sesión.
+   *
+   * Se rellena UNA vez y solo lo que siga vacío: si el comprador ya empezó a
+   * escribir, lo suyo manda. Sin sesión, `ready` nunca llega y el checkout de
+   * invitado no cambia en nada.
+   */
+  const prefill = useCheckoutPrefill(storeSlug, authenticated)
+  const prefilled = useRef(false)
+  useEffect(() => {
+    if (!prefill.ready || prefilled.current) return
+    prefilled.current = true
+    const actuales = getValues()
+    if (!actuales.customerName && prefill.name) setValue('customerName', prefill.name)
+    if (!actuales.customerEmail && prefill.email) setValue('customerEmail', prefill.email)
+    if (!actuales.customerPhone && prefill.phone) setValue('customerPhone', prefill.phone)
+  }, [prefill.ready, prefill.name, prefill.email, prefill.phone, getValues, setValue])
+
+  /** Elegir una dirección guardada escribe los campos de entrega, y nada más. */
+  const usarDireccion = (direccion: SavedAddress) => {
+    const opciones = { shouldValidate: true, shouldDirty: true } as const
+    setValue('address', direccion.address, opciones)
+    setValue('reference', direccion.reference ?? '', opciones)
+    setValue('city', direccion.city ?? '', opciones)
+    setValue('region', direccion.region ?? '', opciones)
+    setValue('postalCode', direccion.postal_code ?? '', opciones)
+    setValue('country', (direccion.country ?? '').toUpperCase(), opciones)
+  }
 
   /**
    * La cotización de entrega se pide con lo que hay ESCRITO en el formulario y
@@ -660,6 +691,37 @@ export function StoreCheckoutPage() {
 
             {paso === 1 && (
               <>
+                {/* H04 · las direcciones de sus pedidos anteriores, para ELEGIR.
+                    No se escribe ninguna sola: una entrega en la casa de antes
+                    por no mirar el formulario es peor que teclear una línea. */}
+                {prefill.addresses.length > 0 && (
+                  <Box>
+                    <Typography
+                      id="direcciones-guardadas"
+                      sx={{ fontSize: TS.label, fontWeight: 700, color: 'var(--muted)', mb: 0.75 }}
+                    >
+                      {t('store.checkout.savedAddresses')}
+                    </Typography>
+                    <Stack
+                      direction="row"
+                      role="group"
+                      aria-labelledby="direcciones-guardadas"
+                      sx={{ gap: 1, flexWrap: 'wrap' }}
+                    >
+                      {prefill.addresses.map((direccion, indice) => (
+                        <Chip
+                          key={`${formatSavedAddress(direccion)}-${indice}`}
+                          clickable
+                          variant={watched.address === direccion.address ? 'filled' : 'outlined'}
+                          color={watched.address === direccion.address ? 'primary' : 'default'}
+                          label={formatSavedAddress(direccion)}
+                          onClick={() => usarDireccion(direccion)}
+                          sx={{ maxWidth: '100%', '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' } }}
+                        />
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
                 <TextField
                   label={t('store.checkout.address')}
                   autoComplete="street-address"
