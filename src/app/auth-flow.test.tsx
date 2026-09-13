@@ -27,6 +27,20 @@ vi.mock('@/shared/lib/supabase', () => ({
   getStorefrontClient: () => holder.client,
 }))
 
+/**
+ * La configuración pública, fijada para la prueba (N08).
+ *
+ * `default-store.ts` pregunta a la base solo si `isSupabaseConfigured`, que se
+ * lee de `VITE_SUPABASE_*` al importar. Sin `.env` era `false` y la prueba
+ * fallaba por la máquina, no por el código. Aquí el backend es el falso de
+ * arriba, así que se declara configurado sin secretos ni red: el resto del
+ * módulo es el real.
+ */
+vi.mock('@/shared/lib/env', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/shared/lib/env')>()),
+  isSupabaseConfigured: true,
+}))
+
 const { SessionProvider } = await import('@/features/auth/SessionProvider')
 const { routes } = await import('./routes')
 

@@ -172,3 +172,22 @@ Tests: `checkout-ui` 56/56, `storefront-ui` + `layout-theme` verdes.
 Typecheck: PASS · Lint: PASS
 E2E: `theme-engine` + `responsive` (escritorio, móvil, comercio-*) 20/20 → los 4 temas siguen verdes.
 Bundle: portada 402,3/405 (sin cambio).
+
+## N08
+Status: PASS
+Commit: (ver `git log --grep "suite unitaria en verde"`)
+Files: `src/test/jsdom-environment.ts` (entorno de Vitest = jsdom + puente de `AbortSignal`), `vite.config.ts`
+(`test.environment` apunta a él), `src/app/auth-flow.test.tsx` y `src/features/storefront/landing.test.tsx`
+(`vi.mock('@/shared/lib/env')` con `isSupabaseConfigured: true`), `package.json` (`engines.node >= 22.12`).
+Causa raíz (reproducida en Node 24.20): el `Request` global es el de undici y exige un `AbortSignal` de Node; el
+entorno jsdom de Vitest pone el `AbortController` de jsdom; `createMemoryRouter` construye un `Request` con esa señal
+en cada navegación → `RequestInit: Expected signal ... to be an instance of AbortSignal`. No era React Router ni el
+producto: es la frontera jsdom/undici. Fix solo de entorno de pruebas: se guardan las clases de Node antes de montar
+jsdom y `Request` convierte una señal ajena en una de Node que se aborta con ella (misma cancelación, mismo motivo).
+Ninguna dependencia actualizada y ningún cambio de runtime.
+Los 2 de configuración: `default-store.ts` solo consulta si `isSupabaseConfigured`; sin `.env` era `false`. Las
+pruebas usan un backend falso, así que se fija la bandera por mock (sin secretos, sin red, sin `.env`).
+Tests: `npm run test` = **205 archivos · 3 922 ✓ · 0 ✗ · 0 errores no controlados** (N00: 3 790 ✓ / 6 ✗ / 4 errores).
+Sin `skip`, sin aserciones rebajadas. Verificado además en Node 25.9 y Node 20.20 (los 3 archivos afectados 19/19).
+Typecheck: PASS · Lint: PASS
+Notes: `engines` declara Node ≥ 22.12 (LTS vigentes 22 y 24; Node 20 está fuera de soporte desde 2026-04 y no se fija).

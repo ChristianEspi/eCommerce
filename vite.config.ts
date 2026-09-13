@@ -227,7 +227,9 @@ export default defineConfig(({ mode }) => {
     },
     test: {
       globals: true,
-      environment: 'jsdom',
+      // jsdom con el `Request` de Node reconciliado con su `AbortSignal` (N08):
+      // ver `src/test/jsdom-environment.ts`.
+      environment: './src/test/jsdom-environment.ts',
       setupFiles: ['./src/test/setup.ts'],
       css: false,
       // Los flujos completos (login -> alta -> panel) recorren el router real con
