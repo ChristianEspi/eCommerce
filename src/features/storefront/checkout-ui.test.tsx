@@ -1443,3 +1443,53 @@ describe('checkout con sesión: datos y direcciones propuestos (H04)', () => {
     expect(screen.getByLabelText(/Nombre y apellido/)).toHaveValue('')
   })
 })
+
+/**
+ * Hardening H08 · el país por defecto sale de la configuración de la tienda.
+ *
+ * `public_stores.default_country` lo deriva la base de sus zonas de entrega. Con
+ * él, la entrega se cotiza desde el primer momento; sin él, el campo sigue vacío
+ * como siempre. Nunca un país escrito en el código.
+ */
+describe('país por defecto del checkout (H08)', () => {
+  it('la tienda que vende a un país lo propone y viaja en la dirección', async () => {
+    const user = userEvent.setup()
+    const fake = backend({ store: { default_country: 'PE' } })
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(fake, '/s/casa-nordica/checkout')
+
+    await rellenarContacto(user)
+    expect(screen.getByLabelText(/País/)).toHaveValue('PE')
+
+    await user.click(await irAPagar(user))
+    await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
+    expect(fake.state.invocations[0]!.body.shipping_address).toMatchObject({ country: 'PE' })
+  })
+
+  it('otra tienda, otro país: no hay nada fijo en el código', async () => {
+    const user = userEvent.setup()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(backend({ store: { default_country: 'CO' } }), '/s/casa-nordica/checkout')
+
+    await rellenarContacto(user)
+    expect(screen.getByLabelText(/País/)).toHaveValue('CO')
+  })
+
+  it('sin país configurado el campo sigue vacío, como antes', async () => {
+    const user = userEvent.setup()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(backend(), '/s/casa-nordica/checkout')
+
+    await rellenarContacto(user)
+    expect(screen.getByLabelText(/País/)).toHaveValue('')
+  })
+
+  it('un valor raro en la vista no rompe la tienda ni se propone', async () => {
+    const user = userEvent.setup()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(backend({ store: { default_country: 'peru' } }), '/s/casa-nordica/checkout')
+
+    await rellenarContacto(user)
+    expect(screen.getByLabelText(/País/)).toHaveValue('')
+  })
+})

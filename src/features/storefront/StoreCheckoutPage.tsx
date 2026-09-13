@@ -193,7 +193,9 @@ export function StoreCheckoutPage() {
       city: '',
       region: '',
       postalCode: '',
-      country: '',
+      // H08 · El país que la tienda configuró al definir su cobertura. Sin
+      // él, vacío como siempre: nunca un país escrito en el código.
+      country: store.default_country ?? '',
       deliveryMethodCode: '',
       pickupPointId: '',
       paymentMethodCode: '',
