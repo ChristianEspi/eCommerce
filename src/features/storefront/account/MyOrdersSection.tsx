@@ -18,9 +18,10 @@ import { formatDate, formatMoney } from '@/shared/lib/format'
 import { BrandLoader } from '@/shared/ui/BrandLoader'
 import { EmptyState, ErrorState } from '@/shared/ui/states'
 import { TS } from '@/theme/tokens'
+import { consumerOrdersKey, fetchConsumerOrders, isMissingFunction } from '../consumer'
 import { fetchMyOrders, myOrdersKey, type MyOrder } from '../portal'
 import { EstadoChip } from './EstadoChip'
-import { MyOrderDrawer } from './MyOrderDrawer'
+import { MyOrderDrawer, type OrdersSource } from './MyOrderDrawer'
 
 /**
  * Mis pedidos.
@@ -33,13 +34,45 @@ import { MyOrderDrawer } from './MyOrderDrawer'
  * La lista sale de `my_business_orders`, que resuelve por vínculo qué pedidos
  * son suyos. Aquí no se filtra por cuenta ni se pasa ningún id: si la persona
  * compra para dos empresas, ve las dos, y cada fila dice de cuál es.
+ *
+ * ## `source="consumer"` (hardening H03)
+ *
+ * El consumidor registrado usa la MISMA lista y el mismo detalle, con otra
+ * fuente: `my_consumer_orders`, que devuelve los pedidos que hizo con sesión en
+ * esta tienda. La pantalla no cambia de forma; cambia de quién son las filas.
  */
-export function MyOrdersSection({ storeSlug }: { storeSlug: string }) {
+export function MyOrdersSection({
+  storeSlug,
+  source = 'business',
+  storeId = null,
+}: {
+  storeSlug: string
+  source?: OrdersSource
+  /** Para volver a comprar desde el detalle. Sin tienda resuelta no se ofrece. */
+  storeId?: string | null
+}) {
   const { t, locale } = useI18n()
-  const query = useQuery({ queryKey: myOrdersKey(), queryFn: () => fetchMyOrders(50) })
+  const consumer = source === 'consumer'
+  const query = useQuery({
+    queryKey: consumer ? consumerOrdersKey(storeSlug) : myOrdersKey(),
+    queryFn: () => (consumer ? fetchConsumerOrders(storeSlug) : fetchMyOrders(50)),
+    enabled: !consumer || storeSlug !== '',
+    // Una función que la base todavía no tiene no aparece por reintentar.
+    retry: (count, error) => !isMissingFunction(error) && count < 2,
+  })
   const [abierto, setAbierto] = useState<MyOrder | null>(null)
 
+  if (consumer && storeSlug === '') return null
   if (query.isPending) return <BrandLoader />
+  if (query.isError && isMissingFunction(query.error)) {
+    return (
+      <EmptyState
+        title={t('account.consumer.unavailable')}
+        description={t('account.consumer.unavailableBody')}
+        icon={<ReceiptLongRoundedIcon fontSize="small" />}
+      />
+    )
+  }
   if (query.isError) return <ErrorState error={query.error} onRetry={() => void query.refetch()} />
 
   const orders = query.data ?? []
@@ -89,10 +122,13 @@ export function MyOrdersSection({ storeSlug }: { storeSlug: string }) {
                   {order.order_number}
                 </Typography>
                 {/* De qué empresa es. Solo dice algo cuando se compra para más
-                    de una, pero cuando lo dice es lo primero que se mira. */}
-                <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>
-                  {order.account_name}
-                </Typography>
+                    de una, pero cuando lo dice es lo primero que se mira. Un
+                    consumidor compra para sí: no hay empresa que nombrar. */}
+                {order.account_name && (
+                  <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>
+                    {order.account_name}
+                  </Typography>
+                )}
               </TableCell>
               <TableCell sx={{ whiteSpace: 'nowrap' }}>
                 {formatDate(new Date(order.placed_at), locale)}
@@ -127,6 +163,9 @@ export function MyOrdersSection({ storeSlug }: { storeSlug: string }) {
         orderId={abierto?.order_id ?? null}
         orderNumber={abierto?.order_number ?? null}
         onClose={() => setAbierto(null)}
+        source={source}
+        storeSlug={storeSlug}
+        storeId={storeId}
       />
     </Card>
   )

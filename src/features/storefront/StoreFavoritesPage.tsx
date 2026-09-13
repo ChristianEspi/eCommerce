@@ -31,14 +31,34 @@ import { useFavorites } from './useFavorites'
  * rota aunque tenga los mismos productos.
  */
 export function StoreFavoritesPage() {
-  const { t } = useI18n()
   const { store, storeSlug } = useStorefront()
-  const favorites = useFavorites(store.store_id)
+  return <FavoritesView storeId={store.store_id} storeSlug={storeSlug} headingComponent="h1" />
+}
+
+/**
+ * La lista de favoritos, sin depender del `<Outlet>` de la vitrina.
+ *
+ * La usan la página `/favoritos` —con su `h1`— y la pestaña «Mis favoritos» de la
+ * cuenta del consumidor, que ya tiene el `h1` de la cuenta encima y por eso
+ * pide un `h2`. Es la misma lista y el mismo hook: dos copias acabarían
+ * enseñando cosas distintas del mismo corazón.
+ */
+export function FavoritesView({
+  storeId,
+  storeSlug,
+  headingComponent,
+}: {
+  storeId: string
+  storeSlug: string
+  headingComponent: 'h1' | 'h2'
+}) {
+  const { t } = useI18n()
+  const favorites = useFavorites(storeId)
   const ids = [...favorites.ids]
 
   const query = useQuery({
-    queryKey: ['storefront', 'favorites', store.store_id, ids],
-    queryFn: () => fetchPublicProductsByIds(store.store_id, ids),
+    queryKey: ['storefront', 'favorites', storeId, ids],
+    queryFn: () => fetchPublicProductsByIds(storeId, ids),
     // Hasta que los favoritos se han leído (servidor o navegador) no se
     // pregunta: con la lista a medias se pediría dos veces y la primera
     // pintaría menos productos de los que hay.
@@ -51,7 +71,10 @@ export function StoreFavoritesPage() {
   return (
     <Stack sx={{ gap: 2.5 }}>
       <Box>
-        <Typography component="h1" sx={{ fontSize: TS.hero, fontWeight: 800, letterSpacing: '-0.5px' }}>
+        <Typography
+          component={headingComponent}
+          sx={{ fontSize: headingComponent === 'h1' ? TS.hero : 17, fontWeight: 800, letterSpacing: '-0.5px' }}
+        >
           {t('store.favorites.title')}
         </Typography>
         <Typography sx={{ color: 'var(--muted)', fontSize: TS.body, mt: 0.5 }}>

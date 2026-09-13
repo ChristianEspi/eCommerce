@@ -85,6 +85,22 @@ export async function requestPasswordReset(email: string): Promise<void> {
   if (error) throw new AuthActionError(mapAuthError(error), error)
 }
 
+/**
+ * Nombre y teléfono de la propia persona, en los metadatos de su cuenta.
+ *
+ * Solo esos dos campos y nunca el correo: cambiar el correo es cambiar la
+ * identidad con la que se entra, y eso no es un «dato de perfil». Van en
+ * `user_metadata`, que el propio usuario puede escribir y que por eso ninguna
+ * regla del sistema lee para autorizar — la autorización vive en
+ * `app_metadata`, que solo escribe el servidor.
+ */
+export async function updateProfile(values: { fullName: string; phone: string }): Promise<void> {
+  const { error } = await client().auth.updateUser({
+    data: { full_name: values.fullName.trim(), phone: values.phone.trim() },
+  })
+  if (error) throw new AuthActionError(mapAuthError(error), error)
+}
+
 export async function updatePassword(password: string): Promise<void> {
   const { error } = await client().auth.updateUser({ password })
   if (error) throw new AuthActionError(mapAuthError(error), error)

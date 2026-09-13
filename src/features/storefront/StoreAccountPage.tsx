@@ -24,6 +24,7 @@ import { useDocumentMeta } from '@/shared/seo/useDocumentMeta'
 import { SectionTabs } from '@/shared/ui/SectionTabs'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
 import { AccountStatementSection } from './account/AccountStatementSection'
+import { ConsumerAccount } from './account/ConsumerAccount'
 import { MyCouponsSection } from './account/MyCouponsSection'
 import { MyOrdersSection } from './account/MyOrdersSection'
 import { MySuggestionsSection } from './account/MySuggestionsSection'
@@ -113,41 +114,20 @@ export function StoreAccountPage() {
     if (pending.isPending) return <LoadingState />
 
     /**
-     * Vinculado, pero sin activar.
+     * Sin cuenta de empresa ACTIVA: la cuenta del consumidor (hardening H02).
      *
-     * Antes caía en «no estás vinculado a ninguna empresa», que era falso y
-     * dejaba a la persona sin saber qué hacer. Lo que le falta es concreto
-     * —que activen su acceso— y la empresa tiene nombre, así que se dice.
+     * Antes caía en «tu usuario no está vinculado a ninguna empresa», que es
+     * cierto y no le sirve de nada a quien compra para sí. Ahora ve lo suyo
+     * —pedidos, favoritos, datos, direcciones y avisos— y, si una empresa lo
+     * vinculó y todavía no activó su acceso, se le dice arriba sin taparle la
+     * cuenta: el nombre de la empresa es concreto y lo que falta también.
      */
-    const pendientes = pending.data ?? []
-
-    // Sin cuenta de empresa activa también hay avisos que leer: el de «te
-    // vincularon», o el de un pedido hecho como visitante con este correo.
     return (
-      <Stack spacing={3}>
-        {pendientes.length > 0 ? (
-          <EmptyState
-            title={t('account.pendingAccounts').replace(
-              '{names}',
-              pendientes.map((cuenta) => cuenta.name).join(', '),
-            )}
-            description={t('account.pendingAccountsBody')}
-            icon={<ApartmentRoundedIcon fontSize="small" />}
-          />
-        ) : (
-          <EmptyState
-            title={t('account.noAccounts')}
-            description={t('account.noAccountsBody')}
-            icon={<ApartmentRoundedIcon fontSize="small" />}
-          />
-        )}
-        <Stack spacing={1}>
-          <Typography variant="h6" component="h2">
-            {t('account.tab.notifications')}
-          </Typography>
-          <StoreNotificationsSection />
-        </Stack>
-      </Stack>
+      <ConsumerAccount
+        storeSlug={storefront?.storeSlug ?? null}
+        storeId={storefront?.store.store_id ?? null}
+        pendingAccountNames={(pending.data ?? []).map((cuenta) => cuenta.name)}
+      />
     )
   }
 

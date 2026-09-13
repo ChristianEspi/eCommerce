@@ -18,8 +18,7 @@ import { useI18n } from '@/shared/i18n/i18n-context'
 import { formatDate } from '@/shared/lib/format'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
-import { fetchPublicProductsByIds, fetchPublicVariants } from '../api'
-import { MAX_LINE_QUANTITY } from '../cart/cart'
+import { addLinesToCart } from '../cart/addLinesToCart'
 import { CartContext } from '../cart/cart-context'
 import { acceptSuggestion, discardSuggestion, fetchMySuggestions, type MySuggestion } from '../portal'
 
@@ -53,30 +52,7 @@ export function MySuggestionsSection({ storeId }: { storeId: string | null }) {
     mutationFn: async (suggestion: MySuggestion) => {
       const lineas = await acceptSuggestion(suggestion.id)
       if (!cart || !storeId) return { added: 0, skipped: lineas.length }
-
-      const productos = await fetchPublicProductsByIds(storeId, lineas.map((l) => l.product_id))
-      const porId = new Map(productos.map((p) => [p.product_id, p]))
-
-      let added = 0
-      let skipped = 0
-      for (const linea of lineas) {
-        const producto = porId.get(linea.product_id)
-        const cantidad = Math.min(MAX_LINE_QUANTITY, Math.max(1, Math.round(Number(linea.quantity))))
-        if (!producto) {
-          skipped += 1
-          continue
-        }
-        const variante = linea.variant_id
-          ? ((await fetchPublicVariants(linea.product_id)).find((v) => v.variant_id === linea.variant_id) ?? null)
-          : null
-        if (linea.variant_id && !variante) {
-          skipped += 1
-          continue
-        }
-        if (await cart.add(producto, cantidad, variante)) added += 1
-        else skipped += 1
-      }
-      return { added, skipped }
+      return addLinesToCart(cart, storeId, lineas)
     },
     onSuccess: ({ added, skipped }) => {
       notify(
