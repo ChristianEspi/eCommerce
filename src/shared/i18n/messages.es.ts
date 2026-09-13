@@ -1064,6 +1064,8 @@ export const es = {
     'store.commerce.tradeTermsActive': 'Condiciones comerciales activas',
     'store.commerce.agreementActive': 'Precio convenio activo',
     'store.commerce.viewAccount': 'Ver cuenta',
+    'store.product.tradePriceCard': 'Tu precio comercial',
+    'store.product.agreementPriceCard': 'Precio convenio',
     'store.register.title': 'Crea tu cuenta',
     'store.register.subtitle': 'Tus pedidos, direcciones y favoritos en {store}.',
     'store.register.submit': 'Crear cuenta',

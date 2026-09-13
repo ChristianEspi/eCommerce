@@ -1049,6 +1049,8 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.commerce.tradeTermsActive': 'Trade terms active',
     'store.commerce.agreementActive': 'Agreement pricing active',
     'store.commerce.viewAccount': 'View account',
+    'store.product.tradePriceCard': 'Your trade price',
+    'store.product.agreementPriceCard': 'Agreement price',
     'store.register.title': 'Create your account',
     'store.register.subtitle': 'Your orders, addresses and favorites at {store}.',
     'store.register.submit': 'Create account',

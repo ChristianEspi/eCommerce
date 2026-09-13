@@ -56,3 +56,22 @@ Notes: el redirect de confirmación (`emailRedirectTo`) y el de recuperación (`
 Supabase Auth de QAS admita `https://<host>/**` en Redirect URLs (anotado en el plan de despliegue). Primera pasada
 E2E tras añadir iconos nuevos: Vite re-optimiza dependencias a mitad de sesión («Invalid hook call»); se repite y pasa
 (artefacto del servidor de desarrollo, se aborda en N08/N09).
+
+## N03
+Status: PASS
+Commit: (ver `git log --grep "precio comercial en la rejilla"`)
+Files: `storefront/commerce/{catalogPrices.ts,catalogQuote.ts,keys.ts,context.ts}`; `ProductCard`, `ProductGrid`,
+`ProductRow`, `OffersFeaturedBand`; i18n (2 claves); `e2e/commerce/multi-account.e2e.ts` (+1 escenario).
+Tests: `catalog-prices.test.tsx` 8 (invitado 0 peticiones; consumidor solo el contexto compartido con la barra y 0
+cotizaciones; N tarjetas = 1 cotización sin variantes ni identidad; menor → etiqueta, igual → nada; empresa
+«Precio convenio»; fallo → precio público; carrito recibe el producto tal cual; cambio A/B recotiza). Storefront +
+pricing: 688 · 687 ✓ · 1 ✗ (= baseline #6).
+Typecheck: PASS
+Lint: PASS
+DB: sin cambios de esquema (reutiliza `price_quote_for_slug`, lote ≤ 100)
+E2E: multi-cuenta 4/4 (escritorio y móvil): tarjeta con «Tu precio comercial» al elegir B, cotizaciones en lote
+(< nº de tarjetas, ninguna de una línea por tarjeta) y vuelta a A quita el precio de B.
+Bundle: PASS · portada 401,8/405. Primera versión 402,5 (hook + contexto con zod-free en la ruta); se partió en
+`catalogPrices.ts` (ansioso, ~0,6 kB) y `catalogQuote.ts` (import dinámico solo con sesión) → +0,9 kB netos.
+Notes: `my_commerce_context` deja de validarse con zod (validación manual equivalente) para no arrastrar zod a la
+portada; misma clave de caché que la barra, así que la rejilla no añade peticiones de contexto.

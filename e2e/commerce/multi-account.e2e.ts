@@ -85,4 +85,56 @@ test.describe('Multi-cuenta · Comprando para', () => {
 
     expect(vigilante.errores).toEqual([])
   })
+
+  test('catálogo: precio comercial en la tarjeta sin N+1, y cambiar de cuenta lo actualiza', async ({
+    page,
+    request,
+    vigilante,
+  }) => {
+    const api = await sesionApi(request, 'MULTI')
+    const cuentas = await api.rpc<Cuenta[]>('my_store_business_accounts', { p_store_slug: 'miquimica' })
+    const andina = cuentas.find((c) => c.name.includes('Andina'))!
+    const boreal = cuentas.find((c) => c.name.includes('Boreal'))!
+    await api.rpc('select_store_business_account', { p_store_slug: 'miquimica', p_account_id: andina.account_id })
+
+    await entrar(page, 'MULTI')
+
+    // Cada cotización que sale del navegador, con cuántas líneas lleva.
+    const cotizaciones: number[] = []
+    page.on('request', (req) => {
+      if (req.method() === 'POST' && req.url().includes('/rest/v1/rpc/price_quote_for_slug')) {
+        const cuerpo = (req.postDataJSON() ?? {}) as { p_items?: unknown[] }
+        cotizaciones.push(cuerpo.p_items?.length ?? 0)
+      }
+    })
+
+    await page.goto(`${TIENDA}?ver=todo`)
+    const tarjetas = page.locator('a[href*="/product/"]')
+    await expect(tarjetas.first()).toBeVisible({ timeout: 20_000 })
+    const tarjeta = page.locator('.MuiCard-root').filter({ has: page.getByRole('heading', { name: /Alcohol en gel/ }) }).first()
+    await expect(tarjeta).toBeVisible()
+
+    // Con Boreal el servidor cotiza por debajo del público; la tarjeta lo dice.
+    const barra = page.getByRole('complementary', { name: 'Contexto de compra' })
+    await barra.getByRole('button', { name: /Cambiar cuenta/ }).click()
+    await page.getByRole('menuitem', { name: new RegExp(boreal.name) }).click()
+    await expect(barra.getByRole('status')).toContainText(boreal.name)
+    const precioBoreal = await api.precio(PRODUCTO, 1)
+    await expect(tarjeta.getByText('Tu precio comercial')).toBeVisible({ timeout: 20_000 })
+    await expect(tarjeta.getByText(importe(precioBoreal)).first()).toBeVisible()
+
+    // Sin N+1: ninguna cotización de UNA sola línea por tarjeta; lotes, y pocos.
+    const cartas = await tarjetas.count()
+    expect(cotizaciones.length).toBeGreaterThan(0)
+    expect(cotizaciones.length).toBeLessThan(cartas)
+    expect(Math.max(...cotizaciones)).toBeGreaterThan(1)
+
+    // Volver a Andina: el precio de la tarjeta vuelve a ser el de Andina.
+    await barra.getByRole('button', { name: /Cambiar cuenta/ }).click()
+    await page.getByRole('menuitem', { name: new RegExp(andina.name) }).click()
+    await expect(barra.getByRole('status')).toContainText(andina.name)
+    await expect(tarjeta.getByText(importe(precioBoreal))).toHaveCount(0, { timeout: 20_000 })
+
+    expect(vigilante.errores).toEqual([])
+  })
 })

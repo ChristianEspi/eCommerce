@@ -1,4 +1,5 @@
 import { Box, Card, Skeleton, Stack } from '@mui/material'
+import { useCatalogCommercialPrices } from '../commerce/catalogPrices'
 import type { PublicProduct } from '../types'
 import { ProductCard } from './ProductCard'
 
@@ -48,6 +49,9 @@ export function ProductGrid({
   favorites?: ReadonlySet<string>
   onToggleFavorite?: (productId: string) => void
 }) {
+  // UNA cotización para toda la rejilla, y solo si la sesión tiene condiciones
+  // comerciales (N03). Invitado y consumidor: ninguna.
+  const commercial = useCatalogCommercialPrices(storeSlug, products)
   return (
     <Box sx={GRID_SX}>
       {products.map((product) => (
@@ -55,6 +59,7 @@ export function ProductGrid({
           key={product.product_id}
           product={product}
           storeSlug={storeSlug}
+          commercialPrice={commercial.get(product.product_id) ?? null}
           {...(onQuickView ? { onQuickView } : {})}
           {...(onToggleFavorite ? { onToggleFavorite } : {})}
           favorite={favorites?.has(product.product_id) ?? false}

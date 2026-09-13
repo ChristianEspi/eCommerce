@@ -18,6 +18,7 @@ import { formatMoney } from '@/shared/lib/format'
 import { TS } from '@/theme/tokens'
 import { track } from '../analytics'
 import { useAddToCart } from '../cart/useAddToCart'
+import type { CommercialPrice } from '../commerce/catalogPrices'
 import { discountPercent, type PublicProduct } from '../types'
 import { ProductMedia } from './ProductMedia'
 
@@ -68,6 +69,7 @@ export function ProductCard({
   favorite,
   onToggleFavorite,
   compact = false,
+  commercialPrice = null,
 }: {
   product: PublicProduct
   storeSlug: string
@@ -109,6 +111,13 @@ export function ProductCard({
    * precio ni el descuento, que es lo que hace que alguien entre.
    */
   compact?: boolean
+  /**
+   * El precio de ESTA sesión, si el servidor lo cotizó para la colección y
+   * mejora el público (N03, `useCatalogCommercialPrices`). La tarjeta no lo
+   * pide ni lo calcula: lo pinta. El carrito sigue recibiendo el producto tal
+   * cual y vuelve a cotizar con el servidor.
+   */
+  commercialPrice?: CommercialPrice | null
 }) {
   const { t, locale } = useI18n()
   const { agregar, pending } = useAddToCart()
@@ -319,9 +328,10 @@ export function ProductCard({
       </Stack>
 
       <Stack sx={{ gap: 0.75, mt: 'auto' }}>
-        <Stack direction="row" sx={{ alignItems: 'baseline', gap: 0.75, flexWrap: 'wrap' }}>
+        <Stack direction="row" sx={{ alignItems: 'baseline', gap: 0.75, flexWrap: 'wrap', minWidth: 0 }}>
           {/* La cifra que decide. Sube a 19 px y el nombre baja a 15: antes
-              pesaban lo mismo y la tarjeta no tenía protagonista. */}
+              pesaban lo mismo y la tarjeta no tenía protagonista. Con precio
+              comercial (N03) la cifra grande es la SUYA y el público se tacha. */}
           <Typography
             className="tnum"
             sx={{
@@ -331,18 +341,37 @@ export function ProductCard({
               lineHeight: 1.2,
             }}
           >
-            {formatMoney(Number(product.price), product.currency, locale)}
+            {formatMoney(commercialPrice ? commercialPrice.amount : Number(product.price), product.currency, locale)}
           </Typography>
-          {discount !== null && product.compare_at_price && (
+          {commercialPrice ? (
             <Typography
               component="s"
               className="tnum"
               sx={{ fontSize: 12.5, color: 'var(--muted)', fontWeight: 600 }}
             >
-              {formatMoney(Number(product.compare_at_price), product.currency, locale)}
+              {formatMoney(Number(product.price), product.currency, locale)}
             </Typography>
+          ) : (
+            discount !== null &&
+            product.compare_at_price && (
+              <Typography
+                component="s"
+                className="tnum"
+                sx={{ fontSize: 12.5, color: 'var(--muted)', fontWeight: 600 }}
+              >
+                {formatMoney(Number(product.compare_at_price), product.currency, locale)}
+              </Typography>
+            )
           )}
         </Stack>
+        {commercialPrice && (
+          <Typography
+            data-commercial-price={commercialPrice.label}
+            sx={{ fontSize: TS.label, fontWeight: 700, color: 'var(--accent-deep)', lineHeight: 1.3, mt: -0.5 }}
+          >
+            {commercialPrice.label === 'enterprise' ? t('store.product.agreementPriceCard') : t('store.product.tradePriceCard')}
+          </Typography>
+        )}
 
         {/* El estado, en pastilla: en una línea de texto suelta se confunde con
             el resto de la ficha, y es lo que decide si el botón sirve. En la

@@ -10,6 +10,7 @@ import { TS } from '@/theme/tokens'
 import { track } from '../analytics'
 import { useAddToCart } from '../cart/useAddToCart'
 import { discountPercent, type PublicProduct } from '../types'
+import { useCatalogCommercialPrices } from '../commerce/catalogPrices'
 import { ProductCard } from './ProductCard'
 import { ProductMedia } from './ProductMedia'
 import { SectionHeading } from './SectionHeading'
@@ -318,6 +319,8 @@ function FeaturedCarousel({
     if (vuelta >= total) setVuelta(0)
   }, [vuelta, total])
 
+  // Toda la banda en UNA cotización, no una por vuelta (N03).
+  const commercial = useCatalogCommercialPrices(storeSlug, products)
   const actuales = vueltas[Math.min(vuelta, Math.max(total - 1, 0))] ?? []
   if (actuales.length === 0) return null
 
@@ -346,6 +349,7 @@ function FeaturedCarousel({
             compact
             product={product}
             storeSlug={storeSlug}
+            commercialPrice={commercial.get(product.product_id) ?? null}
             {...(onQuickView ? { onQuickView } : {})}
             {...(onToggleFavorite ? { onToggleFavorite } : {})}
             favorite={favorites?.has(product.product_id) ?? false}
