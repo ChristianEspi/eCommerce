@@ -224,3 +224,31 @@ Ejecución contra la pila local con los cinco usuarios de fixture: STORE (migrac
 ENTERPRISE (OC exigida = guion), MULTI y PROMOS **OK**; **FAIL** por los 6 umbrales de catálogo (8 productos en el seed
 local frente a mínimos pensados para DEV), igual que en H13 → veredicto correcto para esta pila. Contra DEV/QAS: no
 ejecutado (sin `.env`).
+
+## N11
+Status: PASS
+Commit: (ver `git log --grep "gate de rendimiento y seguridad"`)
+Files: `docs/performance-budget.md` §2.2 (mediciones por fase, techos sin cambios).
+Gates: typecheck PASS · lint PASS · build PASS · `bundle:report` PASS (portada 402,3/405 · ficha 386,2/400 ·
+checkout 404,6/430 · panel 360,7/430) · `scan:secrets` PASS (sin hallazgos; 1 066 archivos versionados + `dist/`).
+Arquitectura y seguridad re-ejecutadas: `architecture` 18, `audience` 10, `commerce-audience-guard` 7,
+`security-baseline` 55 (superficie `anon` cerrada intacta), `schema-invariants` 17 (RLS activada y forzada en
+`buyer_account_selections` y `consumer_addresses`, tenant NOT NULL e indexado, migraciones reproducibles),
+`rls-tenant-isolation` 35, `public-rpc-gates` 3 → 256/256 junto con las suites de N01–N06.
+Confirmaciones explícitas (con su evidencia):
+- **Sin `service_role` en el navegador**: `scan:secrets` limpio; en `src` solo aparece en comentarios y en el guard
+  `assertNoServiceKey` (excepción nominal), que es la única mención en `dist/`.
+- **El selector no permite cross-tenant**: `select_store_business_account` valida vínculo, cuenta, cliente y
+  sociedad de la tienda; cuenta de otra sociedad / de otra persona / uuid inventado → `CUENTA_NO_DISPONIBLE` sin tocar
+  la preferencia (`effective-business-account` casos 7, 8 y extra); la FK con tenant impide apuntar a otra sociedad
+  incluso con `service_role`.
+- **El alta de consumidor no crea tenant**: sin triggers en `auth.users`, conteos de tenants/membresías/cuentas/
+  clientes idénticos tras el alta (`consumer-signup`); E2E comprueba 0 `tenant_members` y 0 `business_account_users`.
+- **Libreta aislada**: por usuario, por tienda del mismo tenant y por tenant; sin GRANT de tabla (`consumer-addresses`).
+- **El checkout sigue rechazando identidad comercial**: `business_account_id`, `customer_id`, `segment_id`,
+  `price_list_id`, `audience` → `CAMPO_NO_PERMITIDO` (`commerce-audience-guard`, `purchase-order`); la OC es una
+  referencia y está prohibida dentro de las líneas.
+- **Precio y promociones salen del servidor**: el overlay del catálogo, el carrito y el pedido usan
+  `price_quote_for_slug` / `promotion_quote_for_slug` / `create_order`, sin parámetro de identidad
+  (`pricing-checkout`, `targeted-promotions`: preview = pedido); el E2E verifica cuerpos sin claves de dinero ni
+  identidad.

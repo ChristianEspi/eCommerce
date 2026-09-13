@@ -60,6 +60,25 @@ el código de la sección de familias. Ninguna dependencia nueva ni nada que deb
 convierte la siguiente pantalla legítima en una alarma. **Pendiente para el operador:** re-basar los
 techos con el criterio de §2 (medido + ~20 %) o abrir una fase de dieta de la entrada.
 
+### 2.2 · Segunda noche del hardening (N01–N07, 2026-09-13): techos SIN cambios
+
+Ningún techo se tocó. Cada fase se midió contra el commit anterior, chunk a chunk (manifiesto de Vite), y lo que
+entraba ansioso sin necesidad se sacó antes de seguir:
+
+| Fase | Portada kB | Checkout kB | Qué se hizo con el delta |
+|---|---|---|---|
+| N00 (`ec52bab`) | 400,3 | 401,9 | — |
+| N01 selector multi-cuenta | 400,5 | 402,2 | `ListItemIcon`/`ListItemText` salían a un chunk ansioso nuevo: sustituidos por `Box` (−0,2) |
+| N02 registro | 400,9 | 402,5 | solo claves ES (la entrada lleva el diccionario por diseño) |
+| N03 precio comercial en rejilla | 401,8 | 402,7 | primera versión 402,5: hook ansioso mínimo + `catalogQuote.ts` por import dinámico solo con sesión; contexto sin zod |
+| N05 orden de compra | 402,0 | 404,0 | — |
+| N06 libreta | 402,3 | 404,6 | `AddRounded` y `useMediaQuery` partían chunks nuevos en la portada: sin icono y diálogo a pantalla completa por CSS |
+| N07 polish | 402,3 | 404,6 | — |
+
+Margen restante de la portada: 2,7 kB (0,7 %). **Pendiente para el operador** (igual que en §2.1): re-basar techos
+con el criterio medido + 20 % o abrir una fase de dieta de la entrada; el diccionario ES es la mayor fuente de
+crecimiento de la entrada y su partición por área es la palanca obvia.
+
 ### De dónde salen los techos
 
 No son aspiracionales ni redondos por gusto: son **el número medido más un
