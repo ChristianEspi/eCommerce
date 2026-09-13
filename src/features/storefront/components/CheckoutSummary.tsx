@@ -4,6 +4,7 @@ import type { PriceQuote } from '@/domain'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { formatMoney } from '@/shared/lib/format'
 import { TS } from '@/theme/tokens'
+import { esAcuerdoDelComprador } from '../cart/agreement'
 import { lineKey, type CartLine } from '../cart/cart'
 import { useSignedThumbnails } from '../hooks'
 import { ProductMedia } from './ProductMedia'
@@ -81,7 +82,8 @@ export function CheckoutSummary({
 
   // Que el precio salga de un acuerdo y no del catálogo es media explicación de
   // por qué este comprador ve un número distinto al de la vitrina.
-  const conAcuerdo = (quoted?.lines ?? []).some((line) => line.source === 'price_list')
+  // Mismo criterio que el carrito: la lista general de la tienda no es un acuerdo.
+  const conAcuerdo = (quoted?.lines ?? []).some(esAcuerdoDelComprador)
 
   const subtotal = Number(quoted?.netTotal ?? subtotalLocal)
   const impuesto = quoted ? Number(quoted.taxTotal) : 0

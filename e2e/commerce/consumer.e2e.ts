@@ -71,6 +71,13 @@ test.describe('B2C · consumidor registrado', () => {
     await page.getByRole('button', { name: /agregar al carrito|añadir al carrito/i }).first().click()
     await expect(page.getByRole('button', { name: /carrito \(\d+\)/i })).toBeVisible({ timeout: 20_000 })
 
+    // Un consumidor con sesión tampoco tiene «precio especial» (A3), ni en el
+    // carrito ni en el resumen del checkout.
+    await page.goto(`${TIENDA}/checkout`)
+    await expect(page.getByRole('heading', { name: /^resumen$/i })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText('Precio confirmado por la tienda')).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText('Precio especial')).toHaveCount(0)
+
     const { respuesta } = await comprar(page)
     const pedido = await pedidoDe(respuesta)
     await expect(page).toHaveURL(/\/order\//, { timeout: 20_000 })

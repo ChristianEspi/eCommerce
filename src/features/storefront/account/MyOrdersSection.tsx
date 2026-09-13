@@ -92,11 +92,14 @@ export function MyOrdersSection({
           cortado por el borde de la tarjeta (H12), y el importe es justo lo que
           no se puede recortar. */}
       <Box sx={{ overflowX: 'auto' }}>
-        <Table size="small">
+        {/* En móvil la fecha baja bajo el número y el aire de las celdas se
+            reduce: a 390 px las cuatro columnas no cabían y lo que quedaba
+            fuera era el total, justo lo que se viene a mirar (H12). */}
+        <Table size="small" sx={{ '& td, & th': { px: { xs: 1, sm: 2 } } }}>
           <TableHead>
             <TableRow>
               <TableCell>{t('account.orders.number')}</TableCell>
-              <TableCell>{t('account.orders.date')}</TableCell>
+              <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{t('account.orders.date')}</TableCell>
               <TableCell>{t('account.orders.state')}</TableCell>
               <TableCell align="right">{t('account.orders.total')}</TableCell>
             </TableRow>
@@ -122,8 +125,11 @@ export function MyOrdersSection({
                 sx={{ cursor: 'pointer' }}
               >
                 <TableCell>
-                  <Typography sx={{ fontSize: TS.body, fontWeight: 800 }}>
+                  <Typography sx={{ fontSize: TS.body, fontWeight: 800, whiteSpace: 'nowrap' }}>
                     {order.order_number}
+                  </Typography>
+                  <Typography sx={{ display: { xs: 'block', sm: 'none' }, fontSize: TS.label, color: 'var(--muted)' }}>
+                    {formatDate(new Date(order.placed_at), locale)}
                   </Typography>
                   {/* De qué empresa es. Solo dice algo cuando se compra para más
                       de una, pero cuando lo dice es lo primero que se mira. Un
@@ -134,7 +140,7 @@ export function MyOrdersSection({
                     </Typography>
                   )}
                 </TableCell>
-                <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                <TableCell sx={{ whiteSpace: 'nowrap', display: { xs: 'none', sm: 'table-cell' } }}>
                   {formatDate(new Date(order.placed_at), locale)}
                 </TableCell>
                 <TableCell>

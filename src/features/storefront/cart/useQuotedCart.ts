@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useCartQuote } from '@/features/pricing/useCartQuote'
 import type { PriceQuote } from '@/domain'
+import { esAcuerdoDelComprador } from './agreement'
 import { useCart } from './cart-context'
 
 /** Constante y no `[]` en la firma: un array nuevo por render cambia la clave. */
@@ -52,14 +53,7 @@ export function useQuotedCart(
   return {
     quote,
     quoted,
-    // Solo un acuerdo DE ESTE COMPRADOR —lista asignada a su cliente o a su
-    // segmento— es «precio especial». La lista base de la tienda también sale
-    // como `price_list`, y con ella cualquier visitante anónimo leía «precio
-    // especial» en un precio que es el de todo el mundo (hallazgo A3 de la
-    // auditoría H01). Es presentación: el importe no cambia en nada.
-    discounted:
-      quoted?.lines.some(
-        (line) => line.source === 'price_list' && (line.scope === 'segment' || line.scope === 'customer'),
-      ) ?? false,
+    // Solo un acuerdo del comprador es «precio especial»: ver `agreement.ts`.
+    discounted: quoted?.lines.some(esAcuerdoDelComprador) ?? false,
   }
 }
