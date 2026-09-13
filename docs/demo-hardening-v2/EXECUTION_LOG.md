@@ -75,3 +75,26 @@ Bundle: PASS · portada 401,8/405. Primera versión 402,5 (hook + contexto con z
 `catalogPrices.ts` (ansioso, ~0,6 kB) y `catalogQuote.ts` (import dinámico solo con sesión) → +0,9 kB netos.
 Notes: `my_commerce_context` deja de validarse con zod (validación manual equivalente) para no arrastrar zod a la
 portada; misma clave de caché que la barra, así que la rejilla no añade peticiones de contexto.
+
+## N04
+Status: PASS
+Commit: (ver `git log --grep "promociones dirigidas"`)
+Files: migración `20260913140000_promotion_quote_buyer_identity.sql` (recrea `promotion_quote_for_slug` con la
+misma firma); `scripts/e2e-local-fixtures.mjs` (campaña dirigida a la cuenta Boreal);
+`e2e/commerce/targeted-promotion.e2e.ts`; `support.ts` (tipos del pedido).
+Tests: `targeted-promotions.test.ts` 8/8 — preview (`promotion_quote_for_slug` con la sesión) = pedido
+(`runCheckout` + `createDbPorts`) para `all`, `segment`, `customer`, `business_account`; usuario equivocado, invitado
+y consumidor sin descuento dirigido; la cuenta elegida en N01 cambia la campaña. **Sin la migración fallan 4 de 8**
+(segment, customer, business_account y A/B): el test prueba el arreglo. Regresión: `promotions-checkout`,
+`promotions`, `security-baseline` (techo de sondeo de cupones), `pricing-checkout`, `checkout-orchestrator`,
+`public-rpc-gates`: 239/239. El descuento en el carrito ya lo cubre `cart-quote.test.tsx` («Descuento» desde la
+cotización del servidor).
+Typecheck: PASS
+Lint: PASS
+DB: verde en los archivos tocados y los de promociones/seguridad
+E2E: promoción dirigida escritorio y móvil 2/2 (Andina sin «Descuento»; Boreal lo ve antes de confirmar; el pedido
+cobra el mismo `discount_total` y el mismo total sin envío) + multi-cuenta 4/4
+Bundle: sin cambios de frontend
+Notes: la cotización no conoce el correo del checkout; los topes por cliente contados por correo siguen
+decidiéndose al crear el pedido (comportamiento previo, documentado en la migración). `create_order` y los
+cerrojos no se tocan.

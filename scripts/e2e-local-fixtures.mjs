@@ -236,6 +236,26 @@ await asegurar(
 await http('DELETE', `/rest/v1/buyer_account_selections?user_id=eq.${multiUser}`)
 
 /**
+ * N04 · una campaña DIRIGIDA a la cuenta Boreal (10 % sobre todo). Andina no la
+ * tiene: elegir una u otra cambia el descuento del carrito y del pedido.
+ */
+const campana = await asegurar(
+  'promotions',
+  `store_id=eq.${tienda.id}&code=eq.e2e-multi-boreal`,
+  { ...tenant, store_id: tienda.id, code: 'e2e-multi-boreal', name: 'Campaña E2E Boreal', kind: 'percentage', status: 'active', value_percent: 10, requires_coupon: false, valid_from: '2026-01-01T00:00:00Z', valid_to: null },
+)
+await asegurar(
+  'promotion_scopes',
+  `promotion_id=eq.${campana.id}&scope_kind=eq.all`,
+  { ...tenant, store_id: tienda.id, promotion_id: campana.id, promotion_kind: 'percentage', scope_kind: 'all' },
+)
+await asegurar(
+  'promotion_audiences',
+  `promotion_id=eq.${campana.id}&audience_kind=eq.business_account`,
+  { ...tenant, store_id: tienda.id, promotion_id: campana.id, audience_kind: 'business_account', business_account_id: boreal.cuenta.id },
+)
+
+/**
  * Lo que las pasadas anteriores gastaron, repuesto.
  *
  * Cada ejecución crea pedidos de verdad: consume existencia (hasta que el

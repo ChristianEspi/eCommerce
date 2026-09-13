@@ -236,6 +236,8 @@ export function todasLasClaves(value: unknown, out: string[] = []): string[] {
 export interface PedidoRespuesta {
   order_number: string
   grand_total: string
+  discount_total: string
+  shipping_total: string
   items: Array<{ quantity: number; unit_price: string }>
 }
 
