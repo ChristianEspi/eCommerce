@@ -8,7 +8,7 @@ push, sin PR, sin despliegue.
 
 ## N00
 Status: PASS_WITH_KNOWN_ISSUE
-Commit: (este commit; ver `git log -- docs/demo-hardening-v2/BASELINE.md`)
+Commit: `6b30dad`
 Files: `docs/demo-hardening-v2/BASELINE.md`, `docs/demo-hardening-v2/EXECUTION_LOG.md`
 Tests: 196 archivos · 3 796 · 3 790 ✓ · 6 ✗ (los mismos 6 de H00/H14, verificados por nombre y causa)
 Typecheck: PASS
@@ -39,7 +39,7 @@ Notes: `commerce-audience-guard` intacto (el cuerpo sigue rechazando `business_a
 
 ## N02
 Status: PASS
-Commit: (ver `git log --grep "registro publico de consumidor"`)
+Commit: `65fe4f1`
 Files: `StoreRegisterPage.tsx` (ruta `/s/:storeSlug/register`), `auth/{authApi,returnTo,passwordPolicy}.ts`,
 `LoginPage`/`ForgotPasswordPage`/`ResetPasswordPage` store-aware, `StoreAccountPage` (Entrar + Crear cuenta con
 vuelta), i18n; test helpers `supabaseMock` (`signUp`, `resetPasswordForEmail` espiables) y `render` (`liveSession`).
@@ -59,7 +59,7 @@ E2E tras añadir iconos nuevos: Vite re-optimiza dependencias a mitad de sesión
 
 ## N03
 Status: PASS
-Commit: (ver `git log --grep "precio comercial en la rejilla"`)
+Commit: `f75d441`
 Files: `storefront/commerce/{catalogPrices.ts,catalogQuote.ts,keys.ts,context.ts}`; `ProductCard`, `ProductGrid`,
 `ProductRow`, `OffersFeaturedBand`; i18n (2 claves); `e2e/commerce/multi-account.e2e.ts` (+1 escenario).
 Tests: `catalog-prices.test.tsx` 8 (invitado 0 peticiones; consumidor solo el contexto compartido con la barra y 0
@@ -78,7 +78,7 @@ portada; misma clave de caché que la barra, así que la rejilla no añade petic
 
 ## N04
 Status: PASS
-Commit: (ver `git log --grep "promociones dirigidas"`)
+Commit: `9fedd17`
 Files: migración `20260913140000_promotion_quote_buyer_identity.sql` (recrea `promotion_quote_for_slug` con la
 misma firma); `scripts/e2e-local-fixtures.mjs` (campaña dirigida a la cuenta Boreal);
 `e2e/commerce/targeted-promotion.e2e.ts`; `support.ts` (tipos del pedido).
@@ -101,7 +101,7 @@ cerrojos no se tocan.
 
 ## N05
 Status: PASS
-Commit: (ver `git log --grep "orden de compra obligatoria"`)
+Commit: `e791100`
 Files: migración `20260913150000_purchase_order_number.sql` (`orders.purchase_order_number` con CHECK e inmutable;
 `create_order` y `checkout_place_order` recreadas con `p_purchase_order_number`; `purchase_order_number` en la lista
 negra de líneas; `my_business_order_detail` la devuelve); borde: `request.ts` (campo permitido, validado, en el
@@ -132,7 +132,7 @@ Notes: el fixture local pone `purchase_order_required = true` en la cuenta E2E-C
 
 ## N06
 Status: PASS
-Commit: (ver `git log --grep "libreta de direcciones"`)
+Commit: `fce704e`
 Files: migración `20260913160000_consumer_addresses.sql` (`consumer_addresses` por usuario + tienda, RLS forzada sin
 GRANT de cliente, una predeterminada por índice único parcial, máx. 20; `my_consumer_addresses`,
 `save_my_consumer_address`, `delete_my_consumer_address`, `set_default_my_consumer_address`);
@@ -158,7 +158,7 @@ Notes: guardar desde el checkout NO se implementó (opcional); se guarda desde �
 
 ## N07
 Status: PASS
-Commit: (ver `git log --grep "asistente flotante"`)
+Commit: `6df57d2`
 Files: `StorefrontLayout.tsx` (el asistente no flota en `/checkout`; `bottom` con `env(safe-area-inset-bottom)`;
 holgura bajo el pie en xs), `BackToTop.tsx` (safe-area), `checkout-ui.test.tsx` (+1).
 Revisión (script de Playwright fuera del repo, 390×844, pila local): se midió qué elementos quedan bajo el botón del
@@ -175,7 +175,7 @@ Bundle: portada 402,3/405 (sin cambio).
 
 ## N08
 Status: PASS
-Commit: (ver `git log --grep "suite unitaria en verde"`)
+Commit: `ffbc4f7`
 Files: `src/test/jsdom-environment.ts` (entorno de Vitest = jsdom + puente de `AbortSignal`), `vite.config.ts`
 (`test.environment` apunta a él), `src/app/auth-flow.test.tsx` y `src/features/storefront/landing.test.tsx`
 (`vi.mock('@/shared/lib/env')` con `isSupabaseConfigured: true`), `package.json` (`engines.node >= 22.12`).
@@ -211,7 +211,7 @@ re-optimiza dependencias y la primera pasada puede dar «Invalid hook call»; en
 
 ## N10
 Status: PASS
-Commit: (ver `git log --grep "preflight de demo v2"`)
+Commit: `71e95fc`
 Files: `scripts/demo-preflight.mjs` (ampliado, no sustituido).
 Nuevas comprobaciones: migraciones N01–N06 (8 funciones, 2 tablas, `orders.purchase_order_number`,
 `promotion_quote_for_slug` con cuenta efectiva); cuenta EFECTIVA de TRADE/ENTERPRISE (varias cuentas ya no es
@@ -227,7 +227,7 @@ ejecutado (sin `.env`).
 
 ## N11
 Status: PASS
-Commit: (ver `git log --grep "gate de rendimiento y seguridad"`)
+Commit: `9a4cdb7`
 Files: `docs/performance-budget.md` §2.2 (mediciones por fase, techos sin cambios).
 Gates: typecheck PASS · lint PASS · build PASS · `bundle:report` PASS (portada 402,3/405 · ficha 386,2/400 ·
 checkout 404,6/430 · panel 360,7/430) · `scan:secrets` PASS (sin hallazgos; 1 066 archivos versionados + `dist/`).
@@ -252,3 +252,18 @@ Confirmaciones explícitas (con su evidencia):
   `price_quote_for_slug` / `promotion_quote_for_slug` / `create_order`, sin parámetro de identidad
   (`pricing-checkout`, `targeted-promotions`: preview = pedido); el E2E verifica cuerpos sin claves de dinero ni
   identidad.
+
+## N12
+Status: PASS
+Commit: este commit (`docs: informe final…`)
+Files: `docs/demo-hardening-v2/FINAL_REPORT.md`, este log.
+Tests: `npm run test` 205 archivos · 3 922 ✓ · 0 ✗ · 0 errores (en serie, `dist/` borrado antes)
+Typecheck: PASS
+Lint: PASS
+DB: 87 archivos · 2 252 ✓
+E2E: 56/56 (escritorio 12 · móvil 12 · comercio-escritorio 16 · comercio-móvil 16), pila local, fixtures repuestas,
+servidor de desarrollo arrancado por Playwright
+Bundle: PASS · 402,3/405 · 386,2/400 · 404,6/430 · 360,7/430 · build 1 700 módulos · `scan:secrets` PASS
+Notes: `git diff --check` limpio; `git status` solo con `docs/quality/` sin seguimiento (previo, no tocado);
+12 commits locales sobre `ec52bab`, nada empujado ni desplegado. Veredicto: `GO_WITH_GAPS` (despliegue, redirect URLs
+de Auth, preflight contra QAS y usuarios de demo).
