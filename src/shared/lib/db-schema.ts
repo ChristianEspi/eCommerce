@@ -442,6 +442,12 @@ export const MY_BUSINESS_ORDERS_RPC = 'my_business_orders'
 export const MY_CONSUMER_ORDERS_RPC = 'my_consumer_orders'
 export const MY_CONSUMER_ORDER_DETAIL_RPC = 'my_consumer_order_detail'
 export const MY_CHECKOUT_PROFILE_RPC = 'my_checkout_profile'
+// Libreta de direcciones del consumidor (N06, migración 20260913160000). Sin
+// usuario por parámetro: sale del JWT; la tienda, por su slug.
+export const MY_CONSUMER_ADDRESSES_RPC = 'my_consumer_addresses'
+export const SAVE_MY_CONSUMER_ADDRESS_RPC = 'save_my_consumer_address'
+export const DELETE_MY_CONSUMER_ADDRESS_RPC = 'delete_my_consumer_address'
+export const SET_DEFAULT_MY_CONSUMER_ADDRESS_RPC = 'set_default_my_consumer_address'
 // Contexto comercial de la sesión en una tienda (H05-H06, migración
 // 20260913110000). Solo para PINTAR «cuenta comercial» o «comprando para»: la
 // misma cuenta que usa el motor de precios, sin un precio ni un id de lista.

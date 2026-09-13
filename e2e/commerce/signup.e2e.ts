@@ -1,5 +1,5 @@
 import { test, expect, TIENDA } from '../consola'
-import { lecturaLocalDeServicio } from './support'
+import { comprar, lecturaLocalDeServicio, pedidoDe } from './support'
 
 /**
  * N02 · Una persona que llega a la tienda y se crea una cuenta.
@@ -70,6 +70,71 @@ test.describe('B2C · registro de consumidor', () => {
     await page.getByRole('button', { name: 'Entrar' }).click()
     await expect(page).toHaveURL(new RegExp(`${TIENDA}/account$`), { timeout: 20_000 })
     await expect(page.getByRole('heading', { level: 1, name: 'Mi cuenta' })).toBeVisible({ timeout: 20_000 })
+
+    // El defecto de N00, con una cuenta RECIÉN creada: la primera compra tiene que
+    // aparecer en «Mis direcciones» sin esperar a que caduque la caché.
+    await page.goto(`${TIENDA}?ver=todo`)
+    const ficha = page.locator('a[href*="/product/"]').first()
+    await expect(ficha).toBeVisible({ timeout: 20_000 })
+    await page.goto((await ficha.getAttribute('href'))!)
+    await page.getByRole('button', { name: /agregar al carrito|añadir al carrito/i }).first().click()
+    await expect(page.getByRole('button', { name: /carrito \(\d+\)/i })).toBeVisible({ timeout: 20_000 })
+    await pedidoDe((await comprar(page)).respuesta)
+    await expect(page).toHaveURL(/\/order\//, { timeout: 20_000 })
+    await page.getByRole('link', { name: 'Tu cuenta' }).click()
+    await page.getByRole('tab', { name: 'Mis direcciones' }).click()
+    await expect(page.getByText('Usadas en tus pedidos')).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText('Av. Arequipa 100').first()).toBeVisible()
+
+    expect(vigilante.errores).toEqual([])
+  })
+
+  test('cuenta nueva → libreta → checkout con su dirección → pedido → Mis pedidos', async ({ page, vigilante }, testInfo) => {
+    const email = `libreta+${Date.now()}-${testInfo.project.name}@hardening.test`
+    const password = `Clave-${Date.now()}`
+
+    await page.goto(`${TIENDA}/register`)
+    await page.getByLabel(/Nombre y apellido/).fill('Diego Libreta')
+    await page.getByLabel(/^Correo/).fill(email)
+    await page.getByLabel(/^Teléfono/).fill('+51 977 666 555')
+    await page.getByLabel(/^Contraseña/).fill(password)
+    await page.getByLabel(/^Repite la contraseña/).fill(password)
+    await page.getByRole('button', { name: 'Crear cuenta' }).click()
+    await expect(page).toHaveURL(new RegExp(`${TIENDA}/account$`), { timeout: 20_000 })
+
+    // Libreta: guardar «Casa» antes de comprar.
+    await page.getByRole('tab', { name: 'Mis direcciones' }).click()
+    await page.getByRole('button', { name: 'Agregar dirección' }).click()
+    const dialogo = page.getByRole('dialog')
+    await dialogo.getByLabel(/Nombre \(Casa/).fill('Casa')
+    await dialogo.getByLabel(/Dirección de entrega/).fill('Calle Las Flores 321')
+    await dialogo.getByLabel(/^Ciudad/).fill('Lima')
+    await dialogo.getByLabel(/Región o departamento/).fill('Lima')
+    await dialogo.getByLabel(/^País/).fill('PE')
+    await dialogo.getByRole('button', { name: 'Guardar dirección' }).click()
+    await expect(dialogo).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Casa' })).toBeVisible()
+    await expect(page.getByText('Predeterminada')).toBeVisible()
+
+    // Comprar con esa dirección.
+    await page.goto(`${TIENDA}?ver=todo`)
+    const ficha = page.locator('a[href*="/product/"]').first()
+    await expect(ficha).toBeVisible({ timeout: 20_000 })
+    await page.goto((await ficha.getAttribute('href'))!)
+    await page.getByRole('button', { name: /agregar al carrito|añadir al carrito/i }).first().click()
+    await expect(page.getByRole('button', { name: /carrito \(\d+\)/i })).toBeVisible({ timeout: 20_000 })
+
+    const { respuesta, cuerpoEnviado } = await comprar(page, { direccionGuardada: /^Casa · Calle Las Flores 321/ })
+    const pedido = await pedidoDe(respuesta)
+    expect(cuerpoEnviado.shipping_address).toMatchObject({ address: 'Calle Las Flores 321', city: 'Lima', country: 'PE' })
+    await expect(page).toHaveURL(/\/order\//, { timeout: 20_000 })
+
+    // Mis pedidos: el pedido. Mis direcciones: la libreta intacta, sin duplicar la usada.
+    await page.getByRole('link', { name: 'Tu cuenta' }).click()
+    await expect(page.getByRole('button', { name: new RegExp(pedido.order_number) })).toBeVisible({ timeout: 20_000 })
+    await page.getByRole('tab', { name: 'Mis direcciones' }).click()
+    await expect(page.getByRole('heading', { name: 'Casa' })).toBeVisible()
+    await expect(page.getByText('Usadas en tus pedidos')).toHaveCount(0)
 
     expect(vigilante.errores).toEqual([])
   })

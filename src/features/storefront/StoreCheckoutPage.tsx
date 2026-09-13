@@ -16,7 +16,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
@@ -50,7 +50,7 @@ import {
   type CheckoutValues,
 } from './checkout'
 import { useCommerceContext } from './commerce/context'
-import { formatSavedAddress, type SavedAddress } from './consumer'
+import { addressBookKey, checkoutProfileKey, consumerOrdersKey, formatSavedAddress, type SavedAddress } from './consumer'
 import { useStorefront } from './hooks'
 import { privateMeta } from './seo'
 import { useCheckoutPrefill } from './useCheckoutPrefill'
@@ -137,6 +137,7 @@ const CAMPOS: ReadonlyArray<ReadonlyArray<keyof CheckoutValues>> = [
 export function StoreCheckoutPage() {
   const { t, locale } = useI18n()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { store, storeSlug } = useStorefront()
   const { cart, subtotal, currency, cartToken, clear, forgetServerCart } = useCart()
   const { status: sessionStatus } = useSessionContext()
@@ -440,6 +441,13 @@ export function StoreCheckoutPage() {
       // comprador sin carrito y sin pedido.
       clearPendingAttempt(storeSlug)
       clear()
+      // Lo que «Mi cuenta» y el siguiente checkout leen de ESTA compra —sus
+      // pedidos y las direcciones usadas— dejó de ser verdad. Sin esto la
+      // primera compra de una cuenta nueva seguía diciendo «todavía no hay
+      // direcciones» durante el minuto de caché (defecto previo, N00).
+      void queryClient.invalidateQueries({ queryKey: checkoutProfileKey(storeSlug) })
+      void queryClient.invalidateQueries({ queryKey: consumerOrdersKey(storeSlug) })
+      void queryClient.invalidateQueries({ queryKey: addressBookKey(storeSlug) })
       // El token va en la URL, no solo en el state del router: es lo que hace
       // que la confirmacion sobreviva a una recarga y se pueda guardar.
       const permalink = order.access_token
@@ -725,7 +733,7 @@ export function StoreCheckoutPage() {
                           clickable
                           variant={watched.address === direccion.address ? 'filled' : 'outlined'}
                           color={watched.address === direccion.address ? 'primary' : 'default'}
-                          label={formatSavedAddress(direccion)}
+                          label={direccion.label ? `${direccion.label} · ${formatSavedAddress(direccion)}` : formatSavedAddress(direccion)}
                           onClick={() => usarDireccion(direccion)}
                           sx={{ maxWidth: '100%', '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' } }}
                         />

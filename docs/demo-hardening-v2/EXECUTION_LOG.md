@@ -129,3 +129,29 @@ El E2E encontró un defecto real antes de commitear: el borde respondía 500 par
 status); corregido a 422.
 Bundle: PASS · portada 402,0/405 · checkout 404,0/430
 Notes: el fixture local pone `purchase_order_required = true` en la cuenta E2E-CORP (escenario enterprise con OC).
+
+## N06
+Status: PASS
+Commit: (ver `git log --grep "libreta de direcciones"`)
+Files: migración `20260913160000_consumer_addresses.sql` (`consumer_addresses` por usuario + tienda, RLS forzada sin
+GRANT de cliente, una predeterminada por índice único parcial, máx. 20; `my_consumer_addresses`,
+`save_my_consumer_address`, `delete_my_consumer_address`, `set_default_my_consumer_address`);
+`consumer.ts` (API + `mergeAddresses`), `useCheckoutPrefill.ts` (libreta primero, historial sin duplicar),
+`ConsumerAddressesSection.tsx` (agregar/editar/eliminar con confirmación/predeterminada; «Usadas en tus pedidos» con
+«Guardar en mi libreta»), `StoreCheckoutPage.tsx` (chips con nombre; invalidación de perfil, pedidos y libreta tras
+el pedido), i18n; `e2e/commerce/signup.e2e.ts` (+1 escenario, +1 comprobación), `support.ts` (elegir dirección).
+Tests: `consumer-addresses.test.ts` 17 (CRUD propio, marca única, aislamiento por usuario, por tienda del mismo tenant
+y por tenant, claves ajenas → `CAMPO_NO_PERMITIDO`, validación, tope, `anon` sin EXECUTE, tabla sin acceso directo,
+firmas sin usuario). `consumer-account.test.tsx` 16 (+7 de libreta); los 2 de H04 declaran ahora la libreta: uno
+simula base SIN libreta (sigue enseñando las de pedidos con «Última»), otro libreta vacía. `checkout-ui` +1 (libreta
+primero con nombre, historial deduplicado, se elige, comprar no guarda).
+Typecheck: PASS
+Lint: PASS
+DB: 87 archivos · 2 252 ✓
+E2E: consumer + signup escritorio y móvil 8/8: registro → libreta «Casa» → checkout eligiendo «Casa · …» → pedido →
+Mis pedidos → libreta intacta sin duplicado. **Defecto de N00 corregido y probado** con cuenta recién creada: primera
+compra → «Mis direcciones» la enseña al momento (el checkout invalida `checkoutProfileKey`).
+Bundle: PASS · portada 402,3/405 (+0,3, claves ES). Se evitaron dos chunks ansiosos nuevos medidos contra `e791100`
+(`AddRounded` y `useMediaQuery` partidos por Rollup): sin icono en «Agregar» y diálogo a pantalla completa por CSS.
+Notes: guardar desde el checkout NO se implementó (opcional); se guarda desde «Mis direcciones», incluida la acción
+«Guardar en mi libreta» sobre una dirección ya usada.

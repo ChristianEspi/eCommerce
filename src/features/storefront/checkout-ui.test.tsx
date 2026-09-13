@@ -1431,6 +1431,40 @@ describe('checkout con sesión: datos y direcciones propuestos (H04)', () => {
     expect(nombre).toHaveValue('Otra Persona')
   })
 
+  it('N06 · la libreta va primero (con su nombre), sin repetir las de pedidos ya guardadas, y se ELIGE', async () => {
+    const user = userEvent.setup()
+    const session = makeSession({ email: 'ana@consumidora.test', withTenantClaims: false })
+    const fake = conCarritoDeServidor(backend({ session }))
+    fake.state.rpc.my_consumer_addresses = () => [
+      { id: '0c000000-0000-4000-8000-00000000ad01', label: 'Casa', address: 'Av. Primavera 120', city: 'Lima', country: 'PE', is_default: true },
+    ]
+    fake.state.rpc.my_checkout_profile = () => ({
+      contact: null,
+      addresses: [
+        { address: 'AV. PRIMAVERA 120', city: 'lima', country: 'PE' },
+        { address: 'Jr. Lampa 55', city: 'Lima', country: 'PE' },
+      ],
+    })
+    renderStorefront(fake, '/s/casa-nordica/checkout', session)
+
+    await user.type(await screen.findByLabelText(/Nombre y apellido/), 'Ana')
+    await user.type(screen.getByLabelText(/Teléfono/), '+51 999 111 222')
+    await user.click(screen.getByRole('button', { name: 'Siguiente' }))
+    expect(await screen.findByLabelText(/Dirección de entrega/)).toHaveValue('')
+
+    const grupo = screen.getByRole('group', { name: 'Tus direcciones' })
+    const opciones = within(grupo).getAllByRole('button').map((b) => b.textContent)
+    expect(opciones).toEqual(['Casa · Av. Primavera 120, Lima, PE', 'Jr. Lampa 55, Lima, PE'])
+
+    await user.click(within(grupo).getByRole('button', { name: 'Casa · Av. Primavera 120, Lima, PE' }))
+    expect(screen.getByLabelText(/Dirección de entrega/)).toHaveValue('Av. Primavera 120')
+    expect(fake.state.rpcCalls.find((c) => c.name === 'my_consumer_addresses')?.args).toEqual({ p_store_slug: 'casa-nordica' })
+    // Comprar no escribe la libreta.
+    await user.click(await irAPagar(user))
+    await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
+    expect(fake.state.rpcCalls.map((c) => c.name)).not.toContain('save_my_consumer_address')
+  })
+
   it('si la base no tiene el perfil, se sigue con lo que dice la sesión', async () => {
     const session = makeSession({ email: 'ana@consumidora.test', withTenantClaims: false })
     const fake = conCarritoDeServidor(backend({ session }))

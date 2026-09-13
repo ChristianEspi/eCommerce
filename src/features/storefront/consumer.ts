@@ -1,9 +1,13 @@
 import type { Session } from '@supabase/supabase-js'
 import { z } from 'zod'
 import {
+  DELETE_MY_CONSUMER_ADDRESS_RPC,
   MY_CHECKOUT_PROFILE_RPC,
+  MY_CONSUMER_ADDRESSES_RPC,
   MY_CONSUMER_ORDERS_RPC,
   MY_CONSUMER_ORDER_DETAIL_RPC,
+  SAVE_MY_CONSUMER_ADDRESS_RPC,
+  SET_DEFAULT_MY_CONSUMER_ADDRESS_RPC,
 } from '@/shared/lib/db-schema'
 import { getSupabaseClient } from '@/shared/lib/supabase'
 import type { MyOrder, MyOrderDetail } from './portal'
@@ -69,7 +73,26 @@ const addressSchema = z.object({
   postal_code: z.string().optional(),
   country: z.string().optional(),
 })
-export type SavedAddress = z.infer<typeof addressSchema>
+
+/**
+ * Una dirección de la LIBRETA (N06): la misma forma más su nombre, quién la
+ * recibe, su teléfono y si es la predeterminada. `id` es de la propia persona.
+ */
+const bookAddressSchema = addressSchema.extend({
+  id: z.string(),
+  label: z.string(),
+  recipient: z.string().optional(),
+  phone: z.string().optional(),
+  is_default: z.boolean(),
+})
+export type BookAddress = z.infer<typeof bookAddressSchema>
+
+/** Lo que se propone al comprar: de la libreta (con nombre) o de un pedido anterior. */
+export type SavedAddress = z.infer<typeof addressSchema> & {
+  readonly id?: string
+  readonly label?: string
+  readonly is_default?: boolean
+}
 
 const detailSchema = z.object({
   order_id: z.string(),
@@ -147,6 +170,56 @@ export const consumerOrdersKey = (storeSlug: string) => ['storefront', 'consumer
 export const consumerOrderDetailKey = (storeSlug: string, orderId: string) =>
   ['storefront', 'consumer-order', storeSlug, orderId] as const
 export const checkoutProfileKey = (storeSlug: string) => ['storefront', 'checkout-profile', storeSlug] as const
+export const addressBookKey = (storeSlug: string) => ['storefront', 'address-book', storeSlug] as const
+
+// ---------------------------------------------------------------------------
+// N06 · La libreta de direcciones del consumidor.
+//
+// Cuatro funciones de la base; ninguna recibe un usuario (sale del JWT) y la
+// tienda va por su slug público. Lo que se manda es SOLO la dirección.
+// ---------------------------------------------------------------------------
+
+export interface AddressInput {
+  readonly label: string
+  readonly recipient?: string
+  readonly phone?: string
+  readonly address: string
+  readonly reference?: string
+  readonly city?: string
+  readonly region?: string
+  readonly postal_code?: string
+  readonly country?: string
+  readonly is_default?: boolean
+}
+
+export async function fetchAddressBook(storeSlug: string): Promise<BookAddress[]> {
+  return bookAddressSchema.array().parse(await rpc(MY_CONSUMER_ADDRESSES_RPC, { p_store_slug: storeSlug }))
+}
+
+export async function saveAddress(storeSlug: string, input: AddressInput, addressId: string | null): Promise<BookAddress> {
+  return bookAddressSchema.parse(
+    await rpc(SAVE_MY_CONSUMER_ADDRESS_RPC, { p_store_slug: storeSlug, p_address: input, p_address_id: addressId }),
+  )
+}
+
+export async function deleteAddress(storeSlug: string, addressId: string): Promise<void> {
+  await rpc(DELETE_MY_CONSUMER_ADDRESS_RPC, { p_store_slug: storeSlug, p_address_id: addressId })
+}
+
+export async function setDefaultAddress(storeSlug: string, addressId: string): Promise<void> {
+  await rpc(SET_DEFAULT_MY_CONSUMER_ADDRESS_RPC, { p_store_slug: storeSlug, p_address_id: addressId })
+}
+
+/** Misma dirección y ciudad, sin mayúsculas ni espacios de más: la regla con la que la base deduplica. */
+export function sameAddress(a: SavedAddress, b: SavedAddress): boolean {
+  const norm = (value: string | undefined) => (value ?? '').trim().replace(/\s+/g, ' ').toLowerCase()
+  return norm(a.address) === norm(b.address) && norm(a.city) === norm(b.city)
+}
+
+/** La libreta primero (predeterminada delante) y luego lo usado en pedidos que no esté ya guardado. */
+export function mergeAddresses(book: readonly BookAddress[], history: readonly SavedAddress[]): SavedAddress[] {
+  return [...book, ...history.filter((old) => !book.some((saved) => sameAddress(saved, old)))]
+}
 
 /** Los datos de la persona que la pantalla puede enseñar y editar. */
 export interface ConsumerProfile {

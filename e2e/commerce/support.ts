@@ -163,7 +163,7 @@ export async function anadirDesdeFicha(page: Page, slug: string, cantidad: numbe
  */
 export async function comprar(
   page: Page,
-  opciones: { ordenDeCompra?: string } = {},
+  opciones: { ordenDeCompra?: string; direccionGuardada?: RegExp } = {},
 ): Promise<{ respuesta: Response; cuerpoEnviado: Record<string, unknown> }> {
   await page.goto(`${TIENDA}/checkout`)
 
@@ -177,9 +177,16 @@ export async function comprar(
   await page.getByRole('button', { name: 'Siguiente' }).click()
 
   await expect(page.getByRole('heading', { name: /^entrega$/i })).toBeVisible()
-  await page.getByLabel(/dirección de entrega/i).fill('Av. Arequipa 100')
-  await page.getByLabel(/^ciudad/i).fill('Lima')
-  await page.getByLabel(/región|departamento/i).first().fill('Lima')
+  if (opciones.direccionGuardada) {
+    // N06 · la dirección de la libreta se ELIGE, no aparece escrita sola.
+    await expect(page.getByLabel(/dirección de entrega/i)).toHaveValue('')
+    await page.getByRole('group', { name: 'Tus direcciones' }).getByRole('button', { name: opciones.direccionGuardada }).click()
+    await expect(page.getByLabel(/dirección de entrega/i)).not.toHaveValue('')
+  } else {
+    await page.getByLabel(/dirección de entrega/i).fill('Av. Arequipa 100')
+    await page.getByLabel(/^ciudad/i).fill('Lima')
+    await page.getByLabel(/región|departamento/i).first().fill('Lima')
+  }
 
   const disponibles = page.getByRole('radio').and(page.locator(':not([disabled])'))
   await expect(disponibles.first()).toBeVisible({ timeout: 20_000 })

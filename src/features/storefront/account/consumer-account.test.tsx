@@ -205,10 +205,16 @@ describe('Mis datos', () => {
 })
 
 describe('Mis direcciones', () => {
+  /**
+   * N06: con la libreta desplegada, las de pedidos van debajo («Usadas en tus
+   * pedidos»). Aquí se simula una base SIN libreta todavía: la pestaña tiene
+   * que seguir enseñando lo de H04, sin error.
+   */
   it('lista las direcciones de sus pedidos, la última usada primero', async () => {
     const fake = createFakeSupabase({
       session: makeSession({ withTenantClaims: false }),
       rpc: {
+        my_consumer_addresses: missing,
         my_checkout_profile: () => ({
           contact: { name: 'Ana', phone: '999' },
           addresses: [
@@ -232,10 +238,163 @@ describe('Mis direcciones', () => {
   it('sin direcciones, lo dice', async () => {
     const fake = createFakeSupabase({
       session: makeSession({ withTenantClaims: false }),
-      rpc: { my_checkout_profile: () => ({ contact: null, addresses: [] }) },
+      rpc: { my_consumer_addresses: () => [], my_checkout_profile: () => ({ contact: null, addresses: [] }) },
     })
     holder.client = fake
     renderWithProviders(<ConsumerAddressesSection storeSlug="tienda-a" />, { session: fake.state.session })
     expect(await screen.findByText('Todavía no hay direcciones')).toBeInTheDocument()
+  })
+})
+
+/**
+ * N06 · La libreta editable.
+ *
+ * Lo que se fija: agregar manda SOLO la dirección (sin usuario, tienda ni
+ * tenant); editar lleva su id; eliminar pide confirmación; marcar
+ * predeterminada; las de pedidos que ya están guardadas no se repiten y las que
+ * no, se pueden guardar con un gesto.
+ */
+describe('Mis direcciones · libreta (N06)', () => {
+  const CASA = {
+    id: '0c000000-0000-4000-8000-00000000ad01',
+    label: 'Casa',
+    address: 'Av. Primavera 120',
+    city: 'Lima',
+    country: 'PE',
+    is_default: true,
+  }
+  const OFICINA = {
+    id: '0c000000-0000-4000-8000-00000000ad02',
+    label: 'Oficina con un nombre larguísimo de edificio corporativo en San Isidro',
+    address: 'Jr. Lampa 55',
+    city: 'Lima',
+    is_default: false,
+  }
+
+  function pintarLibreta(libreta: Array<Record<string, unknown>>, historial: Array<Record<string, unknown>> = []) {
+    let actual = [...libreta]
+    const fake = createFakeSupabase({
+      session: makeSession({ withTenantClaims: false }),
+      rpc: {
+        my_consumer_addresses: () => actual,
+        my_checkout_profile: () => ({ contact: null, addresses: historial }),
+        save_my_consumer_address: (args) => {
+          const input = args.p_address as Record<string, unknown>
+          const guardada = { id: (args.p_address_id as string) ?? '0c000000-0000-4000-8000-00000000ad09', is_default: false, ...input }
+          actual = [...actual.filter((a) => a.id !== guardada.id), guardada]
+          return guardada
+        },
+        delete_my_consumer_address: (args) => {
+          actual = actual.filter((a) => a.id !== args.p_address_id)
+          return actual
+        },
+        set_default_my_consumer_address: (args) => {
+          actual = actual.map((a) => ({ ...a, is_default: a.id === args.p_address_id }))
+          return actual
+        },
+      },
+    })
+    holder.client = fake
+    renderWithProviders(<ConsumerAddressesSection storeSlug="tienda-a" />, { session: fake.state.session })
+    return fake
+  }
+
+  it('lista la libreta con la predeterminada marcada, y no repite las de pedidos ya guardadas', async () => {
+    pintarLibreta([CASA, OFICINA], [
+      { address: 'av. primavera 120 ', city: 'LIMA' },
+      { address: 'Calle Nueva 9', city: 'Lima' },
+    ])
+    expect(await screen.findByRole('heading', { name: 'Casa' })).toBeInTheDocument()
+    expect(screen.getByText('Predeterminada')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: OFICINA.label })).toBeInTheDocument()
+    expect(screen.getByText('Usadas en tus pedidos')).toBeInTheDocument()
+    expect(screen.getByText('Calle Nueva 9')).toBeInTheDocument()
+    expect(screen.queryByText('av. primavera 120')).not.toBeInTheDocument()
+  })
+
+  it('agregar manda SOLO la dirección: sin usuario, tienda ni tenant', async () => {
+    const user = userEvent.setup()
+    const fake = pintarLibreta([])
+    await user.click(await screen.findByRole('button', { name: 'Agregar dirección' }))
+    const dialogo = await screen.findByRole('dialog')
+    await user.type(within(dialogo).getByLabelText(/Nombre \(Casa/), 'Casa de playa')
+    await user.type(within(dialogo).getByLabelText(/Dirección de entrega/), 'Malecón 45')
+    await user.type(within(dialogo).getByLabelText(/^País/), 'pe')
+    await user.click(within(dialogo).getByLabelText('Proponerla primero al comprar'))
+    await user.click(within(dialogo).getByRole('button', { name: 'Guardar dirección' }))
+
+    await waitFor(() => expect(fake.state.rpcCalls.some((c) => c.name === 'save_my_consumer_address')).toBe(true))
+    const llamada = fake.state.rpcCalls.find((c) => c.name === 'save_my_consumer_address')!
+    expect(llamada.args).toEqual({
+      p_store_slug: 'tienda-a',
+      p_address_id: null,
+      p_address: { label: 'Casa de playa', address: 'Malecón 45', country: 'PE', is_default: true },
+    })
+    expect(await screen.findByRole('heading', { name: 'Casa de playa' })).toBeInTheDocument()
+  })
+
+  it('no guarda sin nombre ni dirección', async () => {
+    const user = userEvent.setup()
+    const fake = pintarLibreta([])
+    await user.click(await screen.findByRole('button', { name: 'Agregar dirección' }))
+    const dialogo = await screen.findByRole('dialog')
+    await user.click(within(dialogo).getByRole('button', { name: 'Guardar dirección' }))
+    expect(within(dialogo).getAllByText('Completa este campo')).toHaveLength(2)
+    expect(fake.state.rpcCalls.some((c) => c.name === 'save_my_consumer_address')).toBe(false)
+  })
+
+  it('editar lleva el id de la dirección y los datos cambiados', async () => {
+    const user = userEvent.setup()
+    const fake = pintarLibreta([CASA])
+    await user.click(await screen.findByRole('button', { name: 'Editar: Casa' }))
+    const dialogo = await screen.findByRole('dialog')
+    const campo = within(dialogo).getByLabelText(/Dirección de entrega/)
+    await user.clear(campo)
+    await user.type(campo, 'Av. Primavera 130')
+    await user.click(within(dialogo).getByRole('button', { name: 'Guardar dirección' }))
+    await waitFor(() => expect(fake.state.rpcCalls.some((c) => c.name === 'save_my_consumer_address')).toBe(true))
+    expect(fake.state.rpcCalls.find((c) => c.name === 'save_my_consumer_address')!.args).toMatchObject({
+      p_address_id: CASA.id,
+      p_address: { label: 'Casa', address: 'Av. Primavera 130', city: 'Lima', country: 'PE' },
+    })
+  })
+
+  it('eliminar pide confirmación y luego borra por id', async () => {
+    const user = userEvent.setup()
+    const fake = pintarLibreta([CASA, OFICINA])
+    await user.click(await screen.findByRole('button', { name: `Eliminar: ${OFICINA.label}` }))
+    const confirmacion = await screen.findByRole('dialog')
+    expect(confirmacion).toHaveTextContent(`¿Eliminar «${OFICINA.label}»?`)
+    expect(fake.state.rpcCalls.some((c) => c.name === 'delete_my_consumer_address')).toBe(false)
+    await user.click(within(confirmacion).getByRole('button', { name: 'Eliminar' }))
+    await waitFor(() =>
+      expect(fake.state.rpcCalls.find((c) => c.name === 'delete_my_consumer_address')?.args).toEqual({
+        p_store_slug: 'tienda-a',
+        p_address_id: OFICINA.id,
+      }),
+    )
+    await waitFor(() => expect(screen.queryByRole('heading', { name: OFICINA.label })).not.toBeInTheDocument())
+  })
+
+  it('marcar predeterminada otra dirección', async () => {
+    const user = userEvent.setup()
+    const fake = pintarLibreta([CASA, OFICINA])
+    await user.click(await screen.findByRole('button', { name: 'Usar por defecto' }))
+    await waitFor(() =>
+      expect(fake.state.rpcCalls.find((c) => c.name === 'set_default_my_consumer_address')?.args).toEqual({
+        p_store_slug: 'tienda-a',
+        p_address_id: OFICINA.id,
+      }),
+    )
+  })
+
+  it('una dirección de un pedido se guarda en la libreta con un gesto, con sus datos ya puestos', async () => {
+    const user = userEvent.setup()
+    pintarLibreta([], [{ address: 'Calle Nueva 9', city: 'Arequipa', country: 'PE' }])
+    await user.click(await screen.findByRole('button', { name: 'Guardar en mi libreta' }))
+    const dialogo = await screen.findByRole('dialog')
+    expect(within(dialogo).getByLabelText(/Dirección de entrega/)).toHaveValue('Calle Nueva 9')
+    expect(within(dialogo).getByLabelText(/^Ciudad/)).toHaveValue('Arequipa')
+    expect(within(dialogo).getByLabelText(/Nombre \(Casa/)).toHaveValue('')
   })
 })
