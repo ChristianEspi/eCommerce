@@ -191,3 +191,36 @@ Tests: `npm run test` = **205 archivos · 3 922 ✓ · 0 ✗ · 0 errores no con
 Sin `skip`, sin aserciones rebajadas. Verificado además en Node 25.9 y Node 20.20 (los 3 archivos afectados 19/19).
 Typecheck: PASS · Lint: PASS
 Notes: `engines` declara Node ≥ 22.12 (LTS vigentes 22 y 24; Node 20 está fuera de soporte desde 2026-04 y no se fija).
+
+## N09
+Status: PASS
+Commit: sin cambios de código propios (cada escenario se commiteó con su fase: N01 `41451ec`, N02 `65fe4f1`,
+N03 `f75d441`, N04 `9fedd17`, N05 `e791100`, N06 `fce704e`); este registro va con N10.
+Files: `e2e/commerce/{multi-account,signup,targeted-promotion}.e2e.ts` (nuevos), `enterprise.e2e.ts` (OC),
+`support.ts`, `scripts/e2e-local-fixtures.mjs` (usuario MULTI, campaña dirigida, E2E-CORP con OC).
+E2E (pila local, fixtures repuestas, `npx playwright test` completo): **56/56** — escritorio 12 · móvil 12 ·
+comercio-escritorio 16 · comercio-móvil 16 (H14: 44).
+Cobertura pedida: multi-cuenta (selector → barra = B → ficha = B → carrito = B → pedido cobrado a B → portal con B);
+alta de consumidor (tienda → crear cuenta → Mi cuenta → libreta → checkout con su dirección → pedido → Mis pedidos);
+precio comercial en catálogo (lotes, sin N+1 observable, A/B actualiza); promoción dirigida (carrito la enseña, pedido
+cobra el mismo descuento); OC (sin OC la pantalla no deja y lo dice; con OC pedido + confirmación + portal; llamada
+directa sin OC → 422). Escritorio y móvil en todos. **Nada contra DEV/QAS.**
+Notes: la promoción dirigida en E2E es de audiencia `business_account`; `segment` y `customer` se prueban en
+Postgres (`targeted-promotions.test.ts`). Al añadir imports nuevos con un servidor de desarrollo ya arrancado, Vite
+re-optimiza dependencias y la primera pasada puede dar «Invalid hook call»; en un arranque limpio no ocurre.
+
+## N10
+Status: PASS
+Commit: (ver `git log --grep "preflight de demo v2"`)
+Files: `scripts/demo-preflight.mjs` (ampliado, no sustituido).
+Nuevas comprobaciones: migraciones N01–N06 (8 funciones, 2 tablas, `orders.purchase_order_number`,
+`promotion_quote_for_slug` con cuenta efectiva); cuenta EFECTIVA de TRADE/ENTERPRISE (varias cuentas ya no es
+fallo: informa cuántas, cuál y si la elección guardada es válida); OC obligatoria contra
+`DEMO_ENTERPRISE_REQUIRES_PO`; grupo MULTI (`DEMO_MULTI_EMAIL`: 2+ cuentas, efectiva, sin elección inválida);
+grupo PROMOS (`DEMO_TARGETED_PROMO_CODE`: activa, vigente, audiencia dirigida). Siguen: tema, categorías,
+entrega/pago, país, stock, addon `pricing.lists`. Veredicto `DEMO_PREFLIGHT_V2 = PASS|FAIL`; correos enmascarados,
+sin contraseñas.
+Ejecución contra la pila local con los cinco usuarios de fixture: STORE (migraciones, tema, addon), B2C, TRADE,
+ENTERPRISE (OC exigida = guion), MULTI y PROMOS **OK**; **FAIL** por los 6 umbrales de catálogo (8 productos en el seed
+local frente a mínimos pensados para DEV), igual que en H13 → veredicto correcto para esta pila. Contra DEV/QAS: no
+ejecutado (sin `.env`).

@@ -36,6 +36,23 @@
  * (`DEMO_TRADE_EMAIL`, `DEMO_ENTERPRISE_EMAIL`); sin él se informan como
  * pendientes y el veredicto es FAIL, porque esa parte de la demo no está lista.
  *
+ * ## V2 (segunda noche, N10)
+ *
+ *  · STORE comprueba también las migraciones N01–N06 (cuenta efectiva,
+ *    promociones dirigidas en la cotización, orden de compra, libreta).
+ *  · La cuenta de TRADE/ENTERPRISE es la EFECTIVA (`ebim.effective_business_account`),
+ *    la misma que usan precio, barra, checkout y pedido. Varias cuentas ya no
+ *    son un fallo: se informa cuántas hay, cuál es la efectiva y si la elección
+ *    guardada sigue siendo válida.
+ *  · MULTI (opcional, `DEMO_MULTI_EMAIL`): usuario con 2+ cuentas, selector
+ *    operativo y selección válida.
+ *  · `DEMO_ENTERPRISE_REQUIRES_PO=true|false` (opcional): la OC obligatoria solo
+ *    se exige si el guion pretende enseñarla; sin declararlo, se informa.
+ *  · `DEMO_TARGETED_PROMO_CODE` (opcional): la promoción dirigida de demo existe,
+ *    está activa y tiene audiencia distinta de «todos».
+ *
+ * Veredicto: `DEMO_PREFLIGHT_V2 = PASS | FAIL`.
+ *
  * ## Dónde pregunta
  *
  *  · Por defecto, al proyecto remoto por la API de gestión (`VITE_SUPABASE_URL` +
@@ -50,7 +67,7 @@
  *       node scripts/demo-preflight.mjs miquimica
  *
  * Salida: una línea por comprobación, los motivos accionables y
- * `DEMO_PREFLIGHT = PASS` o `DEMO_PREFLIGHT = FAIL`. Termina con código 1 si
+ * `DEMO_PREFLIGHT_V2 = PASS` o `DEMO_PREFLIGHT_V2 = FAIL`. Termina con código 1 si
  * algo bloquea la demo, para poder encadenarlo en un gate.
  */
 import { execFileSync } from 'node:child_process'
@@ -96,7 +113,7 @@ if (CONTENEDOR) {
 } else {
   if (!env.VITE_SUPABASE_URL || !env.SUPABASE_ACCESS_TOKEN) {
     console.error('Faltan VITE_SUPABASE_URL o SUPABASE_ACCESS_TOKEN (entorno o .env), o PREFLIGHT_DB_CONTAINER para una pila local.')
-    console.log('\nDEMO_PREFLIGHT = FAIL\n')
+    console.log('\nDEMO_PREFLIGHT_V2 = FAIL\n')
     process.exit(1)
   }
   const REF = new URL(env.VITE_SUPABASE_URL).hostname.split('.')[0]
@@ -196,6 +213,31 @@ const STORE = [
   },
   {
     grupo: 'STORE',
+    paso: 'Migraciones N01–N06 aplicadas',
+    arreglo: 'aplicar 20260913130000…20260913160000 en orden (docs/demo-hardening-v2/FINAL_REPORT.md, QAS)',
+    async evaluar() {
+      const [fila] = await sql(`select
+          (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where (n.nspname = 'ebim' and p.proname = 'effective_business_account')
+               or (n.nspname = 'public' and p.proname in ('my_store_business_accounts','select_store_business_account',
+                   'my_effective_business_account_for_slug','my_consumer_addresses','save_my_consumer_address',
+                   'delete_my_consumer_address','set_default_my_consumer_address')))::int as funciones,
+          (select count(*) from information_schema.tables where table_schema = 'public'
+            and table_name in ('buyer_account_selections','consumer_addresses'))::int as tablas,
+          (select count(*) from information_schema.columns where table_schema = 'public'
+            and table_name = 'orders' and column_name = 'purchase_order_number')::int as oc,
+          (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname = 'promotion_quote_for_slug'
+              and p.prosrc like '%effective_business_account%')::int as promos`)
+      const ok = Number(fila?.funciones) === 8 && Number(fila?.tablas) === 2 && Number(fila?.oc) === 1 && Number(fila?.promos) === 1
+      return {
+        ok,
+        detalle: `funciones ${fila?.funciones}/8, tablas ${fila?.tablas}/2, orders.purchase_order_number ${fila?.oc}/1, promos dirigidas en cotización ${fila?.promos}/1`,
+      }
+    },
+  },
+  {
+    grupo: 'STORE',
     paso: 'Migraciones del hardening aplicadas',
     arreglo: 'aplicar 20260913100000, 20260913110000 y 20260913120000 (docs/demo-hardening/FINAL_REPORT.md, QAS)',
     async evaluar() {
@@ -280,17 +322,24 @@ function compradorDeEmpresa(grupo, correo, audienciaEsperada) {
     ]
   }
 
+  // V2 · La cuenta EFECTIVA, con la misma regla que precio, barra, checkout y
+  // pedido. `cuentas` son las válidas del usuario en esta sociedad.
   const CUENTA = `
     select a.*, c.segment_id, c.id as cliente_id, bu.spending_limit, s.id as tienda_id, s.currency as moneda,
            (select count(*) from public.business_locations l where l.business_account_id = a.id and l.is_active) as sedes,
-           count(*) over () as cuentas
+           (select count(*) from public.business_account_users bu2
+              join public.business_accounts a2 on a2.id = bu2.business_account_id and a2.is_active
+              join public.customers c2 on c2.id = a2.customer_id and c2.is_active
+             where bu2.user_id = u.id and bu2.status = 'active'
+               and a2.organization_id = s.organization_id and a2.company_id = s.company_id) as cuentas,
+           (select sel.business_account_id from public.buyer_account_selections sel
+             where sel.user_id = u.id and sel.organization_id = s.organization_id and sel.company_id = s.company_id) as elegida
     from auth.users u
-    join public.business_account_users bu on bu.user_id = u.id and bu.status = 'active'
-    join public.business_accounts a on a.id = bu.business_account_id and a.is_active
-    join public.customers c on c.id = a.customer_id and c.is_active
-    join ${TIENDA} s on s.organization_id = a.organization_id and s.company_id = a.company_id
-    where lower(u.email) = lower(${lit(correo)})
-    order by a.created_at, a.id`
+    join ${TIENDA} s on true
+    join public.business_accounts a on a.id = ebim.effective_business_account(u.id, s.organization_id, s.company_id)
+    join public.customers c on c.id = a.customer_id
+    join public.business_account_users bu on bu.business_account_id = a.id and bu.user_id = u.id and bu.status = 'active'
+    where lower(u.email) = lower(${lit(correo)})`
 
   return [
     {
@@ -298,10 +347,15 @@ function compradorDeEmpresa(grupo, correo, audienciaEsperada) {
       paso: `Usuario ${enmascarar(correo)} y cuenta activa`,
       arreglo: 'node scripts/crear-usuario-b2b.mjs <correo> <contraseña> "<cuenta>" (vínculo activo en la sociedad de la tienda)',
       async evaluar() {
-        const filas = await sql(`select name, cuentas from (${CUENTA}) x limit 1`)
+        const filas = await sql(`select id, name, cuentas, elegida from (${CUENTA}) x limit 1`)
         if (filas.length === 0) return { ok: false, detalle: 'sin usuario o sin cuenta activa en esta sociedad' }
-        const varias = Number(filas[0].cuentas) > 1
-        return { ok: !varias, detalle: varias ? `${filas[0].cuentas} cuentas activas: la demo necesita UNA (sin selector)` : filas[0].name }
+        const [f] = filas
+        const n = Number(f.cuentas)
+        if (n <= 1) return { ok: true, detalle: `efectiva: ${f.name}` }
+        // Con varias, la barra enseña el selector. La elección guardada, si la hay,
+        // tiene que ser la efectiva; si no lo es, quedó inválida y cae a la más antigua.
+        const origen = f.elegida == null ? 'la más antigua (sin elección)' : f.elegida === f.id ? 'elegida' : 'elección guardada INVÁLIDA → la más antigua'
+        return { ok: true, detalle: `${n} cuentas, selector visible; efectiva: ${f.name} (${origen})` }
       },
     },
     {
@@ -364,11 +418,85 @@ function compradorDeEmpresa(grupo, correo, audienciaEsperada) {
   ]
 }
 
+// ---------------------------------------------------------------------------
+// V2 · Orden de compra de la empresa, multi-cuenta y promoción dirigida.
+// ---------------------------------------------------------------------------
+const EXTRA = []
+
+if (env.DEMO_ENTERPRISE_EMAIL) {
+  const pretende = env.DEMO_ENTERPRISE_REQUIRES_PO
+  EXTRA.push({
+    grupo: 'ENTERPRISE',
+    paso: 'Orden de compra obligatoria',
+    arreglo: pretende === 'true'
+      ? 'Clientes → cuenta de la empresa → exigir orden de compra'
+      : 'Clientes → cuenta de la empresa → quitar «exigir orden de compra» (o declarar DEMO_ENTERPRISE_REQUIRES_PO=true)',
+    async evaluar() {
+      const [fila] = await sql(`select a.purchase_order_required as oc
+        from auth.users u join ${TIENDA} s on true
+        join public.business_accounts a on a.id = ebim.effective_business_account(u.id, s.organization_id, s.company_id)
+        where lower(u.email) = lower(${lit(env.DEMO_ENTERPRISE_EMAIL)})`)
+      if (!fila) return { ok: false, detalle: 'sin cuenta efectiva' }
+      const exige = fila.oc === true
+      if (pretende === undefined) return { ok: true, detalle: exige ? 'exige OC (el guion debe teclearla)' : 'no exige OC' }
+      const quiere = pretende === 'true'
+      return { ok: exige === quiere, detalle: `exige: ${exige ? 'sí' : 'no'} · guion: ${quiere ? 'sí' : 'no'}` }
+    },
+  })
+}
+
+if (env.DEMO_MULTI_EMAIL) {
+  EXTRA.push({
+    grupo: 'MULTI',
+    paso: `Usuario ${enmascarar(env.DEMO_MULTI_EMAIL)} con 2+ cuentas y selección válida`,
+    arreglo: 'vincular el usuario a dos cuentas activas de la sociedad de la tienda (node scripts/crear-usuario-b2b.mjs)',
+    async evaluar() {
+      const [fila] = await sql(`select
+          (select count(*) from public.business_account_users bu
+             join public.business_accounts a on a.id = bu.business_account_id and a.is_active
+             join public.customers c on c.id = a.customer_id and c.is_active
+            where bu.user_id = u.id and bu.status = 'active'
+              and a.organization_id = s.organization_id and a.company_id = s.company_id)::int as cuentas,
+          (select a.name from public.business_accounts a
+            where a.id = ebim.effective_business_account(u.id, s.organization_id, s.company_id)) as efectiva,
+          (select count(*) from public.buyer_account_selections sel
+            where sel.user_id = u.id and sel.organization_id = s.organization_id and sel.company_id = s.company_id
+              and sel.business_account_id is distinct from ebim.effective_business_account(u.id, s.organization_id, s.company_id))::int as invalidas
+        from auth.users u join ${TIENDA} s on true
+        where lower(u.email) = lower(${lit(env.DEMO_MULTI_EMAIL)})`)
+      if (!fila) return { ok: false, detalle: 'no existe' }
+      const ok = Number(fila.cuentas) >= 2 && fila.efectiva != null && Number(fila.invalidas) === 0
+      return {
+        ok,
+        detalle: `${fila.cuentas} cuentas · efectiva ${fila.efectiva ?? '—'}${Number(fila.invalidas) > 0 ? ' · elección guardada inválida' : ''}`,
+      }
+    },
+  })
+}
+
+if (env.DEMO_TARGETED_PROMO_CODE) {
+  EXTRA.push({
+    grupo: 'PROMOS',
+    paso: `Promoción dirigida «${env.DEMO_TARGETED_PROMO_CODE}»`,
+    arreglo: 'Promociones → activar la campaña, con vigencia actual y audiencia de segmento, cliente o cuenta',
+    async evaluar() {
+      const filas = await sql(`select string_agg(distinct au.audience_kind::text, ', ') as audiencias
+        from public.promotions p join ${TIENDA} s on s.id = p.store_id
+        join public.promotion_audiences au on au.promotion_id = p.id and au.audience_kind <> 'all'
+        where p.code = ${lit(env.DEMO_TARGETED_PROMO_CODE)} and p.status = 'active'
+          and p.valid_from <= now() and (p.valid_to is null or p.valid_to > now())
+        having count(*) > 0`)
+      return { ok: filas.length > 0, detalle: filas[0] ? `activa · ${filas[0].audiencias}` : 'no activa o sin audiencia dirigida' }
+    },
+  })
+}
+
 const COMPROBACIONES = [
   ...STORE,
   ...B2C,
   ...compradorDeEmpresa('TRADE', env.DEMO_TRADE_EMAIL, 'trade'),
   ...compradorDeEmpresa('ENTERPRISE', env.DEMO_ENTERPRISE_EMAIL, 'enterprise'),
+  ...EXTRA,
 ]
 
 console.log(`\nPreflight de demo · tienda «${SLUG}» · ${destino}\n`)
@@ -395,7 +523,7 @@ for (const control of COMPROBACIONES) {
 console.log('')
 if (pendientes.length === 0) {
   console.log('  Las tres experiencias tienen todo lo que necesitan.')
-  console.log('\nDEMO_PREFLIGHT = PASS\n')
+  console.log('\nDEMO_PREFLIGHT_V2 = PASS\n')
   process.exit(0)
 }
 
@@ -404,5 +532,5 @@ for (const control of pendientes) {
   console.log(`    [${control.grupo}] ${control.paso} — ${control.detalle}`)
   console.log(`      -> ${control.arreglo}`)
 }
-console.log('\nDEMO_PREFLIGHT = FAIL\n')
+console.log('\nDEMO_PREFLIGHT_V2 = FAIL\n')
 process.exit(1)
