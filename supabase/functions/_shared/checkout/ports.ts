@@ -464,7 +464,12 @@ export interface CheckoutPorts {
 
   // Las once etapas, en el orden de `CHECKOUT_STAGES`.
   resolveContext(storeSlug: string): Promise<CheckoutContext>
-  resolveAccount(): Promise<AccountContext>
+  /**
+   * La cuenta B2B EFECTIVA de la sesión en ESTA tienda (N01): la misma regla
+   * que fija el precio (`ebim.effective_business_account`), nunca «la primera
+   * de la lista».
+   */
+  resolveAccount(storeSlug: string): Promise<AccountContext>
   /** Quien compra, segun la base y con el token del llamante. */
   verifyBuyer(): Promise<string | null>
   resolvePrices(storeSlug: string, items: readonly OrderItemInput[]): Promise<Quote>

@@ -11,10 +11,10 @@
  * `service` salta la RLS y se usa para lo que el comprador anónimo no puede
  * hacer por su cuenta: reclamar el intento, reservar existencia, crear el
  * pedido. `caller` actúa COMO QUIEN LLAMA (clave publicable + su
- * `Authorization`) y se usa para una sola cosa: preguntar de qué cuenta B2B es
- * miembro. Es deliberado —`my_business_accounts()` no acepta argumentos desde
- * P05 justamente para que la cuenta salga de la sesión y no de un id— y con
- * `service` la pregunta no tendría respuesta posible: no hay sesión que
+ * `Authorization`) y se usa para lo que depende de la sesión: con qué cuenta
+ * B2B compra en esta tienda (`my_effective_business_account_for_slug`, que no
+ * acepta identidad: la cuenta sale del token), y cotizar con su precio. Con
+ * `service` esas preguntas no tendrían respuesta posible: no hay sesión que
  * consultar.
  */
 import type { OrderItemInput } from '../orders.ts'
@@ -216,7 +216,21 @@ export function createDbPorts(options: DbPortOptions): CheckoutPorts {
       }
     },
 
-    async resolveAccount(): Promise<AccountContext> {
+    /**
+     * N01 · la cuenta EFECTIVA en esta tienda, no la primera de una lista.
+     *
+     * Hasta H14 esto tomaba `rows[0]` de `my_business_accounts()`, que no
+     * filtra por sociedad y ordena por nombre, mientras el precio lo fijaba
+     * `ebim.pricing_actor` con otra regla: con dos cuentas, el carrito cotizaba
+     * con una y el pedido se firmaba con otra. Ahora las dos preguntan a
+     * `ebim.effective_business_account` —aquí a través de
+     * `my_effective_business_account_for_slug`, con el token del comprador— y
+     * no hay segunda regla que pueda discrepar.
+     *
+     * El slug es el de la tienda que resolvió la etapa 1; la identidad sale del
+     * token. Ningún campo del cuerpo de la petición interviene.
+     */
+    async resolveAccount(storeSlug: string): Promise<AccountContext> {
       const empty: AccountContext = {
         hasSession,
         userId: null,
@@ -226,27 +240,27 @@ export function createDbPorts(options: DbPortOptions): CheckoutPorts {
       }
       if (!hasSession) return empty
 
-      // Con sesión pero sin vínculo, la respuesta es una lista vacía y NO un
-      // error: un comprador con cuenta EBIM que todavía no está vinculado a
-      // ninguna empresa compra igual que un anónimo.
-      let rows: unknown
+      // Con sesión pero sin vínculo, la respuesta es `null` y NO un error: un
+      // comprador con cuenta EBIM que todavía no está vinculado a ninguna
+      // empresa compra igual que un anónimo.
+      let raw: unknown
       try {
-        rows = await caller('my_business_accounts', {})
+        raw = await caller('my_effective_business_account_for_slug', { p_store_slug: storeSlug })
       } catch (error) {
-        // Que el portal B2B no conteste no puede impedir una compra normal.
+        // Que la resolución de cuenta no conteste no puede impedir una compra normal.
         console.error('[checkout] no se pudo resolver la cuenta B2B', error)
         return empty
       }
 
-      const first = Array.isArray(rows) ? record(rows[0]) : record(rows)
-      if (!first.account_id) return empty
+      const effective = record(raw)
+      if (!effective.account_id) return empty
 
       return {
         hasSession,
         userId: null,
-        accountId: text(first, 'account_id'),
-        role: nullableText(first, 'role'),
-        spendingLimit: nullableText(first, 'spending_limit'),
+        accountId: text(effective, 'account_id'),
+        role: nullableText(effective, 'role'),
+        spendingLimit: nullableText(effective, 'spending_limit'),
       }
     },
 

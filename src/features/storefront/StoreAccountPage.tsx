@@ -24,6 +24,7 @@ import { useDocumentMeta } from '@/shared/seo/useDocumentMeta'
 import { SectionTabs } from '@/shared/ui/SectionTabs'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
 import { AccountStatementSection } from './account/AccountStatementSection'
+import { useStoreAccounts } from './commerce/accounts'
 import { ConsumerAccount } from './account/ConsumerAccount'
 import { MyCouponsSection } from './account/MyCouponsSection'
 import { MyOrdersSection } from './account/MyOrdersSection'
@@ -91,6 +92,13 @@ export function StoreAccountPage() {
   const pending = useMyPendingAccounts(
     authenticated && query.isSuccess && (query.data ?? []).length === 0,
   )
+  // Con varias cuentas, cuál es la EFECTIVA en esta tienda (N01): la misma que
+  // usan el precio y el checkout. Con una sola no hay nada que distinguir.
+  const efectivas = useStoreAccounts(
+    storefront?.storeSlug ?? '',
+    authenticated && (query.data ?? []).length > 1,
+  )
+  const efectiva = (efectivas.data ?? []).find((cuenta) => cuenta.is_effective)?.account_id ?? null
 
   if (status === 'loading') return <LoadingState />
 
@@ -160,7 +168,10 @@ export function StoreAccountPage() {
                     {account.customer_name} · {account.code}
                   </Typography>
                 </Stack>
-                <Stack direction="row" spacing={1}>
+                <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 0.5 }}>
+                  {account.account_id === efectiva && (
+                    <Chip size="small" color="success" label={t('store.commerce.buyingFor')} />
+                  )}
                   <Chip size="small" color="primary" label={t(`customers.role.${account.role}`)} />
                   {account.requires_approval && (
                     <Chip size="small" color="warning" label={t('account.needsApproval')} />

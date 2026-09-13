@@ -446,6 +446,12 @@ export const MY_CHECKOUT_PROFILE_RPC = 'my_checkout_profile'
 // 20260913110000). Solo para PINTAR «cuenta comercial» o «comprando para»: la
 // misma cuenta que usa el motor de precios, sin un precio ni un id de lista.
 export const MY_COMMERCE_CONTEXT_RPC = 'my_commerce_context'
+// Cuenta B2B efectiva y selector multi-cuenta (N01, migración 20260913130000).
+// El navegador PIDE comprar para una de sus cuentas; el servidor valida vínculo,
+// estado y sociedad antes de guardar. `my_effective_business_account_for_slug`
+// la usa el checkout (Edge Function), no la vitrina.
+export const MY_STORE_BUSINESS_ACCOUNTS_RPC = 'my_store_business_accounts'
+export const SELECT_STORE_BUSINESS_ACCOUNT_RPC = 'select_store_business_account'
 
 // Pagos (P09-SaaS). Las TRES que puede llamar el navegador con sesión, y su
 // autorización vive dentro de cada una. Las del servidor —`payment_intent_open`,

@@ -16,7 +16,7 @@ import { expect, TIENDA } from '../consola'
  * servidor en el momento y se comparan entre sí.
  */
 
-export type Rol = 'CONSUMER' | 'TRADE' | 'ENTERPRISE'
+export type Rol = 'CONSUMER' | 'TRADE' | 'ENTERPRISE' | 'MULTI'
 
 export function credenciales(rol: Rol): { email: string; password: string } {
   const email = process.env[`E2E_${rol}_EMAIL`]
@@ -68,6 +68,51 @@ export async function precioPublico(request: APIRequestContext, slug: string, ca
   expect(cotizacion.ok()).toBe(true)
   const cuerpo = (await cotizacion.json()) as { lines: Array<{ unit_price: string }> }
   return Number(cuerpo.lines[0]?.unit_price)
+}
+
+/**
+ * Una sesión por API con la cuenta de un rol, para PREGUNTARLE al servidor lo
+ * mismo que la vitrina le pregunta: qué cuentas tiene, con cuál compra y a qué
+ * precio. Usa la clave publicable y el JWT de la persona; nunca la de servicio.
+ */
+export async function sesionApi(request: APIRequestContext, rol: Rol) {
+  const { url, key } = proyecto()
+  const { email, password } = credenciales(rol)
+  const login = await request.post(`${url}/auth/v1/token?grant_type=password`, {
+    headers: { apikey: key, 'Content-Type': 'application/json' },
+    data: { email, password },
+  })
+  expect(login.ok()).toBe(true)
+  const { access_token: token } = (await login.json()) as { access_token: string }
+  const cabeceras = { apikey: key, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+
+  async function rpc<T>(fn: string, data: Record<string, unknown>): Promise<T> {
+    const res = await request.post(`${url}/rest/v1/rpc/${fn}`, { headers: cabeceras, data })
+    expect(res.ok(), `${fn}: ${res.status()} ${await res.text()}`).toBe(true)
+    return (await res.json()) as T
+  }
+
+  return {
+    token,
+    rpc,
+    async precio(slug: string, cantidad: number): Promise<number> {
+      // El catálogo público se lee como lo lee la vitrina: con la clave publicable.
+      const productos = await request.get(`${url}/rest/v1/public_products?slug=eq.${slug}&select=product_id`, {
+        headers: { apikey: key, Authorization: `Bearer ${key}` },
+      })
+      const [producto] = (await productos.json()) as Array<{ product_id: string }>
+      const cuerpo = await rpc<{ lines: Array<{ unit_price: string }> }>('price_quote_for_slug', {
+        p_store_slug: SLUG_TIENDA,
+        p_items: [{ product_id: producto!.product_id, quantity: cantidad }],
+      })
+      return Number(cuerpo.lines[0]?.unit_price)
+    },
+  }
+}
+
+/** Un importe tal como lo escribe la vitrina en es-PE, tolerante al separador. */
+export function importe(valor: number): RegExp {
+  return new RegExp(valor.toFixed(2).replace('.', '[.,]'))
 }
 
 /** Entra por la puerta de la vitrina y vuelve a la tienda, como una persona. */

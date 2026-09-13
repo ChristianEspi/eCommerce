@@ -10,6 +10,11 @@
  *    una cuenta sin controles corporativos y su comprador activo;
  *  · una EMPRESA (enterprise): cliente «Corporativo E2E» en el segmento
  *    `clinicas` (lista `convenio`), con crédito a 30 días y su comprador activo;
+ *  · un comprador con DOS cuentas (N01): «E2E Multi Andina» (segmento
+ *    `mayorista`, la más antigua) y «E2E Multi Boreal» (convenio de cliente
+ *    propio sobre el producto de los E2E), para el selector «Comprando para».
+ *    Su elección guardada se borra en cada pasada: arranca siempre en la
+ *    cuenta más antigua;
  *  · los addons implementados activos para la sociedad (como en DEV);
  *  · existencia repuesta y el limitador de checkout vacío, para poder repetir.
  *
@@ -27,6 +32,7 @@
  *   E2E_CONSUMER_EMAIL=... E2E_CONSUMER_PASSWORD=... \
  *   E2E_TRADE_EMAIL=... E2E_TRADE_PASSWORD=... \
  *   E2E_ENTERPRISE_EMAIL=... E2E_ENTERPRISE_PASSWORD=... \
+ *   E2E_MULTI_EMAIL=... E2E_MULTI_PASSWORD=... \
  *   node scripts/e2e-local-fixtures.mjs
  */
 
@@ -40,6 +46,8 @@ const faltan = [
   'E2E_TRADE_PASSWORD',
   'E2E_ENTERPRISE_EMAIL',
   'E2E_ENTERPRISE_PASSWORD',
+  'E2E_MULTI_EMAIL',
+  'E2E_MULTI_PASSWORD',
 ].filter((name) => !env[name])
 if (faltan.length > 0) {
   console.error(`Faltan variables: ${faltan.join(', ')}`)
@@ -112,6 +120,10 @@ async function segmento(code) {
 
 async function compradorDeEmpresa({ email, password, code, name, segmentCode, cuentaExtra }) {
   const userId = await usuario(email, password)
+  return cuentaDe({ userId, email, code, name, segmentCode, cuentaExtra })
+}
+
+async function cuentaDe({ userId, email, code, name, segmentCode, cuentaExtra }) {
   const cliente = await asegurar(
     'customers',
     `code=eq.${code}&organization_id=eq.${tenant.organization_id}&company_id=eq.${tenant.company_id}`,
@@ -127,6 +139,7 @@ async function compradorDeEmpresa({ email, password, code, name, segmentCode, cu
     `business_account_id=eq.${cuenta.id}&user_id=eq.${userId}`,
     { ...tenant, business_account_id: cuenta.id, user_id: userId, email, role: 'buyer', status: 'active' },
   )
+  return { cliente, cuenta }
 }
 
 /**
@@ -177,6 +190,52 @@ await compradorDeEmpresa({
 })
 
 /**
+ * N01 · un comprador con DOS cuentas en la misma sociedad.
+ *
+ * Andina es la más antigua (fecha fija) y cotiza con el segmento `mayorista`;
+ * Boreal tiene un convenio de CLIENTE sobre el producto de los E2E a un precio
+ * claramente menor, así que elegir una u otra cambia el precio a la vista. El
+ * importe se deriva del precio de catálogo del producto, no se escribe a mano.
+ */
+const multiUser = await usuario(env.E2E_MULTI_EMAIL, env.E2E_MULTI_PASSWORD)
+await cuentaDe({
+  userId: multiUser,
+  email: env.E2E_MULTI_EMAIL,
+  code: 'E2E-MULTI-A',
+  name: 'E2E Multi Andina Distribuciones',
+  segmentCode: 'mayorista',
+  cuentaExtra: { requires_approval: false, purchase_order_required: false, credit_limit: null, payment_terms_days: 0, created_at: '2026-01-01T00:00:00Z' },
+})
+const boreal = await cuentaDe({
+  userId: multiUser,
+  email: env.E2E_MULTI_EMAIL,
+  code: 'E2E-MULTI-B',
+  name: 'E2E Multi Boreal Corporativo Industrial SAC',
+  segmentCode: 'mayorista',
+  cuentaExtra: { requires_approval: false, purchase_order_required: false, credit_limit: null, payment_terms_days: 0, created_at: '2026-02-01T00:00:00Z' },
+})
+const productoMulti = await unaFila(
+  `/rest/v1/products?store_id=eq.${tienda.id}&slug=eq.${env.E2E_MULTI_PRODUCT_SLUG ?? 'alcohol-en-gel-70'}&select=id,price`,
+)
+if (!productoMulti) throw new Error('Falta el producto de los E2E multi-cuenta')
+const listaBoreal = await asegurar(
+  'price_lists',
+  `store_id=eq.${tienda.id}&code=eq.e2e-multi-boreal`,
+  { ...tenant, store_id: tienda.id, code: 'e2e-multi-boreal', name: 'Convenio E2E Boreal', currency: 'PEN', valid_from: '2026-01-01T00:00:00Z', valid_to: null, is_active: true, priority: 0 },
+)
+await asegurar(
+  'price_list_assignments',
+  `price_list_id=eq.${listaBoreal.id}&customer_id=eq.${boreal.cliente.id}`,
+  { ...tenant, store_id: tienda.id, price_list_id: listaBoreal.id, scope: 'customer', customer_id: boreal.cliente.id, is_active: true },
+)
+await asegurar(
+  'price_list_items',
+  `price_list_id=eq.${listaBoreal.id}&product_id=eq.${productoMulti.id}&min_quantity=eq.1`,
+  { ...tenant, store_id: tienda.id, price_list_id: listaBoreal.id, product_id: productoMulti.id, min_quantity: 1, unit_price: (Math.round(Number(productoMulti.price) * 55) / 100).toFixed(2) },
+)
+await http('DELETE', `/rest/v1/buyer_account_selections?user_id=eq.${multiUser}`)
+
+/**
  * Lo que las pasadas anteriores gastaron, repuesto.
  *
  * Cada ejecución crea pedidos de verdad: consume existencia (hasta que el
@@ -209,4 +268,4 @@ for (const nivel of niveles) {
 if (repuestos === 0) throw new Error('No se pudo reponer ninguna existencia')
 await http('POST', '/rest/v1/rpc/purge_checkout_attempts', { p_older_than: '0 seconds' })
 
-console.log(`Fixtures E2E listas en «${SLUG}»: consumidor, comercio (E2E-TRADE) y empresa (E2E-CORP).`)
+console.log(`Fixtures E2E listas en «${SLUG}»: consumidor, comercio (E2E-TRADE), empresa (E2E-CORP) y multi-cuenta (E2E-MULTI-A/B).`)

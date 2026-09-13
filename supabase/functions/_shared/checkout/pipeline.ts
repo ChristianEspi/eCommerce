@@ -241,7 +241,7 @@ export async function runCheckout(
 
     // --- 2 · Cliente, cuenta y canal ---------------------------------------
     const account: AccountContext = await stage('validate_account', async () => {
-      const resolved = await ports.resolveAccount()
+      const resolved = await ports.resolveAccount(context.storeSlug)
       // Un canal que exige sesión no lo puede usar un comprador anónimo. La
       // base ya lo impide (`CANAL_NO_PUBLICO`), pero aquí el mensaje puede
       // decir qué hacer —entrar— en vez de solo que no se puede.
