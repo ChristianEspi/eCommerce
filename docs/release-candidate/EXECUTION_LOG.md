@@ -107,3 +107,12 @@ Pila local con los cinco usuarios: todo el contrato OK (crédito 50 000 / 30 dí
 campaña `business_account`); FAIL solo por los 6 umbrales de catálogo del seed local → veredicto correcto.
 Negativos comprobados: OC exigida con guion «no», mismo precio en las dos cuentas y campaña inexistente → FALTA.
 Contra DEV/QAS: no ejecutado (sin `.env`).
+Commit: `f2a5927`
+
+## R08
+Status: PASS
+Files: `docs/release-candidate/VISUAL_QA.md`, `docs/release-candidate/visual/*.png` (6 capturas, 884 kB).
+36 combinaciones (4 temas × 3 audiencias × 3 viewports), 5 páginas por combinación: **792/792 comprobaciones OK**
+(desbordamiento, cabecera, pie, categorías, tarjetas, barra de contexto, selector, precio comercial, carrito,
+checkout 1–3, OC, portal/cuenta, pestañas alcanzables, consola limpia). Tema de la tienda local restaurado al terminar.
+Sin cambios de diseño (ningún defecto observado).
