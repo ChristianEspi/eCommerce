@@ -124,3 +124,15 @@ Files: `docs/release-candidate/PERFORMANCE.md`.
 `bundle:report`: 402,3/405 · 386,2/400 · 404,6/430 · 360,7/430 (idéntico a R00). Análisis por chunk y desglose de la
 entrada por sourcemap. Probado importar capacidades sin el barril `@/domain` para sacar `zod` de la entrada: 402,8
 (peor) → revertido. Sin cambios de código; techos intactos.
+Commit: `23228c5`
+
+## R10
+Status: PASS
+Desde árbol limpio (`dist/` borrado), en serie: typecheck PASS · lint PASS · `test` 207 archivos · 3 940 ✓ · 0 ✗ ·
+`test:db` 88 · 2 260 ✓ · build PASS (1 700 módulos) · bundle 402,3/386,2/404,6/360,7 · `scan:secrets` PASS.
+Sin `skip`/`only`/`todo`. E2E con fixtures repuestas y `checkout` sincronizada: 56/56 (12 · 12 · 16 · 16).
+`git diff --check` limpio; `git status` solo `docs/quality/` (previo). R00 → R10: +18 unit, +8 DB, E2E y bundle iguales.
+
+## R11
+Status: PASS · Veredicto `RC_GO_WITH_EXTERNAL_GAPS`
+Files: `docs/release-candidate/FINAL_CERTIFICATION.md`; manifiesto con el commit certificado.

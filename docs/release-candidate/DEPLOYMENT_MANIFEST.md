@@ -10,7 +10,7 @@
 | Rama | `feature/demo-commerce-release-candidate` |
 | Contiene | `feature/demo-commerce-hardening-v1` (H00–H14) + `feature/demo-commerce-hardening-v2` (N00–N12) + R00–R11 |
 | Base de `dev` | `1bcf74f` (merge-base con `dev`) |
-| Commit certificado | el HEAD que registra `FINAL_CERTIFICATION.md` (al escribir este manifiesto: `d1ee316`) |
+| Commit certificado | código en `23228c5` (ver `FINAL_CERTIFICATION.md`) |
 | Node | mínimo ≥ 22.12 (`engines`), recomendado 24 (`.nvmrc`), usado 24.20.0 / npm 11.19.0 |
 | `package-lock.json` SHA-256 | `78a8dd13afccec3b5250b266572ed461d5ddbcf65f931309d155bf59328e1700` (sin cambios de dependencias en el RC) |
 
