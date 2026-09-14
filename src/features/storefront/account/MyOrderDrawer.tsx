@@ -182,7 +182,19 @@ export function MyOrderDrawer({
               <Stack direction="row" sx={{ gap: 0.75, flexWrap: 'wrap', mt: 1 }}>
                 <EstadoChip valor={detail.status} clave="orders.status" />
                 <EstadoChip valor={detail.payment_status} clave="orders.payment" />
+                {/* Cierre, item 2: la firma B2B, solo cuando la hubo. */}
+                {detail.approval_status && detail.approval_status !== 'not_required' && (
+                  <EstadoChip valor={detail.approval_status} clave="orders.approval" />
+                )}
               </Stack>
+              {detail.approval_decided_email && (
+                <Typography sx={{ fontSize: TS.label, color: 'var(--muted)', mt: 0.75, overflowWrap: 'anywhere' }}>
+                  {t('orders.approval.decidedBy')}: {detail.approval_decided_email}
+                  {detail.approval_status === 'rejected' && detail.approval_reason
+                    ? ` · ${t('orders.approval.reason')}: ${detail.approval_reason}`
+                    : ''}
+                </Typography>
+              )}
             </>
           )}
         </Box>

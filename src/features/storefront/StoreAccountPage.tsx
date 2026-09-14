@@ -27,6 +27,8 @@ import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
 import { AccountStatementSection } from './account/AccountStatementSection'
 import { useStoreAccounts } from './commerce/accounts'
 import { ConsumerAccount } from './account/ConsumerAccount'
+import { useMyPendingApprovals } from './account/approvals'
+import { MyApprovalsSection } from './account/MyApprovalsSection'
 import { MyCouponsSection } from './account/MyCouponsSection'
 import { MyOrdersSection } from './account/MyOrdersSection'
 import { MySuggestionsSection } from './account/MySuggestionsSection'
@@ -101,6 +103,14 @@ export function StoreAccountPage() {
     authenticated && (query.data ?? []).length > 1,
   )
   const efectiva = (efectivas.data ?? []).find((cuenta) => cuenta.is_effective)?.account_id ?? null
+  // Bandeja de aprobaciones (cierre, item 2). La cola se pide para todo
+  // vinculado B2B —es la MISMA consulta que pinta la pestaña y la cuenta del
+  // número—, y decidir quién la ve lo dicen dos señales del SERVIDOR: el rol
+  // en alguna cuenta (`my_business_accounts`) o una fila con `can_decide`. La
+  // primera evita que la pestaña desaparezca bajo los pies de quien acaba de
+  // aprobar el último pedido pendiente.
+  const cuentasB2B = query.data ?? []
+  const aprobaciones = useMyPendingApprovals(authenticated && query.isSuccess && cuentasB2B.length > 0)
 
   if (status === 'loading') return <LoadingState />
 
@@ -137,7 +147,10 @@ export function StoreAccountPage() {
   if (query.isPending) return <LoadingState />
   if (query.isError) return <ErrorState error={query.error} onRetry={() => void query.refetch()} />
 
-  const accounts = query.data ?? []
+  const accounts = cuentasB2B
+  const porDecidir = (aprobaciones.data ?? []).filter((order) => order.can_decide).length
+  const puedeAprobar =
+    accounts.some((account) => account.role === 'admin' || account.role === 'approver') || porDecidir > 0
 
   if (accounts.length === 0) {
     if (pending.isPending) return <LoadingState />
@@ -328,7 +341,32 @@ export function StoreAccountPage() {
       <SectionTabs
         ariaLabel={t('account.title')}
         items={[
-          { id: 'pedidos', label: t('account.tab.orders'), content: <MyOrdersSection storeSlug={storefront?.storeSlug ?? ''} /> },
+          // `storeId` habilita «volver a comprar» en el detalle (cierre, item 6b):
+          // sin él el botón no se ofrecía nunca a un comprador B2B.
+          {
+            id: 'pedidos',
+            label: t('account.tab.orders'),
+            content: (
+              <MyOrdersSection
+                storeSlug={storefront?.storeSlug ?? ''}
+                storeId={storefront?.store.store_id ?? null}
+              />
+            ),
+          },
+          ...(puedeAprobar
+            ? [
+                {
+                  id: 'aprobaciones',
+                  label: porDecidir > 0 ? `${t('account.tab.approvals')} (${porDecidir})` : t('account.tab.approvals'),
+                  content: (
+                    <MyApprovalsSection
+                      storeSlug={storefront?.storeSlug ?? ''}
+                      storeId={storefront?.store.store_id ?? null}
+                    />
+                  ),
+                },
+              ]
+            : []),
           { id: 'estado', label: t('account.tab.statement'), content: <AccountStatementSection /> },
           // Los cupones son de UNA tienda: sin tienda resuelta no hay a quien
           // preguntarle, y la pestaña no se ofrece en vez de fallar dentro.

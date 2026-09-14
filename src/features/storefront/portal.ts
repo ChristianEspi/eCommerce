@@ -1,3 +1,6 @@
+import type { MessageKey } from '@/shared/i18n/messages'
+import { UiError, codeFromDbError, type PostgrestLike } from '@/shared/lib/appError'
+import { ORDER_APPROVAL_DECIDE_RPC } from '@/shared/lib/db-schema'
 import { getSupabaseClient } from '@/shared/lib/supabase'
 
 /**
@@ -37,6 +40,10 @@ export interface MyOrder {
   account_name: string
   my_role: string
   can_decide: boolean
+  /** Cierre · item 2 (migración 20260914110000). Ausente contra una base anterior. */
+  purchase_order_number?: string | null
+  /** Solo llega a quien puede decidir; para el resto el servidor manda `null`. */
+  buyer_email?: string | null
 }
 
 export interface StatementDocument {
@@ -104,6 +111,16 @@ export interface MyOrderDetail {
   }>
   /** N05 · Solo en el detalle del portal B2B: la orden de compra del pedido. */
   purchase_order_number?: string | null
+  /**
+   * Cierre · item 2 · Solo en el detalle del portal B2B (migración
+   * 20260914110000). `can_decide` lo resuelve el servidor con la misma regla
+   * que el candado de `order_approval_decide`; aquí solo se pinta.
+   */
+  approval_status?: string | null
+  can_decide?: boolean
+  approval_decided_at?: string | null
+  approval_decided_email?: string | null
+  approval_reason?: string | null
   /** Solo en el detalle del consumidor (H03). El portal B2B no la devuelve. */
   shipping_address?: Record<string, unknown> | null
   deliveries?: Array<{ method_name: string | null; state: string | null }>
@@ -142,6 +159,90 @@ export const myStatementKey = () => ['storefront', 'my-statement'] as const
 export const myCouponsKey = (storeId: string) => ['storefront', 'my-coupons', storeId] as const
 export const myOrderDetailKey = (orderId: string) =>
   ['storefront', 'my-order', orderId] as const
+
+// ---------------------------------------------------------------------------
+// Bandeja de aprobaciones del comprador B2B (cierre, item 2)
+//
+// La cola es la MISMA función que «Mis pedidos» con `p_only_pending = true`, y
+// la decisión es el MISMO comando que usa el backoffice. No hay un segundo
+// motor de aprobación ni un id de cuenta en ninguna de las dos llamadas: quién
+// puede decidir lo resuelve el servidor por vínculo.
+// ---------------------------------------------------------------------------
+export const DECIDE_APPROVAL_RPC = ORDER_APPROVAL_DECIDE_RPC
+
+/** Bajo `my-orders` a propósito: invalidar la lista refresca también la bandeja. */
+export const myApprovalsKey = () => ['storefront', 'my-orders', 'pending-approval'] as const
+
+export async function fetchMyPendingApprovals(limit = 100): Promise<MyOrder[]> {
+  return rpc<MyOrder[]>(MY_ORDERS_RPC, { p_only_pending: true, p_limit: limit })
+}
+
+export interface ApprovalDecision {
+  order_id: string
+  order_number: string
+  approval_status: string
+  status: string
+  decided_at: string | null
+  /** `true` = reintento de una decisión que ya estaba puesta (idempotencia). */
+  already_decided?: boolean
+}
+
+/**
+ * Error de la bandeja con la clave de i18n ya resuelta. La pantalla nunca ve el
+ * texto de Postgres: solo el código, traducido aquí.
+ */
+export class ApprovalError extends UiError {
+  constructor(key: MessageKey, code: string) {
+    super({ boundary: 'orders', key, code })
+    this.name = 'ApprovalError'
+  }
+}
+
+export function mapApprovalCode(code: string): MessageKey {
+  switch (code) {
+    case 'SIN_PERMISO':
+    case 'NO_AUTENTICADO':
+    case 'OPERADOR_NO_ES_ACTOR':
+    case '42501':
+      return 'account.approvals.error.forbidden'
+    // El pedido ya no espera firma: lo decidió otra persona, o se pide lo
+    // contrario de lo que ya se firmó. La lista se refresca y el aviso lo dice.
+    case 'APROBACION_NO_APLICA':
+      return 'account.approvals.error.notApplicable'
+    case 'MOTIVO_REQUERIDO':
+      return 'account.approvals.error.reasonRequired'
+    case 'PEDIDO_NO_ENCONTRADO':
+      return 'account.approvals.error.notFound'
+    default:
+      return 'account.approvals.error.generic'
+  }
+}
+
+/**
+ * Aprobar o rechazar. Solo viajan el pedido, el sentido y el motivo: ni cuenta,
+ * ni tenant, ni rol. Rechazar sin motivo se corta aquí para no gastar una ida
+ * al servidor que ya se sabe que vuelve con `MOTIVO_REQUERIDO`.
+ */
+export async function decideMyOrderApproval(input: {
+  orderId: string
+  approve: boolean
+  reason?: string | null
+}): Promise<ApprovalDecision> {
+  const reason = input.reason?.trim() ?? ''
+  if (!input.approve && reason === '') {
+    throw new ApprovalError(mapApprovalCode('MOTIVO_REQUERIDO'), 'MOTIVO_REQUERIDO')
+  }
+  try {
+    return await rpc<ApprovalDecision>(DECIDE_APPROVAL_RPC, {
+      p_order_id: input.orderId,
+      p_approve: input.approve,
+      p_reason: reason === '' ? null : reason,
+    })
+  } catch (error) {
+    const code = codeFromDbError(error as PostgrestLike)
+    throw new ApprovalError(mapApprovalCode(code), code)
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Sugeridos de pedido, del lado del comprador
