@@ -115,6 +115,16 @@ export interface FakeState {
   rpcCalls: Array<{ name: string; args: Record<string, unknown> }>
   /** Objetos "subidos" por bucket, para afirmar sobre rutas de Storage. */
   storage: Record<string, Record<string, { size: number; contentType: string }>>
+  /**
+   * Altas de cuenta (N02): lo que se mandó a `auth.signUp`, tal cual. Sirve para
+   * afirmar que un registro de consumidor no lleva tenant ni rol en los
+   * metadatos y que el enlace del correo vuelve a una ruta interna.
+   */
+  signUps: Array<Record<string, unknown>>
+  /** `true` = el proyecto exige confirmar el correo: `signUp` no devuelve sesión. */
+  confirmEmail: boolean
+  /** Lo que se mandó a `auth.resetPasswordForEmail`. */
+  resetRequests: Array<{ email: string; options: Record<string, unknown> | undefined }>
 }
 
 type QueryResult = { data: Row[] | null; error: { message: string } | null; count?: number | null }
@@ -519,6 +529,9 @@ export function createFakeSupabase(initial: Partial<FakeState> = {}) {
     invocations: [],
     rpcCalls: [],
     storage: initial.storage ?? {},
+    signUps: [],
+    confirmEmail: initial.confirmEmail ?? false,
+    resetRequests: [],
   }
 
   type Listener = (event: string, session: Session | null) => void
@@ -552,7 +565,19 @@ export function createFakeSupabase(initial: Partial<FakeState> = {}) {
         emit('SIGNED_OUT')
         return Promise.resolve({ error: null })
       },
-      resetPasswordForEmail: () => Promise.resolve({ data: {}, error: null }),
+      signUp: (params: { email: string; password: string; options?: Record<string, unknown> }) => {
+        state.signUps.push(params as unknown as Record<string, unknown>)
+        if (state.confirmEmail) {
+          return Promise.resolve({ data: { session: null, user: { id: 'nuevo', email: params.email } }, error: null })
+        }
+        state.session = makeSession({ email: params.email, withTenantClaims: false })
+        emit('SIGNED_IN')
+        return Promise.resolve({ data: { session: state.session, user: state.session.user }, error: null })
+      },
+      resetPasswordForEmail: (email: string, options?: Record<string, unknown>) => {
+        state.resetRequests.push({ email, options })
+        return Promise.resolve({ data: {}, error: null })
+      },
       updateUser: () => Promise.resolve({ data: { user: state.session?.user ?? null }, error: null }),
     },
     from: (table: string) => new FakeQuery(state, table),

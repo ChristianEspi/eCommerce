@@ -58,6 +58,9 @@ export const CHECKOUT_ALLOWED_FIELDS = [
   // de recojo y una franja. Ni importe, ni transportista, ni almacen: cuanto
   // cuesta lo decide el servidor con la tarifa delante.
   'delivery',
+  // N05: el número de orden de compra del comprador B2B. Una referencia, no una
+  // identidad ni un importe; entra en el resumen de la petición.
+  'purchase_order_number',
 ] as const
 
 /** Mismo formato que `checkout_intents_key_fmt` en la base. */
@@ -295,6 +298,8 @@ export async function requestHash(input: {
   couponCodes?: readonly string[]
   /** P12. Omitirlo y pasar `null` dan el MISMO resumen. */
   delivery?: DeliveryChoice | null
+  /** N05. Omitirlo y pasar `null` dan el MISMO resumen. */
+  purchaseOrderNumber?: string | null
 }): Promise<string> {
   const ordered = [...input.items].sort((a, b) => (itemKey(a) < itemKey(b) ? -1 : 1))
   return await sha256Hex(
@@ -331,6 +336,10 @@ export async function requestHash(input: {
       // método tiene que dar conflicto y no devolver el pedido anterior, que se
       // cobró con otro transporte.
       delivery: input.delivery ?? null,
+      // N05 · la orden de compra SÍ entra: la misma clave con otra OC es otra
+      // petición (otra referencia en la factura) y tiene que dar conflicto, no
+      // devolver el pedido anterior firmado con la primera.
+      purchase_order_number: input.purchaseOrderNumber ?? null,
     }),
   )
 }
@@ -369,6 +378,7 @@ export async function parseCheckoutBody(
   const couponCodes = codeList(body, 'coupon_codes', 5)
   const giftCardCodes = codeList(body, 'gift_card_codes', 3)
   const delivery = optionalDelivery(body)
+  const purchaseOrderNumber = optionalPurchaseOrderNumber(body)
 
   const hash = await requestHash({
     storeSlug,
@@ -381,6 +391,7 @@ export async function parseCheckoutBody(
     notes: notes ?? null,
     couponCodes,
     delivery,
+    purchaseOrderNumber,
   })
 
   return {
@@ -400,6 +411,31 @@ export async function parseCheckoutBody(
     couponCodes,
     giftCardCodes,
     delivery,
+    purchaseOrderNumber,
     acceptPriceChanges: body.accept_price_changes === true,
   }
+}
+
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS = /[\u0000-\u001F\u007F]/
+
+/**
+ * N05 · La orden de compra: 1 a 60 caracteres, sin controles, espacios
+ * compactados. Vacía = no se tecleó. El mismo formato que exige la base.
+ */
+export function optionalPurchaseOrderNumber(body: Record<string, unknown>): string | null {
+  const value = body.purchase_order_number
+  if (value === undefined || value === null) return null
+  if (typeof value !== 'string') {
+    throw badRequest('CAMPO_INVALIDO', '`purchase_order_number` debe ser texto')
+  }
+  if (CONTROL_CHARS.test(value)) {
+    throw badRequest('ORDEN_COMPRA_INVALIDA', 'La orden de compra no puede llevar caracteres de control')
+  }
+  const normalized = value.trim().replace(/\s+/g, ' ')
+  if (normalized === '') return null
+  if (normalized.length > 60) {
+    throw badRequest('ORDEN_COMPRA_INVALIDA', 'La orden de compra tiene como maximo 60 caracteres')
+  }
+  return normalized
 }

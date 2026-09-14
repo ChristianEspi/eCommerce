@@ -33,7 +33,9 @@ const JOURNEYS = [
       'src/features/storefront/StorefrontLayout.tsx',
       'src/features/storefront/StoreHomePage.tsx',
     ],
-    budgetKb: 400,
+    // 400 -> 405 en el hardening multi-commerce (2026-09-13). Motivo en
+    // docs/performance-budget.md §2.1: la portada ya medía 399,5 antes de empezar.
+    budgetKb: 405,
   },
   {
     name: 'vitrina · ficha de producto',

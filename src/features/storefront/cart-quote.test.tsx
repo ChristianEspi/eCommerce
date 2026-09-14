@@ -75,7 +75,12 @@ function store() {
  * calculados. Es la forma que devuelve `promotion_quote_for_slug`, que es
  * `build_quote` MÁS las campañas — la misma que usa `create_order` al cobrar.
  */
-function cotizacion(source: 'catalog' | 'price_list' = 'price_list') {
+function cotizacion(
+  source: 'catalog' | 'price_list' = 'price_list',
+  // El ámbito de la lista que ganó. Un ACUERDO es de segmento o de cliente; la
+  // lista base de la tienda es de `store` y vale para todo el mundo.
+  scope: 'store' | 'segment' | 'customer' = 'segment',
+) {
   return {
     currency: 'PEN',
     channel: 'b2c',
@@ -100,7 +105,7 @@ function cotizacion(source: 'catalog' | 'price_list' = 'price_list') {
         source,
         price_list_id: source === 'price_list' ? 'dddd1111-1111-4111-8111-111111111111' : null,
         price_list_code: source === 'price_list' ? 'mayorista' : null,
-        scope: source === 'price_list' ? 'store' : null,
+        scope: source === 'price_list' ? scope : null,
         min_quantity: source === 'price_list' ? '1.000000' : null,
       },
     ],
@@ -174,8 +179,24 @@ describe('el resumen del carrito lo decide el servidor', () => {
   })
 
   it('avisa de que el precio salió de un acuerdo y no del catálogo', async () => {
-    renderCart(backend({ quote: () => cotizacion('price_list') }))
+    renderCart(backend({ quote: () => cotizacion('price_list', 'segment') }))
     expect(await screen.findByText('Precio especial')).toBeInTheDocument()
+  })
+
+  it('un acuerdo con el cliente también es precio especial', async () => {
+    renderCart(backend({ quote: () => cotizacion('price_list', 'customer') }))
+    expect(await screen.findByText('Precio especial')).toBeInTheDocument()
+  })
+
+  /**
+   * Hallazgo A3 (H01). La lista base de la tienda también resuelve como
+   * `price_list`, y con ella un visitante anónimo leía «Precio especial» en el
+   * precio de todo el mundo. Una lista de ámbito tienda no es un acuerdo.
+   */
+  it('la lista general de la tienda NO se anuncia como precio especial', async () => {
+    renderCart(backend({ quote: () => cotizacion('price_list', 'store') }))
+    await screen.findAllByText('S/ 184.00')
+    expect(within(resumen()).queryByText('Precio especial')).not.toBeInTheDocument()
   })
 
   /**

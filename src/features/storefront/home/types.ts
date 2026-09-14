@@ -1,7 +1,7 @@
 import type { ComponentProps, ReactNode } from 'react'
 import type { MessageKey } from '@/shared/i18n/messages'
 import type { BrandRow } from '../components/BrandRow'
-import type { ContentBlocks } from '../components/ContentBlocks'
+import type { CategoryDoorGrid, ContentBlocks } from '../components/ContentBlocks'
 import type { PromoCarousel } from '../components/PromoCarousel'
 import type { HomeSectionId } from '../theme/types'
 import type { PublicProduct, PublicStore } from '../types'
@@ -69,6 +69,12 @@ export interface HomeSectionData {
 
   readonly promociones: ComponentProps<typeof PromoCarousel>['promotions']
   readonly promoAssets: ComponentProps<typeof PromoCarousel>['assets']
+
+  /**
+   * Las familias del catálogo (categorías raíz activas), en el orden del
+   * comercio. Las pinta la sección `categories` como puertas.
+   */
+  readonly categorias: ComponentProps<typeof CategoryDoorGrid>['categories']
 
   readonly brands: ComponentProps<typeof BrandRow>['brands']
   readonly brandSelected: string | null

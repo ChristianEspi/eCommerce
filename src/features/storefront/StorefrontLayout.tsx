@@ -15,7 +15,7 @@ import {
   Typography,
   useMediaQuery,
 } from '@mui/material'
-import { useState, type ReactNode } from 'react'
+import { lazy, Suspense, useState, type ReactNode } from 'react'
 import { Link, Outlet, useLocation, useParams } from 'react-router-dom'
 import { ErrorBoundary } from '@/app/ErrorBoundary'
 import { useSessionContext } from '@/features/auth/session-context'
@@ -62,6 +62,11 @@ import '@fontsource/plus-jakarta-sans/latin-700.css'
 import '@fontsource/plus-jakarta-sans/latin-800.css'
 import './storefront.css'
 
+/** Solo se descarga con sesión: ver el comentario donde se monta. */
+const CommerceContextBar = lazy(() =>
+  import('./commerce/CommerceContextBar').then((m) => ({ default: m.CommerceContextBar })),
+)
+
 /**
  * Vitrina pública.
  *
@@ -89,6 +94,7 @@ export function StorefrontLayout() {
   // Antes de cualquier retorno temprano: el orden de los hooks no puede
   // depender de si la tienda cargo.
   const [asistenteAbierto, setAsistenteAbierto] = useState(false)
+  const enCheckout = /\/checkout\/?$/.test(pathname)
   // La sesión no cambia NADA de lo que se ve del catálogo —la vitrina se lee
   // siempre con el cliente anónimo— pero sí decide de quién es el carrito: con
   // sesión, el del comprador; sin ella, el del token del navegador.
@@ -170,6 +176,16 @@ export function StorefrontLayout() {
           <StoreHeader store={store} storeSlug={storeSlug as string} />
 
           <StoreMain>
+            {/* Para quién se compra, cuando hay una cuenta de empresa activa en
+                esta sociedad (H05-H06). Para el consumidor no pinta nada.
+                Diferida y solo con sesión: el visitante anónimo —casi todo el
+                tráfico de una portada— no descarga ni un byte de ella, y la
+                portada estaba a medio kB de su techo de rendimiento. */}
+            {sessionStatus === 'authenticated' && (
+              <Suspense fallback={null}>
+                <CommerceContextBar storeSlug={storeSlug as string} />
+              </Suspense>
+            )}
             <ErrorBoundary>
               <Outlet context={context} />
             </ErrorBoundary>
@@ -185,6 +201,11 @@ export function StorefrontLayout() {
               contenedor que el catálogo: sin banda de fondo propia y sin ancho
               propio, que es lo que arrastraba la página en horizontal. */}
           <StoreFooter store={store} storeSlug={storeSlug as string} />
+          {/* N07 · Holgura bajo el pie en el teléfono: al final del scroll, lo
+              último de la página tiene que poder quedar POR ENCIMA de los dos
+              botones flotantes (asistente y «volver arriba»), incluida la
+              franja segura de un iPhone con barra de gestos. */}
+          <Box aria-hidden sx={{ display: { xs: 'block', md: 'none' }, height: 'calc(72px + env(safe-area-inset-bottom, 0px))' }} />
 
           <CartDrawer storeSlug={storeSlug as string} />
 
@@ -195,6 +216,9 @@ export function StorefrontLayout() {
           Se coloca POR ENCIMA de «volver arriba», que ocupa la misma esquina
           en la portada. Apilados y no superpuestos: dos botones peleandose el
           mismo pixel es un boton que no se puede pulsar. */}
+      {/* N07 · En el checkout NO flota: tapaba «Siguiente» y el campo de orden
+          de compra en el teléfono, justo donde se cierra la venta. */}
+      {!enCheckout && (
       <Fab
         color="primary"
         aria-label={t('store.assistant.open')}
@@ -202,12 +226,13 @@ export function StorefrontLayout() {
         sx={{
           position: 'fixed',
           right: { xs: 16, md: 24 },
-          bottom: { xs: 76, md: 88 },
+          bottom: { xs: 'calc(76px + env(safe-area-inset-bottom, 0px))', md: 88 },
           zIndex: 4,
         }}
       >
         <AutoAwesomeRoundedIcon />
       </Fab>
+      )}
 
       <AssistantDrawer
         open={asistenteAbierto}

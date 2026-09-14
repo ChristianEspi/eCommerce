@@ -92,6 +92,9 @@ export interface MyOrderDetail {
   shipping_total: string
   grand_total: string
   items: Array<{
+    /** Solo en el detalle del consumidor: hace falta para volver a comprar. */
+    product_id?: string | null
+    variant_id?: string | null
     name: string
     sku: string | null
     variant_label: string | null
@@ -99,6 +102,11 @@ export interface MyOrderDetail {
     unit_price: string
     total: string
   }>
+  /** N05 · Solo en el detalle del portal B2B: la orden de compra del pedido. */
+  purchase_order_number?: string | null
+  /** Solo en el detalle del consumidor (H03). El portal B2B no la devuelve. */
+  shipping_address?: Record<string, unknown> | null
+  deliveries?: Array<{ method_name: string | null; state: string | null }>
 }
 
 async function rpc<T>(name: string, params: Record<string, unknown> = {}): Promise<T> {

@@ -82,6 +82,8 @@ const ORDER_SELECT = [
   'shipping_address',
   'billing_address',
   'customer_snapshot',
+  // N05 · orden de compra del comprador B2B.
+  'purchase_order_number',
   'approval_reason',
   'approval_decided_email',
   'approval_decided_at',

@@ -1342,3 +1342,311 @@ describe('los tres pasos del checkout', () => {
     expect(screen.getByText('2 artículos')).toBeInTheDocument()
   })
 })
+
+/**
+ * Hardening H04 · el checkout propone lo que ya sabe de quien compra con sesión.
+ *
+ * Tres garantías: al invitado no se le pregunta nada ni se le rellena nada; al
+ * que tiene sesión se le proponen sus datos SOLO en campos vacíos; y una
+ * dirección guardada se ELIGE, no aparece escrita sola. Lo que viaja sigue
+ * siendo el mismo cuerpo de siempre, sin una sola clave de identidad.
+ */
+describe('checkout con sesión: datos y direcciones propuestos (H04)', () => {
+  function conCarritoDeServidor(fake: FakeSupabase) {
+    fake.state.rpc.cart_open = () =>
+      carritoServidor([
+        {
+          product_id: P_SILLA,
+          variant_id: null,
+          uom_code: null,
+          quantity: 2,
+          slug: 'silla-roble',
+          name: 'Silla de roble',
+          unit_price: '100.00',
+          unit_price_snapshot: '100.00',
+        },
+      ])
+    return fake
+  }
+
+  it('el invitado no pregunta por su perfil ni ve nada relleno', async () => {
+    const fake = backend()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(fake, '/s/casa-nordica/checkout')
+
+    expect(await screen.findByLabelText(/Nombre y apellido/)).toHaveValue('')
+    expect(screen.getByLabelText(/Correo/)).toHaveValue('')
+    expect(fake.state.rpcCalls.map((c) => c.name)).not.toContain('my_checkout_profile')
+  })
+
+  it('con sesión propone nombre, correo y teléfono, y la dirección se elige', async () => {
+    const user = userEvent.setup()
+    const session = makeSession({ email: 'ana@consumidora.test', withTenantClaims: false })
+    const fake = conCarritoDeServidor(backend({ session }))
+    fake.state.rpc.my_checkout_profile = () => ({
+      contact: { name: 'Ana Consumidora', phone: '+51 999 111 222' },
+      addresses: [{ address: 'Jr. Lampa 55', city: 'Lima', country: 'PE' }],
+    })
+    renderStorefront(fake, '/s/casa-nordica/checkout', session)
+
+    expect(await screen.findByDisplayValue('Ana Consumidora')).toBeInTheDocument()
+    expect(screen.getByLabelText(/Correo/)).toHaveValue('ana@consumidora.test')
+    expect(screen.getByLabelText(/Teléfono/)).toHaveValue('+51 999 111 222')
+    expect(fake.state.rpcCalls.find((c) => c.name === 'my_checkout_profile')?.args).toEqual({
+      p_store_slug: 'casa-nordica',
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Siguiente' }))
+    // La dirección NO aparece escrita sola.
+    expect(await screen.findByLabelText(/Dirección de entrega/)).toHaveValue('')
+
+    await user.click(screen.getByRole('button', { name: 'Jr. Lampa 55, Lima, PE' }))
+    expect(screen.getByLabelText(/Dirección de entrega/)).toHaveValue('Jr. Lampa 55')
+    expect(screen.getByLabelText(/País/)).toHaveValue('PE')
+
+    await user.click(await irAPagar(user))
+    await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
+    const { body } = fake.state.invocations[0]!
+    expect(body.customer_name).toBe('Ana Consumidora')
+    expect(body.shipping_address).toMatchObject({ address: 'Jr. Lampa 55', city: 'Lima', country: 'PE' })
+    const claves = todasLasClaves(body)
+    for (const prohibida of CLAVES_PROHIBIDAS) {
+      expect(claves, `clave prohibida en el cuerpo: ${prohibida}`).not.toContain(prohibida)
+    }
+  })
+
+  it('lo que el comprador ya escribió no se pisa aunque el perfil llegue tarde', async () => {
+    const user = userEvent.setup()
+    const session = makeSession({ email: 'ana@consumidora.test', withTenantClaims: false })
+    const fake = conCarritoDeServidor(backend({ session }))
+    let responder: (value: unknown) => void = () => {}
+    fake.state.rpc.my_checkout_profile = () => new Promise((resolve) => (responder = resolve))
+    renderStorefront(fake, '/s/casa-nordica/checkout', session)
+
+    const nombre = await screen.findByLabelText(/Nombre y apellido/)
+    await user.type(nombre, 'Otra Persona')
+    responder({ contact: { name: 'Ana Consumidora', phone: '+51 999 111 222' }, addresses: [] })
+
+    await waitFor(() => expect(screen.getByLabelText(/Teléfono/)).toHaveValue('+51 999 111 222'))
+    expect(nombre).toHaveValue('Otra Persona')
+  })
+
+  it('N06 · la libreta va primero (con su nombre), sin repetir las de pedidos ya guardadas, y se ELIGE', async () => {
+    const user = userEvent.setup()
+    const session = makeSession({ email: 'ana@consumidora.test', withTenantClaims: false })
+    const fake = conCarritoDeServidor(backend({ session }))
+    fake.state.rpc.my_consumer_addresses = () => [
+      { id: '0c000000-0000-4000-8000-00000000ad01', label: 'Casa', address: 'Av. Primavera 120', city: 'Lima', country: 'PE', is_default: true },
+    ]
+    fake.state.rpc.my_checkout_profile = () => ({
+      contact: null,
+      addresses: [
+        { address: 'AV. PRIMAVERA 120', city: 'lima', country: 'PE' },
+        { address: 'Jr. Lampa 55', city: 'Lima', country: 'PE' },
+      ],
+    })
+    renderStorefront(fake, '/s/casa-nordica/checkout', session)
+
+    await user.type(await screen.findByLabelText(/Nombre y apellido/), 'Ana')
+    await user.type(screen.getByLabelText(/Teléfono/), '+51 999 111 222')
+    await user.click(screen.getByRole('button', { name: 'Siguiente' }))
+    expect(await screen.findByLabelText(/Dirección de entrega/)).toHaveValue('')
+
+    const grupo = screen.getByRole('group', { name: 'Tus direcciones' })
+    const opciones = within(grupo).getAllByRole('button').map((b) => b.textContent)
+    expect(opciones).toEqual(['Casa · Av. Primavera 120, Lima, PE', 'Jr. Lampa 55, Lima, PE'])
+
+    await user.click(within(grupo).getByRole('button', { name: 'Casa · Av. Primavera 120, Lima, PE' }))
+    expect(screen.getByLabelText(/Dirección de entrega/)).toHaveValue('Av. Primavera 120')
+    expect(fake.state.rpcCalls.find((c) => c.name === 'my_consumer_addresses')?.args).toEqual({ p_store_slug: 'casa-nordica' })
+    // Comprar no escribe la libreta.
+    await user.click(await irAPagar(user))
+    await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
+    expect(fake.state.rpcCalls.map((c) => c.name)).not.toContain('save_my_consumer_address')
+  })
+
+  it('si la base no tiene el perfil, se sigue con lo que dice la sesión', async () => {
+    const session = makeSession({ email: 'ana@consumidora.test', withTenantClaims: false })
+    const fake = conCarritoDeServidor(backend({ session }))
+    fake.state.rpc.my_checkout_profile = () => {
+      throw Object.assign(new Error('Could not find the function public.my_checkout_profile'), { code: 'PGRST202' })
+    }
+    renderStorefront(fake, '/s/casa-nordica/checkout', session)
+
+    await waitFor(() => expect(screen.getByLabelText(/Correo/)).toHaveValue('ana@consumidora.test'))
+    expect(screen.getByLabelText(/Nombre y apellido/)).toHaveValue('')
+  })
+})
+
+/**
+ * Hardening H08 · el país por defecto sale de la configuración de la tienda.
+ *
+ * `public_stores.default_country` lo deriva la base de sus zonas de entrega. Con
+ * él, la entrega se cotiza desde el primer momento; sin él, el campo sigue vacío
+ * como siempre. Nunca un país escrito en el código.
+ */
+describe('país por defecto del checkout (H08)', () => {
+  it('la tienda que vende a un país lo propone y viaja en la dirección', async () => {
+    const user = userEvent.setup()
+    const fake = backend({ store: { default_country: 'PE' } })
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(fake, '/s/casa-nordica/checkout')
+
+    await rellenarContacto(user)
+    expect(screen.getByLabelText(/País/)).toHaveValue('PE')
+
+    await user.click(await irAPagar(user))
+    await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
+    expect(fake.state.invocations[0]!.body.shipping_address).toMatchObject({ country: 'PE' })
+  })
+
+  it('otra tienda, otro país: no hay nada fijo en el código', async () => {
+    const user = userEvent.setup()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(backend({ store: { default_country: 'CO' } }), '/s/casa-nordica/checkout')
+
+    await rellenarContacto(user)
+    expect(screen.getByLabelText(/País/)).toHaveValue('CO')
+  })
+
+  it('sin país configurado el campo sigue vacío, como antes', async () => {
+    const user = userEvent.setup()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(backend(), '/s/casa-nordica/checkout')
+
+    await rellenarContacto(user)
+    expect(screen.getByLabelText(/País/)).toHaveValue('')
+  })
+
+  it('un valor raro en la vista no rompe la tienda ni se propone', async () => {
+    const user = userEvent.setup()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(backend({ store: { default_country: 'peru' } }), '/s/casa-nordica/checkout')
+
+    await rellenarContacto(user)
+    expect(screen.getByLabelText(/País/)).toHaveValue('')
+  })
+})
+
+/**
+ * N05 · La orden de compra obligatoria en la pantalla.
+ *
+ * La autoridad es la base (`purchase-order.test.ts`); aquí se fija que la
+ * pantalla la pide SOLO cuando la cuenta la exige, que no deja enviar sin ella,
+ * que viaja como un campo del pedido (nunca en una línea) y que sin exigencia
+ * el cuerpo no cambia.
+ */
+describe('orden de compra (N05)', () => {
+  const CONTEXTO_EMPRESA = {
+    account_name: 'Corporación Andina SAC',
+    account_code: 'CORP',
+    customer_name: 'Corporación Andina SAC',
+    requires_approval: false,
+    purchase_order_required: true,
+    has_spending_limit: false,
+    has_credit_terms: false,
+    locations_count: 0,
+    has_commercial_pricing: false,
+    accounts_in_store: 1,
+  }
+
+  function conSesion(contexto: unknown) {
+    const session = makeSession({ withTenantClaims: false })
+    const fake = backend({ session })
+    fake.state.rpc.my_commerce_context = () => contexto
+    fake.state.rpc.cart_open = () =>
+      carritoServidor([
+        {
+          product_id: P_SILLA,
+          variant_id: null,
+          uom_code: null,
+          quantity: 2,
+          slug: 'silla-roble',
+          name: 'Silla de roble',
+          unit_price: '100.00',
+          unit_price_snapshot: '100.00',
+        },
+      ])
+    renderStorefront(fake, '/s/casa-nordica/checkout', session)
+    return fake
+  }
+
+  async function rellenarConSesion(user: ReturnType<typeof userEvent.setup>) {
+    const nombre = await screen.findByLabelText(/Nombre y apellido/)
+    if ((nombre as HTMLInputElement).value === '') await user.type(nombre, 'Ana Pérez')
+    const correo = screen.getByLabelText(/Correo/)
+    if ((correo as HTMLInputElement).value === '') await user.type(correo, 'ana@compradora.com')
+    await user.type(screen.getByLabelText(/Teléfono/), '+51 999 888 777')
+    await user.click(screen.getByRole('button', { name: 'Siguiente' }))
+    await user.type(await screen.findByLabelText(/Dirección de entrega/), 'Av. Primavera 120')
+  }
+
+  it('la cuenta la exige: campo obligatorio, no deja confirmar sin OC y luego viaja en el pedido', async () => {
+    const user = userEvent.setup()
+    const fake = conSesion(CONTEXTO_EMPRESA)
+    await rellenarConSesion(user)
+    await irAPagar(user)
+
+    const campo = await screen.findByLabelText(/Orden de compra/)
+    expect(campo).toBeRequired()
+
+    await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Escribe el número de orden de compra')
+    expect(fake.state.invocations).toHaveLength(0)
+
+    await user.type(campo, 'OC-2026-00125')
+    await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
+    await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
+    const { body } = fake.state.invocations[0]!
+    expect(body.purchase_order_number).toBe('OC-2026-00125')
+    // Del pedido, no de una línea; y sin identidad comercial ni importes.
+    for (const linea of body.items as Array<Record<string, unknown>>) {
+      expect(Object.keys(linea)).not.toContain('purchase_order_number')
+    }
+    for (const prohibida of CLAVES_PROHIBIDAS) expect(todasLasClaves(body)).not.toContain(prohibida)
+  })
+
+  it('sin exigencia no hay campo y el cuerpo no lleva la clave', async () => {
+    const user = userEvent.setup()
+    const fake = conSesion({ ...CONTEXTO_EMPRESA, purchase_order_required: false })
+    await rellenarConSesion(user)
+    await irAPagar(user)
+    expect(screen.queryByLabelText(/Orden de compra/)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
+    await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
+    expect(Object.keys(fake.state.invocations[0]!.body)).not.toContain('purchase_order_number')
+  })
+
+  it('si el servidor la exige igualmente, el aviso dice qué falta', async () => {
+    const user = userEvent.setup()
+    const fake = backend({
+      onCheckout: () => {
+        throw new FunctionsHttpErrorLike(422, 'ORDEN_COMPRA_REQUERIDA', { stage: 'authorize_payment', retryable: false })
+      },
+    })
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(fake, '/s/casa-nordica/checkout')
+    await rellenarContacto(user)
+    await irAPagar(user)
+    await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Escribe el número de orden de compra')
+  })
+})
+
+/**
+ * N07 · El asistente flotante no tapa el cierre de la compra en el teléfono:
+ * en el checkout no se pinta; en el resto de la tienda sigue.
+ */
+const ASISTENTE = 'Abrir asistente de compra'
+describe('botón flotante del asistente (N07)', () => {
+  it('no flota en el checkout y sí en el carrito', async () => {
+    sembrarCarrito([LINEA_SILLA])
+    const { unmount } = renderStorefront(backend(), '/s/casa-nordica/checkout')
+    expect(await screen.findByLabelText(/Nombre y apellido/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: ASISTENTE })).not.toBeInTheDocument()
+    unmount()
+
+    renderStorefront(backend(), '/s/casa-nordica/cart')
+    expect(await screen.findByRole('button', { name: ASISTENTE })).toBeInTheDocument()
+  })
+})

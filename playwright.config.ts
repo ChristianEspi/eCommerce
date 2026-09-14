@@ -45,9 +45,27 @@ export default defineConfig({
     locale: 'es-PE',
   },
 
+  /**
+   * Dos familias de proyectos.
+   *
+   * `escritorio` y `movil` recorren la vitrina SIN crear nada: se pueden correr
+   * contra la demo real antes de enseñarla.
+   *
+   * `comercio-*` (hardening H09-H11) recorren las tres experiencias de compra
+   * —consumidor, comercio y empresa— hasta el PEDIDO, con cuentas de fixture que
+   * llegan por entorno (`scripts/e2e-local-fixtures.mjs` en una pila local). Van
+   * aparte porque crean pedidos de verdad: no se lanzan contra una demo por
+   * accidente al escribir `--project=escritorio`.
+   */
   projects: [
-    { name: 'escritorio', use: { ...devices['Desktop Chrome'] } },
-    { name: 'movil', use: { ...devices['Pixel 5'] } },
+    { name: 'escritorio', testIgnore: '**/commerce/**', use: { ...devices['Desktop Chrome'] } },
+    { name: 'movil', testIgnore: '**/commerce/**', use: { ...devices['Pixel 5'] } },
+    {
+      name: 'comercio-escritorio',
+      testMatch: '**/commerce/*.e2e.ts',
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } },
+    },
+    { name: 'comercio-movil', testMatch: '**/commerce/*.e2e.ts', use: { ...devices['Pixel 5'] } },
   ],
 
   webServer: {

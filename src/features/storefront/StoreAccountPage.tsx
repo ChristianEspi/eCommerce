@@ -14,7 +14,7 @@ import {
   TableRow,
   Typography,
 } from '@mui/material'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useSessionContext } from '@/features/auth/session-context'
 import { useMyAccounts, useMyPendingAccounts } from '@/features/customers/hooks'
 import { StoreNotificationsSection } from '@/features/notifications/StoreNotificationsSection'
@@ -24,6 +24,8 @@ import { useDocumentMeta } from '@/shared/seo/useDocumentMeta'
 import { SectionTabs } from '@/shared/ui/SectionTabs'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
 import { AccountStatementSection } from './account/AccountStatementSection'
+import { useStoreAccounts } from './commerce/accounts'
+import { ConsumerAccount } from './account/ConsumerAccount'
 import { MyCouponsSection } from './account/MyCouponsSection'
 import { MyOrdersSection } from './account/MyOrdersSection'
 import { MySuggestionsSection } from './account/MySuggestionsSection'
@@ -63,6 +65,7 @@ export function StoreAccountPage() {
   // comprador vea su cuenta.
   const storefront = useStorefrontOptional()
   const { status } = useSessionContext()
+  const location = useLocation()
 
   // Carrito, checkout, cuenta y seguimiento NO se indexan (P15-SaaS). No es
   // pudor: son estado de una sesión, no contenido, y el seguimiento además
@@ -90,6 +93,13 @@ export function StoreAccountPage() {
   const pending = useMyPendingAccounts(
     authenticated && query.isSuccess && (query.data ?? []).length === 0,
   )
+  // Con varias cuentas, cuál es la EFECTIVA en esta tienda (N01): la misma que
+  // usan el precio y el checkout. Con una sola no hay nada que distinguir.
+  const efectivas = useStoreAccounts(
+    storefront?.storeSlug ?? '',
+    authenticated && (query.data ?? []).length > 1,
+  )
+  const efectiva = (efectivas.data ?? []).find((cuenta) => cuenta.is_effective)?.account_id ?? null
 
   if (status === 'loading') return <LoadingState />
 
@@ -99,7 +109,26 @@ export function StoreAccountPage() {
         title={t('account.signedOut')}
         description={t('account.signedOutBody')}
         icon={<ApartmentRoundedIcon fontSize="small" />}
-        action={<Link to="/login">{t('auth.submit')}</Link>}
+        action={
+          // Vuelve AQUÍ al entrar (N02), y quien no tiene cuenta puede crearla en
+          // esta tienda sin pasar por el alta de empresas.
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <Button component={Link} to="/login" state={{ from: location.pathname }} variant="contained" size="small">
+              {t('auth.submit')}
+            </Button>
+            {storefront && (
+              <Button
+                component={Link}
+                to={`/s/${storefront.storeSlug}/register`}
+                state={{ from: location.pathname }}
+                variant="outlined"
+                size="small"
+              >
+                {t('store.register.submit')}
+              </Button>
+            )}
+          </Stack>
+        }
       />
     )
   }
@@ -113,41 +142,20 @@ export function StoreAccountPage() {
     if (pending.isPending) return <LoadingState />
 
     /**
-     * Vinculado, pero sin activar.
+     * Sin cuenta de empresa ACTIVA: la cuenta del consumidor (hardening H02).
      *
-     * Antes caía en «no estás vinculado a ninguna empresa», que era falso y
-     * dejaba a la persona sin saber qué hacer. Lo que le falta es concreto
-     * —que activen su acceso— y la empresa tiene nombre, así que se dice.
+     * Antes caía en «tu usuario no está vinculado a ninguna empresa», que es
+     * cierto y no le sirve de nada a quien compra para sí. Ahora ve lo suyo
+     * —pedidos, favoritos, datos, direcciones y avisos— y, si una empresa lo
+     * vinculó y todavía no activó su acceso, se le dice arriba sin taparle la
+     * cuenta: el nombre de la empresa es concreto y lo que falta también.
      */
-    const pendientes = pending.data ?? []
-
-    // Sin cuenta de empresa activa también hay avisos que leer: el de «te
-    // vincularon», o el de un pedido hecho como visitante con este correo.
     return (
-      <Stack spacing={3}>
-        {pendientes.length > 0 ? (
-          <EmptyState
-            title={t('account.pendingAccounts').replace(
-              '{names}',
-              pendientes.map((cuenta) => cuenta.name).join(', '),
-            )}
-            description={t('account.pendingAccountsBody')}
-            icon={<ApartmentRoundedIcon fontSize="small" />}
-          />
-        ) : (
-          <EmptyState
-            title={t('account.noAccounts')}
-            description={t('account.noAccountsBody')}
-            icon={<ApartmentRoundedIcon fontSize="small" />}
-          />
-        )}
-        <Stack spacing={1}>
-          <Typography variant="h6" component="h2">
-            {t('account.tab.notifications')}
-          </Typography>
-          <StoreNotificationsSection />
-        </Stack>
-      </Stack>
+      <ConsumerAccount
+        storeSlug={storefront?.storeSlug ?? null}
+        storeId={storefront?.store.store_id ?? null}
+        pendingAccountNames={(pending.data ?? []).map((cuenta) => cuenta.name)}
+      />
     )
   }
 
@@ -180,7 +188,10 @@ export function StoreAccountPage() {
                     {account.customer_name} · {account.code}
                   </Typography>
                 </Stack>
-                <Stack direction="row" spacing={1}>
+                <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 0.5 }}>
+                  {account.account_id === efectiva && (
+                    <Chip size="small" color="success" label={t('store.commerce.buyingFor')} />
+                  )}
                   <Chip size="small" color="primary" label={t(`customers.role.${account.role}`)} />
                   {account.requires_approval && (
                     <Chip size="small" color="warning" label={t('account.needsApproval')} />

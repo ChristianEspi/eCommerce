@@ -493,6 +493,20 @@ export function StoreHomePage() {
     (seccion) => seccion.id === 'featured' && seccion.enabled,
   )
 
+  /**
+   * H07 · Las familias para la sección `categories`: raíces, en el orden que el
+   * comercio les dio. Salen de la MISMA consulta que la barra de la cabecera
+   * (`usePublicCategories` comparte clave), así que no cuestan una petición.
+   */
+  const familias = useMemo(
+    () =>
+      (categories.data ?? [])
+        .filter((category) => category.parent_id === null)
+        .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name))
+        .map((category) => ({ category_id: category.category_id, name: category.name, slug: category.slug })),
+    [categories.data],
+  )
+
   const datosPortada: HomeSectionData = {
     store,
     storeSlug,
@@ -513,6 +527,7 @@ export function StoreHomePage() {
     cmsTraeProductos,
     promociones: promosVigentes,
     promoAssets: assetsPromos,
+    categorias: familias,
     brands: brandOptions,
     brandSelected: brand,
     favorites: favorites.ids,

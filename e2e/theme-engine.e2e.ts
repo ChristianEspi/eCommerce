@@ -73,6 +73,9 @@ test.describe('el tema de la tienda', () => {
     await esperarCatalogo(page)
     await page.locator(FICHA).first().click()
 
-    await expect(page.getByRole('dialog').or(page.locator('main'))).toBeVisible()
+    // `.first()`: cuando la tarjeta abre la vista rápida hay diálogo Y `main`
+    // a la vez, y un localizador con dos coincidencias rompe el modo estricto
+    // aunque las dos estén bien.
+    await expect(page.getByRole('dialog').or(page.locator('main')).first()).toBeVisible()
   })
 })

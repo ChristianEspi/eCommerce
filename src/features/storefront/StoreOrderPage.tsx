@@ -176,6 +176,12 @@ export function StoreOrderPage() {
         <Typography sx={{ fontSize: 20, fontWeight: 800, letterSpacing: 0.5 }}>
           {order?.order_number ?? orderNumber}
         </Typography>
+        {/* N05 · La orden de compra con la que se firmó, si la hubo. */}
+        {order?.purchase_order_number && (
+          <Typography sx={{ fontSize: TS.body, color: 'var(--muted)', mt: 0.5 }}>
+            {t('store.checkout.purchaseOrder')}: <strong>{order.purchase_order_number}</strong>
+          </Typography>
+        )}
 
         {/* El sello dice lo que dice la FILA, no lo que solía pasar.
 

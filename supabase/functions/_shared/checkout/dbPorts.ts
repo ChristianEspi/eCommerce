@@ -11,10 +11,10 @@
  * `service` salta la RLS y se usa para lo que el comprador anónimo no puede
  * hacer por su cuenta: reclamar el intento, reservar existencia, crear el
  * pedido. `caller` actúa COMO QUIEN LLAMA (clave publicable + su
- * `Authorization`) y se usa para una sola cosa: preguntar de qué cuenta B2B es
- * miembro. Es deliberado —`my_business_accounts()` no acepta argumentos desde
- * P05 justamente para que la cuenta salga de la sesión y no de un id— y con
- * `service` la pregunta no tendría respuesta posible: no hay sesión que
+ * `Authorization`) y se usa para lo que depende de la sesión: con qué cuenta
+ * B2B compra en esta tienda (`my_effective_business_account_for_slug`, que no
+ * acepta identidad: la cuenta sale del token), y cotizar con su precio. Con
+ * `service` esas preguntas no tendrían respuesta posible: no hay sesión que
  * consultar.
  */
 import type { OrderItemInput } from '../orders.ts'
@@ -216,7 +216,21 @@ export function createDbPorts(options: DbPortOptions): CheckoutPorts {
       }
     },
 
-    async resolveAccount(): Promise<AccountContext> {
+    /**
+     * N01 · la cuenta EFECTIVA en esta tienda, no la primera de una lista.
+     *
+     * Hasta H14 esto tomaba `rows[0]` de `my_business_accounts()`, que no
+     * filtra por sociedad y ordena por nombre, mientras el precio lo fijaba
+     * `ebim.pricing_actor` con otra regla: con dos cuentas, el carrito cotizaba
+     * con una y el pedido se firmaba con otra. Ahora las dos preguntan a
+     * `ebim.effective_business_account` —aquí a través de
+     * `my_effective_business_account_for_slug`, con el token del comprador— y
+     * no hay segunda regla que pueda discrepar.
+     *
+     * El slug es el de la tienda que resolvió la etapa 1; la identidad sale del
+     * token. Ningún campo del cuerpo de la petición interviene.
+     */
+    async resolveAccount(storeSlug: string): Promise<AccountContext> {
       const empty: AccountContext = {
         hasSession,
         userId: null,
@@ -226,27 +240,27 @@ export function createDbPorts(options: DbPortOptions): CheckoutPorts {
       }
       if (!hasSession) return empty
 
-      // Con sesión pero sin vínculo, la respuesta es una lista vacía y NO un
-      // error: un comprador con cuenta EBIM que todavía no está vinculado a
-      // ninguna empresa compra igual que un anónimo.
-      let rows: unknown
+      // Con sesión pero sin vínculo, la respuesta es `null` y NO un error: un
+      // comprador con cuenta EBIM que todavía no está vinculado a ninguna
+      // empresa compra igual que un anónimo.
+      let raw: unknown
       try {
-        rows = await caller('my_business_accounts', {})
+        raw = await caller('my_effective_business_account_for_slug', { p_store_slug: storeSlug })
       } catch (error) {
-        // Que el portal B2B no conteste no puede impedir una compra normal.
+        // Que la resolución de cuenta no conteste no puede impedir una compra normal.
         console.error('[checkout] no se pudo resolver la cuenta B2B', error)
         return empty
       }
 
-      const first = Array.isArray(rows) ? record(rows[0]) : record(rows)
-      if (!first.account_id) return empty
+      const effective = record(raw)
+      if (!effective.account_id) return empty
 
       return {
         hasSession,
         userId: null,
-        accountId: text(first, 'account_id'),
-        role: nullableText(first, 'role'),
-        spendingLimit: nullableText(first, 'spending_limit'),
+        accountId: text(effective, 'account_id'),
+        role: nullableText(effective, 'role'),
+        spendingLimit: nullableText(effective, 'spending_limit'),
       }
     },
 
@@ -371,8 +385,16 @@ export function createDbPorts(options: DbPortOptions): CheckoutPorts {
         })
       }
 
+      // R01 · Con el cliente del LLAMANTE y no con `service`, por la misma razón
+      // que `resolvePrices`: la RPC recalcula el subtotal con `ebim.build_quote`,
+      // que resuelve el precio comercial desde la SESIÓN. Con `service_role` no
+      // hay sesión, el subtotal salía a precio público y el umbral de envío
+      // gratis se evaluaba con otro número que el de `create_order`: el checkout
+      // autorizaba el cobro, el tope y la aprobación con un envío distinto del
+      // que el pedido cobraba. La función está concedida a `anon` y
+      // `authenticated` (la vitrina ya la llama así) y no recibe identidad.
       const quoted = record(
-        await service('delivery_options_for_slug', {
+        await caller('delivery_options_for_slug', {
           p_store_slug: input.context.storeSlug,
           p_address: input.address,
           p_items: itemPayload(input.items),
@@ -513,6 +535,9 @@ export function createDbPorts(options: DbPortOptions): CheckoutPorts {
                       }
                     : null,
                 },
+          // N05 · la orden de compra tecleada. `create_order` la valida y, si la
+          // cuenta la exige y no llegó, no crea el pedido.
+          p_purchase_order_number: input.request.purchaseOrderNumber ?? null,
         }),
       )
       const orderId = text(raw, 'order_id')
@@ -555,6 +580,29 @@ export function createDbPorts(options: DbPortOptions): CheckoutPorts {
         }
       }
 
+      // Hardening H02 · quién compró, cuando compró con sesión.
+      //
+      // `orders` no guarda al usuario, y «Mis pedidos» del consumidor no puede
+      // salir de filtrar por correo (un correo no prueba nada). El vínculo se
+      // escribe AQUÍ, igual que el cobro y la tarjeta regalo: después del
+      // pedido y sin poder tumbarlo.
+      //
+      // El usuario es el VERIFICADO: el de la etapa 2 si ya se comprobó, o el
+      // que devuelve `current_buyer()` con el token del llamante, que PostgREST
+      // valida antes de ejecutar. `hasSession` solo decide si merece la pena
+      // preguntar; un token con la firma falsa no llega a responder.
+      if (orderId !== '' && hasSession) {
+        try {
+          const buyer =
+            input.account.userId ?? nullableText(record(await caller('current_buyer', {})), 'user_id')
+          if (buyer) {
+            await service('checkout_link_order_buyer', { p_order_id: orderId, p_user_id: buyer })
+          }
+        } catch (error) {
+          console.error('[checkout] no se pudo vincular el pedido con su comprador', error)
+        }
+      }
+
       return {
         orderId,
         orderNumber: text(raw, 'order_number'),
@@ -569,6 +617,7 @@ export function createDbPorts(options: DbPortOptions): CheckoutPorts {
         grandTotal: text(raw, 'grand_total', '0.00'),
         items: Array.isArray(raw.items) ? (raw.items as Record<string, unknown>[]) : [],
         delivery: raw.delivery === null || raw.delivery === undefined ? null : record(raw.delivery),
+        purchaseOrderNumber: nullableText(raw, 'purchase_order_number'),
         replay: raw.replay === true,
       }
     },

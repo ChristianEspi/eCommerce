@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -14,7 +17,8 @@
     "db:types": "node scripts/gen-db-types.mjs",
     "test:db": "vitest run supabase/tests",
     "bundle:report": "node scripts/bundle-report.mjs",
-    "scan:secrets": "node scripts/secret-scan.mjs"
+    "scan:secrets": "node scripts/secret-scan.mjs",
+    "smoke:qas": "node scripts/qas-smoke.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

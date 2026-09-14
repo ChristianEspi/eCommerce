@@ -225,6 +225,12 @@ describe('ordenar la portada', () => {
     expect(marcas?.enabled).toBe(false)
   })
 
+  it('las familias de la portada (categories) ya se pueden encender', () => {
+    pintar()
+
+    expect(screen.getByRole('checkbox', { name: 'Mostrar: Categorías' })).toBeEnabled()
+  })
+
   it('una sección sin componente todavía no se puede encender', () => {
     pintar()
 

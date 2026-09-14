@@ -241,7 +241,7 @@ export async function runCheckout(
 
     // --- 2 · Cliente, cuenta y canal ---------------------------------------
     const account: AccountContext = await stage('validate_account', async () => {
-      const resolved = await ports.resolveAccount()
+      const resolved = await ports.resolveAccount(context.storeSlug)
       // Un canal que exige sesión no lo puede usar un comprador anónimo. La
       // base ya lo impide (`CANAL_NO_PUBLICO`), pero aquí el mensaje puede
       // decir qué hacer —entrar— en vez de solo que no se puede.
@@ -411,6 +411,19 @@ export async function runCheckout(
           console.error('[checkout] no se pudo resolver la autorizacion de compra', error)
           approval = null
         }
+      }
+
+      // N05 · Orden de compra obligatoria, dicha ANTES de tocar la pasarela o
+      // una tarjeta regalo: descubrirlo en `create_order` obligaría a anular un
+      // cobro ya autorizado. No es la autoridad —`create_order` lo vuelve a
+      // exigir con la fila de la cuenta delante, aunque esta pregunta falle—,
+      // es el aviso temprano.
+      if (approval?.purchaseOrderRequired === true && !input.purchaseOrderNumber) {
+        throw new CheckoutStageError({
+          stage: 'authorize_payment',
+          code: 'ORDEN_COMPRA_REQUERIDA',
+          message: 'Esta cuenta exige un numero de orden de compra',
+        })
       }
 
       // ---- 8a · La tarjeta regalo, ANTES de la pasarela -------------------

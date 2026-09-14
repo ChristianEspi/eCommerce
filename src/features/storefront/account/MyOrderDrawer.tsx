@@ -1,14 +1,23 @@
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
+import ReplayRoundedIcon from '@mui/icons-material/ReplayRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
-import { Box, Drawer, IconButton, Stack, Typography } from '@mui/material'
-import { useQuery } from '@tanstack/react-query'
+import { Box, Button, Drawer, IconButton, Stack, Typography } from '@mui/material'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { useContext } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import { BrandLoader } from '@/shared/ui/BrandLoader'
+import { useFeedback } from '@/shared/ui/feedback-context'
 import { ErrorState } from '@/shared/ui/states'
 import { TS } from '@/theme/tokens'
+import { addLinesToCart } from '../cart/addLinesToCart'
+import { CartContext } from '../cart/cart-context'
+import { consumerOrderDetailKey, fetchConsumerOrderDetail, formatSavedAddress } from '../consumer'
 import { fetchMyOrderDetail, myOrderDetailKey } from '../portal'
 import { EstadoChip } from './EstadoChip'
+
+/** De quién son los pedidos que se enseñan: de la empresa o de la persona. */
+export type OrdersSource = 'business' | 'consumer'
 
 /**
  * El detalle de un pedido del portal del comprador.
@@ -41,21 +50,68 @@ export function MyOrderDrawer({
   orderId,
   orderNumber,
   onClose,
+  source = 'business',
+  storeSlug = '',
+  storeId = null,
 }: {
   /** `null` cierra el panel. Es también la clave de la consulta. */
   orderId: string | null
   orderNumber: string | null
   onClose: () => void
+  source?: OrdersSource
+  storeSlug?: string
+  storeId?: string | null
 }) {
   const { t, locale } = useI18n()
+  const { notify } = useFeedback()
+  const cart = useContext(CartContext)
+  const consumer = source === 'consumer'
   const query = useQuery({
-    queryKey: myOrderDetailKey(orderId ?? ''),
-    queryFn: () => fetchMyOrderDetail(orderId as string),
+    queryKey: consumer ? consumerOrderDetailKey(storeSlug, orderId ?? '') : myOrderDetailKey(orderId ?? ''),
+    queryFn: () =>
+      consumer ? fetchConsumerOrderDetail(storeSlug, orderId as string) : fetchMyOrderDetail(orderId as string),
     enabled: orderId !== null,
   })
 
   const detail = query.data ?? null
   const money = (value: string) => formatMoney(Number(value), detail?.currency ?? 'PEN', locale)
+
+  /**
+   * Volver a comprar (H03).
+   *
+   * Manda al carrito QUÉ y CUÁNTO, nunca a cuánto: `addLinesToCart` vuelve a
+   * leer cada producto del catálogo y el carrito lo recotiza con el servidor.
+   * El precio del pedido viejo se queda en el pedido viejo. Solo se ofrece
+   * cuando el detalle trae los productos y hay carrito y tienda a mano.
+   */
+  const reorderable = Boolean(
+    cart && storeId && detail?.items.some((item) => typeof item.product_id === 'string' && item.product_id),
+  )
+  const reorder = useMutation({
+    mutationFn: async () =>
+      cart && storeId && detail ? addLinesToCart(cart, storeId, detail.items) : { added: 0, skipped: 0 },
+    onSuccess: ({ added, skipped }) => {
+      if (added === 0) {
+        notify(t('account.orders.reorderNone'), 'warning')
+        return
+      }
+      notify(
+        skipped > 0
+          ? t('account.orders.reorderPartial').replace('{added}', String(added)).replace('{skipped}', String(skipped))
+          : t('account.orders.reorderDone'),
+        skipped > 0 ? 'warning' : 'success',
+      )
+      onClose()
+      cart?.openCart()
+    },
+    onError: () => notify(t('account.orders.reorderError'), 'error'),
+  })
+
+  const direccion =
+    detail?.shipping_address && typeof detail.shipping_address.address === 'string'
+      ? formatSavedAddress(detail.shipping_address as { address: string })
+      : null
+  const entrega = detail?.deliveries?.find((d) => d.method_name)?.method_name ?? null
 
   return (
     <Drawer
@@ -115,6 +171,11 @@ export function MyOrderDrawer({
               <Typography sx={{ fontSize: TS.label, color: 'var(--muted)', mt: 0.25 }}>
                 {formatDate(new Date(detail.placed_at), locale)}
               </Typography>
+              {detail.purchase_order_number && (
+                <Typography sx={{ fontSize: TS.label, color: 'var(--muted)', mt: 0.25 }}>
+                  {t('store.checkout.purchaseOrder')}: <strong>{detail.purchase_order_number}</strong>
+                </Typography>
+              )}
               {/* El estado también aquí: se abre el detalle justo para saber si
                   ya salió, y obligar a cerrarlo para leerlo en la lista es
                   hacer trabajar al comprador por nada. */}
@@ -220,6 +281,36 @@ export function MyOrderDrawer({
           )}
           <Box sx={{ height: '1px', bgcolor: 'var(--sf-line)', my: 0.75 }} />
           <Linea etiqueta={t('account.orders.total')} valor={money(detail.grand_total)} fuerte />
+
+          {/* Cómo y dónde se entrega, cuando el detalle lo trae. Es la otra
+              pregunta con la que se abre un pedido: «¿a dónde lo mandé?». */}
+          {(entrega || direccion) && (
+            <Box sx={{ mt: 0.75 }}>
+              <Typography sx={{ fontSize: TS.label, color: 'var(--muted)', fontWeight: 700 }}>
+                {t('account.orders.delivery')}
+              </Typography>
+              <Typography sx={{ fontSize: TS.body, overflowWrap: 'anywhere' }}>
+                {[entrega, direccion].filter(Boolean).join(' · ')}
+              </Typography>
+            </Box>
+          )}
+
+          {reorderable && (
+            <Button
+              variant="contained"
+              startIcon={<ReplayRoundedIcon />}
+              onClick={() => reorder.mutate()}
+              disabled={reorder.isPending}
+              sx={{ mt: 1 }}
+            >
+              {t('account.orders.reorder')}
+            </Button>
+          )}
+          {reorderable && (
+            <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>
+              {t('account.orders.reorderHint')}
+            </Typography>
+          )}
         </Stack>
       )}
     </Drawer>

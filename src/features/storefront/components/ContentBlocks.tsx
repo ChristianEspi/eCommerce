@@ -907,6 +907,37 @@ function CategoryCollectionBlock({
   return (
     <Stack component="section" aria-label={block.title ?? undefined} sx={{ gap: 1.5 }}>
       <BlockHeading block={block} />
+      <CategoryDoorGrid categories={categories} storeSlug={storeSlug} ariaLabel={block.title ?? undefined} />
+    </Stack>
+  )
+}
+
+/** Lo mínimo que una puerta necesita de una categoría, venga del CMS o del catálogo. */
+export interface CategoryDoorItem {
+  readonly category_id: string
+  readonly name: string
+  readonly slug: string
+}
+
+/**
+ * Las puertas de categoría, sin cabecera.
+ *
+ * La usan el bloque `category_collection` del CMS y la sección `categories` de
+ * la portada (H07), que pinta las familias REALES del tenant. Una sola
+ * implementación: la misma familia tiene el mismo tinte e icono en los dos
+ * sitios, y un arreglo de accesibilidad llega a los dos a la vez.
+ */
+export function CategoryDoorGrid({
+  categories,
+  storeSlug,
+  ariaLabel,
+}: {
+  categories: readonly CategoryDoorItem[]
+  storeSlug: string
+  ariaLabel?: string
+}) {
+  return (
+    <>
       {/* Puertas, no etiquetas.
           Eran `Chip` en fila: el mismo tratamiento que un filtro activo del
           catálogo, y aquí no filtran nada — llevan a otro sitio. Una fila de
@@ -950,13 +981,13 @@ function CategoryCollectionBlock({
           items={categories}
           keyOf={(category) => category.category_id}
           itemWidth={{ xs: '68%', sm: '42%', md: 260 }}
-          ariaLabel={block.title ?? undefined}
+          ariaLabel={ariaLabel}
           render={(category, duplicada) => (
             <CategoryDoor category={category} storeSlug={storeSlug} sinFoco={duplicada} />
           )}
         />
       )}
-    </Stack>
+    </>
   )
 }
 
@@ -976,7 +1007,7 @@ function CategoryDoor({
   storeSlug,
   sinFoco = false,
 }: {
-  category: Extract<ContentCollectionItem, { kind: 'category' }>
+  category: CategoryDoorItem
   storeSlug: string
   /** La copia del bucle: se ve y se pulsa, pero no se tabula ni se anuncia. */
   sinFoco?: boolean

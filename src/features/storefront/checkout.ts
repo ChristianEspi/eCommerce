@@ -106,6 +106,12 @@ export const checkoutSchema = z.object({
    * algo— lo decide el servidor cuando ya tiene la fila delante y bloqueada.
    */
   couponCode: z.string().trim().max(40, 'store.checkout.error.coupon').optional(),
+  /**
+   * N05 · El número de orden de compra, cuando la cuenta de empresa la exige.
+   * Una REFERENCIA del comprador: ni identidad ni importe. Que sea obligatoria
+   * lo decide la cuenta en el servidor; la pantalla solo lo avisa antes.
+   */
+  purchaseOrderNumber: z.string().trim().max(60, 'store.checkout.error.purchaseOrder').optional(),
 })
 export type CheckoutValues = z.infer<typeof checkoutSchema>
 
@@ -165,6 +171,8 @@ export const orderResultSchema = z.object({
   replay: z.boolean().default(false),
   intent_id: z.string().uuid().optional(),
   payment_status: z.string().optional(),
+  /** N05: la orden de compra con la que quedó firmado. Ausente en respuestas anteriores. */
+  purchase_order_number: z.string().nullable().optional(),
 })
 export type OrderResult = z.infer<typeof orderResultSchema>
 
@@ -251,6 +259,10 @@ export function mapCheckoutCode(code: string): MessageKey {
       return 'store.checkout.error.needsAccount'
     case 'LIMITE_DE_AUTORIZACION':
       return 'store.checkout.error.spendingLimit'
+    case 'ORDEN_COMPRA_REQUERIDA':
+      return 'store.checkout.error.purchaseOrderRequired'
+    case 'ORDEN_COMPRA_INVALIDA':
+      return 'store.checkout.error.purchaseOrder'
     case 'PAGO_RECHAZADO':
       return 'store.checkout.error.payment'
     case 'DIRECCION_NO_ENTREGABLE':
@@ -441,6 +453,8 @@ export async function startCheckout(input: StartCheckoutInput): Promise<OrderRes
       // P10. La lista viaja vacía cuando no se tecleó nada: un `[]` es «no hay
       // cupón», que es distinto de «no se preguntó».
       coupon_codes: input.couponCode ? [input.couponCode] : [],
+      // N05. Solo viaja si se tecleó: vacía y ausente son la MISMA petición.
+      ...(input.purchaseOrderNumber?.trim() ? { purchase_order_number: input.purchaseOrderNumber.trim() } : {}),
     },
     })
   }

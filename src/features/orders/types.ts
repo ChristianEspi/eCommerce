@@ -190,6 +190,7 @@ export const orderSchema = z.object({
   shipping_address: shippingAddressSchema.nullable().default(null),
   billing_address: shippingAddressSchema.nullable().default(null),
   customer_snapshot: customerSnapshotSchema.nullable().default(null),
+  purchase_order_number: z.string().nullable().default(null),
   approval_reason: z.string().nullable().default(null),
   approval_decided_email: z.string().nullable().default(null),
   approval_decided_at: z.string().nullable().default(null),

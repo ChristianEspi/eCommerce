@@ -283,8 +283,15 @@ describe('el importe lo calcula la base', () => {
   it('una tasa caducada no se aplica: vale la vigente en la fecha del pedido', async () => {
     const temporal = await taxCategory('temporal', '0.5000')
     // Se cierra la del 50 % y se abre una del 5 %.
+    //
+    // La del 50 % empezó AYER y no «ahora»: con `valid_from = now()` del alta y
+    // `valid_to = now()` del cierre, dos sentencias en el mismo instante del
+    // reloj dan `valid_to = valid_from`, que el CHECK `tax_rates_period` rechaza
+    // con razón. Pasaba en una máquina rápida (medido en la segunda noche del
+    // hardening: fallaba igual en commits anteriores). Lo que se prueba no
+    // cambia: una tasa ya cerrada no se aplica.
     await svc(
-      `update public.tax_rates set valid_to = now() where tax_category_id = $1`,
+      `update public.tax_rates set valid_from = now() - interval '1 day', valid_to = now() where tax_category_id = $1`,
       [temporal],
     )
     await svc(

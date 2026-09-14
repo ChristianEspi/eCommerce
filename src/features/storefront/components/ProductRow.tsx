@@ -1,6 +1,7 @@
 import { Box, Button, Skeleton, Stack } from '@mui/material'
 import { Link } from 'react-router-dom'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { useCatalogCommercialPrices } from '../commerce/catalogPrices'
 import type { PublicProduct } from '../types'
 import { ProductCard } from './ProductCard'
 import { LoopingRow } from './LoopingRow'
@@ -54,6 +55,9 @@ export function ProductRow({
   onToggleFavorite?: (productId: string) => void
 }) {
   const { t } = useI18n()
+  // Una cotización por fila, no por tarjeta: la fila que gira repite tarjetas
+  // pero no productos (N03).
+  const commercial = useCatalogCommercialPrices(storeSlug, products)
   if (!loading && products.length === 0) return null
 
   return (
@@ -108,6 +112,7 @@ export function ProductRow({
                 compact
                 product={product}
                 storeSlug={storeSlug}
+                commercialPrice={commercial.get(product.product_id) ?? null}
                 {...(onQuickView ? { onQuickView } : {})}
                 {...(onToggleFavorite ? { onToggleFavorite } : {})}
                 favorite={favorites?.has(product.product_id) ?? false}

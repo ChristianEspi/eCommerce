@@ -376,6 +376,8 @@ export interface PlacedOrder {
    * se eligio entrega, que es distinto de «entrega gratis».
    */
   readonly delivery: Record<string, unknown> | null
+  /** N05: la orden de compra tal como quedó guardada en el pedido, o `null`. */
+  readonly purchaseOrderNumber?: string | null
   readonly replay: boolean
 }
 
@@ -441,6 +443,14 @@ export interface CheckoutRequest {
    * ha configurado métodos sigue vendiendo.
    */
   readonly delivery: DeliveryChoice | null
+  /**
+   * N05 · Número de orden de compra del comprador B2B. Una REFERENCIA
+   * comercial: no identifica a nadie ni fija un importe. `null` = no se
+   * tecleó. Si la cuenta la exige, la base se niega a crear el pedido sin ella.
+   * Opcional en el tipo para no obligar a escribir `null` en cada llamada que
+   * nunca será B2B.
+   */
+  readonly purchaseOrderNumber?: string | null
 }
 
 export interface IntentClaim {
@@ -464,7 +474,12 @@ export interface CheckoutPorts {
 
   // Las once etapas, en el orden de `CHECKOUT_STAGES`.
   resolveContext(storeSlug: string): Promise<CheckoutContext>
-  resolveAccount(): Promise<AccountContext>
+  /**
+   * La cuenta B2B EFECTIVA de la sesión en ESTA tienda (N01): la misma regla
+   * que fija el precio (`ebim.effective_business_account`), nunca «la primera
+   * de la lista».
+   */
+  resolveAccount(storeSlug: string): Promise<AccountContext>
   /** Quien compra, segun la base y con el token del llamante. */
   verifyBuyer(): Promise<string | null>
   resolvePrices(storeSlug: string, items: readonly OrderItemInput[]): Promise<Quote>

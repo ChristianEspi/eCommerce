@@ -109,6 +109,18 @@ export const publicStoreSchema = z.object({
   theme_preset: z.unknown(),
   storefront_style: z.unknown(),
   home_layout: z.unknown(),
+  /**
+   * H08 · País por defecto del checkout, derivado de las zonas de entrega de la
+   * tienda (migración `20260913120000`). `null` si vende a varios países o no
+   * configuró cobertura. `catch(null)` y `default(null)`: una base anterior a la
+   * migración, o un valor raro, deja el checkout exactamente como estaba.
+   */
+  default_country: z
+    .string()
+    .regex(/^[A-Z]{2}$/)
+    .nullable()
+    .catch(null)
+    .default(null),
 })
 export type PublicStore = z.infer<typeof publicStoreSchema>
 

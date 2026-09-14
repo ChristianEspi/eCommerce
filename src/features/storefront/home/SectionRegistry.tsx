@@ -1,9 +1,11 @@
 import { BrandRow } from '../components/BrandRow'
 import { BrandTrustStrip } from '../components/BrandTrustStrip'
-import { ContentBlocks } from '../components/ContentBlocks'
+import { Stack } from '@mui/material'
+import { CategoryDoorGrid, ContentBlocks } from '../components/ContentBlocks'
 import { OffersFeaturedBand } from '../components/OffersFeaturedBand'
 import { ProductRow } from '../components/ProductRow'
 import { PromoCarousel } from '../components/PromoCarousel'
+import { SectionHeading } from '../components/SectionHeading'
 import { StoreFeaturedHero } from '../components/StoreFeaturedHero'
 import { StoreHero } from '../components/StoreHero'
 import { StoreServicesStrip } from '../components/StoreServicesStrip'
@@ -31,7 +33,7 @@ import type { HomeSectionData, HomeSectionRegistry } from './types'
  * ## Las que devuelven `null`
  *
  * `business-info` y `newsletter` están declaradas en el contrato y no tienen
- * componente todavía. Devuelven `null` limpiamente en lugar de inventar
+ * componente todavía (`categories` lo tiene desde H07). Devuelven `null` limpiamente en lugar de inventar
  * contenido: una sección de «síguenos» con enlaces que nadie configuró es peor
  * que no tenerla.
  */
@@ -115,15 +117,30 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
   },
 
   /**
-   * Las categorías de la PORTADA, que no son las del catálogo.
+   * Las categorías de la PORTADA, que no son las del catálogo (H07).
    *
    * En el catálogo son píldoras —un filtro que se enciende y se apaga— y las
-   * pinta la propia vista de catálogo. En la portada serían puertas, con icono
-   * y cuenta. Todavía no existen ahí, así que esto devuelve `null` en vez de
-   * reaprovechar la barra de filtros: una barra de filtros en una portada sin
-   * catálogo a la vista no filtra nada.
+   * pinta la propia vista de catálogo. En la portada son PUERTAS: las familias
+   * reales del tenant (las que no cuelgan de nadie), con el mismo tinte e icono
+   * que el bloque de categorías del CMS, porque es el mismo componente.
+   *
+   * Vale igual para una zapatería, una ferretería o una botica: lo que cambia es
+   * el catálogo del comercio, no el código. Sin familias, no se pinta.
    */
-  categories: () => null,
+  categories: (data, maxItems) => {
+    const familias = conTope(data.categorias, maxItems)
+    if (familias.length === 0) return null
+    return (
+      <Stack component="section" aria-label={data.t('store.categories.shopBy')} sx={{ gap: 1.5 }}>
+        <SectionHeading title={data.t('store.categories.shopBy')} />
+        <CategoryDoorGrid
+          categories={familias}
+          storeSlug={data.storeSlug}
+          ariaLabel={data.t('store.categories.shopBy')}
+        />
+      </Stack>
+    )
+  },
 
   /**
    * Las marcas, al lado de las categorías: en una botica se compra por marca

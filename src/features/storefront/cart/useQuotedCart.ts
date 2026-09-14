@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useCartQuote } from '@/features/pricing/useCartQuote'
 import type { PriceQuote } from '@/domain'
+import { esAcuerdoDelComprador } from './agreement'
 import { useCart } from './cart-context'
 
 /** Constante y no `[]` en la firma: un array nuevo por render cambia la clave. */
@@ -27,7 +28,7 @@ export function useQuotedCart(
 ): {
   quote: ReturnType<typeof useCartQuote>
   quoted: PriceQuote | null
-  /** Alguna línea sale de una lista de precios: hay acuerdo aplicado. */
+  /** Alguna línea sale de un acuerdo del comprador (segmento o cliente). */
   discounted: boolean
 } {
   const { cart, currency } = useCart()
@@ -52,6 +53,7 @@ export function useQuotedCart(
   return {
     quote,
     quoted,
-    discounted: quoted?.lines.some((line) => line.source === 'price_list') ?? false,
+    // Solo un acuerdo del comprador es «precio especial»: ver `agreement.ts`.
+    discounted: quoted?.lines.some(esAcuerdoDelComprador) ?? false,
   }
 }

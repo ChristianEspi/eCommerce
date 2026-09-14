@@ -118,6 +118,9 @@ const StoreCheckoutPage = lazyPage(() =>
 const StoreAccountPage = lazyPage(() =>
   import('@/features/storefront/StoreAccountPage').then((m) => ({ default: m.StoreAccountPage })),
 )
+const StoreRegisterPage = lazyPage(() =>
+  import('@/features/storefront/StoreRegisterPage').then((m) => ({ default: m.StoreRegisterPage })),
+)
 const StoreContentPage = lazyPage(() =>
   import('@/features/storefront/StoreContentPage').then((m) => ({ default: m.StoreContentPage })),
 )
@@ -257,6 +260,8 @@ export const routes: RouteObject[] = [
       // quien entra aquí es un comprador de un cliente, no un miembro del
       // tenant, y su contexto lo resuelve el servidor a partir del vínculo.
       { path: 'account', element: withSuspense(<StoreAccountPage />) },
+      // Alta de CONSUMIDOR dentro de la tienda (N02). No crea tenant: eso es `/onboarding`.
+      { path: 'register', element: withSuspense(<StoreRegisterPage />) },
       // Confirmación del pedido. El número va en la URL para que el comprador
       // pueda guardarla o compartirla; el detalle llega por estado de
       // navegación, porque un comprador anónimo no puede releer el pedido.

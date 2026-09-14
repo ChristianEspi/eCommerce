@@ -64,7 +64,8 @@ const NOMBRE: Record<HomeSectionId, MessageKey> = {
  * si no lo ha visto. Así sabe que existe y que aún no está.
  */
 const SIN_IMPLEMENTAR: ReadonlySet<HomeSectionId> = new Set<HomeSectionId>([
-  'categories',
+  // `categories` salió de esta lista en H07: pinta las familias reales del
+  // catálogo como puertas, y el comercio ya puede encenderla.
   'business-info',
   'newsletter',
 ])

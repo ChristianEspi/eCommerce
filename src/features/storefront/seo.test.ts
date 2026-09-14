@@ -49,6 +49,7 @@ const store: PublicStore = {
   ui_density: null,
   business_display_name: 'Casa Verde S.A.C.',
   checkout_requires_account: false,
+  default_country: null,
 }
 
 const product: PublicProduct = {

@@ -11,6 +11,24 @@ el recorrido SaaS P00–P17 queda cerrado)
 > (`claude-saas-opus/config/phases.json`), que se identifica siempre como «P0x-SaaS». No son la misma
 > serie: el P12 histórico es el framework de integraciones; el P12-SaaS es fulfillment y devoluciones.
 
+## Hardening multi-commerce (2026-09-13, rama `feature/demo-commerce-hardening-v1`)
+
+Tres experiencias sobre la MISMA vitrina, el mismo motor de precios y el mismo checkout: B2C
+Consumer, Trade/Reseller y Enterprise B2B. **Veredicto: `GO_WITH_GAPS`** — código verificado
+(44/44 E2E en pila local), pendiente de despliegue y de usuarios de demo en QAS. Sin push ni deploy.
+
+- Informe, gaps, guion de demo y checklist de QAS: [`docs/demo-hardening/FINAL_REPORT.md`](demo-hardening/FINAL_REPORT.md).
+- Fase a fase: [`docs/demo-hardening/EXECUTION_LOG.md`](demo-hardening/EXECUTION_LOG.md) ·
+  línea base: [`BASELINE.md`](demo-hardening/BASELINE.md) ·
+  auditoría de identidad comercial: [`COMMERCIAL_CONTEXT_AUDIT.md`](demo-hardening/COMMERCIAL_CONTEXT_AUDIT.md).
+- Migraciones nuevas (sin aplicar): `20260913100000_consumer_account`, `20260913110000_commerce_context`,
+  `20260913120000_store_default_country`. Edge Function a desplegar: `checkout`.
+- Decisiones que cuesta revertir: el pedido se vincula al consumidor por `order_buyers` (usuario
+  verificado, escrito por el checkout) y **no** por correo; la audiencia `trade`/`enterprise` es solo
+  presentación y sale de los controles de la cuenta; el país por defecto se deriva de las zonas de
+  entrega; techo de la portada 400 → 405 kB (`performance-budget.md` §2.1).
+- Gates H14: typecheck/lint/build PASS · unit 3 790 ✓ + los 6 fallos de entorno de siempre · DB 2 185 ✓.
+
 ## Recorrido B2B (arranca 2026-09-02, rama `feat/b2b-upgrade`)
 
 **Tercera numeración**, y tampoco es la misma serie: 17 fases de evolución hacia B2B corporativo +

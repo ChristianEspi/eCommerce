@@ -171,6 +171,8 @@ const handler = serveJson(
             approval_status: result.order.approvalStatus,
             approval_reason: result.approval?.reason ?? null,
             source_channel: result.order.sourceChannel,
+            // N05: la orden de compra con la que quedó firmado el pedido.
+            purchase_order_number: result.order.purchaseOrderNumber ?? null,
           },
         },
       }

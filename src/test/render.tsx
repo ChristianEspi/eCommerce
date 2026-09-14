@@ -16,11 +16,16 @@ interface Options extends Omit<RenderOptions, 'wrapper'> {
   tenantAccent?: string | null
   /** Sesión ya resuelta: evita que los tests dependan de la red. */
   session?: Session | null
+  /**
+   * `true` = la sesión NO se fija: el `SessionProvider` la lee del cliente
+   * simulado y escucha sus eventos (entrar, registrarse, salir), como en la app.
+   */
+  liveSession?: boolean
 }
 
 /** Render con los providers reales: los tests ejercitan el mismo árbol que la app. */
 export function renderWithProviders(ui: ReactElement, options: Options = {}): RenderResult {
-  const { locale = 'es', route = '/', tenantAccent = null, session = null, ...rest } = options
+  const { locale = 'es', route = '/', tenantAccent = null, session = null, liveSession = false, ...rest } = options
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   })
@@ -31,7 +36,7 @@ export function renderWithProviders(ui: ReactElement, options: Options = {}): Re
         <AppearanceProvider initial={DEFAULT_APPEARANCE} tenantAccent={tenantAccent}>
           <QueryClientProvider client={queryClient}>
             <FeedbackProvider>
-              <SessionProvider initialSession={session}>
+              <SessionProvider {...(liveSession ? {} : { initialSession: session })}>
                 <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
               </SessionProvider>
             </FeedbackProvider>

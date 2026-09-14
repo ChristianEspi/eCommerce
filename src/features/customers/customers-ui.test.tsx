@@ -255,11 +255,26 @@ describe('Área de cuenta del comprador', () => {
     expect(screen.queryByText('Tu usuario no está vinculado a ninguna empresa')).not.toBeInTheDocument()
   })
 
-  it('con sesión y sin vínculo lo dice claro: no es un problema de la sesión', async () => {
-    renderAccount(
-      backend({ rpc: { my_business_accounts: () => [], my_pending_business_accounts: () => [] } }),
-    )
-    expect(await screen.findByText('Tu usuario no está vinculado a ninguna empresa')).toBeInTheDocument()
+  /**
+   * Con sesión y sin cuenta de empresa: la cuenta del CONSUMIDOR (hardening H02).
+   *
+   * Antes esta persona leía «tu usuario no está vinculado a ninguna empresa».
+   * Cierto, e inútil para quien compra para sí: le decía que su cuenta estaba
+   * rota. Lo que se exige ahora es más, no menos: que vea SU cuenta, que no se
+   * le hable de empresas, y que el contexto B2B siga saliendo de UNA llamada sin
+   * argumentos.
+   */
+  it('con sesión y sin vínculo ve su cuenta de consumidor, no un aviso de empresa', async () => {
+    const fake = backend({ rpc: { my_business_accounts: () => [], my_pending_business_accounts: () => [] } })
+    renderAccount(fake)
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Mi cuenta' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Mis datos' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Avisos' })).toBeInTheDocument()
+    expect(screen.queryByText('Tu usuario no está vinculado a ninguna empresa')).not.toBeInTheDocument()
+    // Ni una pestaña del portal B2B.
+    expect(screen.queryByRole('tab', { name: 'Estado de cuenta' })).not.toBeInTheDocument()
+    expect(fake.state.rpcCalls.find((c) => c.name === 'my_business_accounts')?.args ?? {}).toEqual({})
   })
 
   /**

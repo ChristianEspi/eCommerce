@@ -79,6 +79,21 @@ function render(fake: ReturnType<typeof createFakeSupabase>) {
 }
 
 describe('Mis pedidos — el detalle', () => {
+  it('enseña la orden de compra con la que se firmó el pedido (N05)', async () => {
+    const user = userEvent.setup()
+    const fake = createFakeSupabase({
+      rpc: {
+        my_business_orders: () => [PEDIDO],
+        my_business_order_detail: () => ({ ...DETALLE, purchase_order_number: 'OC-2026-00125' }),
+      },
+    })
+    render(fake)
+    await user.click(await screen.findByRole('button', { name: /MQ-2026-0102/ }))
+    const panel = await screen.findByRole('presentation')
+    expect(within(panel).getByText('OC-2026-00125')).toBeInTheDocument()
+    expect(within(panel).getByText(/Orden de compra/)).toBeInTheDocument()
+  })
+
   it('la fila entera abre el pedido, no un enlace escondido en una columna', async () => {
     const user = userEvent.setup()
     render(backend())

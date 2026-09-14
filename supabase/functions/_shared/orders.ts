@@ -161,6 +161,9 @@ const FORBIDDEN_ITEM_FIELDS = [
   'customer_id',
   'price_list_id',
   'price_source',
+  // N05: la orden de compra es del PEDIDO. Dentro de una línea no significa
+  // nada, y aceptarla en silencio escondería un cliente mal construido.
+  'purchase_order_number',
 ]
 
 /**

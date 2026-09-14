@@ -16,7 +16,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
@@ -49,8 +49,11 @@ import {
   type CheckoutStage,
   type CheckoutValues,
 } from './checkout'
+import { useCommerceContext } from './commerce/context'
+import { addressBookKey, checkoutProfileKey, consumerOrdersKey, formatSavedAddress, type SavedAddress } from './consumer'
 import { useStorefront } from './hooks'
 import { privateMeta } from './seo'
+import { useCheckoutPrefill } from './useCheckoutPrefill'
 
 /**
  * Checkout: nombre, correo, teléfono, dirección y una referencia opcional.
@@ -128,16 +131,21 @@ const PASOS = [
 const CAMPOS: ReadonlyArray<ReadonlyArray<keyof CheckoutValues>> = [
   ['customerName', 'customerEmail', 'customerPhone'],
   ['address', 'city', 'region', 'postalCode', 'country', 'reference', 'couponCode'],
-  ['paymentMethodCode'],
+  ['paymentMethodCode', 'purchaseOrderNumber'],
 ]
 
 export function StoreCheckoutPage() {
   const { t, locale } = useI18n()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { store, storeSlug } = useStorefront()
   const { cart, subtotal, currency, cartToken, clear, forgetServerCart } = useCart()
   const { status: sessionStatus } = useSessionContext()
   const authenticated = sessionStatus === 'authenticated'
+  // N05 · ¿La cuenta con la que se compra exige orden de compra? Lo dice el
+  // servidor (el mismo contexto que la barra); sin sesión o sin cuenta, no.
+  const ordenDeCompraObligatoria =
+    useCommerceContext(storeSlug, authenticated).context?.purchase_order_required === true
 
   // Carrito, checkout, cuenta y seguimiento NO se indexan (P15-SaaS). No es
   // pudor: son estado de una sesión, no contenido. `robots.txt` pide que no se
@@ -191,12 +199,44 @@ export function StoreCheckoutPage() {
       city: '',
       region: '',
       postalCode: '',
-      country: '',
+      // H08 · El país que la tienda configuró al definir su cobertura. Sin
+      // él, vacío como siempre: nunca un país escrito en el código.
+      country: store.default_country ?? '',
       deliveryMethodCode: '',
       pickupPointId: '',
       paymentMethodCode: '',
+      purchaseOrderNumber: '',
     },
   })
+
+  /**
+   * H04 · Lo que ya sabemos de quien compra con sesión.
+   *
+   * Se rellena UNA vez y solo lo que siga vacío: si el comprador ya empezó a
+   * escribir, lo suyo manda. Sin sesión, `ready` nunca llega y el checkout de
+   * invitado no cambia en nada.
+   */
+  const prefill = useCheckoutPrefill(storeSlug, authenticated)
+  const prefilled = useRef(false)
+  useEffect(() => {
+    if (!prefill.ready || prefilled.current) return
+    prefilled.current = true
+    const actuales = getValues()
+    if (!actuales.customerName && prefill.name) setValue('customerName', prefill.name)
+    if (!actuales.customerEmail && prefill.email) setValue('customerEmail', prefill.email)
+    if (!actuales.customerPhone && prefill.phone) setValue('customerPhone', prefill.phone)
+  }, [prefill.ready, prefill.name, prefill.email, prefill.phone, getValues, setValue])
+
+  /** Elegir una dirección guardada escribe los campos de entrega, y nada más. */
+  const usarDireccion = (direccion: SavedAddress) => {
+    const opciones = { shouldValidate: true, shouldDirty: true } as const
+    setValue('address', direccion.address, opciones)
+    setValue('reference', direccion.reference ?? '', opciones)
+    setValue('city', direccion.city ?? '', opciones)
+    setValue('region', direccion.region ?? '', opciones)
+    setValue('postalCode', direccion.postal_code ?? '', opciones)
+    setValue('country', (direccion.country ?? '').toUpperCase(), opciones)
+  }
 
   /**
    * La cotización de entrega se pide con lo que hay ESCRITO en el formulario y
@@ -314,6 +354,9 @@ export function StoreCheckoutPage() {
       if (paymentMethods.length > 0 && !values.paymentMethodCode) {
         return 'store.checkout.error.payment.method'
       }
+      if (ordenDeCompraObligatoria && !(values.purchaseOrderNumber ?? '').trim()) {
+        return 'store.checkout.error.purchaseOrderRequired'
+      }
       // Luhn en el navegador no valida una tarjeta —eso lo dice el emisor—:
       // evita gastar una llamada a la pasarela por un digito mal tecleado.
       if (pideTarjeta && !pareceTarjeta(tarjeta.numero)) return 'store.card.numberInvalid'
@@ -398,6 +441,13 @@ export function StoreCheckoutPage() {
       // comprador sin carrito y sin pedido.
       clearPendingAttempt(storeSlug)
       clear()
+      // Lo que «Mi cuenta» y el siguiente checkout leen de ESTA compra —sus
+      // pedidos y las direcciones usadas— dejó de ser verdad. Sin esto la
+      // primera compra de una cuenta nueva seguía diciendo «todavía no hay
+      // direcciones» durante el minuto de caché (defecto previo, N00).
+      void queryClient.invalidateQueries({ queryKey: checkoutProfileKey(storeSlug) })
+      void queryClient.invalidateQueries({ queryKey: consumerOrdersKey(storeSlug) })
+      void queryClient.invalidateQueries({ queryKey: addressBookKey(storeSlug) })
       // El token va en la URL, no solo en el state del router: es lo que hace
       // que la confirmacion sobreviva a una recarga y se pueda guardar.
       const permalink = order.access_token
@@ -660,6 +710,37 @@ export function StoreCheckoutPage() {
 
             {paso === 1 && (
               <>
+                {/* H04 · las direcciones de sus pedidos anteriores, para ELEGIR.
+                    No se escribe ninguna sola: una entrega en la casa de antes
+                    por no mirar el formulario es peor que teclear una línea. */}
+                {prefill.addresses.length > 0 && (
+                  <Box>
+                    <Typography
+                      id="direcciones-guardadas"
+                      sx={{ fontSize: TS.label, fontWeight: 700, color: 'var(--muted)', mb: 0.75 }}
+                    >
+                      {t('store.checkout.savedAddresses')}
+                    </Typography>
+                    <Stack
+                      direction="row"
+                      role="group"
+                      aria-labelledby="direcciones-guardadas"
+                      sx={{ gap: 1, flexWrap: 'wrap' }}
+                    >
+                      {prefill.addresses.map((direccion, indice) => (
+                        <Chip
+                          key={`${formatSavedAddress(direccion)}-${indice}`}
+                          clickable
+                          variant={watched.address === direccion.address ? 'filled' : 'outlined'}
+                          color={watched.address === direccion.address ? 'primary' : 'default'}
+                          label={direccion.label ? `${direccion.label} · ${formatSavedAddress(direccion)}` : formatSavedAddress(direccion)}
+                          onClick={() => usarDireccion(direccion)}
+                          sx={{ maxWidth: '100%', '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' } }}
+                        />
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
                 <TextField
                   label={t('store.checkout.address')}
                   autoComplete="street-address"
@@ -770,6 +851,28 @@ export function StoreCheckoutPage() {
                     un numero de tarjeta a quien va a pagar por transferencia es
                     pedir un dato que nadie va a usar. */}
                 {pideTarjeta && <CardFields datos={tarjeta} onCambio={setTarjeta} error={null} />}
+
+                {/* N05 · Solo si la cuenta con la que se compra la EXIGE. Sin esa
+                    exigencia no hay campo: una casilla opcional más en el paso
+                    que cierra la compra es ruido para casi todos. */}
+                {ordenDeCompraObligatoria && (
+                  <TextField
+                    id="checkout-purchase-order"
+                    label={t('store.checkout.purchaseOrder')}
+                    required
+                    fullWidth
+                    autoComplete="off"
+                    placeholder="OC-2026-00125"
+                    error={Boolean(errors.purchaseOrderNumber) || errorKey === 'store.checkout.error.purchaseOrderRequired'}
+                    helperText={
+                      errors.purchaseOrderNumber
+                        ? t(errors.purchaseOrderNumber.message as MessageKey)
+                        : t('store.checkout.purchaseOrderHelp')
+                    }
+                    slotProps={{ htmlInput: { maxLength: 60 } }}
+                    {...register('purchaseOrderNumber')}
+                  />
+                )}
               </>
             )}
           </Stack>

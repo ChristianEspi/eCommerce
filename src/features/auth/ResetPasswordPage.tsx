@@ -4,7 +4,7 @@ import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded'
 import { Alert, Box, Button, IconButton, InputAdornment, Stack, TextField } from '@mui/material'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Link as RouterLink, Navigate } from 'react-router-dom'
+import { Link as RouterLink, Navigate, useLocation } from 'react-router-dom'
 import { z } from 'zod'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
@@ -12,12 +12,13 @@ import { LoadingState } from '@/shared/ui/states'
 import { R } from '@/theme/tokens'
 import { AuthShell, CTA_SX, FieldLabel, ROUNDED_FIELD_SX } from './AuthShell'
 import { AuthActionError, updatePassword } from './authApi'
+import { MIN_PASSWORD_LENGTH } from './passwordPolicy'
+import { returnPathOr } from './returnTo'
 import { useSessionContext } from './session-context'
 
-/** 8 caracteres es el mínimo por defecto de Supabase Auth; no se relaja aquí. */
 const schema = z
   .object({
-    password: z.string().min(8, 'auth.reset.tooShort'),
+    password: z.string().min(MIN_PASSWORD_LENGTH, 'auth.reset.tooShort'),
     confirm: z.string().min(1, 'auth.reset.confirmRequired'),
   })
   .refine((values) => values.password === values.confirm, {
@@ -33,10 +34,14 @@ type FormValues = z.infer<typeof schema>
  * Solo se llega aquí con la sesión especial que emite el enlace del correo
  * (`PASSWORD_RECOVERY`). Con esa sesión el resto del backoffice está cerrado:
  * mientras no haya contraseña nueva, el guard devuelve a esta pantalla.
+ *
+ * Al terminar va a `?returnTo=` si es una ruta interna (la cuenta de la tienda
+ * de la que se pidió el enlace, N02) y a `/app` si no, como siempre.
  */
 export function ResetPasswordPage() {
   const { t } = useI18n()
   const { status, clearRecovery } = useSessionContext()
+  const location = useLocation()
   const [showPassword, setShowPassword] = useState(false)
   const [done, setDone] = useState(false)
   const [serverError, setServerError] = useState<MessageKey | null>(null)
@@ -64,7 +69,7 @@ export function ResetPasswordPage() {
   }
 
   if (status === 'loading') return <LoadingState />
-  if (done) return <Navigate to="/app" replace />
+  if (done) return <Navigate to={returnPathOr(null, location.search, '/app', 'returnTo')} replace />
 
   // Sin sesión no hay nada que cambiar: el enlace caducó o se abrió suelto.
   const linkExpired = status === 'anonymous'
