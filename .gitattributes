@@ -1,0 +1,8 @@
+# Los scripts de Node empiezan con un shebang (`#!/usr/bin/env node`).
+#
+# Con `core.autocrlf=true` —lo habitual en Windows— git los saca con CRLF, el
+# `\r` queda pegado al shebang y Vitest no puede cargarlos: la suite falla con
+# `SyntaxError: Invalid or unexpected token` en `scripts/*.test.mjs` sin que el
+# contenido tenga nada mal. Forzar LF aquí hace que no dependa de cómo tenga
+# configurado git cada máquina.
+scripts/*.mjs text eol=lf
