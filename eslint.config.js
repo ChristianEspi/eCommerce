@@ -5,7 +5,9 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist', 'coverage', 'node_modules'] },
+  // `.claude`: worktrees de trabajo en paralelo, copias completas del repo. Un
+  // lint del árbol principal no tiene nada que decir sobre otra rama.
+  { ignores: ['dist', 'coverage', 'node_modules', '.claude'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],

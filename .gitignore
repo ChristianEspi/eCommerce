@@ -35,3 +35,7 @@ EBIM_eCommerce_Demo_VSCode_Prompts/
 # Salida del servidor de desarrollo.
 vite-dev.log
 
+# Worktrees de trabajo en paralelo: cada uno es una rama viva con su propio
+# commit. Se integran por git, no copiando carpetas.
+.claude/worktrees/
+

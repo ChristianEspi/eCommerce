@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from 'vitest/config'
+import { configDefaults, defineConfig, type Plugin } from 'vitest/config'
 import { loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { createHash } from 'node:crypto'
@@ -231,6 +231,12 @@ export default defineConfig(({ mode }) => {
       // ver `src/test/jsdom-environment.ts`.
       environment: './src/test/jsdom-environment.ts',
       setupFiles: ['./src/test/setup.ts'],
+      // Los worktrees de trabajo en paralelo viven bajo `.claude/worktrees` y
+      // son copias COMPLETAS del repositorio, con sus propios tests. Sin esto la
+      // suite los recoge: corre cada archivo una vez por worktree y mezcla en el
+      // resultado código a medio hacer de otra rama, que es justo lo contrario
+      // de lo que un gate tiene que medir.
+      exclude: [...configDefaults.exclude, '.claude/**'],
       css: false,
       // Los flujos completos (login -> alta -> panel) recorren el router real con
       // rutas `React.lazy`. Con la suite entera en paralelo, resolver esos
