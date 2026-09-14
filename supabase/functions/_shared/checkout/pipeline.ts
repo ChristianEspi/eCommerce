@@ -254,6 +254,26 @@ export async function runCheckout(
       }
 
       /**
+       * A1 · Una cuenta con el crédito bloqueado no compra.
+       *
+       * AQUÍ, en la etapa 2, y no al crear el pedido: todo lo que viene después
+       * —precio, reserva de stock, apertura del pago— es trabajo que habría que
+       * deshacer. Detenerse antes de empezarlo es la diferencia entre rechazar
+       * una compra y compensarla.
+       *
+       * No es la autoridad. La base impide insertar el pedido con su trigger
+       * aunque esta etapa no se ejecute o el puerto no informe el estado; esto
+       * solo evita llegar hasta ahí.
+       */
+      if (resolved.creditBlocked) {
+        throw new CheckoutStageError({
+          stage: 'validate_account',
+          code: 'CREDITO_BLOQUEADO',
+          message: 'La cuenta corporativa tiene el credito bloqueado',
+        })
+      }
+
+      /**
        * P18 · La tienda que solo vende a quien ha entrado.
        *
        * Se comprueba contra la identidad VERIFICADA, no contra `hasSession`:

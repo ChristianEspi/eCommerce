@@ -687,10 +687,18 @@ describe('exigir el cobro antes de entregar', () => {
     expect(message).toMatch(/PAGO_PENDIENTE/)
   })
 
-  /** Y una cuenta con el credito BLOQUEADO no es una cuenta a credito. */
+  /**
+   * Y una cuenta con el credito BLOQUEADO no es una cuenta a credito.
+   *
+   * El pedido se crea con la cuenta AL DIA y el bloqueo llega despues. Desde A1
+   * no puede ser de otra forma —una cuenta bloqueada ya no puede crear pedidos—,
+   * y es ademas el caso real que esta prueba vigila: un pedido vivo de una
+   * cuenta a la que cobranzas acaba de retener.
+   */
   it('con el credito bloqueado, la excepcion no aplica', async () => {
-    const cuenta = await cuentaConCredito('BLOQ', 'blocked')
+    const cuenta = await cuentaConCredito('BLOQ', 'ok')
     const { entrega, pedido } = await nueva(cuenta)
+    await svc(`update public.business_accounts set credit_status = 'blocked' where id = $1`, [cuenta])
     await conMedio(pedido, 'credito-bloq', 'credit')
     await dejarLista(entrega)
 

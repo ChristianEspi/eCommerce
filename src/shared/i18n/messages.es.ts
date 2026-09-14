@@ -405,6 +405,10 @@ export const es = {
       'Preparar el pedido se puede igual; lo que se frena es marcarlo en camino o entregado mientras no conste el pago. Las cuentas con línea de crédito quedan exentas.',
     'store.checkout.error.spendingLimit':
       'El importe supera tu límite de autorización. Pídele a quien administra tu cuenta que lo revise.',
+    // A1 · Crédito bloqueado. Dice a quién acudir, porque reintentar no lo
+    // arregla: el bloqueo lo levanta quien cobra, no quien compra.
+    'store.checkout.error.creditBlocked':
+      'Tu empresa tiene el crédito bloqueado y no puede hacer pedidos ahora. Contacta con el área de cobranzas de la tienda.',
     'store.checkout.error.payment': 'El pago no se pudo autorizar. Prueba con otro medio.',
     'store.checkout.error.delivery': 'No podemos entregar en esa dirección.',
     'store.checkout.error.rateLimit':

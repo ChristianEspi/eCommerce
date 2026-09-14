@@ -259,6 +259,8 @@ export function mapCheckoutCode(code: string): MessageKey {
       return 'store.checkout.error.needsAccount'
     case 'LIMITE_DE_AUTORIZACION':
       return 'store.checkout.error.spendingLimit'
+    case 'CREDITO_BLOQUEADO':
+      return 'store.checkout.error.creditBlocked'
     case 'ORDEN_COMPRA_REQUERIDA':
       return 'store.checkout.error.purchaseOrderRequired'
     case 'ORDEN_COMPRA_INVALIDA':

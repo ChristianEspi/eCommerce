@@ -71,6 +71,10 @@ const STAGE_CODE_STATUS: Record<string, ErrorStatus> = {
   // --- Cliente y cuenta ---
   CUENTA_NO_VINCULADA: 403,
   LIMITE_DE_AUTORIZACION: 403,
+  // A1: la cuenta está en retención de crédito. 403 y no 402: no falta un pago
+  // que el comprador pueda hacer ahora, falta que quien cobra levante el
+  // bloqueo. Por la misma razón NO es reintentable: insistir no lo cambia.
+  CREDITO_BLOQUEADO: 403,
   // --- Catálogo y precio ---
   PRODUCTO_NO_DISPONIBLE: 404,
   PRODUCTO_FUERA_DE_CANAL: 409,

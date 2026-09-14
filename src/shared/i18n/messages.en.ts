@@ -395,6 +395,10 @@ export const en: Readonly<Record<MessageKey, string>> = {
       'Preparing the order still works; what is blocked is marking it in transit or delivered while no payment is on record. Accounts with a credit line are exempt.',
     'store.checkout.error.spendingLimit':
       'The amount is over your approval limit. Ask whoever manages your account to review it.',
+    // A1 · Credit hold. Says who to contact, because retrying will not fix it:
+    // the hold is lifted by collections, not by the buyer.
+    'store.checkout.error.creditBlocked':
+      'Your company’s credit is on hold and it cannot place orders right now. Please contact the store’s collections team.',
     'store.checkout.error.payment': 'The payment could not be authorised. Try another method.',
     'store.checkout.error.delivery': 'We cannot deliver to that address.',
     'store.checkout.error.rateLimit':

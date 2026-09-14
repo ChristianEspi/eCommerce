@@ -261,6 +261,9 @@ export function createDbPorts(options: DbPortOptions): CheckoutPorts {
         accountId: text(effective, 'account_id'),
         role: nullableText(effective, 'role'),
         spendingLimit: nullableText(effective, 'spending_limit'),
+        // A1: el estado sale de la MISMA fila que firma el pedido, resuelta con
+        // el token del comprador. Ningún campo del cuerpo puede declararlo.
+        creditBlocked: nullableText(effective, 'credit_status') === 'blocked',
       }
     },
 

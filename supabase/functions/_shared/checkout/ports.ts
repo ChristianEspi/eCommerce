@@ -80,6 +80,17 @@ export interface AccountContext {
   readonly role: string | null
   /** Tope de autorización de la persona, como texto decimal. `null` = sin tope. */
   readonly spendingLimit: MoneyText | null
+  /**
+   * A1 · La cuenta tiene el crédito BLOQUEADO.
+   *
+   * Opcional a propósito, y ausente cuenta como «no bloqueada». No es un
+   * descuido de seguridad: esto es solo el AVISO TEMPRANO, el que detiene la
+   * compra antes de reservar stock y abrir el pago. La autoridad es la base —el
+   * trigger `orders_assert_account_credit_open` impide insertar el pedido—, así
+   * que un puerto que no informe este campo no abre ningún hueco: como mucho
+   * llega hasta `create_order` y ahí se detiene, con compensación.
+   */
+  readonly creditBlocked?: boolean
 }
 
 /**
