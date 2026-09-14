@@ -29,6 +29,7 @@ import { useStoreAccounts } from './commerce/accounts'
 import { ConsumerAccount } from './account/ConsumerAccount'
 import { useMyPendingApprovals } from './account/approvals'
 import { MyApprovalsSection } from './account/MyApprovalsSection'
+import { MyQuotesSection } from './account/MyQuotesSection'
 import { MyCouponsSection } from './account/MyCouponsSection'
 import { MyOrdersSection } from './account/MyOrdersSection'
 import { MySuggestionsSection } from './account/MySuggestionsSection'
@@ -380,6 +381,20 @@ export function StoreAccountPage() {
             label: t('account.tab.suggestions'),
             content: <MySuggestionsSection storeId={storefront?.store.store_id ?? null} />,
           },
+          // Cierre A3. `cotizaciones` es el ancla a la que lleva «Ver mis
+          // cotizaciones» tras pedir una desde el carrito: cambiar el id rompe
+          // ese enlace. Sin tienda resuelta no hay a qué cotizaciones preguntar.
+          ...(storefront
+            ? [
+                {
+                  id: 'cotizaciones',
+                  label: t('account.tab.quotes'),
+                  content: (
+                    <MyQuotesSection storeSlug={storefront.storeSlug} storeId={storefront.store.store_id} />
+                  ),
+                },
+              ]
+            : []),
           { id: 'avisos', label: t('account.tab.notifications'), content: <StoreNotificationsSection /> },
           { id: 'cuenta', label: t('account.tab.summary'), content: resumen },
         ]}
