@@ -409,6 +409,53 @@ export const es = {
     // arregla: el bloqueo lo levanta quien cobra, no quien compra.
     'store.checkout.error.creditBlocked':
       'Tu empresa tiene el crédito bloqueado y no puede hacer pedidos ahora. Contacta con el área de cobranzas de la tienda.',
+
+    // --- Cierre A3 · cotizaciones del comprador ------------------------------
+    'account.tab.quotes': 'Cotizaciones',
+    'account.quotes.status.requested': 'Solicitada',
+    'account.quotes.status.sent': 'Por aceptar',
+    'account.quotes.status.accepted': 'Aceptada',
+    'account.quotes.status.rejected': 'Rechazada',
+    'account.quotes.status.expired': 'Vencida',
+    'account.quotes.validUntil': 'Válida hasta el {date}',
+    'account.quotes.product': 'Producto',
+    'account.quotes.quantity': 'Cantidad',
+    'account.quotes.unitPrice': 'Precio unitario',
+    'account.quotes.accept': 'Aceptar y llevar al carrito',
+    'account.quotes.addAgain': 'Llevar al carrito',
+    'account.quotes.added': 'Cotización aceptada. Las líneas están en tu carrito con el precio cotizado.',
+    'account.quotes.addedPartial': '{added} líneas añadidas; {skipped} ya no están disponibles.',
+    'account.quotes.empty': 'Todavía no tienes cotizaciones',
+    'account.quotes.emptyBody': 'Puedes pedir una desde tu carrito con «Solicitar cotización».',
+    'account.quotes.requestedHint': 'La tienda está preparando el precio. Aparecerá aquí para aceptarla.',
+    // Por qué a veces no hay botón: aceptar crearía un acuerdo que el carrito no
+    // puede usar, y el pedido saldría a precio de catálogo sin avisar.
+    'account.quotes.blocked.tooLarge':
+      'Esta cotización tiene cantidades mayores a las que admite el carrito de la tienda. Pide a tu vendedor que convierta el pedido.',
+    'account.quotes.blocked.presentation':
+      'Esta cotización está en presentaciones que el carrito de la tienda no admite. Pide a tu vendedor que convierta el pedido.',
+    'account.quotes.hint': 'El precio cotizado se aplica al comprar las cantidades cotizadas, una vez y hasta la fecha de validez.',
+    'account.quotes.error.expired': 'La cotización ya venció. Pide una nueva a la tienda.',
+    'account.quotes.error.converted': 'Esta cotización ya se convirtió en un pedido.',
+    'account.quotes.error.notAcceptable': 'Esta cotización no se puede aceptar. Consulta con la tienda.',
+    'account.quotes.error.forbidden': 'Tu rol en la cuenta no permite aceptar cotizaciones.',
+    'account.quotes.error.notFound': 'No encontramos esa cotización en tu cuenta.',
+    'account.quotes.error.generic': 'No se pudo aceptar la cotización. Inténtalo de nuevo.',
+    'store.cart.requestQuote.button': 'Solicitar cotización',
+    'store.cart.requestQuote.title': 'Solicitar cotización',
+    'store.cart.requestQuote.body':
+      'Enviaremos a la tienda las {count} líneas de tu carrito para que te prepare un precio. No se crea ningún pedido.',
+    'store.cart.requestQuote.notes': 'Nota para el vendedor (opcional)',
+    'store.cart.requestQuote.notesTooLong': 'La nota admite como máximo 1000 caracteres.',
+    'store.cart.requestQuote.send': 'Enviar solicitud',
+    'store.cart.requestQuote.sending': 'Enviando…',
+    'store.cart.requestQuote.done': 'Solicitud enviada con el número {number}.',
+    'store.cart.requestQuote.doneHint': 'Cuando la tienda la cotice, la verás en tu cuenta para aceptarla.',
+    'store.cart.requestQuote.seeQuotes': 'Ver mis cotizaciones',
+    'store.cart.requestQuote.error.forbidden': 'Tu cuenta no puede pedir cotizaciones en esta tienda.',
+    'store.cart.requestQuote.error.unavailable': 'Esta tienda no ofrece cotizaciones.',
+    'store.cart.requestQuote.error.lines': 'Alguna línea del carrito ya no se puede cotizar. Revisa el carrito.',
+    'store.cart.requestQuote.error.generic': 'No se pudo enviar la solicitud. Inténtalo de nuevo.',
     'store.checkout.error.payment': 'El pago no se pudo autorizar. Prueba con otro medio.',
     'store.checkout.error.delivery': 'No podemos entregar en esa dirección.',
     'store.checkout.error.rateLimit':

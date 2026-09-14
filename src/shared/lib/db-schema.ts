@@ -464,6 +464,17 @@ export const MY_COMMERCE_CONTEXT_RPC = 'my_commerce_context' satisfies FunctionN
 export const MY_STORE_BUSINESS_ACCOUNTS_RPC = 'my_store_business_accounts' satisfies FunctionName
 export const SELECT_STORE_BUSINESS_ACCOUNT_RPC = 'select_store_business_account' satisfies FunctionName
 
+// --- Cierre A3 · cotizaciones del comprador (migración 20260914101000) -------
+// SIN `satisfies`: la migración aún no está en el proyecto contra el que se
+// generan los tipos. La red de seguridad es `supabase/tests/quote-to-order.test.ts`.
+// Ninguna acepta un id de cuenta ni de cliente: los resuelve la sesión.
+/** Las cotizaciones del comprador en esta tienda, sin los borradores del vendedor. */
+export const MY_QUOTES_RPC = 'my_quotes'
+/** Aceptar: el precio pasa a acuerdo del motor y las líneas vuelven para el carrito. */
+export const ACCEPT_QUOTE_RPC = 'accept_quote'
+/** Pedir una cotización: borrador con precio de referencia del motor. */
+export const REQUEST_QUOTE_RPC = 'request_quote'
+
 // Pagos (P09-SaaS). Las TRES que puede llamar el navegador con sesión, y su
 // autorización vive dentro de cada una. Las del servidor —`payment_intent_open`,
 // `payment_intent_attach_order`, `payment_apply_outcome`, `payment_refund_settle`—

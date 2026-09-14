@@ -399,6 +399,53 @@ export const en: Readonly<Record<MessageKey, string>> = {
     // the hold is lifted by collections, not by the buyer.
     'store.checkout.error.creditBlocked':
       'Your company’s credit is on hold and it cannot place orders right now. Please contact the store’s collections team.',
+
+    // --- A3 closure · buyer quotes -------------------------------------------
+    'account.tab.quotes': 'Quotes',
+    'account.quotes.status.requested': 'Requested',
+    'account.quotes.status.sent': 'Awaiting acceptance',
+    'account.quotes.status.accepted': 'Accepted',
+    'account.quotes.status.rejected': 'Rejected',
+    'account.quotes.status.expired': 'Expired',
+    'account.quotes.validUntil': 'Valid until {date}',
+    'account.quotes.product': 'Product',
+    'account.quotes.quantity': 'Quantity',
+    'account.quotes.unitPrice': 'Unit price',
+    'account.quotes.accept': 'Accept and add to cart',
+    'account.quotes.addAgain': 'Add to cart',
+    'account.quotes.added': 'Quote accepted. The lines are in your cart at the quoted price.',
+    'account.quotes.addedPartial': '{added} lines added; {skipped} are no longer available.',
+    'account.quotes.empty': 'You have no quotes yet',
+    'account.quotes.emptyBody': 'You can request one from your cart with “Request a quote”.',
+    'account.quotes.requestedHint': 'The store is preparing the price. It will show up here for you to accept.',
+    // Why there is sometimes no button: accepting would create an agreement the
+    // cart cannot use, and the order would silently be charged at list price.
+    'account.quotes.blocked.tooLarge':
+      'This quote has quantities larger than the store’s cart allows. Ask your sales rep to place the order.',
+    'account.quotes.blocked.presentation':
+      'This quote uses pack sizes the store’s cart does not support. Ask your sales rep to place the order.',
+    'account.quotes.hint': 'The quoted price applies when you buy the quoted quantities, once, until the validity date.',
+    'account.quotes.error.expired': 'The quote has expired. Request a new one from the store.',
+    'account.quotes.error.converted': 'This quote has already become an order.',
+    'account.quotes.error.notAcceptable': 'This quote cannot be accepted. Please check with the store.',
+    'account.quotes.error.forbidden': 'Your role on the account does not allow accepting quotes.',
+    'account.quotes.error.notFound': 'We could not find that quote on your account.',
+    'account.quotes.error.generic': 'The quote could not be accepted. Please try again.',
+    'store.cart.requestQuote.button': 'Request a quote',
+    'store.cart.requestQuote.title': 'Request a quote',
+    'store.cart.requestQuote.body':
+      'We will send the {count} lines in your cart to the store so it can prepare a price. No order is created.',
+    'store.cart.requestQuote.notes': 'Note for the sales rep (optional)',
+    'store.cart.requestQuote.notesTooLong': 'The note can be at most 1000 characters.',
+    'store.cart.requestQuote.send': 'Send request',
+    'store.cart.requestQuote.sending': 'Sending…',
+    'store.cart.requestQuote.done': 'Request sent with number {number}.',
+    'store.cart.requestQuote.doneHint': 'Once the store quotes it, you will see it in your account to accept.',
+    'store.cart.requestQuote.seeQuotes': 'See my quotes',
+    'store.cart.requestQuote.error.forbidden': 'Your account cannot request quotes in this store.',
+    'store.cart.requestQuote.error.unavailable': 'This store does not offer quotes.',
+    'store.cart.requestQuote.error.lines': 'Some cart lines can no longer be quoted. Please review your cart.',
+    'store.cart.requestQuote.error.generic': 'The request could not be sent. Please try again.',
     'store.checkout.error.payment': 'The payment could not be authorised. Try another method.',
     'store.checkout.error.delivery': 'We cannot deliver to that address.',
     'store.checkout.error.rateLimit':
