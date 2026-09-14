@@ -424,6 +424,12 @@ export const SEED_INVENTORY_RPC = 'seed_inventory_from_catalog'
 export const CART_OPEN_RPC = 'cart_open'
 export const CART_REPLACE_LINES_RPC = 'cart_replace_lines'
 export const CART_ABANDON_RPC = 'cart_abandon'
+// Pedido rápido y CSV (cierre). Traduce `[{sku, quantity}]` a producto y
+// variante con un motivo por fila; solo con sesión, porque el SKU no es
+// público. No toca el carrito: las filas aceptadas entran por el carrito de
+// siempre. Sin `satisfies` hasta regenerar los tipos: la red mientras tanto es
+// `supabase/tests/quick-order-resolver.test.ts`.
+export const RESOLVE_ORDER_LINES_RPC = 'resolve_order_lines_for_slug'
 
 // OMS (P08-SaaS). Los COMANDOS del pedido. No hay ningún `update` directo sobre
 // `orders` en `features/orders`: los tres ejes nuevos no tienen GRANT de
