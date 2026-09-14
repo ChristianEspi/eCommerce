@@ -385,8 +385,16 @@ export function createDbPorts(options: DbPortOptions): CheckoutPorts {
         })
       }
 
+      // R01 · Con el cliente del LLAMANTE y no con `service`, por la misma razón
+      // que `resolvePrices`: la RPC recalcula el subtotal con `ebim.build_quote`,
+      // que resuelve el precio comercial desde la SESIÓN. Con `service_role` no
+      // hay sesión, el subtotal salía a precio público y el umbral de envío
+      // gratis se evaluaba con otro número que el de `create_order`: el checkout
+      // autorizaba el cobro, el tope y la aprobación con un envío distinto del
+      // que el pedido cobraba. La función está concedida a `anon` y
+      // `authenticated` (la vitrina ya la llama así) y no recibe identidad.
       const quoted = record(
-        await service('delivery_options_for_slug', {
+        await caller('delivery_options_for_slug', {
           p_store_slug: input.context.storeSlug,
           p_address: input.address,
           p_items: itemPayload(input.items),

@@ -25,6 +25,7 @@ vi.mock('@/shared/lib/supabase', () => ({
 
 const { CommerceContextBar } = await import('./CommerceContextBar')
 const { useCartQuote } = await import('@/features/pricing/useCartQuote')
+const { useDeliveryOptions } = await import('../delivery')
 
 const PRODUCTO = 'cccc1111-1111-4111-8111-111111111111'
 const LINEAS = [{ productId: PRODUCTO, variantId: null, uomCode: null, quantity: 1 }]
@@ -33,6 +34,21 @@ const LINEAS = [{ productId: PRODUCTO, variantId: null, uomCode: null, quantity:
 function TotalDelCarrito() {
   const quote = useCartQuote('tienda-a', 'PEN', LINEAS)
   return <p data-testid="total">{quote.data?.grossTotal ?? '…'}</p>
+}
+
+/** Las opciones de entrega del checkout, con el hook real de la vitrina. */
+function EntregaDelCheckout() {
+  const cart = {
+    store_id: 'aaaa1111-1111-4111-8111-111111111111',
+    lines: [{ product_id: PRODUCTO, variant_id: null, slug: 'jabon', name: 'Jabón', unit_price: '10.00', currency: 'PEN', image_path: null, quantity: 1 }],
+  } as unknown as Parameters<typeof useDeliveryOptions>[0]['cart']
+  const delivery = useDeliveryOptions({
+    storeSlug: 'tienda-a',
+    address: { address: 'Av. Primavera 120', city: 'Lima', country: 'PE' } as Parameters<typeof useDeliveryOptions>[0]['address'],
+    cart,
+    enabled: true,
+  })
+  return <p data-testid="entrega">{delivery.status}</p>
 }
 
 function cotizacion(unit: string) {
@@ -173,7 +189,7 @@ describe('CommerceContextBar · varias cuentas en la tienda (N01)', () => {
     is_effective: false,
   }
 
-  function pintarMulti(select: (args: Record<string, unknown>) => unknown, conCarrito = false) {
+  function pintarMulti(select: (args: Record<string, unknown>) => unknown, conCarrito = false, conEntrega = false) {
     let efectiva = A.account_id
     const session = makeSession({ withTenantClaims: false })
     const fake: FakeSupabase = createFakeSupabase({
@@ -196,6 +212,7 @@ describe('CommerceContextBar · varias cuentas en la tienda (N01)', () => {
         },
         // El precio lo decide la cuenta efectiva del SERVIDOR: A cotiza 8, B cotiza 6.
         promotion_quote_for_slug: () => cotizacion(efectiva === A.account_id ? '8.00' : '6.00'),
+        delivery_options_for_slug: () => ({ currency: 'PEN', subtotal: '8.00', options: [] }),
       },
     })
     holder.client = fake
@@ -203,6 +220,7 @@ describe('CommerceContextBar · varias cuentas en la tienda (N01)', () => {
       <>
         <CommerceContextBar storeSlug="tienda-a" />
         {conCarrito && <TotalDelCarrito />}
+        {conEntrega && <EntregaDelCheckout />}
       </>,
       { session },
     )
@@ -250,6 +268,22 @@ describe('CommerceContextBar · varias cuentas en la tienda (N01)', () => {
     for (const c of cotizaciones) {
       expect(c.args).toEqual({ p_store_slug: 'tienda-a', p_items: [{ product_id: PRODUCTO, quantity: 1 }] })
     }
+  })
+
+  it('R01 · cambiar de cuenta vuelve a pedir las opciones de entrega (su umbral depende del precio)', async () => {
+    const user = userEvent.setup()
+    const fake = pintarMulti(() => ({ account_id: B.account_id }), false, true)
+    await waitFor(() => expect(fake.state.rpcCalls.filter((c) => c.name === 'delivery_options_for_slug')).toHaveLength(1))
+
+    await user.click(await screen.findByRole('button', { name: /Cambiar cuenta/ }))
+    await user.click(within(await screen.findByRole('menu')).getByText(B.name))
+    await screen.findByRole('status')
+
+    const entregas = fake.state.rpcCalls.filter((c) => c.name === 'delivery_options_for_slug')
+    expect(entregas).toHaveLength(2)
+    // La misma petición: dirección y qué se compra, sin cuenta ni precio.
+    expect(entregas[1]!.args).toEqual(entregas[0]!.args)
+    expect(JSON.stringify(entregas[1]!.args)).not.toMatch(/business_account|customer_id|segment_id|price/)
   })
 
   it('si el servidor rechaza la cuenta, lo dice y la barra sigue con la de antes', async () => {

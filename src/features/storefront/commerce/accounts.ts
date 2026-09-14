@@ -72,9 +72,10 @@ export interface AccountSwitchResult {
  *
  * El carrito no se toca: sus líneas son las mismas; lo que cambia es con qué
  * condiciones se cotizan, y eso lo vuelve a decir el servidor. Se invalidan el
- * contexto, la lista de cuentas y TODAS las cotizaciones (`['pricing']`: ficha,
- * carrito, checkout y precio de catálogo), y se esperan las que están a la
- * vista para poder decir si el precio cambió.
+ * contexto, la lista de cuentas, TODAS las cotizaciones (`['pricing']`: ficha,
+ * carrito, checkout y precio de catálogo) y las opciones de entrega (su umbral
+ * de envío gratis depende del precio), y se esperan las que están a la vista
+ * para poder decir si el precio cambió.
  */
 export function useSwitchStoreAccount(storeSlug: string) {
   const queryClient = useQueryClient()
@@ -86,6 +87,9 @@ export function useSwitchStoreAccount(storeSlug: string) {
         queryClient.invalidateQueries({ queryKey: commerceContextKey(storeSlug) }),
         queryClient.invalidateQueries({ queryKey: storeAccountsKey(storeSlug) }),
         queryClient.invalidateQueries({ queryKey: ['pricing'] }),
+        // R01 · Las opciones de entrega recalculan el subtotal con el precio de
+        // la cuenta: el umbral de envío gratis puede cambiar con ella.
+        queryClient.invalidateQueries({ queryKey: ['storefront', 'delivery'] }),
       ])
       const after = quotedTotals(queryClient)
       let pricesChanged = false
