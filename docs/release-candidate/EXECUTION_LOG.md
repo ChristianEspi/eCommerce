@@ -116,3 +116,11 @@ Files: `docs/release-candidate/VISUAL_QA.md`, `docs/release-candidate/visual/*.p
 (desbordamiento, cabecera, pie, categorías, tarjetas, barra de contexto, selector, precio comercial, carrito,
 checkout 1–3, OC, portal/cuenta, pestañas alcanzables, consola limpia). Tema de la tienda local restaurado al terminar.
 Sin cambios de diseño (ningún defecto observado).
+Commit: `349203f`
+
+## R09
+Status: PASS
+Files: `docs/release-candidate/PERFORMANCE.md`.
+`bundle:report`: 402,3/405 · 386,2/400 · 404,6/430 · 360,7/430 (idéntico a R00). Análisis por chunk y desglose de la
+entrada por sourcemap. Probado importar capacidades sin el barril `@/domain` para sacar `zod` de la entrada: 402,8
+(peor) → revertido. Sin cambios de código; techos intactos.
