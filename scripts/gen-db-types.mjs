@@ -17,6 +17,14 @@
  * deja el archivo anterior intacto y devuelve exit 1.
  *
  * Requiere el CLI de Supabase y el proyecto enlazado (`supabase link`).
+ *
+ * ## Desde una base LOCAL (Release Candidate, R02)
+ *
+ * `DB_TYPES_DB_URL=postgresql://postgres:postgres@127.0.0.1:55322/postgres npm run db:types`
+ * genera contra esa base en vez de contra el proyecto enlazado. Es la forma de
+ * obtener los tipos de migraciones que todavía no están aplicadas en DEV/QAS
+ * sin tocar DEV/QAS. Solo se admite un host local: un `DB_TYPES_DB_URL` remoto
+ * se rechaza, para que nadie apunte esto por error a una base compartida.
  */
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync, readFileSync } from 'node:fs'
@@ -37,9 +45,24 @@ function fail(reason) {
   process.exit(1)
 }
 
+const localDbUrl = process.env.DB_TYPES_DB_URL
+let source = ['--linked']
+if (localDbUrl) {
+  let host = ''
+  try {
+    host = new URL(localDbUrl).hostname
+  } catch {
+    fail('DB_TYPES_DB_URL no es una URL de Postgres válida.')
+  }
+  if (!['127.0.0.1', 'localhost', '::1'].includes(host)) {
+    fail(`DB_TYPES_DB_URL apunta a ${host}: solo se admite una base local.`)
+  }
+  source = ['--db-url', `"${localDbUrl}"`]
+}
+
 const result = spawnSync(
   'supabase',
-  ['gen', 'types', 'typescript', '--linked', '--schema', 'public'],
+  ['gen', 'types', 'typescript', ...source, '--schema', 'public'],
   { encoding: 'utf8', shell: true, maxBuffer: 64 * 1024 * 1024 },
 )
 

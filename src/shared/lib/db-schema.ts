@@ -436,28 +436,33 @@ export const ORDER_APPROVAL_DECIDE_RPC = 'order_approval_decide'
 export const MY_BUSINESS_ORDERS_RPC = 'my_business_orders'
 // Cuenta del CONSUMIDOR registrado (hardening H02-H04, migración 20260913100000).
 // Las tres reciben el slug público de la tienda y nada más: el usuario sale del
-// JWT y los pedidos, del vínculo que escribe el checkout (`order_buyers`). Sin
-// `satisfies` hasta regenerar los tipos: la red es `consumer-account.test.ts`.
+// JWT y los pedidos, del vínculo que escribe el checkout (`order_buyers`).
 // `checkout_link_order_buyer` NO está aquí a propósito: es de `service_role`.
-export const MY_CONSUMER_ORDERS_RPC = 'my_consumer_orders'
-export const MY_CONSUMER_ORDER_DETAIL_RPC = 'my_consumer_order_detail'
-export const MY_CHECKOUT_PROFILE_RPC = 'my_checkout_profile'
+//
+// Release Candidate R02: los tipos se regeneraron desde una base LOCAL con todas
+// las migraciones hasta 20260913160000 (`DB_TYPES_DB_URL`, ver
+// `scripts/gen-db-types.mjs`), así que las constantes de H14 y N01–N06 ya llevan
+// `satisfies`. Si alguien regenera contra un proyecto que NO tenga esas
+// migraciones, el typecheck lo dirá aquí — que es la señal que se busca.
+export const MY_CONSUMER_ORDERS_RPC = 'my_consumer_orders' satisfies FunctionName
+export const MY_CONSUMER_ORDER_DETAIL_RPC = 'my_consumer_order_detail' satisfies FunctionName
+export const MY_CHECKOUT_PROFILE_RPC = 'my_checkout_profile' satisfies FunctionName
 // Libreta de direcciones del consumidor (N06, migración 20260913160000). Sin
 // usuario por parámetro: sale del JWT; la tienda, por su slug.
-export const MY_CONSUMER_ADDRESSES_RPC = 'my_consumer_addresses'
-export const SAVE_MY_CONSUMER_ADDRESS_RPC = 'save_my_consumer_address'
-export const DELETE_MY_CONSUMER_ADDRESS_RPC = 'delete_my_consumer_address'
-export const SET_DEFAULT_MY_CONSUMER_ADDRESS_RPC = 'set_default_my_consumer_address'
+export const MY_CONSUMER_ADDRESSES_RPC = 'my_consumer_addresses' satisfies FunctionName
+export const SAVE_MY_CONSUMER_ADDRESS_RPC = 'save_my_consumer_address' satisfies FunctionName
+export const DELETE_MY_CONSUMER_ADDRESS_RPC = 'delete_my_consumer_address' satisfies FunctionName
+export const SET_DEFAULT_MY_CONSUMER_ADDRESS_RPC = 'set_default_my_consumer_address' satisfies FunctionName
 // Contexto comercial de la sesión en una tienda (H05-H06, migración
 // 20260913110000). Solo para PINTAR «cuenta comercial» o «comprando para»: la
 // misma cuenta que usa el motor de precios, sin un precio ni un id de lista.
-export const MY_COMMERCE_CONTEXT_RPC = 'my_commerce_context'
+export const MY_COMMERCE_CONTEXT_RPC = 'my_commerce_context' satisfies FunctionName
 // Cuenta B2B efectiva y selector multi-cuenta (N01, migración 20260913130000).
 // El navegador PIDE comprar para una de sus cuentas; el servidor valida vínculo,
 // estado y sociedad antes de guardar. `my_effective_business_account_for_slug`
 // la usa el checkout (Edge Function), no la vitrina.
-export const MY_STORE_BUSINESS_ACCOUNTS_RPC = 'my_store_business_accounts'
-export const SELECT_STORE_BUSINESS_ACCOUNT_RPC = 'select_store_business_account'
+export const MY_STORE_BUSINESS_ACCOUNTS_RPC = 'my_store_business_accounts' satisfies FunctionName
+export const SELECT_STORE_BUSINESS_ACCOUNT_RPC = 'select_store_business_account' satisfies FunctionName
 
 // Pagos (P09-SaaS). Las TRES que puede llamar el navegador con sesión, y su
 // autorización vive dentro de cada una. Las del servidor —`payment_intent_open`,
