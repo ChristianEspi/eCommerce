@@ -109,6 +109,8 @@ describe('rutas base', () => {
     //
     // N02 anade `/register`: el alta de CONSUMIDOR vive dentro de la tienda y
     // no en el backoffice (el alta de empresa sigue siendo `/onboarding`).
+    //
+    // El cierre anade `/pedido-rapido`: SKU + cantidad o CSV hacia el carrito.
     expect(paths(storefront?.children ?? [], '/s/:storeSlug').sort()).toEqual([
       '/s/:storeSlug',
       '/s/:storeSlug/account',
@@ -117,6 +119,7 @@ describe('rutas base', () => {
       '/s/:storeSlug/favoritos',
       '/s/:storeSlug/order/:orderNumber',
       '/s/:storeSlug/p/:pageSlug',
+      '/s/:storeSlug/pedido-rapido',
       '/s/:storeSlug/product/:productSlug',
       '/s/:storeSlug/register',
     ])

@@ -1,4 +1,5 @@
 import ApartmentRoundedIcon from '@mui/icons-material/ApartmentRounded'
+import BoltRoundedIcon from '@mui/icons-material/BoltRounded'
 import StorefrontRoundedIcon from '@mui/icons-material/StorefrontRounded'
 import {
   Button,
@@ -299,16 +300,28 @@ export function StoreAccountPage() {
             tienda resuelta —esta pantalla también se monta suelta— porque sin
             slug no hay a dónde ir. */}
         {storefront && (
-          <Button
-            variant="outlined"
-            size="small"
-            component={Link}
-            to={`/s/${storefront.storeSlug}`}
-            startIcon={<StorefrontRoundedIcon fontSize="small" />}
-            sx={{ alignSelf: { xs: 'flex-start', sm: 'auto' }, flexShrink: 0 }}
-          >
-            {t('account.keepShopping')}
-          </Button>
+          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1, flexShrink: 0 }}>
+            {/* Pedido rápido: quien repone con una lista de SKU no busca
+                producto a producto. Termina en el carrito, no en un pedido. */}
+            <Button
+              variant="contained"
+              size="small"
+              component={Link}
+              to={`/s/${storefront.storeSlug}/pedido-rapido`}
+              startIcon={<BoltRoundedIcon fontSize="small" />}
+            >
+              {t('store.quickOrder.open')}
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              component={Link}
+              to={`/s/${storefront.storeSlug}`}
+              startIcon={<StorefrontRoundedIcon fontSize="small" />}
+            >
+              {t('account.keepShopping')}
+            </Button>
+          </Stack>
         )}
       </Stack>
 

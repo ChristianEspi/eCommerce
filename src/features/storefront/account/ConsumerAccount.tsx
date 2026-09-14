@@ -1,4 +1,5 @@
 import ApartmentRoundedIcon from '@mui/icons-material/ApartmentRounded'
+import BoltRoundedIcon from '@mui/icons-material/BoltRounded'
 import StorefrontRoundedIcon from '@mui/icons-material/StorefrontRounded'
 import { Alert, Box, Button, Stack, Typography } from '@mui/material'
 import { Link } from 'react-router-dom'
@@ -93,16 +94,28 @@ export function ConsumerAccount({
         </Box>
 
         {storeSlug && (
-          <Button
-            variant="outlined"
-            size="small"
-            component={Link}
-            to={`/s/${storeSlug}`}
-            startIcon={<StorefrontRoundedIcon fontSize="small" />}
-            sx={{ alignSelf: { xs: 'flex-start', sm: 'auto' }, flexShrink: 0 }}
-          >
-            {t('account.keepShopping')}
-          </Button>
+          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1, flexShrink: 0 }}>
+            {/* Pedido rápido también para el consumidor: una lista de SKU hacia
+                el carrito. Sin cuenta de empresa no hay surtido que recorte. */}
+            <Button
+              variant="outlined"
+              size="small"
+              component={Link}
+              to={`/s/${storeSlug}/pedido-rapido`}
+              startIcon={<BoltRoundedIcon fontSize="small" />}
+            >
+              {t('store.quickOrder.open')}
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              component={Link}
+              to={`/s/${storeSlug}`}
+              startIcon={<StorefrontRoundedIcon fontSize="small" />}
+            >
+              {t('account.keepShopping')}
+            </Button>
+          </Stack>
         )}
       </Stack>
 
