@@ -56,3 +56,12 @@ Files: `.nvmrc` (`24`), `.npmrc` (`engine-strict=true`), `docs/release-candidate
 Mínima ≥ 22.12 (sin cambios), recomendada 24, usada 24.20.0. `npm ci` en copia aislada: Node 20 → EBADENGINE;
 Node 24 y 25 → 414 paquetes. Amplify: no se modificó (su build spec vive en la consola); fijar Node 24 queda en el
 checklist de despliegue.
+Commit: `4bcb401`
+
+## R04
+Status: PASS
+Files: `docs/release-candidate/DEPENDENCY_AUDIT.md`.
+4 moderadas (2 advisories de fondo): React Router 6.30.6 (runtime; open redirect por `\` — no explotable: todas las
+entradas externas pasan por `isInternalPath`/`safeHref`, con tests; SSR hydration — no aplicable, SPA sin SSR) y
+Vitest 3.2.7 (dev-only, no aplicable a producción). Sin PATCH/MINOR disponibles (instaladas = últimas de su major);
+no se tocaron dependencias ni se usó `--force`. 0 HIGH/CRITICAL.
