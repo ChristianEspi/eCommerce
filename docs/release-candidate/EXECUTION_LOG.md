@@ -79,3 +79,15 @@ Tests contra alojamientos simulados: sano → PASS y solo GET; sin rewrite → F
 → FAIL; 502 → FAIL; caché → AVISO; http remoto → rechazado; el fuente no tiene métodos de escritura ni cliente de
 Supabase. Prueba real contra `vite preview` del build en localhost: 16/16 OK → PASS.
 Contra QAS: `NOT_RUN` (no hay `QAS_BASE_URL` en esta máquina).
+Commit: `d1ee316`
+
+## R06
+Status: PASS
+Files: `docs/release-candidate/DEPLOYMENT_MANIFEST.md`.
+Base, Node y hash del lock; 7 migraciones en orden con SHA-256; Edge Functions clasificadas por cierre de imports de
+cada `index.ts` contra los archivos cambiados desde `dev` (`1bcf74f`): `checkout` REQUIRED; `create-order`
+RECOMMENDED (rechaza OC en líneas); `api` y `update-order-status` UNCHANGED (importan `_shared` cambiado sin cambio de
+comportamiento); resto UNCHANGED. Frontend después de migraciones y functions (el backoffice lee
+`orders.purchase_order_number`). Auth Redirect URLs y reescritura de SPA de Amplify documentadas como pendientes,
+sin afirmar que estén configuradas. Roll-forward sin rollback destructivo. Búsqueda de sintaxis exclusiva de
+Postgres ≥ 16 en las siete migraciones: ninguna (DEV/QAS usan 15).
