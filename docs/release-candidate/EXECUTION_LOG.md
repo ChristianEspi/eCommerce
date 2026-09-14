@@ -48,3 +48,11 @@ Diff revisado: +204/−15. Añadidos: tablas `order_buyers`, `buyer_account_sele
 El archivo anterior era de `8fe8cd1` (antes de H14).
 Tests: `npm run test` 206 archivos · 3 931 ✓ · `npm run test:db` 88 · 2 260 ✓ (incluye `delivery-buyer-pricing`).
 Typecheck: PASS · Lint: PASS
+Commit: `6c9eb87`
+
+## R03
+Status: PASS
+Files: `.nvmrc` (`24`), `.npmrc` (`engine-strict=true`), `docs/release-candidate/RUNTIME.md`.
+Mínima ≥ 22.12 (sin cambios), recomendada 24, usada 24.20.0. `npm ci` en copia aislada: Node 20 → EBADENGINE;
+Node 24 y 25 → 414 paquetes. Amplify: no se modificó (su build spec vive en la consola); fijar Node 24 queda en el
+checklist de despliegue.
