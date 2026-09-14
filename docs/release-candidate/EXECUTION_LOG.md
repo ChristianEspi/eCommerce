@@ -65,3 +65,17 @@ Files: `docs/release-candidate/DEPENDENCY_AUDIT.md`.
 entradas externas pasan por `isInternalPath`/`safeHref`, con tests; SSR hydration — no aplicable, SPA sin SSR) y
 Vitest 3.2.7 (dev-only, no aplicable a producción). Sin PATCH/MINOR disponibles (instaladas = últimas de su major);
 no se tocaron dependencias ni se usó `--force`. 0 HIGH/CRITICAL.
+Commit: `26d0c3c`
+
+## R05
+Status: PASS
+Files: `scripts/qas-smoke.mjs` (nuevo, `npm run smoke:qas`), `scripts/qas-smoke.test.mjs` (9).
+Solo GET al alojamiento; ni Supabase, ni login, ni checkout. Variables `QAS_BASE_URL`, `QAS_STORE_SLUG`,
+`QAS_DEEP_LINK`; sin `QAS_BASE_URL` → `QAS_READ_ONLY_SMOKE = NOT_RUN` (código 0). Comprueba `/`, `/s/:slug`,
+`/s/:slug/cart`, `/login` y el deep link configurado reciben el shell del SPA (un 404/403 se reporta como «el
+alojamiento no reescribe las rutas del SPA»), recursos del build (JS/CSS con tipo correcto y no servidos como
+`index.html`), favicon, ningún 5xx, y avisa si `index.html` se cachea. Rechaza `http` fuera de localhost.
+Tests contra alojamientos simulados: sano → PASS y solo GET; sin rewrite → FAIL con motivo; recurso servido como HTML
+→ FAIL; 502 → FAIL; caché → AVISO; http remoto → rechazado; el fuente no tiene métodos de escritura ni cliente de
+Supabase. Prueba real contra `vite preview` del build en localhost: 16/16 OK → PASS.
+Contra QAS: `NOT_RUN` (no hay `QAS_BASE_URL` en esta máquina).
