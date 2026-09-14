@@ -91,3 +91,19 @@ comportamiento); resto UNCHANGED. Frontend después de migraciones y functions (
 `orders.purchase_order_number`). Auth Redirect URLs y reescritura de SPA de Amplify documentadas como pendientes,
 sin afirmar que estén configuradas. Roll-forward sin rollback destructivo. Búsqueda de sintaxis exclusiva de
 Postgres ≥ 16 en las siete migraciones: ninguna (DEV/QAS usan 15).
+Commit: `69bc48c`
+
+## R07
+Status: PASS
+Files: `scripts/demo-preflight.mjs` (ampliado, veredicto `DEMO_PREFLIGHT_RC`).
+Huecos detectados frente al contrato y cerrados: crédito cuando el guion lo enseña (`DEMO_ENTERPRISE_SHOWS_CREDIT`),
+precios distintos por cuenta en MULTI cuando el guion depende de ello (`DEMO_MULTI_PRODUCT_SLUG`, con
+`ebim.resolve_price` sobre el cliente/segmento de cada cuenta), y filas AUTH «NO VERIFICABLE» (Redirect URLs y
+reescritura de SPA) que informan sin bloquear y remiten al manifiesto y a `npm run smoke:qas`. Ya cubría: tienda,
+tema, catálogo, categorías, stock, entrega, pago, país, consumidor sin cuenta, trade/enterprise (cuenta efectiva,
+vínculo, lista, producto demostrable, bloqueo), OC según guion, MULTI 2+ con selección válida, campaña dirigida.
+Solo lecturas; correos enmascarados; ningún secreto.
+Pila local con los cinco usuarios: todo el contrato OK (crédito 50 000 / 30 días; Andina 14,90 vs Boreal 8,20;
+campaña `business_account`); FAIL solo por los 6 umbrales de catálogo del seed local → veredicto correcto.
+Negativos comprobados: OC exigida con guion «no», mismo precio en las dos cuentas y campaña inexistente → FALTA.
+Contra DEV/QAS: no ejecutado (sin `.env`).

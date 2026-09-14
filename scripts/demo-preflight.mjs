@@ -51,7 +51,19 @@
  *  · `DEMO_TARGETED_PROMO_CODE` (opcional): la promoción dirigida de demo existe,
  *    está activa y tiene audiencia distinta de «todos».
  *
- * Veredicto: `DEMO_PREFLIGHT_V2 = PASS | FAIL`.
+ * ## RC (Release Candidate, R07)
+ *
+ *  · `DEMO_ENTERPRISE_SHOWS_CREDIT=true`: el guion enseña crédito → la cuenta
+ *    efectiva tiene límite > 0 y no está bloqueada.
+ *  · `DEMO_MULTI_PRODUCT_SLUG`: el guion enseña que el precio cambia con la
+ *    cuenta → las cuentas del usuario MULTI resuelven precios DISTINTOS para ese
+ *    producto (con el mismo motor, `ebim.resolve_price`, cantidad 1).
+ *  · AUTH: las Redirect URLs de Supabase Auth y la reescritura de SPA del
+ *    alojamiento no se pueden leer desde aquí; se informan como «no verificable»
+ *    (no bloquean) y se remiten a `docs/release-candidate/DEPLOYMENT_MANIFEST.md`
+ *    y a `npm run smoke:qas`.
+ *
+ * Veredicto: `DEMO_PREFLIGHT_RC = PASS | FAIL`.
  *
  * ## Dónde pregunta
  *
@@ -67,7 +79,7 @@
  *       node scripts/demo-preflight.mjs miquimica
  *
  * Salida: una línea por comprobación, los motivos accionables y
- * `DEMO_PREFLIGHT_V2 = PASS` o `DEMO_PREFLIGHT_V2 = FAIL`. Termina con código 1 si
+ * `DEMO_PREFLIGHT_RC = PASS` o `DEMO_PREFLIGHT_RC = FAIL`. Termina con código 1 si
  * algo bloquea la demo, para poder encadenarlo en un gate.
  */
 import { execFileSync } from 'node:child_process'
@@ -113,7 +125,7 @@ if (CONTENEDOR) {
 } else {
   if (!env.VITE_SUPABASE_URL || !env.SUPABASE_ACCESS_TOKEN) {
     console.error('Faltan VITE_SUPABASE_URL o SUPABASE_ACCESS_TOKEN (entorno o .env), o PREFLIGHT_DB_CONTAINER para una pila local.')
-    console.log('\nDEMO_PREFLIGHT_V2 = FAIL\n')
+    console.log('\nDEMO_PREFLIGHT_RC = FAIL\n')
     process.exit(1)
   }
   const REF = new URL(env.VITE_SUPABASE_URL).hostname.split('.')[0]
@@ -445,6 +457,24 @@ if (env.DEMO_ENTERPRISE_EMAIL) {
   })
 }
 
+if (env.DEMO_ENTERPRISE_EMAIL && env.DEMO_ENTERPRISE_SHOWS_CREDIT === 'true') {
+  EXTRA.push({
+    grupo: 'ENTERPRISE',
+    paso: 'Crédito para enseñar (guion)',
+    arreglo: 'Crédito → dar límite a la cuenta de la empresa y desbloquearla',
+    async evaluar() {
+      const [fila] = await sql(`select coalesce(a.credit_limit, 0)::text as limite, coalesce(a.credit_status::text, 'ok') as estado,
+          a.payment_terms_days as plazo
+        from auth.users u join ${TIENDA} s on true
+        join public.business_accounts a on a.id = ebim.effective_business_account(u.id, s.organization_id, s.company_id)
+        where lower(u.email) = lower(${lit(env.DEMO_ENTERPRISE_EMAIL)})`)
+      if (!fila) return { ok: false, detalle: 'sin cuenta efectiva' }
+      const ok = Number(fila.limite) > 0 && fila.estado !== 'blocked'
+      return { ok, detalle: `límite ${fila.limite} · plazo ${fila.plazo} días · crédito ${fila.estado}` }
+    },
+  })
+}
+
 if (env.DEMO_MULTI_EMAIL) {
   EXTRA.push({
     grupo: 'MULTI',
@@ -474,6 +504,32 @@ if (env.DEMO_MULTI_EMAIL) {
   })
 }
 
+if (env.DEMO_MULTI_EMAIL && env.DEMO_MULTI_PRODUCT_SLUG) {
+  EXTRA.push({
+    grupo: 'MULTI',
+    paso: `Precio distinto por cuenta en «${env.DEMO_MULTI_PRODUCT_SLUG}»`,
+    arreglo: 'asignar a una de las dos cuentas (cliente o segmento) una lista vigente con otro precio para ese producto',
+    async evaluar() {
+      const filas = await sql(`select a.name,
+          (ebim.resolve_price(s.id, ch.id, p.id, null, null, 1, s.currency, now(), c.segment_id, c.id) ->> 'unit_price') as precio
+        from auth.users u join ${TIENDA} s on true
+        join public.channels ch on ch.store_id = s.id and ch.is_default and ch.is_active
+        join public.products p on p.store_id = s.id and p.slug = ${lit(env.DEMO_MULTI_PRODUCT_SLUG)}
+        join public.business_account_users bu on bu.user_id = u.id and bu.status = 'active'
+        join public.business_accounts a on a.id = bu.business_account_id and a.is_active
+          and a.organization_id = s.organization_id and a.company_id = s.company_id
+        join public.customers c on c.id = a.customer_id and c.is_active
+        where lower(u.email) = lower(${lit(env.DEMO_MULTI_EMAIL)})
+        order by a.created_at, a.id`)
+      const distintos = new Set(filas.map((f) => f.precio)).size
+      return {
+        ok: filas.length >= 2 && distintos >= 2,
+        detalle: filas.length ? filas.map((f) => `${f.name}: ${f.precio ?? 'sin precio'}`).join(' · ') : 'sin producto o sin cuentas',
+      }
+    },
+  })
+}
+
 if (env.DEMO_TARGETED_PROMO_CODE) {
   EXTRA.push({
     grupo: 'PROMOS',
@@ -491,12 +547,36 @@ if (env.DEMO_TARGETED_PROMO_CODE) {
   })
 }
 
+// Lo que el código no puede leer. Se INFORMA (no bloquea): es configuración de
+// consolas externas, y decir «OK» sin verlo sería mentir.
+const NO_VERIFICABLE = [
+  {
+    grupo: 'AUTH',
+    paso: 'Redirect URLs de Supabase Auth',
+    arreglo: 'consola de Supabase → Authentication → URL Configuration (DEPLOYMENT_MANIFEST.md §4)',
+    informativo: true,
+    async evaluar() {
+      return { ok: true, detalle: 'NO VERIFICABLE desde el código: requiere https://<host>/** (alta y recuperación)' }
+    },
+  },
+  {
+    grupo: 'AUTH',
+    paso: 'Reescritura de SPA del alojamiento',
+    arreglo: 'QAS_BASE_URL=https://<host> npm run smoke:qas (DEPLOYMENT_MANIFEST.md §5)',
+    informativo: true,
+    async evaluar() {
+      return { ok: true, detalle: 'NO VERIFICABLE desde la base: usar npm run smoke:qas' }
+    },
+  },
+]
+
 const COMPROBACIONES = [
   ...STORE,
   ...B2C,
   ...compradorDeEmpresa('TRADE', env.DEMO_TRADE_EMAIL, 'trade'),
   ...compradorDeEmpresa('ENTERPRISE', env.DEMO_ENTERPRISE_EMAIL, 'enterprise'),
   ...EXTRA,
+  ...NO_VERIFICABLE,
 ]
 
 console.log(`\nPreflight de demo · tienda «${SLUG}» · ${destino}\n`)
@@ -515,15 +595,14 @@ for (const control of COMPROBACIONES) {
   if (!resultado.ok) pendientes.push({ ...control, detalle: resultado.detalle })
   const grupo = control.grupo === grupoAnterior ? '' : control.grupo
   grupoAnterior = control.grupo
-  console.log(
-    `  ${grupo.padEnd(11)} ${(resultado.ok ? 'OK' : 'FALTA').padEnd(7)} ${control.paso.padEnd(49)} ${resultado.detalle}`,
-  )
+  const estado = control.informativo ? 'INFO' : resultado.ok ? 'OK' : 'FALTA'
+  console.log(`  ${grupo.padEnd(11)} ${estado.padEnd(7)} ${control.paso.padEnd(49)} ${resultado.detalle}`)
 }
 
 console.log('')
 if (pendientes.length === 0) {
   console.log('  Las tres experiencias tienen todo lo que necesitan.')
-  console.log('\nDEMO_PREFLIGHT_V2 = PASS\n')
+  console.log('\nDEMO_PREFLIGHT_RC = PASS\n')
   process.exit(0)
 }
 
@@ -532,5 +611,5 @@ for (const control of pendientes) {
   console.log(`    [${control.grupo}] ${control.paso} — ${control.detalle}`)
   console.log(`      -> ${control.arreglo}`)
 }
-console.log('\nDEMO_PREFLIGHT_V2 = FAIL\n')
+console.log('\nDEMO_PREFLIGHT_RC = FAIL\n')
 process.exit(1)
