@@ -157,6 +157,22 @@ no entrega fuera del equipo. Antes de tener consumidores reales: volver a `false
 | Empresa | `e***@miquimica.demo` | Laboratorio Vega SAC | exige orden de compra: se pinta como enterprise |
 | Multi-cuenta | `m***@miquimica.demo` | Consultorio Dental Lima SAC y Clínica San Rafael SAC | dos cuentas, selector visible |
 
+**Hallazgos durante la congelación, para después de la demo** (2026-09-14, `FREEZE_POLICY.md`: no
+son P0/P1 de la demo):
+
+1. **En `npm run dev` el carrito nunca se guarda en el servidor.** `CartProvider` marca la
+   reconciliación como hecha en un `useRef` antes de que responda `cart_open`. `StrictMode` monta,
+   desmonta y vuelve a montar: el desmontaje cancela la respuesta y el segundo montaje se salta la
+   reconciliación por el `ref`, así que `synced` no pasa nunca a `true` y el efecto que empuja las
+   líneas no llega a ejecutarse. Evidencia: sesión de `m***@miquimica.demo`, tres `add_to_cart` a las
+   06:12–06:13 con sus `availability_for_slug`, cero llamadas a `cart_replace_lines` y carrito del
+   servidor con 0 líneas. En el build de producción los efectos corren una vez y no ocurre. El
+   checkout funciona sin token; lo que se pierde es la fusión al iniciar sesión, el carrito entre
+   dispositivos y marcar el carrito como convertido.
+2. **El selector de cantidad de la ficha conserva el último valor tras añadir.** Pulsar otra vez suma
+   de nuevo sin que la ficha diga cuántas unidades ya hay en el carrito. Se reportó como «añadí 4 y
+   salen 8»: fueron tres pulsaciones, 1 + 3 + 4.
+
 Pendiente para QAS en Amplify: §3 frontend con Node 24, §5 reescritura de SPA y la URL de QAS en las
 redirecciones de Auth. Sin declarar en el preflight: producto con precio distinto por cuenta del
 multi-cuenta, y código de promoción dirigida.
