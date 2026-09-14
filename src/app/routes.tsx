@@ -118,6 +118,9 @@ const StoreCheckoutPage = lazyPage(() =>
 const StoreAccountPage = lazyPage(() =>
   import('@/features/storefront/StoreAccountPage').then((m) => ({ default: m.StoreAccountPage })),
 )
+const QuickOrderPage = lazyPage(() =>
+  import('@/features/storefront/quick-order/QuickOrderPage').then((m) => ({ default: m.QuickOrderPage })),
+)
 const StoreRegisterPage = lazyPage(() =>
   import('@/features/storefront/StoreRegisterPage').then((m) => ({ default: m.StoreRegisterPage })),
 )
@@ -260,6 +263,10 @@ export const routes: RouteObject[] = [
       // quien entra aquí es un comprador de un cliente, no un miembro del
       // tenant, y su contexto lo resuelve el servidor a partir del vínculo.
       { path: 'account', element: withSuspense(<StoreAccountPage />) },
+      // Pedido rápido y CSV (cierre). Exige sesión dentro de la pantalla, no con
+      // un guard del backoffice: quien entra es un comprador. Termina en el
+      // carrito; el pedido lo sigue creando solo el checkout oficial.
+      { path: 'pedido-rapido', element: withSuspense(<QuickOrderPage />) },
       // Alta de CONSUMIDOR dentro de la tienda (N02). No crea tenant: eso es `/onboarding`.
       { path: 'register', element: withSuspense(<StoreRegisterPage />) },
       // Confirmación del pedido. El número va en la URL para que el comprador
