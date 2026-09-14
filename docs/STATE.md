@@ -130,6 +130,37 @@ puesta en el proyecto y todas las cuentas nuevas nacen con esa contraseña, conf
 `gmao-037`. La parte B de ese aviso —poner la misma contraseña a las cuentas **existentes**— no se
 ha ejecutado.
 
+## Release candidate de la demo desplegado en DEV/QAS (2026-09-13)
+
+Tras fusionar la PR #1 (`38cf8a6`), por orden del operador y siguiendo
+`docs/release-candidate/DEPLOYMENT_MANIFEST.md`:
+
+| Paso del manifiesto | Resultado |
+|---|---|
+| Integridad de las 7 migraciones | las 7 huellas coinciden con el contenido de Git; en disco difieren solo por CRLF |
+| §1 · Migraciones `20260913100000` a `20260913160000` | aplicadas una a una, objetos verificados |
+| §2 · `checkout` (requerida) y `create-order` (recomendada) | desplegadas, v10 y v14; el primer intento de `checkout` falló de forma transitoria y se repitió |
+| §4 · Redirect URLs de Auth | añadida `http://localhost:5173/**` |
+| `db:types` contra el proyecto | sin diferencias de objetos; solo formato del generador y versión de PostgREST. El archivo no se reescribe |
+| Preflight de demo | **`DEMO_PREFLIGHT_RC = PASS`** |
+
+**Decisión de demo, reversible:** `mailer_autoconfirm = true`. El alta pública de consumidor entra
+sin confirmar el correo, porque el hook de Graph sigue apagado y el remitente por defecto de Supabase
+no entrega fuera del equipo. Antes de tener consumidores reales: volver a `false` y configurar Graph.
+
+**Usuarios de demo**, contraseña de suite `Demo2026!` (`gmao-037`), cuentas confirmadas:
+
+| Perfil | Usuario | Empresa | Por qué esa |
+|---|---|---|---|
+| Consumidor | `c***@miquimica.demo` | ninguna | sin vínculos |
+| Revendedor | `r***@miquimica.demo` | Consultorio Dental Lima SAC | sin aprobación, OC, crédito ni tope: se pinta como trade |
+| Empresa | `e***@miquimica.demo` | Laboratorio Vega SAC | exige orden de compra: se pinta como enterprise |
+| Multi-cuenta | `m***@miquimica.demo` | Consultorio Dental Lima SAC y Clínica San Rafael SAC | dos cuentas, selector visible |
+
+Pendiente para QAS en Amplify: §3 frontend con Node 24, §5 reescritura de SPA y la URL de QAS en las
+redirecciones de Auth. Sin declarar en el preflight: producto con precio distinto por cuenta del
+multi-cuenta, y código de promoción dirigida.
+
 ## Notificaciones y correo (2026-09-12)
 
 Análisis y decisiones: [`docs/NOTIFICATIONS_ANALYSIS.md`](NOTIFICATIONS_ANALYSIS.md).
