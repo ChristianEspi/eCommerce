@@ -111,8 +111,26 @@ Reglas de propiedad: **solo el carril A** redefine `create_order`, `checkout_pla
 
 ## P1
 
-### 4. Scheduled Orders — [PENDIENTE]
-- Bloqueo de diseño detectado en la auditoría: el checkout exige el JWT del comprador (cuenta efectiva y precio de convenio salen de la sesión). Un runner con `service_role` no puede reutilizar el pipeline tal cual. Opción segura prevista: el runner prepara carrito/borrador y avisa al comprador (patrón de sugeridos).
+### 4. Scheduled Orders — [COMPLETADO] `ae2f295`
+- **Decisión explícita: el runner PREPARA y AVISA; no crea pedidos.** El checkout exige el JWT del comprador (cuenta efectiva, precio de convenio, crédito, OC, aprobación) y un pedido desde SQL a las 03:00 se saltaría todo eso. Se respeta la regla de `20260902150000`: `order_templates`, `order_schedules` y `order_schedule_advance()` no se reemplazan.
+- Runner `ebim.run_order_schedules(limit)` (solo `service_role`, pg_cron cada hora, guardado por disponibilidad):
+  - reclama vencidas con `for update of s skip locked`; `order_schedule_runs` único `(schedule_id, run_on)`; propuesta + aviso + evento + avance en la MISMA transacción → dos pasadas = una propuesta y un aviso;
+  - motivo de negocio (tienda inactiva, plantilla archivada, sin módulo, sin líneas, cliente inactivo, nadie a quien avisar) → `skipped` y avanza;
+  - error técnico → bloque deshecho, `failed` con espera 5 min·2ⁿ⁻¹ (tope 6 h); a los 5 intentos `dead` y deja de reclamarse;
+  - la propuesta `ready` anterior no usada pasa a `expired`;
+  - aviso `order_schedule.run_ready` a `admin`/`buyer` de la cuenta (enlace `#programados`) y hecho de dominio con la misma clave.
+- Comprador (definer; tienda por slug, cuenta por `ebim.effective_business_account`, módulo `orders.advanced` por `company_is_entitled`): `my_order_schedules`, `save_my_order_schedule` (alta idempotente por clave; líneas validadas como el pedido rápido: publicado, variante, canal, moneda, surtido; campos fuera de lista = `CAMPO_NO_PERMITIDO`), `set_my_order_schedule_status` (reanudar no dispara lo perdido), `archive_my_order_schedule`, `take_my_order_schedule_run` (devuelve qué y cuánto; repetible), `dismiss_my_order_schedule_run`. Lector ve y no gestiona. Ajeno e inexistente responden lo mismo.
+- Archivos modificados:
+  - `supabase/migrations/20260914130000_scheduled_orders.sql`, `20260914130100_scheduled_orders_schedule.sql` (nuevas; aditivas: `order_templates.created_by`/`request_key`).
+  - `src/features/storefront/scheduledOrders.ts`, `account/MyScheduledOrdersSection.tsx`, `account/ScheduleDialog.tsx`, `cart/ScheduleCartButton.tsx`, `StoreAccountPage.tsx` (pestaña «Programados»), `StoreCartPage.tsx`, `notifications/text.ts`, `db-schema.ts`, i18n ES/EN.
+  - Tests: `supabase/tests/scheduled-orders.test.ts` (20), `account/scheduled-orders.test.tsx` (14), `notifications-ui.test.tsx` (tipo nuevo).
+- Pruebas ejecutadas: SQL **20/20** (incluye propuesta → `runCheckout` de producción con precio del motor y cuenta B2B); seguridad/capacidades/RLS/orders-advanced/notificaciones **161/161**; vitrina + arquitectura + i18n + invariantes **148/148**; `tsc` y `lint` limpios.
+- Pendientes / riesgos:
+  - Solo aviso en la app; **sin correo** (no hay plantilla `order_schedule.run_ready` en `notifications-dispatch`).
+  - `current_date` es la del servidor (UTC); la UI pide primera fecha desde mañana para no chocar a última hora en Lima.
+  - Sin pantalla de backoffice para las ejecuciones: el personal las lee por RLS (`order_schedule_runs`), no hay vista.
+  - Mismo tope transversal de 99 por línea: una plantilla que lo supere se avisa y no se ofrece al carrito.
+  - Migraciones **no aplicadas** en DEV/QAS.
 
 ### 5. Quick Order — [COMPLETADO] `1debe36`, `0cc6cdd`, `fcc5184` (carril C, integrado en `377691d`)
 ### 6. Bulk CSV Orders — [COMPLETADO] (mismos commits)
@@ -152,8 +170,21 @@ Reglas de propiedad: **solo el carril A** redefine `create_order`, `checkout_pla
 - Migraciones `20260914160000_cart_recovery.sql`, `20260914160100_cart_recovery_schedule.sql`. Tests: 46 + 9 + 8. `security-baseline` → 21 funciones anónimas.
 - Riesgos: sin retención de filas de recordatorio; secretos de baja sin caducidad; sin cabecera `List-Unsubscribe`; entrega real depende de Graph y Vault.
 
-### 9. Product Relations — [EN PROGRESO] `d76e294`, `fd1c610` (carril D1, falta integrar)
-### 10. Reviews — [EN PROGRESO] `2f93f98` SQL hecho; falta interfaz (carril D1)
+### 9. Product Relations — [COMPLETADO] `d76e294`, `fd1c610` (carril D1, integrado en `4a0da56`)
+- `public.product_relations_for_slug(slug, product, kinds, limit)` (anon): solo ids de relacionados publicados, visibles en el canal público y de la misma tienda; tope 24; tipo desconocido = `TIPO_RELACION_INVALIDO`.
+- Ficha: «Completa tu compra» (cross-sell, accesorio, repuesto), «Mejora tu elección» (up-sell), «También te puede interesar» (relacionado, sustituto). El relleno por categoría solo si no hay curados o la función falla, sin repetir.
+- PIM: subir, bajar y quitar con la RLS existente (sin función nueva).
+- Migración `20260914140000_storefront_product_relations.sql`. Tests: SQL 17, UI 6 + 5.
+
+### 10. Reviews — [COMPLETADO] `2f93f98`, `255f3c9` (carril D1, integrado en `4a0da56`)
+- `product_reviews` con RLS forzada; sin escritura directa. `submit_product_review` (sesión; solo rating/título/cuerpo/nombre; `verified_purchase` lo pone el servidor por `order_buyers` + `order_items`, excluye cancelados y reembolsados; cada edición vuelve a pendiente; el personal no reseña su catálogo; 10/h por usuario y techo por tienda). `product_reviews_for_slug` (anon, solo publicadas + resumen calculado). `moderate_product_review` (owner/admin/catalog, motivo al rechazar, `audit_log`).
+- Ficha: resumen, lista paginada, «Compra verificada», formulario con estado propio. Backoffice `/app/reviews` (capacidad `catalog`, permiso `catalog.write`) con pestañas, buscador y exportar.
+- Migración `20260914141000_product_reviews.sql`. Tests: SQL 38, UI 14 + 5.
+- Riesgos: el techo por tienda es compartido (un abusador puede frenar a otros durante una hora, igual que en pedido rápido); exportar CSV sin test.
+
+### Integración D1 — verificada (`4a0da56`)
+- Conflicto en la superficie anónima (D1 +2 publicado, D3 +1 secreto): resuelta a **23 = 12 publicado · 8 secreto · 2 techo · 1 recogido** en `security-baseline.test.ts` y `docs/SECURITY_BASELINE.md` §1.6. Resto fusionado solo.
+- Sobre el árbol integrado: `tsc` y `lint` limpios; D1 + programados + guardas (`security-baseline`, `capability-enforcement`, `public-rpc-gates`, `schema-invariants`, rutas, i18n, arquitectura, navegación, admin): **21 archivos, 317/317**.
 
 ### 11. Suggested Orders v2 — [COMPLETADO] `36dff86` (carril D2)
 - `suggest_order_v2` explicable con respaldo `historic_v1`. Dos ventanas (reciente `p_days` 7–180; larga máx(3R, 90); 60 % reciente + 40 % larga). Estacionalidad solo con ≥1 año de historia, ≥3 pedidos y ventas en el año; factor acotado [0.5, 2]; si no, 1 con motivo.
