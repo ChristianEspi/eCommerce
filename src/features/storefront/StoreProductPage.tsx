@@ -31,6 +31,8 @@ import { useAddToCart } from './cart/useAddToCart'
 import { ProductGallery } from './components/ProductGallery'
 import { ProductGrid } from './components/ProductGrid'
 import { QuantityStepper } from './components/QuantityStepper'
+import { useRelatedSections } from './relations'
+import { ProductReviews } from './reviews/ProductReviews'
 import {
   useGallery,
   usePublicProduct,
@@ -80,11 +82,19 @@ export function StoreProductPage() {
     product.data && product.data.kind !== 'variant' ? product.data : null,
   )
 
+  // Relaciones CURADAS por el comercio (cierre): «Completa tu compra», «Mejora
+  // tu elección» y «También te puede interesar». Ver `relations.ts`.
+  const curated = useRelatedSections(storeSlug, store.store_id, product.data?.product_id ?? null)
+  // El relleno por categoría solo entra cuando ya se sabe que el comercio no
+  // curó relacionados: pedirlo a la vez sería descargar doce productos por
+  // ficha para tirarlos en cuanto llegan los de verdad.
+  const needsFallback = curated.settled && curated.sections.related.length === 0
+
   // Relacionados «simples»: el resto de su categoría. Si no tiene categoría o
   // no llega para llenar la fila, `pickRelated` completa con el catálogo.
   const relatedQuery: CatalogQuery = useMemo(
     () => ({
-      storeId: product.data ? store.store_id : null,
+      storeId: product.data && needsFallback ? store.store_id : null,
       search: '',
       categorySlug: product.data?.category_slug ?? null,
       availability: 'all',
@@ -97,11 +107,23 @@ export function StoreProductPage() {
       // (`published_at desc`) no cambia al recortar.
       limit: RELATED_FETCH,
     }),
-    [product.data, store.store_id],
+    [product.data, store.store_id, needsFallback],
   )
   const catalog = usePublicProducts(relatedQuery)
-  const related = product.data ? pickRelated(catalog.data ?? [], product.data) : []
-  const relatedThumbs = useThumbnails(related)
+  const { complete, upgrade } = curated.sections
+  // Lo que ya sale en otra fila curada no se repite en el relleno: la misma
+  // tarjeta dos veces en la misma ficha parece un error de la tienda.
+  const shownElsewhere = new Set([...complete, ...upgrade].map((item) => item.product_id))
+  const related =
+    curated.sections.related.length > 0
+      ? curated.sections.related
+      : product.data && needsFallback
+        ? pickRelated(
+            (catalog.data ?? []).filter((item) => !shownElsewhere.has(item.product_id)),
+            product.data,
+          )
+        : []
+  const relatedThumbs = useThumbnails([...complete, ...upgrade, ...related])
 
   // `product_view` (P13-SaaS). Se emite cuando la ficha ya se resolvió y por
   // producto, no por render: sin la dependencia en el id, cada cambio de
@@ -452,18 +474,57 @@ export function StoreProductPage() {
         </Typography>
       </Card>
 
-      {related.length > 0 && (
-        <Box component="section">
-          <Typography
-            component="h2"
-            sx={{ fontSize: { xs: 20, md: 24 }, fontWeight: 800, letterSpacing: '-0.02em', mb: 2 }}
-          >
-            {t('store.product.related')}
-          </Typography>
-          <ProductGrid products={related} storeSlug={storeSlug} thumbnails={relatedThumbs} />
-        </Box>
-      )}
+      {/* Opiniones (cierre): solo lo moderado, más la reseña propia con su
+          estado. Ver `reviews/ProductReviews.tsx`. */}
+      <ProductReviews storeSlug={storeSlug} productId={item.product_id} />
+
+      {/* Primero lo que completa la compra —es lo que suma al carrito que ya se
+          está decidiendo—, después la mejora y al final lo parecido. */}
+      <RelatedRow
+        title={t('store.product.relations.complete')}
+        products={complete}
+        storeSlug={storeSlug}
+        thumbnails={relatedThumbs}
+      />
+      <RelatedRow
+        title={t('store.product.relations.upgrade')}
+        products={upgrade}
+        storeSlug={storeSlug}
+        thumbnails={relatedThumbs}
+      />
+      <RelatedRow
+        title={t('store.product.related')}
+        products={related}
+        storeSlug={storeSlug}
+        thumbnails={relatedThumbs}
+      />
     </Stack>
+  )
+}
+
+/** Una fila de productos sugeridos. Sin productos no se pinta ni el título. */
+function RelatedRow({
+  title,
+  products,
+  storeSlug,
+  thumbnails,
+}: {
+  title: string
+  products: PublicProduct[]
+  storeSlug: string
+  thumbnails: Record<string, string>
+}) {
+  if (products.length === 0) return null
+  return (
+    <Box component="section">
+      <Typography
+        component="h2"
+        sx={{ fontSize: { xs: 20, md: 24 }, fontWeight: 800, letterSpacing: '-0.02em', mb: 2 }}
+      >
+        {title}
+      </Typography>
+      <ProductGrid products={products} storeSlug={storeSlug} thumbnails={thumbnails} />
+    </Box>
   )
 }
 

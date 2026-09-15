@@ -11,6 +11,7 @@ import PeopleAltRoundedIcon from '@mui/icons-material/PeopleAltRounded'
 import ArticleRoundedIcon from '@mui/icons-material/ArticleRounded'
 import FactCheckRoundedIcon from '@mui/icons-material/FactCheckRounded'
 import RequestQuoteRoundedIcon from '@mui/icons-material/RequestQuoteRounded'
+import RateReviewRoundedIcon from '@mui/icons-material/RateReviewRounded'
 import LocalOfferRoundedIcon from '@mui/icons-material/LocalOfferRounded'
 import LocalShippingRoundedIcon from '@mui/icons-material/LocalShippingRounded'
 import PriceChangeRoundedIcon from '@mui/icons-material/PriceChangeRounded'
@@ -106,6 +107,18 @@ export const NAV_ITEMS: NavItem[] = [
     capability: 'catalog.advanced',
     group: 'catalog',
   },
+  // --- Cierre · moderación de reseñas ---
+  {
+    // Con el catálogo: lo que se modera es lo que opinan de un producto, y
+    // quien lo decide es el rol que lo edita (`catalog.write`).
+    to: '/app/reviews',
+    label: 'nav.reviews',
+    icon: <RateReviewRoundedIcon fontSize="small" />,
+    capability: 'catalog',
+    permission: 'catalog.write',
+    group: 'catalog',
+  },
+  // --- fin reseñas ---
   {
     to: '/app/pricing',
     label: 'nav.pricing',

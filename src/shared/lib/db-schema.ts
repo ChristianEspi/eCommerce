@@ -442,6 +442,26 @@ export const CART_ABANDON_RPC = 'cart_abandon'
 // `supabase/tests/quick-order-resolver.test.ts`.
 export const RESOLVE_ORDER_LINES_RPC = 'resolve_order_lines_for_slug'
 
+// --- Cierre · relaciones de producto en la vitrina (20260914140000) ---------
+// Puerta ANÓNIMA: ids de relacionados publicados y visibles en el canal
+// público, en el orden que fija el comercio. Sin `satisfies` hasta regenerar
+// los tipos: la red mientras tanto es
+// `supabase/tests/storefront-product-relations.test.ts`.
+export const PRODUCT_RELATIONS_PUBLIC_RPC = 'product_relations_for_slug'
+// --- fin relaciones ----------------------------------------------------------
+
+// --- Cierre · reseñas y valoraciones (20260914141000) -----------------------
+// `PRODUCT_REVIEWS_PUBLIC_RPC` es ANÓNIMA (solo publicadas + resumen). Enviar y
+// leer la propia exigen sesión; moderar, rol de catálogo del tenant del JWT.
+// La cola de moderación se lee de la TABLA (RLS de miembros). Sin `satisfies`
+// hasta regenerar los tipos: la red es `supabase/tests/product-reviews.test.ts`.
+export const PRODUCT_REVIEWS_TABLE = 'product_reviews'
+export const PRODUCT_REVIEWS_PUBLIC_RPC = 'product_reviews_for_slug'
+export const MY_PRODUCT_REVIEW_RPC = 'my_product_review'
+export const SUBMIT_PRODUCT_REVIEW_RPC = 'submit_product_review'
+export const MODERATE_PRODUCT_REVIEW_RPC = 'moderate_product_review'
+// --- fin reseñas -------------------------------------------------------------
+
 // OMS (P08-SaaS). Los COMANDOS del pedido. No hay ningún `update` directo sobre
 // `orders` en `features/orders`: los tres ejes nuevos no tienen GRANT de
 // escritura, así que `order_transition` no es la forma recomendada — es la

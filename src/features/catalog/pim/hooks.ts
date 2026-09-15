@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   addBundleItem,
   addRelation,
+  deleteRelation,
   deleteRow,
   fetchAttributeValues,
   fetchAttributes,
@@ -14,6 +15,7 @@ import {
   fetchUnits,
   fetchVariantAxes,
   fetchVariants,
+  reorderRelations,
   saveAttribute,
   saveAttributeValue,
   saveBrand,
@@ -212,4 +214,16 @@ export function useAddBundleItem() {
 export function useAddRelation() {
   const invalidate = useInvalidatePim()
   return useMutation({ mutationFn: addRelation, onSuccess: invalidate })
+}
+
+// Cierre · quitar y reordenar. Se invalida también al FALLAR el reordenado:
+// una parte pudo quedar escrita y la lista tiene que volver a decir la verdad.
+export function useDeleteRelation() {
+  const invalidate = useInvalidatePim()
+  return useMutation({ mutationFn: deleteRelation, onSuccess: invalidate })
+}
+
+export function useReorderRelations() {
+  const invalidate = useInvalidatePim()
+  return useMutation({ mutationFn: reorderRelations, onSettled: invalidate })
 }

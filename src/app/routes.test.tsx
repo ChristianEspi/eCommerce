@@ -97,6 +97,8 @@ describe('rutas base', () => {
       '/app/products',
       '/app/promotions',
       '/app/quotes',
+      // Cierre · moderación de reseñas.
+      '/app/reviews',
       '/app/sales',
       '/app/settings',
     ])

@@ -44,6 +44,11 @@ const CategoriesPage = lazyPage(() =>
 const PimPage = lazyPage(() =>
   import('@/features/catalog/pim/PimPage').then((m) => ({ default: m.PimPage })),
 )
+// --- Cierre · moderación de reseñas ---
+const ReviewsPage = lazyPage(() =>
+  import('@/features/catalog/reviews/ReviewsPage').then((m) => ({ default: m.ReviewsPage })),
+)
+// --- fin reseñas ---
 const PricingPage = lazyPage(() =>
   import('@/features/pricing/PricingPage').then((m) => ({ default: m.PricingPage })),
 )
@@ -185,6 +190,11 @@ export const routes: RouteObject[] = [
           { path: 'categories', element: gated('catalog', <CategoriesPage />) },
           // El vocabulario del PIM es del módulo vendible, no del baseline.
           { path: 'pim', element: gated('catalog.advanced', <PimPage />) },
+          // --- Cierre · moderación de reseñas: cuelga de `catalog`, que es
+          // baseline. Sin addon vendible nuevo; moderar exige rol de catálogo y
+          // lo decide la base (`moderate_product_review`).
+          { path: 'reviews', element: gated('catalog', <ReviewsPage />) },
+          // --- fin reseñas ---
           // El precio por canal, segmento o cliente es el módulo vendible; el
           // precio de catálogo sigue viniendo con el producto.
           { path: 'pricing', element: gated('pricing.lists', <PricingPage />) },
