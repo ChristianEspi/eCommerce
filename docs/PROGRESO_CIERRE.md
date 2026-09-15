@@ -231,4 +231,12 @@ Reglas de propiedad: **solo el carril A** redefine `create_order`, `checkout_pla
 - **Defectos reales encontrados en la primera pasada y corregidos:** `catalog-copy` lanzaba `notFound` con el texto como código (el navegador recibía una frase); `_shared/userProvisioning.ts` no compilaba con TS 6 de Deno.
 - Pruebas: verde sobre el árbol; **rojo (exit 1) con un error de tipos plantado** y retirado; `scripts/check-edge.test.mjs` 7/7; `create-user`, catálogo, `secret-scan`, `qas-smoke`: 198/198; `tsc` y `lint` limpios.
 - Pendiente: la primera ejecución sin caché descarga Deno y los `npm:` del borde (red necesaria en CI).
-### 15. E2E y certificación final P07/P08 — [PENDIENTE]
+### 15. E2E y certificación final P07/P08 — [COMPLETADO · dictamen GO CONDICIONADO] `4f490f5`, `39f3d68`, `c5066af`
+- Documentos: `docs/release-candidate/FINAL_CERTIFICATION.md` (gates, cobertura, seguridad, matriz de defectos D-01…D-11, condiciones C1…C9), `RELEASE_NOTES.md`, `DEPLOYMENT_MANIFEST.md` (19 migraciones con SHA-256 verificado contra el contenido versionado, 9 Edge Functions clasificadas, secretos nuevos).
+- Gates sobre `c5066af`: typecheck, lint, `npm test` **233 archivos · 4 380 ✓ · 0 ✗**, `check:edge` 67 archivos, build, `bundle:report` (portada 399,6/405, ficha 384,6/400), `scan:secrets` PASS, `npm audit` 4 moderadas aceptadas / 0 high-critical. `npm ci` falla en Node 22.12 (condición C8).
+- **Pila local limpia (Docker):** 175 migraciones desde cero en **Postgres 17.6**, pg_cron real (3 trabajos), seed + demo; **E2E 64/64** (escritorio 12 · móvil 12 · comercio-escritorio 20 · comercio-móvil 20), 0 flaky en la pasada final.
+- Defectos encontrados y corregidos DURANTE la certificación (cada uno con prueba en rojo sin el arreglo):
+  - **Presupuesto de bundle en rojo** (portada 411/405, ficha 407/400) → diccionario ES del backoffice por `import()` (802 claves, 13 namespaces) + opiniones de la ficha por `lazy`; guardia `backoffice-split.test.ts` que recorre el grafo de imports de la vitrina. `4f490f5`.
+  - **`cart_open` concurrente con 409** (defecto previo, `20260828100100`): reproducido en Postgres real (9–19 de 20 llamadas fallaban) → `on conflict` + `for update` en la fusión; 0 errores en 3×20 y 1×50. `39f3d68`.
+- Nuevo E2E del cierre `e2e/commerce/closure.e2e.ts`: crédito bloqueado, pedido rápido, solicitar cotización, programar/pausar/eliminar (8/8). `c5066af`.
+- Notas de entorno (no son defectos del código): la migración antigua `20260827090600_storage_buckets.sql` necesita en las imágenes locales actuales `grant supabase_storage_admin to postgres` (aplicado solo en la pila local); los puertos 5432x y 5173 los ocupa otra aplicación de la máquina (config de pila y de Playwright fuera del repo, en 553xx y 5199).

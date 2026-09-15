@@ -1,114 +1,121 @@
-# Deployment manifest — eCommerce Release Candidate
+# Deployment manifest — cierre del plan eCommerce
 
 > **Nada de esto está desplegado.** Es la lista exacta, en orden, de lo que hay que llevar a QAS. Ningún paso se
-> ejecutó contra DEV/QAS/PRD desde esta rama.
+> ejecutó contra DEV/QAS/PRD. El manifiesto del RC anterior (2026-09-13, siete migraciones `20260913*`) está en el
+> historial (`0395ca3`) y es **prerrequisito** de este.
 
 ## Base
 
 | Dato | Valor |
 |---|---|
-| Rama | `feature/demo-commerce-release-candidate` |
-| Contiene | `feature/demo-commerce-hardening-v1` (H00–H14) + `feature/demo-commerce-hardening-v2` (N00–N12) + R00–R11 |
-| Base de `dev` | `1bcf74f` (merge-base con `dev`) |
-| Commit certificado | código en `23228c5` (ver `FINAL_CERTIFICATION.md`) |
-| Node | mínimo ≥ 22.12 (`engines`), recomendado 24 (`.nvmrc`), usado 24.20.0 / npm 11.19.0 |
-| `package-lock.json` SHA-256 | `78a8dd13afccec3b5250b266572ed461d5ddbcf65f931309d155bf59328e1700` (sin cambios de dependencias en el RC) |
+| Rama | `dev` |
+| Base del plan | `5e3da4e` |
+| Commit certificado | `c5066af` (ver `FINAL_CERTIFICATION.md`) |
+| Node | contrato `engines` ≥ 22.12, recomendado 24 (`.nvmrc`). **Ver §0: el árbol actual exige ≥ 22.13 para instalar.** |
+| `package-lock.json` SHA-256 | `78a8dd13afccec3b5250b266572ed461d5ddbcf65f931309d155bf59328e1700` (idéntico al RC anterior) |
 
 ## 0 · Antes de empezar
 
-- [ ] Fusionar la rama en `dev` por PR revisado (no hecho desde aquí).
-- [ ] Confirmar que QAS tiene aplicadas las migraciones hasta `20260912130000_sugeridos_del_comprador.sql` (la última
-  de `dev` @ `1bcf74f`). `scripts/aplicar-migracion.mjs` no lleva tabla de control: comprobarlo por objetos (p. ej.
-  existencia de lo que crea `20260912130000`) o con el preflight.
-- [ ] Ventana sin tráfico de compra: la migración 6 recrea `create_order` y `checkout_place_order`.
+- [ ] Fusionar/promover `dev` por el camino habitual (no hecho desde aquí).
+- [ ] Confirmar que QAS tiene aplicadas las migraciones hasta `20260913160000_consumer_addresses.sql` (manifiesto
+  del RC anterior). Comprobarlo por objetos o con el preflight: `scripts/aplicar-migracion.mjs` no lleva tabla de
+  control.
+- [ ] **Candados de capacidad (migraciones 14–17):** listar los tenants que YA tienen fila en
+  `tenant_platform_context` y comprobar que sus `tenant_entitlements` incluyen `ecommerce.payments`,
+  `ecommerce.fulfillment` y `ecommerce.catalog.advanced` si usan esos módulos. Un tenant sincronizado sin ellos
+  **pierde** esos módulos al aplicar; uno nunca sincronizado los conserva.
+- [ ] **Postgres 15 en DEV/QAS.** La certificación corrió en Postgres 17.6 local y en PGlite. Revisión heurística sin
+  sintaxis de 16/17 en las 19 migraciones; no probado en un 15 real.
+- [ ] **Node del build:** `engine-strict=true` + una dependencia de ESLint (`eslint-visitor-keys@5`) exigen Node
+  ≥ 22.13; `npm ci` falla en 22.12. Usar Node 24 (`RUNTIME.md`) o subir `engines`.
+- [ ] Ventana sin tráfico de compra: la migración 1 añade un trigger a `orders` y la 19 recrea `cart_open`.
 
-## 1 · Migraciones requeridas (en este orden, una a una)
+## 1 · Migraciones (en este orden, una a una)
 
-`node scripts/aplicar-migracion.mjs supabase/migrations/<archivo>` — cada una debe terminar sin error antes de la
-siguiente.
+`node scripts/aplicar-migracion.mjs supabase/migrations/<archivo>`. SHA-256 del contenido versionado
+(`git cat-file -p HEAD:<ruta> | shasum -a 256`; el árbol de trabajo en Windows tiene CRLF y da otro hash).
 
 | # | Archivo | SHA-256 | Qué cambia |
 |---|---|---|---|
-| 1 | `20260913100000_consumer_account.sql` | `e4bde910fc124515e16abe27585c8abc45fc85b53cd9e2c3bffa9635c59f87e2` | `order_buyers`, `checkout_link_order_buyer` (service_role), `my_consumer_orders`, `my_consumer_order_detail`, `my_checkout_profile` |
-| 2 | `20260913110000_commerce_context.sql` | `9841e036fd46ff64b465271058b0fe3ae4f52edef6064023bc14f746c716800d` | `my_commerce_context` |
-| 3 | `20260913120000_store_default_country.sql` | `713e6a14586202f272ce528d5ed05acfea159226b7827b6c056a1d732c0089ea` | `ebim.store_default_country`; **recrea la vista `public_stores`** con `default_country` |
-| 4 | `20260913130000_effective_business_account.sql` | `8f877211a8b6cd7d6a7d95dc02c2542f66141c9cfe93aa8af2595c1dabab6bf3` | `buyer_account_selections`, `ebim.effective_business_account`; `ebim.pricing_actor` y `my_commerce_context` sobre ella; `my_store_business_accounts`, `select_store_business_account`, `my_effective_business_account_for_slug` |
-| 5 | `20260913140000_promotion_quote_buyer_identity.sql` | `1907c3869faa727eb97ecf8a81776c8d42af3f77b31169eb3c60cdd3af119330` | `promotion_quote_for_slug` con identidad del servidor (misma firma) |
-| 6 | `20260913150000_purchase_order_number.sql` | `778632a26efae6317637760decf70b7aa46e76d7a4d7c71b0715c8db4efd896b` | `orders.purchase_order_number` + CHECK + trigger de inmutabilidad; **drop + create** de `create_order` y `checkout_place_order` (+1 parámetro); `my_business_order_detail` |
-| 7 | `20260913160000_consumer_addresses.sql` | `ac96a7e4eed5bf70200c8fc1b895c668a99ddf4bf434af31c55790bcb13fe55c` | `consumer_addresses` + 4 RPC |
+| 1 | `20260914100000_credit_block_checkout.sql` | `a73594248f133375a073f2d2185a9cc92037f2d751166cf78e35148c06e0659d` | trigger `orders_assert_account_credit_open`; `my_effective_business_account_for_slug` + `credit_status` |
+| 2 | `20260914101000_quote_to_order.sql` | `60caaa237c53358a804016473361a940055a7109ff5a0c5898af7d7d79eeb78a` | `price_lists.source_quote_id`, columnas de aceptación en `quotes`, vista `active_price_lists`, `my_quotes`, `accept_quote`, `request_quote`, trigger diferido de enlace pedido↔cotización |
+| 3 | `20260914110000_approval_inbox.sql` | `066f9dfe55ffe085207e266d2a613f2095bae91ba6b4d015dc285d6f6ab529fd` | `order_approval_decide` idempotente; `my_business_order_detail`, `my_business_orders` |
+| 4 | `20260914120000_quick_order_sku_resolver.sql` | `8d7d621a0c52c120de5cda443c19f5a43f8214fc2a15075f2b1d5feddb74999d` | `resolve_order_lines_for_slug` |
+| 5 | `20260914130000_scheduled_orders.sql` | `c600c495461dd2b7e2bd7ced7360f46a0c071540ecfc24c43a0c7f3f185fb494` | `order_schedule_runs`, `ebim.run_order_schedules`, 6 RPC del comprador; `order_templates.created_by/request_key` |
+| 6 | `20260914130100_scheduled_orders_schedule.sql` | `7bb15aca73fe9e16bbff0b2d6d793a3d0c2424b51ee034aa8e2b60d24e586262` | pg_cron `ecommerce-order-schedules` (cada hora) |
+| 7 | `20260914140000_storefront_product_relations.sql` | `a483cf3ba595f1a9c78aac4ec3f95adf60e5277544496f17c392e14f0c3aadca` | `product_relations_for_slug` (anon) |
+| 8 | `20260914141000_product_reviews.sql` | `d0d1b57ec13b774cf60ca37daa41b86bff2ac23249f0c405f774431f67d753fc` | `product_reviews` + 4 RPC (una anon) |
+| 9 | `20260914150000_channels_admin.sql` | `755aee111f28528f6a219060e0d35ead089c990f83b808467a0ca71d62b514b8` | `channel_set_default`, trigger `guard_channel_write` |
+| 10 | `20260914151000_suggest_order_v2.sql` | `7364d401b77c7375c0316cda978d65568c3fef41ef8f54165803791f8dbf9208` | `suggest_order_v2` |
+| 11 | `20260914160000_cart_recovery.sql` | `e4884b1bf222e0d1a1617999a5df126564b0c7c2c88dac4a0ac2b63e141d0f76` | ajustes por tienda (apagados), bajas, recordatorios; **recrea `notification_email_claim`** |
+| 12 | `20260914160100_cart_recovery_schedule.sql` | `cfcf89ca3e86302514cc610034f358b2ff68b072e4787c7256d5064bde452304` | pg_cron `ecommerce-cart-recovery` (cada 15 min) |
+| 13 | `20260914170000_invoice_issue_producer.sql` | `cf4726626ea0fca227f7b16f88e481ed6aa142b693c1a2199c0a763ef07d01f0` | `invoice_issue_requests`, `invoice_request_issue`, `ebim.invoice_issue_enqueue`, vista `invoice_issue_status` |
+| 14 | `20260914180000_capability_guard_core.sql` | `c9a3620b9146dbed4eb7f1a0a862d154ee45ae4b8262a4f45232d927c66d0df5` | `app_capabilities.legacy_until_synced`, `ebim.assert_capability`, **redefine `company_is_entitled`** |
+| 15 | `20260914180100_capability_guard_catalog_advanced.sql` | `3b0dd72148525d5602b5ebede95a63fc2dbbb2bf94fddf756609941bdcbd13ac` | policies de escritura de 11 tablas PIM |
+| 16 | `20260914180200_capability_guard_payments.sql` | `c46c1d7432f353ae7eb2a46902135b546cd3e6d8d0039fd51d80f23f77cde5cd` | `payment_methods` + `ebim.assert_payment_operator` |
+| 17 | `20260914180300_capability_guard_fulfillment.sql` | `029df068ec9be33e15f30ea47596d57dce76ad410d1bf1932be5d748d9fe57e7` | configuración de entrega/devolución + `ebim.assert_fulfillment_operator`; recrea 6 comandos |
+| 18 | `20260914190000_payment_dispatch_hardening.sql` | `285a02a3a80cfcdd164611aecad885add009b3ce61f08889e542db6923211f19` | **recrea `payment_apply_outcome`**, `fulfillment_transition`, `shipment_open`; `ebim.assert_dispatch_payment` |
+| 19 | `20260914191000_cart_open_concurrency.sql` | `511e68440f318c9ef1bd75896e286380fb405805d06b33ec0a64f6c01e19e4c6` | recrea `cart_open` (concurrente sin 409) |
 
-Verificación de integridad antes de aplicar: `shasum -a 256 supabase/migrations/2026091310*.sql supabase/migrations/2026091311*.sql …`
-debe coincidir con la tabla. Reproducibilidad: las 156 migraciones se aplican en limpio en PGlite
-(`schema-invariants`: «dos bases vírgenes dan el mismo esquema») y en Postgres 17 local; **DEV/QAS usan Postgres 15**:
-diferencia declarada, sin sintaxis específica de 16/17 en estas siete.
+Superficie anónima tras aplicar: **23** funciones (`security-baseline.test.ts`, `docs/SECURITY_BASELINE.md` §1.6).
 
-Después: `npm run db:types` contra QAS **solo en lectura** y comparar con `src/shared/lib/database.types.ts`
-(generado en R02 desde la pila local); cualquier diferencia de objetos indica una migración sin aplicar.
+Después: `npm run db:types` contra QAS **solo en lectura** y comparar con `src/shared/lib/database.types.ts`.
 
 ## 2 · Edge Functions (después de las migraciones)
 
-Cambios en `supabase/functions` desde `dev` (`1bcf74f`): `checkout/index.ts`, `_shared/checkout/{dbPorts,errors,
-pipeline,ports,request}.ts`, `_shared/orders.ts`. Clasificación por cierre de imports de cada `index.ts`:
+Clasificación por cierre de imports de cada `index.ts` contra lo cambiado desde `5e3da4e`:
 
-| Función | Importa código cambiado | Cambio de comportamiento | Clasificación |
+| Función | Código cambiado que arrastra | Cambio de comportamiento | Clasificación |
 |---|---|---|---|
-| `checkout` | `index.ts`, `_shared/checkout/*`, `_shared/orders.ts` | cuenta efectiva (N01), OC + 422 (N05), entrega con precio del comprador (R01), vínculo del comprador (H02) | **REQUIRED** |
-| `create-order` | `_shared/orders.ts` (`normalizeOrderItems`) | rechaza `purchase_order_number` dentro de una línea (`CAMPO_NO_PERMITIDO`) | **RECOMMENDED** |
-| `api` | `_shared/checkout/request.ts` (solo `sha256Hex`) → arrastra `orders.ts`/`ports.ts` | ninguno (función usada sin cambios; los tipos no viajan) | **UNCHANGED** (redeploy opcional para igualar el bundle) |
-| `update-order-status` | `_shared/orders.ts` (`canTransition`, `ORDER_STATUSES`) | ninguno | **UNCHANGED** (redeploy opcional) |
-| resto (`auth-email-hook`, `bootstrap-tenant`, `catalog-copy`, `catalog-product`, `create-user`, `fulfillment-webhook`, `integration-worker`, `notifications-*`, `payments-webhook`, `platform-context`, `shopping-assistant`, `storefront-seo`) | no | ninguno | **UNCHANGED** |
+| `checkout` | `index.ts`, `_shared/checkout/{dbPorts,errors,pipeline,ports}`, `_shared/payments/{gateway,provider,culqi,sandbox}` | crédito bloqueado (403), simulacro solo con permiso | **REQUIRED** |
+| `payments-webhook` | `_shared/payments/{provider,culqi,sandbox}` | adaptadores declaran `simulated` | **REQUIRED** (mismo bundle que `checkout`) |
+| `integration-worker` | `index.ts`, `_shared/webhooks/dispatcher.ts` | `secret_ref` encerrado por sociedad | **REQUIRED** (+ re-aprovisionar secretos, §3) |
+| `notifications-dispatch` | `_shared/notifications/templates.ts` | plantilla `cart.recovery` | **REQUIRED** si se enciende la recuperación de carritos |
+| `catalog-copy` | `index.ts` | 404 con código `PRODUCTO_NO_ENCONTRADO` | **RECOMMENDED** |
+| `create-user` | `_shared/userProvisioning.ts` | ninguno (firma de tipos) | **RECOMMENDED** |
+| `auth-email-hook`, `notifications-test` | `_shared/notifications/templates.ts` | ninguno propio | **RECOMMENDED** (igualar bundle) |
+| `api` | `_shared/checkout/ports.ts` (solo tipos) | ninguno | **UNCHANGED** (redeploy opcional) |
+| resto | no | ninguno | **UNCHANGED** |
 
-`supabase/config.toml` sin cambios desde `dev` (`verify_jwt` intacto).
+Orden: `checkout` **después** de la migración 1 (lee `credit_status`) y de la 18. `npm run check:edge` verde sobre
+los 67 archivos del borde en `c5066af`.
 
-Orden: `checkout` justo después de la migración 7 (la función nueva llama a `my_effective_business_account_for_slug`
-y a `checkout_place_order` con `p_purchase_order_number`: **no desplegarla antes de las migraciones 4 y 6**).
+## 3 · Secretos de Edge Functions
 
-## 3 · Frontend (después de migraciones y functions)
+- [ ] `EBIM_PAYMENTS_ALLOW_SIMULATION=true` en **DEV/QAS/demo** si se sigue cobrando con `sandbox`. **Nunca** en
+  producción. Sin ella, un conector simulado devuelve «pago no disponible».
+- [ ] Webhooks salientes: renombrar cada secreto a `EBIM_WH_<company_id en hex, sin guiones>_<secret_ref>`. Hasta
+  entonces esas entregas fallan con `SECRETO_NO_CONFIGURADO` (visible en Integraciones).
+- Sin cambios en `EBIM_PAYMENT_SECRET_<PROVEEDOR>` ni en `EBIM_PAYMENT_WEBHOOK_SECRET_<PROVEEDOR>`.
 
-- Build de la rama fusionada con Node 24 (ver `RUNTIME.md`; `.npmrc` `engine-strict=true` hace fallar `npm ci` con
-  Node < 22.12).
-- Variables públicas: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (sin ellas no se genera `_headers`/CSP).
-- **No publicar el frontend antes de la migración 6**: la ficha de pedido del backoffice selecciona
-  `orders.purchase_order_number` y fallaría contra una base sin la columna.
+## 4 · Frontend (después de migraciones y functions)
 
-## 4 · Auth (Supabase, consola de QAS)
+- Build con Node 24. Variables públicas: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`.
+- **No publicar antes de las migraciones 2, 3, 5 y 13**: las pestañas Cotizaciones, Aprobaciones, Programados y la
+  columna de emisión llaman a sus funciones.
+- Nuevo chunk `messages.es.backoffice-*.js` (se pide al entrar en `/app`): `customHttp.yml` ya sirve `/assets/**`.
 
-- [ ] *Authentication → URL Configuration → Redirect URLs*: añadir `https://<host-de-la-vitrina>/**`.
-  Lo usan la confirmación del alta (`emailRedirectTo` → `/s/<slug>/…`) y la recuperación
-  (`/nueva-clave?returnTo=…`). Sin la entrada, Auth redirige a la *Site URL* y se pierde la vuelta a la tienda.
-- **No verificado ni configurado desde este repositorio.**
+## 5 · Auth y hosting
 
-## 5 · Hosting (AWS Amplify, consola)
-
-- [ ] **Reescritura de SPA** (*Rewrites and redirects*): toda ruta sin extensión de recurso → `/index.html` con
-  **200 (Rewrite)**, p. ej. origen
-  `</^[^.]+$|\.(?!(css|gif|ico|jpg|jpeg|js|json|map|png|svg|txt|webp|woff|woff2|ttf)$)([^.]+$)/>` → destino
-  `/index.html`. Sin ella, recargar `/s/<slug>/…` da 404 (visto en QAS: `DEMO_WEDNESDAY_README.md`).
-- [ ] Node 24 en el build (ver `RUNTIME.md`).
-- `customHttp.yml` (en el repo) ya define `index.html` sin caché y `/assets/**` inmutable.
-- **No verificado ni configurado desde este repositorio.** Verificación posterior, solo lectura:
-  `QAS_BASE_URL=https://<host> QAS_STORE_SLUG=miquimica npm run smoke:qas` → `QAS_READ_ONLY_SMOKE = PASS`.
+Sin cambios respecto al RC anterior: Redirect URLs y reescritura de SPA de Amplify siguen **pendientes y no
+verificables desde el repo** (manifiesto `0395ca3` §4–§5).
 
 ## 6 · Verificación posterior (solo lectura)
 
-1. `npm run smoke:qas` con `QAS_BASE_URL` → PASS (rewrite, recursos, sin 5xx).
-2. `DEMO_*_EMAIL=… node scripts/demo-preflight.mjs miquimica` → `DEMO_PREFLIGHT_RC = PASS` (usuarios de demo creados
-   por el operador, fuera de este RC).
-3. `npx playwright test --project=escritorio --project=movil` contra QAS (no crean datos). **Nunca** `comercio-*`
-   contra QAS: crean usuarios y pedidos.
+1. `QAS_BASE_URL=… npm run smoke:qas` → PASS.
+2. `node scripts/demo-preflight.mjs miquimica` → PASS. **Aviso:** su lista de migraciones esperadas termina en
+   `20260913160000` y no conoce las 19 nuevas; comprobar sus objetos a mano (tabla de §1).
+3. `select jobname, schedule from cron.job` → incluye `ecommerce-order-schedules` y `ecommerce-cart-recovery`.
+4. `npx playwright test --project=escritorio --project=movil` contra QAS. **Nunca** `comercio-*` contra QAS: crean
+   usuarios, pedidos y alteran el crédito de una cuenta.
 
 ## 7 · Si algo falla: roll-forward, nunca rollback destructivo
 
-- **Detener el despliegue** en el paso que falló. No publicar functions ni frontend si una migración no terminó.
-- Una migración que falla dentro de un archivo: el endpoint de consultas ejecuta el archivo en una sola petición;
-  comprobar por objetos si quedó aplicada parcialmente (tabla/función/columna de la fila de la tabla de arriba) antes
-  de reintentar. Varias de estas migraciones **no son re-ejecutables tal cual** (`create table`, `add column`,
-  `add constraint`): no repetir a ciegas.
-- Corregir con una **migración nueva posterior** (forward) o un hotfix de la función; nunca editar una migración ya
-  aplicada ni hacer `drop` de tablas con datos (`order_buyers`, `buyer_account_selections`, `consumer_addresses`,
-  `orders.purchase_order_number`).
-- Functions: redeploy de la versión anterior de `checkout` solo si las migraciones 4 y 6 NO se aplicaron (la función
-  anterior llama a `checkout_place_order` sin `p_purchase_order_number`, que tras la migración 6 sigue resolviendo por
-  valor por defecto; la anterior toma `rows[0]` de `my_business_accounts`, que sigue existiendo).
-- Frontend: volver al build anterior es seguro mientras la base tenga la columna (el anterior no la lee).
-- Registrar el incidente en `docs/STATE.md` y avisar por el buzón de coordinación si afecta a otra app de la suite.
+- Detener en el paso que falló; no publicar functions ni frontend con una migración a medias.
+- Corregir con una migración **nueva posterior**; nunca editar una aplicada ni borrar tablas con datos
+  (`order_schedule_runs`, `product_reviews`, `cart_recovery_*`, `invoice_issue_requests`).
+- Candados de capacidad: si un tenant sincronizado pierde un módulo que usaba, la corrección es de datos (dar la
+  capacidad en `tenant_entitlements` por el Hub/aprovisionamiento), no revertir la migración.
+- `checkout` anterior: solo si la migración 1 no se aplicó (la anterior no conoce `CREDITO_BLOQUEADO`; el trigger
+  de la base rechazaría igual, con un error genérico).
+- Registrar el incidente en `docs/STATE.md`.
