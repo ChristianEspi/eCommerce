@@ -1,6 +1,7 @@
 import { codeFromDbError, type PostgrestLike } from '@/shared/lib/appError'
 import {
   ARCHIVE_MY_ORDER_SCHEDULE_RPC,
+  CHECK_MY_ORDER_SCHEDULE_LINES_RPC,
   DISMISS_MY_ORDER_SCHEDULE_RUN_RPC,
   MY_ORDER_SCHEDULES_RPC,
   SAVE_MY_ORDER_SCHEDULE_RPC,
@@ -121,6 +122,68 @@ export async function saveMyOrderSchedule(input: SaveScheduleInput): Promise<Sch
   })
 }
 
+/** Motivos estables de `check_my_order_schedule_lines` (20260914192000). */
+export type ScheduleLineReason =
+  | 'LINEAS_INVALIDAS'
+  | 'CANTIDAD_INVALIDA'
+  | 'LINEA_DUPLICADA'
+  | 'PRODUCTO_NO_DISPONIBLE'
+  | 'VARIANTE_REQUERIDA'
+  | 'VARIANTE_NO_DISPONIBLE'
+  | 'FUERA_DE_CANAL'
+  | 'OTRA_MONEDA'
+  | 'FUERA_DE_SURTIDO'
+
+export interface ScheduleLineCheck {
+  readonly index: number
+  readonly product_id: string
+  readonly variant_id?: string | null
+  readonly status: 'ok' | 'rejected'
+  readonly reason?: ScheduleLineReason
+}
+
+export interface ScheduleLinesReview {
+  readonly lines: readonly ScheduleLineCheck[]
+  readonly accepted: number
+  readonly rejected: number
+}
+
+/**
+ * La revisión PREVIA: qué líneas se pueden programar y por qué no las otras.
+ * Mismas reglas que el guardado —es la misma función en la base—, sin escribir
+ * nada. La pantalla la pide al abrir el diálogo para avisar antes de pulsar.
+ */
+export async function checkMyOrderScheduleLines(
+  storeSlug: string,
+  lines: readonly ScheduleLine[],
+): Promise<ScheduleLinesReview> {
+  return rpc(CHECK_MY_ORDER_SCHEDULE_LINES_RPC, {
+    p_store_slug: storeSlug,
+    p_lines: lines.map((line) => ({
+      product_id: line.product_id,
+      ...(line.variant_id ? { variant_id: line.variant_id } : {}),
+      quantity: line.quantity,
+    })),
+  })
+}
+
+const REASON_KEY: Record<ScheduleLineReason, MessageKey> = {
+  LINEAS_INVALIDAS: 'account.schedules.reason.LINEAS_INVALIDAS',
+  CANTIDAD_INVALIDA: 'account.schedules.reason.CANTIDAD_INVALIDA',
+  LINEA_DUPLICADA: 'account.schedules.reason.LINEA_DUPLICADA',
+  PRODUCTO_NO_DISPONIBLE: 'account.schedules.reason.PRODUCTO_NO_DISPONIBLE',
+  VARIANTE_REQUERIDA: 'account.schedules.reason.VARIANTE_REQUERIDA',
+  VARIANTE_NO_DISPONIBLE: 'account.schedules.reason.VARIANTE_NO_DISPONIBLE',
+  FUERA_DE_CANAL: 'account.schedules.reason.FUERA_DE_CANAL',
+  OTRA_MONEDA: 'account.schedules.reason.OTRA_MONEDA',
+  FUERA_DE_SURTIDO: 'account.schedules.reason.FUERA_DE_SURTIDO',
+}
+
+/** El motivo de una línea, en palabras. Uno desconocido cae en el genérico. */
+export function scheduleReasonKey(reason: string | undefined): MessageKey {
+  return (reason && REASON_KEY[reason as ScheduleLineReason]) || 'account.schedules.reason.DESCONOCIDO'
+}
+
 export async function setMyOrderScheduleStatus(
   storeSlug: string,
   templateId: string,
@@ -162,8 +225,17 @@ export function mapScheduleCode(code: string): MessageKey {
       return 'account.schedules.error.forbidden'
     case 'SIN_MODULO':
       return 'account.schedules.error.unavailable'
-    case 'PRODUCTO_NO_DISPONIBLE':
+    // Cada familia de motivo con su texto: «algún producto no se puede
+    // programar» no le decía al comprador qué hacer.
     case 'FUERA_DE_SURTIDO':
+      return 'account.schedules.error.assortment'
+    case 'PRODUCTO_NO_DISPONIBLE':
+    case 'VARIANTE_REQUERIDA':
+    case 'VARIANTE_NO_DISPONIBLE':
+      return 'account.schedules.error.unavailable_product'
+    case 'FUERA_DE_CANAL':
+    case 'OTRA_MONEDA':
+      return 'account.schedules.error.channel'
     case 'CANTIDAD_INVALIDA':
     case 'LINEA_DUPLICADA':
     case 'LINEAS_INVALIDAS':

@@ -335,6 +335,100 @@ describe('el comprador programa', () => {
   })
 })
 
+/**
+ * 20260914192000 · Visto en DEV: el cliente tenía un surtido de LISTA PERMITIDA
+ * con dos productos y «Programar» solo decía «algún producto no se puede
+ * programar». Ahora la pantalla revisa ANTES y cada línea trae su motivo.
+ */
+describe('la revisión previa dice qué línea y por qué', () => {
+  async function surtidoSoloJabon() {
+    const [cuenta] = await svc<{ customer_id: string }>(
+      `select a.customer_id from public.business_account_users u
+         join public.business_accounts a on a.id = u.business_account_id where u.user_id = $1`,
+      [COMPRADOR],
+    )
+    const surtido = await id(
+      `insert into public.assortments (organization_id, company_id, store_id, code, name, is_allow_list)
+       values ($1, $2, $3, $4, 'Solo jabón', true) returning id`,
+      [TENANT_A.organizationId, TENANT_A.companyId, storeA, `SOLO-JABON-${Date.now()}`],
+    )
+    await svc(
+      `insert into public.assortment_items (organization_id, company_id, assortment_id, product_id)
+       values ($1, $2, $3, $4)`,
+      [TENANT_A.organizationId, TENANT_A.companyId, surtido, jabon],
+    )
+    await svc(
+      `insert into public.assortment_assignments (organization_id, company_id, store_id, assortment_id, scope, customer_id)
+       values ($1, $2, $3, $4, 'customer', $5)`,
+      [TENANT_A.organizationId, TENANT_A.companyId, storeA, surtido, cuenta?.customer_id],
+    )
+    await entitle([...CON_MODULO, 'ecommerce.trade.assortments'])
+    return surtido
+  }
+
+  it('cada línea sale con ok o rechazada y su motivo, sin escribir nada', async () => {
+    const surtido = await surtidoSoloJabon()
+    try {
+      const antes = await svc<{ n: number }>(`select count(*)::int as n from public.order_templates`)
+      const r = await como<Row>(
+        COMPRADOR,
+        `select public.check_my_order_schedule_lines($1, $2::jsonb) as r`,
+        [
+          TENANT_A.storeSlug,
+          JSON.stringify([
+            { product_id: jabon, quantity: 2 },
+            { product_id: champu, quantity: 1 },
+            { product_id: borrador, quantity: 1 },
+            { product_id: jabon, quantity: 5 },
+          ]),
+        ],
+      )
+      expect((r.lines as Row[]).map((l) => [l.index, l.status, l.reason ?? null])).toEqual([
+        [0, 'ok', null],
+        [1, 'rejected', 'FUERA_DE_SURTIDO'],
+        [2, 'rejected', 'PRODUCTO_NO_DISPONIBLE'],
+        [3, 'rejected', 'LINEA_DUPLICADA'],
+      ])
+      expect(r).toMatchObject({ accepted: 1, rejected: 3 })
+      expect(JSON.stringify(r)).not.toMatch(/price|stock/)
+      expect(await svc(`select count(*)::int as n from public.order_templates`)).toEqual(antes)
+    } finally {
+      await svc(`update public.assortment_assignments set is_active = false where assortment_id = $1`, [surtido])
+    }
+  })
+
+  it('guardar con una línea fuera de surtido falla con ESE motivo, no con uno genérico', async () => {
+    const surtido = await surtidoSoloJabon()
+    try {
+      expect(
+        await expectFailure(() =>
+          guardar(COMPRADOR, { lines: [{ product_id: jabon, quantity: 1 }, { product_id: champu, quantity: 1 }] }),
+        ),
+      ).toMatch(/^FUERA_DE_SURTIDO: la linea 2/)
+      // Solo con lo que sí está en el surtido, se programa.
+      const r = await guardar(COMPRADOR, { lines: [{ product_id: jabon, quantity: 1 }] })
+      expect(r.replayed).toBe(false)
+    } finally {
+      await svc(`update public.assortment_assignments set is_active = false where assortment_id = $1`, [surtido])
+    }
+  })
+
+  it('la revisión exige sesión y cuenta: anon no la ejecuta y el lector no la usa', async () => {
+    const lineas = JSON.stringify([{ product_id: jabon, quantity: 1 }])
+    const anon = await expectFailure(() =>
+      asRole(db, 'anon', null, async () =>
+        db.query(`select public.check_my_order_schedule_lines($1, $2::jsonb)`, [TENANT_A.storeSlug, lineas]),
+      ),
+    )
+    expect(anon).toMatch(/permission denied/i)
+    expect(
+      await expectFailure(() =>
+        como(LECTOR, `select public.check_my_order_schedule_lines($1, $2::jsonb) as r`, [TENANT_A.storeSlug, lineas]),
+      ),
+    ).toMatch(/SIN_PERMISO/)
+  })
+})
+
 describe('quién puede', () => {
   it('el lector ve pero no gestiona', async () => {
     const r = await guardar(COMPRADOR)

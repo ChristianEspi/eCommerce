@@ -528,6 +528,8 @@ export const REQUEST_QUOTE_RPC = 'request_quote'
 export const MY_ORDER_SCHEDULES_RPC = 'my_order_schedules'
 /** Alta (idempotente por clave) o edición de plantilla + programación. */
 export const SAVE_MY_ORDER_SCHEDULE_RPC = 'save_my_order_schedule'
+/** Revisión previa (20260914192000): cada línea con ok/rechazada y su motivo. No escribe. */
+export const CHECK_MY_ORDER_SCHEDULE_LINES_RPC = 'check_my_order_schedule_lines'
 /** Pausar o reanudar. */
 export const SET_MY_ORDER_SCHEDULE_STATUS_RPC = 'set_my_order_schedule_status'
 export const ARCHIVE_MY_ORDER_SCHEDULE_RPC = 'archive_my_order_schedule'

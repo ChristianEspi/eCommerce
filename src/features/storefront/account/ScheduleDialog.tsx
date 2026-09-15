@@ -9,7 +9,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { SCHEDULE_INTERVALS, isoDateFromToday, scheduleFormError } from '../scheduledOrders'
@@ -42,6 +42,8 @@ export function ScheduleDialog({
   initial,
   saving,
   submitLabel,
+  notice,
+  submitDisabled = false,
   onClose,
   onSubmit,
 }: {
@@ -51,6 +53,10 @@ export function ScheduleDialog({
   initial?: ScheduleFormValues
   saving: boolean
   submitLabel: string
+  /** Aviso previo a cualquier acción: qué no se podrá programar y por qué. */
+  notice?: ReactNode
+  /** `true` cuando se sabe de antemano que no hay nada que programar. */
+  submitDisabled?: boolean
   onClose: () => void
   onSubmit: (values: ScheduleFormValues) => void
 }) {
@@ -92,6 +98,7 @@ export function ScheduleDialog({
               {intro}
             </Typography>
           )}
+          {notice}
           <TextField
             label={t('account.schedules.form.name')}
             value={name}
@@ -148,7 +155,7 @@ export function ScheduleDialog({
         <Button onClick={onClose} disabled={saving}>
           {t('common.cancel')}
         </Button>
-        <Button variant="contained" onClick={enviar} disabled={saving}>
+        <Button variant="contained" onClick={enviar} disabled={saving || submitDisabled}>
           {saving ? t('account.schedules.saving') : submitLabel}
         </Button>
       </DialogActions>

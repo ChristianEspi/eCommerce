@@ -260,18 +260,84 @@ describe('programar desde el carrito', () => {
     { product_id: JABON, variant_id: null, variant_name: null, slug: 'jabon', name: 'Jabón', unit_price: '10.00', currency: 'PEN', image_path: null, quantity: 3 },
   ] as CartLine[]
 
-  function pintarBoton(context: unknown) {
+  const todoOk = (args: Record<string, unknown>) => {
+    const enviadas = args.p_lines as unknown[]
+    return {
+      lines: enviadas.map((_, index) => ({ index, product_id: JABON, status: 'ok' })),
+      accepted: enviadas.length,
+      rejected: 0,
+    }
+  }
+
+  function pintarBoton(
+    context: unknown,
+    revision: (args: Record<string, unknown>) => unknown = todoOk,
+    carrito: CartLine[] = lineas,
+  ) {
     const fake = createFakeSupabase({
       session: makeSession(),
       rpc: {
         my_commerce_context: () => context,
+        check_my_order_schedule_lines: revision,
         save_my_order_schedule: () => ({ ...plantilla(), replayed: false }),
       },
     })
     holder.client = fake
-    renderWithProviders(<ScheduleCartButton storeSlug="tienda-a" lines={lineas} />, { session: fake.state.session })
+    renderWithProviders(<ScheduleCartButton storeSlug="tienda-a" lines={carrito} />, { session: fake.state.session })
     return { fake }
   }
+
+  const dosLineas = [
+    { product_id: JABON, variant_id: null, variant_name: null, slug: 'jabon', name: 'Jabón', unit_price: '10.00', currency: 'PEN', image_path: null, quantity: 3 },
+    { product_id: CHAMPU, variant_id: null, variant_name: null, slug: 'champu', name: 'Champú', unit_price: '20.00', currency: 'PEN', image_path: null, quantity: 1 },
+  ] as CartLine[]
+
+  it('ANTES de pulsar dice qué producto no se puede programar y por qué, y programa solo el resto', async () => {
+    const user = userEvent.setup()
+    const { fake } = pintarBoton(
+      CONTEXTO_EMPRESA,
+      () => ({
+        lines: [
+          { index: 0, product_id: JABON, status: 'ok' },
+          { index: 1, product_id: CHAMPU, status: 'rejected', reason: 'FUERA_DE_SURTIDO' },
+        ],
+        accepted: 1,
+        rejected: 1,
+      }),
+      dosLineas,
+    )
+
+    await user.click(await screen.findByRole('button', { name: 'Programar este pedido' }))
+    const dialogo = await screen.findByRole('dialog')
+    expect(await within(dialogo).findByText('1 de 2 productos no se pueden programar:')).toBeInTheDocument()
+    expect(within(dialogo).getByText('Champú')).toBeInTheDocument()
+    expect(within(dialogo).getByText(/no está en el surtido de tu cuenta/)).toBeInTheDocument()
+    expect(within(dialogo).getByText('Se programarán solo los 1 productos restantes.')).toBeInTheDocument()
+
+    await user.type(within(dialogo).getByLabelText(/Nombre/), 'Semanal')
+    await user.click(within(dialogo).getByRole('button', { name: 'Programar 1 productos' }))
+
+    await waitFor(() => expect(fake.state.rpcCalls.map((c) => c.name)).toContain('save_my_order_schedule'))
+    const args = fake.state.rpcCalls.find((c) => c.name === 'save_my_order_schedule')?.args as Record<string, unknown>
+    // Solo la línea que pasó la revisión.
+    expect(args.p_lines).toEqual([{ product_id: JABON, quantity: 3 }])
+  })
+
+  it('si ninguno se puede programar, lo dice y no deja enviar', async () => {
+    const user = userEvent.setup()
+    const { fake } = pintarBoton(CONTEXTO_EMPRESA, () => ({
+      lines: [{ index: 0, product_id: JABON, status: 'rejected', reason: 'PRODUCTO_NO_DISPONIBLE' }],
+      accepted: 0,
+      rejected: 1,
+    }))
+
+    await user.click(await screen.findByRole('button', { name: 'Programar este pedido' }))
+    const dialogo = await screen.findByRole('dialog')
+    expect(await within(dialogo).findByText('Ningún producto del carrito se puede programar:')).toBeInTheDocument()
+    expect(within(dialogo).getByText(/ya no está publicado en la tienda/)).toBeInTheDocument()
+    expect(within(dialogo).getByRole('button', { name: 'Programar' })).toBeDisabled()
+    expect(fake.state.rpcCalls.map((c) => c.name)).not.toContain('save_my_order_schedule')
+  })
 
   it('sin cuenta de empresa en esta tienda, el botón no aparece', async () => {
     const { fake } = pintarBoton(null)
@@ -324,6 +390,10 @@ describe('reglas puras', () => {
 
   it('un código desconocido cae en el mensaje genérico', () => {
     expect(mapScheduleCode('ALGO_RARO')).toBe('account.schedules.error.generic')
-    expect(mapScheduleCode('FUERA_DE_SURTIDO')).toBe('account.schedules.error.lines')
+    // Cada familia con su texto: el genérico «algún producto…» no decía qué hacer.
+    expect(mapScheduleCode('FUERA_DE_SURTIDO')).toBe('account.schedules.error.assortment')
+    expect(mapScheduleCode('VARIANTE_REQUERIDA')).toBe('account.schedules.error.unavailable_product')
+    expect(mapScheduleCode('FUERA_DE_CANAL')).toBe('account.schedules.error.channel')
+    expect(mapScheduleCode('LINEA_DUPLICADA')).toBe('account.schedules.error.lines')
   })
 })
