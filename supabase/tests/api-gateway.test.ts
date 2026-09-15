@@ -49,6 +49,7 @@ import {
 } from '../functions/_shared/webhooks/signature.ts'
 import {
   dispatchWebhooks,
+  webhookSecretEnvName,
   WEBHOOK_PROVIDER_CODE,
   type DispatcherPorts,
   type OutboxMessage,
@@ -719,6 +720,38 @@ describe('el trabajador que vacia la cola', () => {
     expect(sent).toEqual([])
     expect(failed[0]?.error).toMatch(/SECRETO_NO_CONFIGURADO/)
     expect(failed[0]?.error).toMatch(/EBIM_WEBHOOK_SECRET_ERP/)
+  })
+
+  /**
+   * Cierre · D2. `secret_ref` lo escribe el administrador del tenant: resuelto
+   * tal cual, podía nombrar `SUPABASE_SERVICE_ROLE_KEY` o el secreto de otra
+   * sociedad y el trabajador firmaba con él hacia la URL que ese tenant eligió.
+   */
+  it('el secreto se busca SOLO en el espacio de la sociedad del mensaje', async () => {
+    const pedidos: string[] = []
+    const { ports, sent } = makeDispatcher({
+      target: { ...endpoint, secret_ref: 'SUPABASE_SERVICE_ROLE_KEY' },
+    })
+    ports.resolveSecret = (name) => {
+      pedidos.push(name)
+      return name === 'SUPABASE_SERVICE_ROLE_KEY' ? 'clave-de-plataforma' : null
+    }
+    await dispatchWebhooks(ports, { worker: 'w1' })
+
+    // Nunca se pide la variable de la plataforma: se pide la del espacio de la
+    // sociedad, que no existe, y no sale nada firmado.
+    expect(pedidos).toEqual(['EBIM_WH_0A0000000000400080000000000000C1_SUPABASE_SERVICE_ROLE_KEY'])
+    expect(sent).toEqual([])
+  })
+
+  it('dos sociedades con el mismo secret_ref resuelven variables distintas', () => {
+    const a = webhookSecretEnvName('0a000000-0000-4000-8000-0000000000c1', 'EBIM_WEBHOOK_SECRET_ERP')
+    const b = webhookSecretEnvName('0b000000-0000-4000-8000-0000000000c2', 'EBIM_WEBHOOK_SECRET_ERP')
+    expect(a).toBe('EBIM_WH_0A0000000000400080000000000000C1_EBIM_WEBHOOK_SECRET_ERP')
+    expect(b).not.toBe(a)
+    // Sin forma válida no hay nombre que resolver.
+    expect(webhookSecretEnvName('no-es-un-uuid', 'EBIM_WEBHOOK_SECRET_ERP')).toBeNull()
+    expect(webhookSecretEnvName('0a000000-0000-4000-8000-0000000000c1', 'x; rm')).toBeNull()
   })
 
   it('un destino que ya no existe falla sin intentar la entrega', async () => {

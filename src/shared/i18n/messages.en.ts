@@ -3723,7 +3723,8 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'integrations.webhooks.url': 'URL',
     'integrations.webhooks.urlHelp': 'https only, and public addresses only.',
     'integrations.webhooks.secretRef': 'Secret variable name',
-    'integrations.webhooks.secretRefHelp': 'The signing secret is NOT typed here: it lives in the deployment and this is only its name (uppercase and underscore).',
+    'integrations.webhooks.secretRefHelp':
+      'The signing secret is NOT typed here: it lives in the deployment and this is only its name (uppercase and underscore). The deployment looks it up inside your company namespace: EBIM_WH_<company>_<this name>.',
     'integrations.webhooks.description': 'Description',
     'integrations.webhooks.events': 'Events',
     'integrations.webhooks.enable': 'Enable',

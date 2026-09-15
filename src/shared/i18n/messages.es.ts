@@ -3744,7 +3744,8 @@ export const es = {
     'integrations.webhooks.url': 'URL',
     'integrations.webhooks.urlHelp': 'Solo https y solo direcciones públicas.',
     'integrations.webhooks.secretRef': 'Nombre de la variable del secreto',
-    'integrations.webhooks.secretRefHelp': 'El secreto de firma NO se escribe aquí: se guarda en el despliegue y esto es solo su nombre (mayúsculas y guion bajo).',
+    'integrations.webhooks.secretRefHelp':
+      'El secreto de firma NO se escribe aquí: se guarda en el despliegue y esto es solo su nombre (mayúsculas y guion bajo). El despliegue lo busca dentro del espacio de tu sociedad: EBIM_WH_<sociedad>_<este nombre>.',
     'integrations.webhooks.description': 'Descripción',
     'integrations.webhooks.events': 'Eventos',
     'integrations.webhooks.enable': 'Activar',
