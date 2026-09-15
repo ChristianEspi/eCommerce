@@ -942,6 +942,16 @@ export const es = {
     'pim.relation.accessory': 'Accesorio',
     'pim.relation.substitute': 'Sustituto',
     'pim.relation.spare_part': 'Repuesto',
+    // --- Cierre · relaciones en la vitrina y orden en el PIM ---------------
+    'pim.relations.order': 'Orden',
+    'pim.relations.actions': 'Acciones',
+    'pim.relations.moveUp': 'Subir {name}',
+    'pim.relations.moveDown': 'Bajar {name}',
+    'pim.relations.remove': 'Quitar la relación con {name}',
+    'pim.relations.removed': 'Relación quitada',
+    'store.product.relations.complete': 'Completa tu compra',
+    'store.product.relations.upgrade': 'Mejora tu elección',
+    // --- fin relaciones ------------------------------------------------------
     'pim.error.code': 'Usa minúsculas, números, guiones y guiones bajos',
     'pim.error.name': 'Escribe un nombre',
     'pim.error.symbol': 'Ese texto es demasiado largo',

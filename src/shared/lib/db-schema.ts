@@ -431,6 +431,14 @@ export const CART_ABANDON_RPC = 'cart_abandon'
 // `supabase/tests/quick-order-resolver.test.ts`.
 export const RESOLVE_ORDER_LINES_RPC = 'resolve_order_lines_for_slug'
 
+// --- Cierre · relaciones de producto en la vitrina (20260914140000) ---------
+// Puerta ANÓNIMA: ids de relacionados publicados y visibles en el canal
+// público, en el orden que fija el comercio. Sin `satisfies` hasta regenerar
+// los tipos: la red mientras tanto es
+// `supabase/tests/storefront-product-relations.test.ts`.
+export const PRODUCT_RELATIONS_PUBLIC_RPC = 'product_relations_for_slug'
+// --- fin relaciones ----------------------------------------------------------
+
 // OMS (P08-SaaS). Los COMANDOS del pedido. No hay ningún `update` directo sobre
 // `orders` en `features/orders`: los tres ejes nuevos no tienen GRANT de
 // escritura, así que `order_transition` no es la forma recomendada — es la

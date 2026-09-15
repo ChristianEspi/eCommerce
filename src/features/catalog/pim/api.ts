@@ -592,6 +592,7 @@ export async function addRelation(input: {
   relatedProductId: string
   kind: ProductRelationKind
   scope: StoreScope
+  position?: number
 }): Promise<void> {
   const { error } = await catalogClient()
     .from(PRODUCT_RELATIONS_TABLE)
@@ -602,6 +603,58 @@ export async function addRelation(input: {
       product_id: input.productId,
       related_product_id: input.relatedProductId,
       relation_kind: input.kind,
+      // Al final de la lista: la relación nueva no se cuela delante de las que
+      // el comercio ya ordenó.
+      position: input.position ?? 0,
     })
   if (error) throw catalogErrorFromDb(error)
 }
+
+// --- Cierre · quitar y reordenar relaciones ---------------------------------
+//
+// Sin función DEFINER: la RLS de `product_relations` ya da UPDATE y DELETE a
+// `owner`, `admin` y `catalog` de su tenant (20260827170000), que es justo
+// quien edita el catálogo. Una puerta nueva sería una segunda regla para lo
+// mismo.
+
+export async function deleteRelation(id: string): Promise<void> {
+  await deleteRow(PRODUCT_RELATIONS_TABLE, id)
+}
+
+/**
+ * Posiciones tras mover una relación `delta` puestos. Función PURA.
+ *
+ * Renumera la lista entera de 1 a n y devuelve SOLO las filas cuya posición
+ * cambia: con posiciones repetidas (las altas antiguas nacían todas en 0) mover
+ * una sola fila no ordenaría nada.
+ */
+export function relationPositionsAfterMove(
+  list: readonly Pick<ProductRelation, 'id' | 'position'>[],
+  index: number,
+  delta: -1 | 1,
+): { id: string; position: number }[] {
+  const target = index + delta
+  if (index < 0 || index >= list.length || target < 0 || target >= list.length) return []
+  const next = [...list]
+  const [moved] = next.splice(index, 1)
+  if (!moved) return []
+  next.splice(target, 0, moved)
+  return next
+    .map((item, i) => ({ id: item.id, position: i + 1, before: item.position }))
+    .filter((item) => item.position !== item.before)
+    .map(({ id, position }) => ({ id, position }))
+}
+
+export async function reorderRelations(changes: readonly { id: string; position: number }[]): Promise<void> {
+  // De una en una y en orden: si una falla, las anteriores ya quedaron y la
+  // lista se vuelve a leer —la invalida el hook—, así que la pantalla nunca
+  // enseña un orden que la base no tiene.
+  for (const change of changes) {
+    const { error } = await catalogClient()
+      .from(PRODUCT_RELATIONS_TABLE)
+      .update({ position: change.position })
+      .eq('id', change.id)
+    if (error) throw catalogErrorFromDb(error)
+  }
+}
+// --- fin relaciones -----------------------------------------------------------

@@ -928,6 +928,16 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'pim.relation.accessory': 'Accessory',
     'pim.relation.substitute': 'Substitute',
     'pim.relation.spare_part': 'Spare part',
+    // --- Closure · storefront relations and PIM ordering -------------------
+    'pim.relations.order': 'Order',
+    'pim.relations.actions': 'Actions',
+    'pim.relations.moveUp': 'Move {name} up',
+    'pim.relations.moveDown': 'Move {name} down',
+    'pim.relations.remove': 'Remove the relation with {name}',
+    'pim.relations.removed': 'Relation removed',
+    'store.product.relations.complete': 'Complete your purchase',
+    'store.product.relations.upgrade': 'Upgrade your choice',
+    // --- end relations -------------------------------------------------------
     'pim.error.code': 'Use lowercase letters, digits, dashes and underscores',
     'pim.error.name': 'Type a name',
     'pim.error.symbol': 'That text is too long',

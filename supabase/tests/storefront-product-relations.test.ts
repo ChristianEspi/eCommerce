@@ -15,7 +15,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
-import { TENANT_A, TENANT_B, asRole, createTestDatabase, expectFailure } from './harness.ts'
+import { TENANT_A, TENANT_B, asRole, claimsFor, createTestDatabase, expectFailure } from './harness.ts'
 
 type Row = Record<string, unknown>
 
@@ -236,5 +236,58 @@ describe('la puerta', () => {
   it('la tabla sigue cerrada para anon', async () => {
     const message = await expectFailure(() => anon(`select * from public.product_relations`))
     expect(message).toMatch(/permission denied/i)
+  })
+})
+describe('reordenar y quitar desde el backoffice: la RLS que ya existía', () => {
+  const LECTOR = '0e300000-0000-4000-8000-0000000f0001'
+  const CATALOGO = '0e300000-0000-4000-8000-0000000f0002'
+
+  function miembro(sub: string, role: string) {
+    return claimsFor(TENANT_A, { sub, email: `${sub}@tenant-a.com`, companies: [{ id: TENANT_A.companyId, role }] })
+  }
+
+  async function como<T = Row>(claims: ReturnType<typeof claimsFor>, query: string, params: unknown[] = []) {
+    return asRole(db, 'authenticated', claims, async () => (await db.query<T>(query, params)).rows)
+  }
+
+  beforeAll(async () => {
+    for (const [user, role] of [
+      [LECTOR, 'viewer'],
+      [CATALOGO, 'catalog'],
+    ] as const) {
+      await svc(
+        `insert into public.tenant_members (organization_id, company_id, user_id, email, role)
+         values ($1, $2, $3, $4, $5)`,
+        [TENANT_A.organizationId, TENANT_A.companyId, user, `${user}@tenant-a.com`, role],
+      )
+    }
+  })
+
+  it('un lector ni reordena ni quita; otro tenant tampoco', async () => {
+    for (const claims of [miembro(LECTOR, 'viewer'), claimsFor(TENANT_B)]) {
+      const movidas = await como(claims, `update public.product_relations set position = 99 where product_id = $1 returning id`, [silla])
+      const quitadas = await como(claims, `delete from public.product_relations where product_id = $1 returning id`, [silla])
+      expect({ movidas: movidas.length, quitadas: quitadas.length }).toEqual({ movidas: 0, quitadas: 0 })
+    }
+  })
+
+  it('el rol de catálogo reordena, y la vitrina sigue ese orden', async () => {
+    await como(
+      miembro(CATALOGO, 'catalog'),
+      `update public.product_relations set position = 0 where product_id = $1 and related_product_id = $2`,
+      [silla, funda],
+    )
+    const rows = await relacionados(silla)
+    expect(rows[0]?.related_product_id).toBe(funda)
+  })
+
+  it('el rol de catálogo quita, y la vitrina deja de sugerirlo', async () => {
+    const quitadas = await como(
+      miembro(CATALOGO, 'catalog'),
+      `delete from public.product_relations where product_id = $1 and related_product_id = $2 returning id`,
+      [silla, mesa],
+    )
+    expect(quitadas).toHaveLength(1)
+    expect((await relacionados(silla)).map((r) => r.related_product_id)).not.toContain(mesa)
   })
 })

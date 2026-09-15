@@ -1,8 +1,12 @@
+import ArrowDownwardRoundedIcon from '@mui/icons-material/ArrowDownwardRounded'
+import ArrowUpwardRoundedIcon from '@mui/icons-material/ArrowUpwardRounded'
+import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
 import { usePagedRows } from '@/shared/ui/usePagedRows'
 import { TablePager } from '@/shared/ui/TablePager'
 import {
   Alert,
   Button,
+  IconButton,
   MenuItem,
   Stack,
   Table,
@@ -19,8 +23,9 @@ import type { MessageKey } from '@/shared/i18n/messages'
 import { LoadingState } from '@/shared/ui/states'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { CatalogError } from '../api/errors'
+import { relationPositionsAfterMove } from './api'
 import { PanelHint } from './VariantsPanel'
-import { useAddRelation, useRelations } from './hooks'
+import { useAddRelation, useDeleteRelation, useRelations, useReorderRelations } from './hooks'
 import { PRODUCT_RELATION_KINDS, type ProductRelationKind } from './types'
 import type { Product } from '../types'
 
@@ -40,6 +45,10 @@ const RELATION_LABEL: Record<ProductRelationKind, MessageKey> = {
  * automáticamente: el sustituto de un producto descatalogado es su reemplazo, y
  * lo contrario no es cierto. Crear el par sin preguntar llenaría el catálogo de
  * sugerencias que nadie escribió.
+ *
+ * Desde el cierre la vitrina PINTA estas relaciones (`product_relations_for_slug`),
+ * así que el orden importa: es el orden en que el comprador las ve. Por eso se
+ * pueden subir, bajar y quitar aquí.
  */
 export function RelationsPanel({
   product,
@@ -62,6 +71,8 @@ export function RelationsPanel({
   const productId = product?.id ?? null
   const relations = useRelations(productId)
   const add = useAddRelation()
+  const remove = useDeleteRelation()
+  const reorder = useReorderRelations()
 
   const [target, setTarget] = useState('')
   const [kind, setKind] = useState<ProductRelationKind>('related')
@@ -86,6 +97,11 @@ export function RelationsPanel({
 
   if (relations.isPending) return <LoadingState />
 
+  const busy = add.isPending || remove.isPending || reorder.isPending
+
+  function failure(caught: unknown) {
+    setError(caught instanceof CatalogError ? caught.key : 'catalog.error.generic')
+  }
 
   async function onAdd() {
     if (!product || !target) return
@@ -96,11 +112,33 @@ export function RelationsPanel({
         relatedProductId: target,
         kind,
         scope: { organizationId, companyId, storeId },
+        position: list.reduce((max, item) => Math.max(max, item.position), 0) + 1,
       })
       notify(t('pim.toast.saved'))
       setTarget('')
     } catch (caught) {
-      setError(caught instanceof CatalogError ? caught.key : 'catalog.error.generic')
+      failure(caught)
+    }
+  }
+
+  async function onMove(index: number, delta: -1 | 1) {
+    const changes = relationPositionsAfterMove(list, index, delta)
+    if (changes.length === 0) return
+    setError(null)
+    try {
+      await reorder.mutateAsync(changes)
+    } catch (caught) {
+      failure(caught)
+    }
+  }
+
+  async function onRemove(id: string) {
+    setError(null)
+    try {
+      await remove.mutateAsync(id)
+      notify(t('pim.relations.removed'))
+    } catch (caught) {
+      failure(caught)
     }
   }
 
@@ -145,7 +183,7 @@ export function RelationsPanel({
             ))}
           </TextField>
 
-          <Button variant="outlined" disabled={!target || add.isPending} onClick={() => void onAdd()}>
+          <Button variant="outlined" disabled={!target || busy} onClick={() => void onAdd()}>
             {t('common.add')}
           </Button>
         </Stack>
@@ -157,21 +195,58 @@ export function RelationsPanel({
         <Table size="small">
           <TableHead>
             <TableRow>
+              <TableCell>{t('pim.relations.order')}</TableCell>
               <TableCell>{t('pim.field.product')}</TableCell>
               <TableCell>{t('pim.field.relationKind')}</TableCell>
+              {canWrite && <TableCell align="right">{t('pim.relations.actions')}</TableCell>}
             </TableRow>
           </TableHead>
           <TableBody>
-            {pager.rows.map((relation) => (
-              <TableRow key={relation.id} hover>
-                <TableCell sx={{ fontWeight: 700 }}>
-                  {byId.get(relation.related_product_id)?.name ?? t('common.none')}
-                </TableCell>
-                <TableCell sx={{ color: 'var(--muted)' }}>
-                  {t(RELATION_LABEL[relation.relation_kind])}
-                </TableCell>
-              </TableRow>
-            ))}
+            {pager.rows.map((relation) => {
+              // El índice en la lista ENTERA, no en la página: subir la
+              // primera fila de la página dos la cambia con la última de la uno.
+              const index = list.indexOf(relation)
+              const name = byId.get(relation.related_product_id)?.name ?? t('common.none')
+              return (
+                <TableRow key={relation.id} hover>
+                  <TableCell sx={{ color: 'var(--muted)', fontVariantNumeric: 'tabular-nums' }}>
+                    {index + 1}
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>{name}</TableCell>
+                  <TableCell sx={{ color: 'var(--muted)' }}>
+                    {t(RELATION_LABEL[relation.relation_kind])}
+                  </TableCell>
+                  {canWrite && (
+                    <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                      <IconButton
+                        size="small"
+                        aria-label={t('pim.relations.moveUp').replace('{name}', name)}
+                        disabled={busy || index === 0}
+                        onClick={() => void onMove(index, -1)}
+                      >
+                        <ArrowUpwardRoundedIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        aria-label={t('pim.relations.moveDown').replace('{name}', name)}
+                        disabled={busy || index === list.length - 1}
+                        onClick={() => void onMove(index, 1)}
+                      >
+                        <ArrowDownwardRoundedIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        aria-label={t('pim.relations.remove').replace('{name}', name)}
+                        disabled={busy}
+                        onClick={() => void onRemove(relation.id)}
+                      >
+                        <DeleteOutlineRoundedIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  )}
+                </TableRow>
+              )
+            })}
           </TableBody>
         </Table>
       )}
