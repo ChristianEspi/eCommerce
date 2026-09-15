@@ -729,6 +729,137 @@ describe('el cobro y el eje del pedido', () => {
 })
 
 // ===========================================================================
+// Cierre · D2 (20260914190000): cobro incompleto y aviso tardío.
+describe('cobrar por menos de lo debido y avisos tardíos', () => {
+  async function pedidoConIntento(key: string, amount = '100.00') {
+    const pedido = await place(TENANT_A, productA, 1)
+    const intento = await openIntent(TENANT_A, 'tarjeta', amount, key)
+    await svc(`select public.payment_intent_attach_order($1, $2)`, [intento.intent_id, pedido.order_id])
+    return { orderId: String(pedido.order_id), intentId: String(intento.intent_id) }
+  }
+
+  async function estadoPago(orderId: string) {
+    const [fila] = await svc<{ payment_status: string }>(
+      `select payment_status::text from public.orders where id = $1`,
+      [orderId],
+    )
+    return fila?.payment_status
+  }
+
+  it('un cobro por MENOS de lo debido se escribe, pero el pedido NO queda pagado', async () => {
+    const { orderId, intentId } = await pedidoConIntento('incompleto-key-000001')
+
+    const resultado = await applyOutcome({
+      intentId,
+      key: 'incompleto-att-000001',
+      attemptStatus: 'succeeded',
+      intentStatus: 'captured',
+      amount: '30.00',
+      reference: 'sbx-cap-incompleto',
+    })
+
+    expect(resultado.underpaid).toBe(true)
+    // El dinero que llegó existe: perderlo sería peor.
+    expect(resultado.payment_id).toBeTruthy()
+    expect(resultado.captured).toBe('30.00')
+    // Pero el pedido no se da por pagado.
+    expect(await estadoPago(orderId)).not.toBe('paid')
+
+    const [incidente] = await svc<{ code: string; severity: string }>(
+      `select code, severity::text from public.ops_events
+        where entity_type = 'payment_intent' and entity_id = $1`,
+      [intentId],
+    )
+    expect(incidente).toMatchObject({ code: 'COBRO_INCOMPLETO', severity: 'error' })
+
+    const [nota] = await svc<{ note: string | null }>(
+      `select note from public.payment_events
+        where payment_intent_id = $1 and note is not null order by created_at desc limit 1`,
+      [intentId],
+    )
+    expect(nota?.note).toMatch(/COBRO_INCOMPLETO/)
+  })
+
+  it('el importe completo sigue dejando el pedido pagado (sin incidente)', async () => {
+    const { orderId, intentId } = await pedidoConIntento('completo-key-00000001')
+    const resultado = await applyOutcome({
+      intentId,
+      key: 'completo-att-00000001',
+      attemptStatus: 'succeeded',
+      intentStatus: 'captured',
+      amount: '100.00',
+      reference: 'sbx-cap-completo',
+    })
+    expect(resultado.underpaid).toBe(false)
+    expect(await estadoPago(orderId)).toBe('paid')
+    const incidentes = await svc(
+      `select 1 from public.ops_events where entity_type = 'payment_intent' and entity_id = $1`,
+      [intentId],
+    )
+    expect(incidentes).toHaveLength(0)
+  })
+
+  it('un aviso TARDÍO de la pasarela sobre un intento capturado se registra y NO hace reintentar', async () => {
+    const { orderId, intentId } = await pedidoConIntento('tardio-key-0000000001')
+    await applyOutcome({
+      intentId,
+      key: 'tardio-att-cap-000001',
+      attemptStatus: 'succeeded',
+      intentStatus: 'captured',
+      amount: '100.00',
+      reference: 'sbx-cap-tardio',
+    })
+
+    const aviso = {
+      intentId,
+      key: 'tardio-att-webhook-01',
+      attemptStatus: 'succeeded',
+      intentStatus: 'authorized',
+      source: 'provider_webhook',
+      signatureVerified: true,
+      externalEventId: 'evt-tardio-authorized-1',
+    }
+    const primero = await applyOutcome(aviso)
+    // Contesta como resuelto: el borde devuelve 2xx y la pasarela deja de insistir.
+    expect(primero).toMatchObject({ replay: true, reason: 'transicion_no_aplicable', status: 'captured' })
+    expect(await estadoPago(orderId)).toBe('paid')
+
+    const [ignorado] = await svc<{ n: number }>(
+      `select count(*)::int as n from public.payment_events
+        where payment_intent_id = $1 and event_type = 'payment.transition_ignored'`,
+      [intentId],
+    )
+    expect(ignorado?.n).toBe(1)
+
+    // El reenvío del MISMO evento cae en el cerrojo 1: ni otra fila ni error.
+    const reenvio = await applyOutcome({ ...aviso, key: 'tardio-att-webhook-02' })
+    expect(reenvio).toMatchObject({ replay: true, reason: 'evento_ya_procesado' })
+  })
+
+  it('la misma transición imposible desde una PERSONA sigue fallando: es un error que tiene que verse', async () => {
+    const { intentId } = await pedidoConIntento('tardio-op-key-0000001')
+    await applyOutcome({
+      intentId,
+      key: 'tardio-op-att-cap-001',
+      attemptStatus: 'succeeded',
+      intentStatus: 'captured',
+      amount: '100.00',
+      reference: 'sbx-cap-tardio-op',
+    })
+    const mensaje = await expectFailure(() =>
+      applyOutcome({
+        intentId,
+        key: 'tardio-op-att-manual1',
+        attemptStatus: 'succeeded',
+        intentStatus: 'failed',
+        source: 'operator',
+      }),
+    )
+    expect(mensaje).toMatch(/PAGO_INTENTO_TRANSICION_INVALIDA/)
+  })
+})
+
+// ===========================================================================
 describe('la bitacora no se reescribe, ni siendo service_role', () => {
   it('un intento de llamada no se puede editar ni borrar', async () => {
     const [fila] = await svc<{ id: string }>(`select id from public.payment_attempts limit 1`)

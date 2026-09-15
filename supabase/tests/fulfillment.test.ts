@@ -719,6 +719,47 @@ describe('exigir el cobro antes de entregar', () => {
     const [fila] = await svc(`select state::text from public.fulfillments where id = $1`, [entrega])
     expect(fila?.state).toBe('delivered')
   })
+
+  // -------------------------------------------------------------------------
+  // Cierre · D2 (20260914190000). Abrir el envío es entregar el bulto al
+  // transportista: sin este candado, el seguimiento movía la entrega a «en
+  // camino» sin haber pasado nunca por la regla.
+  // -------------------------------------------------------------------------
+  it('abrir el ENVÍO sin cobrar también se rechaza, y no deja envío a medias', async () => {
+    const { entrega } = await nueva()
+    await dejarLista(entrega)
+
+    const message = await expectFailure(() =>
+      asUser(ordersA(), `select public.shipment_open($1, 'envio-sin-cobro-001') as result`, [entrega]),
+    )
+    expect(message).toMatch(/PAGO_PENDIENTE/)
+    const envios = await svc(`select 1 from public.shipments where fulfillment_id = $1`, [entrega])
+    expect(envios).toHaveLength(0)
+  })
+
+  it('cobrado, el envío se abre', async () => {
+    const { entrega, pedido } = await nueva()
+    await dejarLista(entrega)
+    await svc(`update public.orders set payment_status = 'paid' where id = $1`, [pedido])
+
+    const [row] = await asUser(ordersA(), `select public.shipment_open($1, 'envio-cobrado-0001') as result`, [
+      entrega,
+    ])
+    expect((row?.result as Row).replay).toBe(false)
+  })
+
+  it('un envío YA abierto se reintenta sin chocar con la regla encendida después', async () => {
+    const { entrega } = await nueva()
+    await dejarLista(entrega)
+    await svc(`update public.store_settings set require_payment_before_dispatch = false`)
+    await asUser(ordersA(), `select public.shipment_open($1, 'envio-previo-00001') as result`, [entrega])
+
+    await svc(`update public.store_settings set require_payment_before_dispatch = true`)
+    const [row] = await asUser(ordersA(), `select public.shipment_open($1, 'envio-previo-00001') as result`, [
+      entrega,
+    ])
+    expect((row?.result as Row).replay).toBe(true)
+  })
 })
 
 describe('transiciones', () => {
