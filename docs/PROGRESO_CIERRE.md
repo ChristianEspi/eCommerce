@@ -134,11 +134,36 @@ Reglas de propiedad: **solo el carril A** redefine `create_order`, `checkout_pla
 
 ## P2
 
-### 7. Channels Admin — [PENDIENTE]
-### 8. Abandoned Cart Recovery — [PENDIENTE]
-### 9. Product Relations — [PENDIENTE]
-### 10. Reviews — [PENDIENTE]
-### 11. Suggested Orders v2 — [PENDIENTE]
+### 7. Channels Admin — [COMPLETADO] `a9d52ad` (carril D2, integrado en `a9a5129`)
+- Pantalla `/app/channels` (owner/admin, permiso `store.manage`, grupo Catálogo): buscador único, alta/edición (el `requires_auth` se deriva del tipo), activar/desactivar, resumen de catálogo por canal.
+- `public.channel_set_default(p_channel_id)`: definer con autorización interna owner/admin del tenant; bloquea los canales de la tienda; destino **activo y B2C** (un defecto B2B dejaría sin vender a la vitrina pública, que depende de `ebim.public_channel`); idempotente. Canal ajeno e inexistente responden igual.
+- Trigger `ebim.guard_channel_write` (solo `authenticated`): impide desactivar, cerrar a B2B, borrar o mover el canal por defecto y cambiar `is_default` a mano.
+- Migración `20260914150000_channels_admin.sql`. Tests: `channels-admin.test.ts` (17), `channels-ui.test.tsx` (12).
+- Riesgo: la exención del guard se apoya en `current_user`; verificado en PGlite, no en Supabase real.
+
+### 8. Abandoned Cart Recovery — [COMPLETADO · condicionado a base legal] `633c8bb`, `f7b83df`, `0effee5` (carril D3, integrado en `eeac6ec`)
+- **Condición externa:** no hay dato de consentimiento de marketing en el esquema. El ajuste por tienda nace **APAGADO**; el dueño legal/negocio debe confirmar la base legal antes de encenderlo.
+- Elegibilidad: solo comprador autenticado con correo de Auth (nunca `@ebim.pe`), carrito activo/abandonado con líneas, inactividad entre ventana (4 h, 1–72) y edad máxima (7 d, 1–30), tienda activa y ajuste encendido. **Invitados nunca.**
+- Supresión centralizada (`ebim.cart_recovery_block_reason`): convertido, fusionado, vaciado, nueva actividad, demasiado viejo, tienda apagada, sin contacto, baja, pedido posterior no cancelado o carrito más nuevo del mismo usuario.
+- **Guardia al enviar:** `public.notification_email_claim` redefinida con un paso previo que caduca con `SUPRIMIDO` lo que ya no califica. Worker sin cambios, sin segunda cola.
+- Idempotencia: episodio `(cart_id, last_activity_at)` único + clave de cola. Dos ejecuciones = un correo.
+- Baja de un clic con secreto de 244 bits guardado como sha256; la RPC pública solo devuelve booleano y solo da de baja a ese destinatario en esa tienda; la página pide confirmar. También desde Tu cuenta → Avisos.
+- Observabilidad `cart_recovery_overview` (30 días). pg_cron cada 15 min, 200 carritos, sin secretos.
+- Migraciones `20260914160000_cart_recovery.sql`, `20260914160100_cart_recovery_schedule.sql`. Tests: 46 + 9 + 8. `security-baseline` → 21 funciones anónimas.
+- Riesgos: sin retención de filas de recordatorio; secretos de baja sin caducidad; sin cabecera `List-Unsubscribe`; entrega real depende de Graph y Vault.
+
+### 9. Product Relations — [EN PROGRESO] `d76e294`, `fd1c610` (carril D1, falta integrar)
+### 10. Reviews — [EN PROGRESO] `2f93f98` SQL hecho; falta interfaz (carril D1)
+
+### 11. Suggested Orders v2 — [COMPLETADO] `36dff86` (carril D2)
+- `suggest_order_v2` explicable con respaldo `historic_v1`. Dos ventanas (reciente `p_days` 7–180; larga máx(3R, 90); 60 % reciente + 40 % larga). Estacionalidad solo con ≥1 año de historia, ≥3 pedidos y ventas en el año; factor acotado [0.5, 2]; si no, 1 con motivo.
+- Filtros antes de cantidad: publicado, variante activa, surtido, visibilidad por canal. ATP: stock conocido recorta; sin stock → `shortage` (se muestra, no se guarda); desconocido o con backorder → no recorta y lo dice.
+- `saveSuggestion` guarda `model_code` y `on_hand_quantity`.
+- Migración `20260914151000_suggest_order_v2.sql`. Tests: 17 SQL + 4 UI.
+- Riesgos: sin conversión de unidades (igual que v1); con `service_role` el ATP sale desconocido.
+
+### Integración D2 + D3 — verificada
+- Fusiones sin conflictos. Sobre el árbol integrado: `tsc` y `lint` limpios; rutas, i18n, arquitectura, navegación, `security-baseline`, `capability-enforcement`, `schema-invariants`, `public-rpc-gates` y pruebas nuevas: **17 archivos, 284/284**.
 
 ## P3
 
