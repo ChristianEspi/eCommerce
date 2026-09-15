@@ -198,7 +198,14 @@ Reglas de propiedad: **solo el carril A** redefine `create_order`, `checkout_pla
 
 ## P3
 
-### 12. invoice.issue — [PENDIENTE]
-### 13. Capability guards — [PENDIENTE]
-### 14. check:edge — [PENDIENTE]
+### 12. invoice.issue — [EN PROGRESO] (carril E1, worktree; rango `20260914170000`–`179999`; incluye revisión D2 pagos/fulfillment)
+### 13. Capability guards — [EN PROGRESO] (carril E2, worktree; rango `20260914180000`–`189999`)
+
+### 14. check:edge — [COMPLETADO] `ddc9423`
+- `npm run check:edge` → `scripts/check-edge.mjs`: `deno check` de **todos** los `.ts` de `supabase/functions` (67: entradas, `_runtime`, `_shared`; sin `*.test.ts`), con configuración propia `scripts/deno.check.json` (strict, `nodeModulesDir: none`) para no heredar el `tsconfig` del frontend ni cambiar el despliegue.
+- Deno: `DENO_BIN` → `deno` del PATH → paquete oficial npm `deno@2.9.6` fijado (vía `npx`, sin shell). Sin archivos o sin Deno sale con 1: nunca es no-op.
+- No se añadió como devDependency: `engine-strict` rechaza la instalación en Node 22.12 por `eslint-visitor-keys@5` (exige ≥22.13). **Hallazgo:** el contrato `engines.node >=22.12` ya no se sostiene con el árbol actual para instalaciones nuevas; revisar `.nvmrc`/engines antes de `npm ci` en CI.
+- **Defectos reales encontrados en la primera pasada y corregidos:** `catalog-copy` lanzaba `notFound` con el texto como código (el navegador recibía una frase); `_shared/userProvisioning.ts` no compilaba con TS 6 de Deno.
+- Pruebas: verde sobre el árbol; **rojo (exit 1) con un error de tipos plantado** y retirado; `scripts/check-edge.test.mjs` 7/7; `create-user`, catálogo, `secret-scan`, `qas-smoke`: 198/198; `tsc` y `lint` limpios.
+- Pendiente: la primera ejecución sin caché descarga Deno y los `npm:` del borde (red necesaria en CI).
 ### 15. E2E y certificación final P07/P08 — [PENDIENTE]
