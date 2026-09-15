@@ -56,6 +56,7 @@
 | 17 | `20260914180300_capability_guard_fulfillment.sql` | `029df068ec9be33e15f30ea47596d57dce76ad410d1bf1932be5d748d9fe57e7` | configuración de entrega/devolución + `ebim.assert_fulfillment_operator`; recrea 6 comandos |
 | 18 | `20260914190000_payment_dispatch_hardening.sql` | `285a02a3a80cfcdd164611aecad885add009b3ce61f08889e542db6923211f19` | **recrea `payment_apply_outcome`**, `fulfillment_transition`, `shipment_open`; `ebim.assert_dispatch_payment` |
 | 19 | `20260914191000_cart_open_concurrency.sql` | `511e68440f318c9ef1bd75896e286380fb405805d06b33ec0a64f6c01e19e4c6` | recrea `cart_open` (concurrente sin 409) |
+| 20 | `20260914192000_order_schedule_line_check.sql` | `9f23941b7100027206d81f6413e20575a7055253a4dac6e52cce4e3a10ac89b4` | `ebim.order_schedule_line_issue`, `check_my_order_schedule_lines` (revisión previa por línea); **recrea `save_my_order_schedule`** con el motivo concreto |
 
 Superficie anónima tras aplicar: **23** funciones (`security-baseline.test.ts`, `docs/SECURITY_BASELINE.md` §1.6).
 

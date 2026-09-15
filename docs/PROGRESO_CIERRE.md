@@ -90,7 +90,7 @@ Reglas de propiedad: **solo el carril A** redefine `create_order`, `checkout_pla
 - `StoreAccountPage` pasa `storeId` a `MyOrdersSection` y el detalle devuelve `product_id`/`variant_id`: «Volver a comprar» aparece para B2B y sigue pasando por el carrito.
 
 ### 3. Quote → Order idempotente — [COMPLETADO] `e54b4a8`, `4f050c2` + pestaña en la integración
-- **Decisión explícita: aceptar crea un ACUERDO DE PRECIO + líneas para el carrito, NO un pedido.** `create_order` nunca acepta precio del llamante; copiar importes obligaría a abrir esa puerta, y un pedido desde SQL se saltaría surtido, ATP, crédito, OC y aprobación. La cotización aceptada se convierte en una lista de alcance `customer` (el de mayor precedencia del motor existente), vigente hasta `valid_until`. No hay segundo motor de precio.
+- **Decisión explícita: aceptar crea un ACUERDO DE PRECIO + líneas para el carrito, NO un pedido.** `create_order` nunca acepta precio del llamante; copiar importes obligaría a abrir esa puerta, y un pedido desde SQL se saltaría ATP, crédito, OC y aprobación. (Corrección 2026-09-15: el checkout **no** aplica el surtido de la cuenta; ver D-12 en `FINAL_CERTIFICATION.md`.) La cotización aceptada se convierte en una lista de alcance `customer` (el de mayor precedencia del motor existente), vigente hasta `valid_until`. No hay segundo motor de precio.
 - Por qué el precio no se escapa: `min_quantity` = cantidad cotizada en unidades base; la lista se **cierra** al primer pedido que la usa; vigencia = la de la cotización.
 - **Enlace pedido ↔ cotización por trigger DIFERIDO al commit**: `create_order` resuelve el precio línea a línea en su bucle, así que cerrar la lista al insertar la primera línea cobraría la segunda a catálogo. El trigger bloquea la cotización `for update`: un segundo pedido que intente el mismo precio aborta al confirmar.
 - Las listas nacidas de cotización las gobierna `trade.quotes`, no `pricing.lists` (`ebim.active_price_lists` redefinida con las mismas columnas).
@@ -240,6 +240,13 @@ Reglas de propiedad: **solo el carril A** redefine `create_order`, `checkout_pla
   - Secreto `EBIM_PAYMENTS_ALLOW_SIMULATION=true` (escritura en el almacén de secretos).
   - Despliegue de `integration-worker`, `notifications-dispatch`, `notifications-test`, `auth-email-hook`, `create-user`, `api`, y **retenidos a propósito** `checkout` y `payments-webhook` hasta que exista el secreto (sin él, el `checkout` nuevo deja de cobrar con `sandbox`).
 - **Estado coherente mientras tanto:** la base nueva funciona con las funciones anteriores ya desplegadas (mismas firmas; el crédito bloqueado lo rechaza el trigger, con error genérico hasta desplegar `checkout`).
+
+### Ajuste tras prueba manual en DEV — «Programar» decía qué línea y por qué — [COMPLETADO] `d874c18`
+- Síntoma (cespinoza, `miquimica`): «Algún producto ya no se puede programar. Revisa el carrito.» sin decir cuál.
+- Causa verificada en DEV (lectura): el cliente de la cuenta B2B-001 tiene asignado el surtido «Canal moderno», lista permitida de 2 productos; el carrito traía otros. El guardado paraba en la primera línea con un código que mezclaba cinco motivos.
+- Arreglo: migración `20260914192000_order_schedule_line_check.sql` (motivo por línea en una sola función, revisión previa `check_my_order_schedule_lines`, guardado con el motivo concreto); el diálogo avisa ANTES de pulsar qué producto no se programará y por qué, programa solo las válidas y no deja enviar si no hay ninguna; errores por familia. **Aplicada en DEV** y verificada (la RPC existe y rechaza a anon).
+- Hallazgo que corrige la certificación: **D-12**, el checkout no aplica el surtido (decisión de negocio pendiente).
+- Pruebas: SQL 23/23 (+3), UI 16/16 (+2), i18n, arquitectura, `backoffice-split`, `tsc`, `lint`, `bundle:report` en verde.
 
 ### 15. E2E y certificación final P07/P08 — [COMPLETADO · dictamen GO CONDICIONADO] `4f490f5`, `39f3d68`, `c5066af`
 - Documentos: `docs/release-candidate/FINAL_CERTIFICATION.md` (gates, cobertura, seguridad, matriz de defectos D-01…D-11, condiciones C1…C9), `RELEASE_NOTES.md`, `DEPLOYMENT_MANIFEST.md` (19 migraciones con SHA-256 verificado contra el contenido versionado, 9 Edge Functions clasificadas, secretos nuevos).

@@ -107,6 +107,7 @@ veces después: 6/6. Se registra como inestabilidad de entorno (D-09).
 | D-09 | P3 | E2E `signup` inestable con el servidor de desarrollo en frío (reoptimización de Vite) | QA | Precalentar `optimizeDeps` o E2E contra `vite preview` |
 | D-10 | P3 | Aviso de pedido programado solo en la app (sin plantilla de correo) | eCommerce | Plantilla `order_schedule.run_ready` |
 | D-11 | P3 | `docs/STATE.md`, ADR 017 y `SAAS_GAPS.md` §2.1 aún describen los tres huecos de capacidad como abiertos | eCommerce | Actualizar docs |
+| D-12 | **P1 (decisión)** | **El checkout NO aplica el surtido de la cuenta** (`product_in_assortment` no se llama en carrito ni en `create_order`). Pedido rápido, sugerido v2 y programados sí lo aplican, así que un producto fuera de surtido se puede comprar pero no programar. Encontrado en la prueba manual en DEV (2026-09-15, cuenta B2B-001 con surtido «Canal moderno» de 2 productos). **Corrige esta certificación**, que daba por hecho que el pipeline lo aplicaba. | Negocio B2B + eCommerce | Decidir si el surtido es restricción de compra (aplicarlo en `cart_replace_lines`/`create_order`) o solo de sugerencia; mientras, la programación avisa por línea antes de pulsar (`d874c18`) |
 
 ## Condiciones del GO (externas o de operación)
 
