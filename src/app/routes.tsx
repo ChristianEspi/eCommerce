@@ -125,6 +125,9 @@ const StoreAccountPage = lazyPage(() =>
 const QuickOrderPage = lazyPage(() =>
   import('@/features/storefront/quick-order/QuickOrderPage').then((m) => ({ default: m.QuickOrderPage })),
 )
+const StoreUnsubscribePage = lazyPage(() =>
+  import('@/features/notifications/StoreUnsubscribePage').then((m) => ({ default: m.StoreUnsubscribePage })),
+)
 const StoreRegisterPage = lazyPage(() =>
   import('@/features/storefront/StoreRegisterPage').then((m) => ({ default: m.StoreRegisterPage })),
 )
@@ -277,6 +280,11 @@ export const routes: RouteObject[] = [
       { path: 'pedido-rapido', element: withSuspense(<QuickOrderPage />) },
       // Alta de CONSUMIDOR dentro de la tienda (N02). No crea tenant: eso es `/onboarding`.
       { path: 'register', element: withSuspense(<StoreRegisterPage />) },
+      // Baja de un clic de los recordatorios de carrito (cierre, ítem 8). Sin
+      // sesión: el secreto del enlace es la autorización, y la página pide
+      // confirmar antes de llamar para que un filtro de correo no dé de baja a
+      // nadie al abrir el enlace.
+      { path: 'unsubscribe', element: withSuspense(<StoreUnsubscribePage />) },
       // Confirmación del pedido. El número va en la URL para que el comprador
       // pueda guardarla o compartirla; el detalle llega por estado de
       // navegación, porque un comprador anónimo no puede releer el pedido.

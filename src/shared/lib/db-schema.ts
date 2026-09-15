@@ -492,6 +492,20 @@ export const ACCEPT_QUOTE_RPC = 'accept_quote'
 /** Pedir una cotización: borrador con precio de referencia del motor. */
 export const REQUEST_QUOTE_RPC = 'request_quote'
 
+// --- Cierre 8 · recuperación de carritos (migración 20260914160000) -----------
+// SIN `satisfies` hasta regenerar los tipos; la red es
+// `supabase/tests/cart-recovery.test.ts`. El encolado (`ebim.enqueue_cart_recovery`)
+// es de servidor y no tiene constante aquí a propósito.
+/** Backoffice (owner/admin): el ajuste de la tienda y los números de 30 días. */
+export const CART_RECOVERY_OVERVIEW_RPC = 'cart_recovery_overview'
+/** Backoffice (owner/admin): encender, apagar y ajustar la ventana. */
+export const CART_RECOVERY_CONFIGURE_RPC = 'cart_recovery_configure'
+/** Tienda con sesión: ¿quiero recordatorios de carrito de esta tienda? */
+export const MY_CART_REMINDERS_RPC = 'my_cart_reminders'
+export const SET_MY_CART_REMINDERS_RPC = 'set_my_cart_reminders'
+/** Tienda sin sesión: la baja de un clic con el secreto que trae el correo. */
+export const CART_RECOVERY_UNSUBSCRIBE_RPC = 'cart_recovery_unsubscribe'
+
 // Pagos (P09-SaaS). Las TRES que puede llamar el navegador con sesión, y su
 // autorización vive dentro de cada una. Las del servidor —`payment_intent_open`,
 // `payment_intent_attach_order`, `payment_apply_outcome`, `payment_refund_settle`—

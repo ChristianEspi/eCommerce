@@ -260,6 +260,34 @@ const COPY: Record<string, Record<Locale, CopyBuilder>> = {
       action: 'View the suggestion',
     }),
   },
+  /**
+   * Recordatorio de carrito abandonado (cierre, ítem 8).
+   *
+   * No es transaccional: por eso lleva SIEMPRE enlace de baja (ver
+   * `unsubscribeUrl`) y sin él no se renderiza. Ni un precio ni un producto: los
+   * precios y la disponibilidad se confirman al pagar, y el correo enlaza al
+   * carrito en vez de copiarlo.
+   */
+  'cart.recovery': {
+    es: (p, _l, e) => ({
+      subject: text(p, 'store_name')
+        ? `Dejaste productos en tu carrito de ${text(p, 'store_name')}`
+        : 'Dejaste productos en tu carrito',
+      title: 'Tu carrito te espera',
+      body: `Guardamos lo que dejaste en tu carrito${text(p, 'store_name') ? ` de <strong>${e('store_name')}</strong>` : ''}. Los precios y la disponibilidad se confirman al pagar.`,
+      action: 'Volver a mi carrito',
+      note: 'Recibes este recordatorio porque tienes una cuenta en esta tienda.',
+    }),
+    en: (p, _l, e) => ({
+      subject: text(p, 'store_name')
+        ? `You left items in your ${text(p, 'store_name')} cart`
+        : 'You left items in your cart',
+      title: 'Your cart is waiting',
+      body: `We saved what you left in your cart${text(p, 'store_name') ? ` at <strong>${e('store_name')}</strong>` : ''}. Prices and availability are confirmed at checkout.`,
+      action: 'Back to my cart',
+      note: 'You are receiving this reminder because you have an account with this store.',
+    }),
+  },
   'mail.test': {
     es: () => ({
       subject: 'Prueba de correo de eCommerce',
@@ -367,6 +395,29 @@ const STOREFRONT_KINDS = new Set([
   'suggestion.sent',
 ])
 
+const STORE_SLUG = /^[a-z0-9][a-z0-9-]*$/
+const UNSUBSCRIBE_TOKEN = /^[0-9a-f]{64}$/
+
+/** Plantillas que NO son transaccionales: sin enlace de baja válido no salen. */
+const NEEDS_UNSUBSCRIBE = new Set(['cart.recovery'])
+
+/**
+ * Enlace de baja de un clic.
+ *
+ * Lleva a una página de la tienda que pide confirmar con un botón antes de
+ * llamar a `cart_recovery_unsubscribe`: los filtros de correo abren los enlaces
+ * para analizarlos, y una baja por el mero hecho de abrir la URL daría de baja a
+ * gente que no lo pidió.
+ */
+export function unsubscribeUrl(kind: string, params: Params, baseUrl: string): string | null {
+  if (!NEEDS_UNSUBSCRIBE.has(kind)) return null
+  const base = baseUrl.replace(/\/+$/, '')
+  const slug = text(params, 'store_slug')
+  const token = text(params, 'unsubscribe_token')
+  if (!isSafeAbsoluteUrl(base) || !STORE_SLUG.test(slug) || !UNSUBSCRIBE_TOKEN.test(token)) return null
+  return `${base}/s/${slug}/unsubscribe?token=${token}`
+}
+
 /**
  * A dónde lleva el botón.
  *
@@ -381,6 +432,10 @@ export function actionUrl(kind: string, params: Params, baseUrl: string): string
     return isSafeAbsoluteUrl(url) ? url : null
   }
   if (!isSafeAbsoluteUrl(base)) return null
+  if (kind === 'cart.recovery') {
+    const slug = text(params, 'store_slug')
+    return STORE_SLUG.test(slug) ? `${base}/s/${slug}/cart` : null
+  }
   if (STOREFRONT_KINDS.has(kind)) {
     const slug = text(params, 'store_slug')
     if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) return null
@@ -403,6 +458,10 @@ export function renderEmail(
   const esc = (key: string) => escapeHtml(text(params, key))
   const copy = builders[lang](params, lang, esc)
   const href = copy.action ? actionUrl(kind, params, baseUrl) : null
+  const unsubscribe = unsubscribeUrl(kind, params, baseUrl)
+  // Un recordatorio sin enlace de baja, o sin a dónde volver, no se envía roto:
+  // no se renderiza, y el worker lo cierra sin reintento.
+  if (NEEDS_UNSUBSCRIBE.has(kind) && (!unsubscribe || !href)) return null
 
   const storeName = text(params, 'store_name')
   const logo = text(params, 'store_logo')
@@ -434,9 +493,19 @@ export function renderEmail(
       }<br />${escapeHtml(href)}</p>`
     : ''
 
+  const unsubscribeBlock = unsubscribe
+    ? `<p style="margin:16px 0 0 0;font-size:12px;line-height:1.6;color:#55615c;">${
+        lang === 'es'
+          ? '¿No quieres más recordatorios de carrito de esta tienda?'
+          : 'Do not want cart reminders from this store?'
+      } <a href="${escapeHtml(unsubscribe)}" style="color:#056769;">${
+        lang === 'es' ? 'Darme de baja' : 'Unsubscribe'
+      }</a></p>`
+    : ''
+
   const html = `<!doctype html><html lang="${lang}"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>${escapeHtml(copy.title)}</title></head><body style="margin:0;padding:0;background:#f4f6f5;font-family:'DM Sans',Arial,Helvetica,sans-serif;color:#1c2421;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f5;padding:32px 16px;"><tr><td align="center"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:12px;border:1px solid #e2e8e5;">${header}<tr><td style="padding:24px 32px 8px 32px;"><h1 style="margin:0 0 16px 0;font-size:20px;line-height:1.3;color:#1c2421;">${escapeHtml(copy.title)}</h1><p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;">${copy.body}</p></td></tr>${button}<tr><td style="padding:0 32px 32px 32px;">${
     copy.note ? `<p style="margin:0 0 12px 0;font-size:13px;line-height:1.6;color:#55615c;">${escapeHtml(copy.note)}</p>` : ''
-  }${fallback}<p style="margin:16px 0 0 0;font-size:12px;line-height:1.6;color:#8a948f;">${footer}</p></td></tr></table></td></tr></table></body></html>`
+  }${fallback}${unsubscribeBlock}<p style="margin:16px 0 0 0;font-size:12px;line-height:1.6;color:#8a948f;">${footer}</p></td></tr></table></td></tr></table></body></html>`
 
   return { subject: copy.subject, html }
 }
