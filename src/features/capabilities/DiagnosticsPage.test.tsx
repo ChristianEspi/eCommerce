@@ -132,6 +132,26 @@ describe('DiagnosticsPage', () => {
   })
 
   /**
+   * Cierre D3: sin sincronizar, los tres módulos con fallback legado están
+   * activos sin entitlement. Tienen que contar como contratados para que su
+   * corte técnico se pueda usar; el resto de vendibles sigue «no contratado».
+   */
+  it('sin contexto, un módulo con fallback legado está activo y su interruptor se puede usar', async () => {
+    holder.client = backend({ context: makePlatformContext({ legacyFallback: true }) })
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'Módulos' }))
+
+    const pagos = (await screen.findByText('payments')).closest('tr') as HTMLElement
+    const precios = screen.getByText('pricing.lists').closest('tr') as HTMLElement
+
+    expect(within(pagos).getByText('Activo')).toBeInTheDocument()
+    expect(within(pagos).getByRole('checkbox')).toBeEnabled()
+    expect(within(precios).getByText('No contratado')).toBeInTheDocument()
+    expect(within(precios).getByRole('checkbox')).toBeDisabled()
+  })
+
+  /**
    * Un código que el hub manda y esta versión no conoce es la señal de que el
    * catálogo va por delante del binario desplegado. Perderlo en silencio es
    * cómo un cliente jura haber comprado algo que no aparece por ningún lado.
