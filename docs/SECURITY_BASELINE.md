@@ -130,12 +130,12 @@ La cifra de existencias nunca sale: `anon` lee `products.in_stock` —columna ge
 
 ### 1.6 La superficie anónima es una lista cerrada — PASS *(nuevo en P16)*
 
-`anon` puede ejecutar exactamente **21** funciones de `public`, cada una clasificada y justificada
-en el propio test. Una vigesimosegunda pone la suite roja.
+`anon` puede ejecutar exactamente **22** funciones de `public`, cada una clasificada y justificada
+en el propio test. Una vigesimotercera pone la suite roja.
 
 | Clase | Cuántas | Qué las protege |
 |---|---|---|
-| `publicado` | 11 | solo leen lo que la tienda ya publica; la autoridad es la RLS |
+| `publicado` | 12 | solo leen lo que la tienda ya publica; la autoridad es la RLS |
 | `secreto` | 7 | exigen un token de 256 bits (pedido, carrito, devolución) o un código de 96 (tarjeta regalo) |
 | `techo` | 2 | escriben o revelan, y llevan límite de tasa desde P16 (§3.6) |
 | `recogido` | 1 | escribe sin poder llevar techo —sería negar la venta— y por eso lo que escribe se recoge (§3.7) |
@@ -157,9 +157,13 @@ en el propio test. Una vigesimosegunda pone la suite roja.
 > del token que le llega: leer el `sub` de un JWT no prueba nada, y una tienda
 > que exige cuenta para comprar necesita una respuesta que no se pueda falsificar.
 
-> **Añadida en el cierre (relaciones).** `product_relations_for_slug` devuelve
-> los ids de los relacionados publicados y visibles en el canal público de la
-> tienda, en el orden que fija el comercio. No enseña precio, existencia ni tenant.
+> **Añadidas en el cierre (relaciones y reseñas).** `product_relations_for_slug`
+> devuelve los ids de los relacionados publicados y visibles en el canal público
+> de la tienda, en el orden que fija el comercio; `product_reviews_for_slug`
+> devuelve reseñas ya moderadas y su resumen (cuántas, media como texto, reparto
+> por estrellas), de un producto publicado. Ninguna enseña precio, usuario,
+> correo ni tenant. Escribir una reseña exige sesión (`submit_product_review`,
+> fuera de esta lista) y moderarla, rol de catálogo (`moderate_product_review`).
 
 Además: ninguna función de `ebim` **alcanzable** por `anon` es volátil —es decir, ninguna escribe—.
 Las funciones de disparador quedan fuera del recuento y el test **demuestra por qué**: Postgres se
