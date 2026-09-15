@@ -88,6 +88,15 @@ export interface PaymentGatewayOptions {
    * finge un cobro: simula si sabe, y rechaza si no.
    */
   readonly secretFor?: (providerCode: string) => string | null
+  /**
+   * ¿Puede un adaptador SIMULADO (`provider.simulated`) resolver un cobro?
+   *
+   * `false` por defecto, y es la decisión: sin esto, el `sandbox` elegido por
+   * un comercio o una pasarela real con el secreto sin configurar dejaban
+   * pedidos PAGADOS sin dinero en cualquier entorno. Lo enciende el borde con
+   * `EBIM_PAYMENTS_ALLOW_SIMULATION=true`, solo en DEV/QAS y demos.
+   */
+  readonly allowSimulation?: boolean
 }
 
 export interface PaymentGateway {
@@ -163,6 +172,29 @@ export function createPaymentGateway(options: PaymentGatewayOptions): PaymentGat
         secret: options.secretFor?.(providerCode) ?? null,
       })
       const authorize = requireOperation(provider, 'authorize', provider.authorize)
+
+      // Simulacro donde el despliegue no lo permite: no se llama al adaptador.
+      // Queda el intento fallido con su código —se ve en la bitácora de pagos— y
+      // el comprador recibe «pago no disponible», que es la verdad: la tienda no
+      // tiene cobro real configurado. Nunca un pedido pagado sin dinero.
+      if (provider.simulated === true && options.allowSimulation !== true) {
+        await applyOutcome(
+          intentId,
+          attemptOperation('authorize'),
+          request.idempotencyKey,
+          {
+            status: 'failed',
+            providerReference: null,
+            resultCode: null,
+            errorCode: 'SIMULACION_NO_PERMITIDA',
+            errorDetail: `El conector ${providerCode} no mueve dinero real y este despliegue no permite simular cobros`,
+            redirectUrl: null,
+            amount: request.amount,
+          },
+          0,
+        )
+        throw new Error('PAGO_NO_DISPONIBLE: la tienda no tiene cobro real configurado')
+      }
 
       const startedAt = now()
       let result: PaymentResult

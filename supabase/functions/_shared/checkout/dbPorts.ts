@@ -122,6 +122,8 @@ export interface DbPortOptions {
    * rechaza. Ninguno finge un cobro.
    */
   readonly secretFor?: (providerCode: string) => string | null
+  /** Ver `PaymentGatewayOptions.allowSimulation`. `false` si no se dice. */
+  readonly allowSimulation?: boolean
 }
 
 export function createDbPorts(options: DbPortOptions): CheckoutPorts {
@@ -142,6 +144,7 @@ export function createDbPorts(options: DbPortOptions): CheckoutPorts {
   const gateway = createPaymentGateway({
     service,
     ...(options.secretFor ? { secretFor: options.secretFor } : {}),
+    allowSimulation: options.allowSimulation === true,
   })
 
   return {

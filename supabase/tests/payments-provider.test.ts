@@ -308,7 +308,9 @@ describe('el gancho del checkout, con puertos falsos', () => {
       payment_intent_open: openedIntent(),
       payment_apply_outcome: { intent_id: INTENT, status: 'captured', replay: false },
     })
-    const gateway = createPaymentGateway({ service: rpc.caller, now: () => 0 })
+    // `allowSimulation`: estas pruebas recorren el `sandbox`, que es un simulacro.
+    // Sin permiso expreso la pasarela ya no lo deja cobrar (ver bloque siguiente).
+    const gateway = createPaymentGateway({ service: rpc.caller, now: () => 0, allowSimulation: true })
     const outcome = await gateway.authorizePayment(request())
 
     expect(outcome.status).toBe('captured')
@@ -329,7 +331,7 @@ describe('el gancho del checkout, con puertos falsos', () => {
       payment_intent_open: openedIntent({ amount: '100.01' }),
       payment_apply_outcome: { replay: false },
     })
-    const gateway = createPaymentGateway({ service: rpc.caller, now: () => 0 })
+    const gateway = createPaymentGateway({ service: rpc.caller, now: () => 0, allowSimulation: true })
     const outcome = await gateway.authorizePayment(request({ amount: '100.01' }))
 
     expect(outcome.status).toBe('declined')
@@ -342,7 +344,7 @@ describe('el gancho del checkout, con puertos falsos', () => {
       payment_intent_open: openedIntent({ amount: '100.02' }),
       payment_apply_outcome: { replay: false },
     })
-    const gateway = createPaymentGateway({ service: rpc.caller, now: () => 0 })
+    const gateway = createPaymentGateway({ service: rpc.caller, now: () => 0, allowSimulation: true })
 
     await expect(gateway.authorizePayment(request({ amount: '100.02' }))).rejects.toThrow(
       /PAGO_NO_DISPONIBLE/,
@@ -385,6 +387,7 @@ describe('el gancho del checkout, con puertos falsos', () => {
     const gateway = createPaymentGateway({
       service: rpc.caller,
       now: () => 0,
+      allowSimulation: true,
       returnUrl: (slug) => `https://ebim.test/s/${slug}/checkout/retorno`,
     })
     const outcome = await gateway.authorizePayment(request({ amount: '100.03' }))
@@ -392,6 +395,42 @@ describe('el gancho del checkout, con puertos falsos', () => {
     expect(outcome.status).toBe('pending')
     // La URL la compuso el SERVIDOR a partir del slug, no vino en la peticion.
     expect(outcome.redirectUrl).toBe('https://ebim.test/s/tienda-a/checkout/retorno')
+  })
+
+  // -------------------------------------------------------------------------
+  // Cierre · D2: un simulacro no cobra donde el despliegue no lo permite.
+  // -------------------------------------------------------------------------
+  it('SIN permiso de simulacro, el `sandbox` no cobra: intento fallido con código y pago no disponible', async () => {
+    const rpc = fakeRpc({
+      payment_intent_open: openedIntent(),
+      payment_apply_outcome: { replay: false },
+    })
+    const gateway = createPaymentGateway({ service: rpc.caller, now: () => 0 })
+
+    await expect(gateway.authorizePayment(request())).rejects.toThrow(/PAGO_NO_DISPONIBLE/)
+    const args = rpc.of('payment_apply_outcome')[0]?.args
+    // Queda escrito y NO como cobrado: fallido, con el motivo que lo explica.
+    expect(args?.p_intent_status).toBe('failed')
+    expect(args?.p_attempt_status).not.toBe('succeeded')
+    expect(args?.p_error_code).toBe('SIMULACION_NO_PERMITIDA')
+    expect(rpc.of('payment_apply_outcome')).toHaveLength(1)
+  })
+
+  it('una pasarela real SIN su secreto simula, y por tanto tampoco cobra sin permiso', async () => {
+    const rpc = fakeRpc({
+      payment_intent_open: openedIntent({ provider_code: 'culqi' }),
+      payment_apply_outcome: { replay: false },
+    })
+    const gateway = createPaymentGateway({ service: rpc.caller, now: () => 0, secretFor: () => null })
+
+    await expect(gateway.authorizePayment(request())).rejects.toThrow(/PAGO_NO_DISPONIBLE/)
+    expect(rpc.of('payment_apply_outcome')[0]?.args.p_error_code).toBe('SIMULACION_NO_PERMITIDA')
+  })
+
+  it('con su secreto, la pasarela real NO es simulacro (el permiso no le afecta)', () => {
+    expect(resolvePaymentProvider('culqi', { secret: 'sk_test_x' }).simulated).toBe(false)
+    expect(resolvePaymentProvider('culqi', {}).simulated).toBe(true)
+    expect(resolvePaymentProvider('sandbox', {}).simulated).toBe(true)
   })
 
   it('la compensacion devuelve lo capturado y anula lo autorizado', async () => {

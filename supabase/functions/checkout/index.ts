@@ -126,6 +126,8 @@ const handler = serveJson(
        */
       secretFor: (providerCode) =>
         Deno.env.get(`EBIM_PAYMENT_SECRET_${providerCode.toUpperCase()}`) ?? null,
+      // Solo el literal `true` enciende el simulacro. En producción no se define.
+      allowSimulation: Deno.env.get('EBIM_PAYMENTS_ALLOW_SIMULATION') === 'true',
     })
 
     try {

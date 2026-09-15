@@ -105,6 +105,8 @@ export function createSandboxProvider(options: SandboxOptions = {}): PaymentProv
 
   return {
     code: SANDBOX_PROVIDER_CODE,
+    // Siempre: es su razón de ser. Solo cobra donde el despliegue lo permite.
+    simulated: true,
     capabilities: {
       authorize: true,
       capture: true,

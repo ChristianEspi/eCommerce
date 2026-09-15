@@ -180,6 +180,8 @@ export function createCulqiProvider(options: CulqiOptions = {}): PaymentProvider
 
   return {
     code: CULQI_PROVIDER_CODE,
+    // Sin credencial simula (ver abajo). La pasarela decide si eso se permite.
+    simulated: !secret,
     capabilities: {
       authorize: true,
       // Cobro en un paso: no hay captura ni anulación previas al cobro.

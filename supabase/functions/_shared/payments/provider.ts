@@ -141,6 +141,14 @@ export interface PaymentProvider {
   /** Código en `integration_providers`. Un dato del catálogo, no una marca. */
   readonly code: string
   readonly capabilities: PaymentProviderCapabilities
+  /**
+   * `true` si este adaptador, tal como se construyó, NO mueve dinero real: el
+   * `sandbox` siempre, y una pasarela real sin credencial. La pasarela
+   * (`gateway.ts`) no le deja cobrar salvo que el despliegue lo permita
+   * expresamente: un secreto olvidado en producción no puede convertirse en
+   * pedidos pagados sin dinero.
+   */
+  readonly simulated?: boolean
   authorize?(input: PaymentAuthorizeInput): Promise<PaymentResult>
   capture?(input: PaymentReferenceInput): Promise<PaymentResult>
   cancel?(input: PaymentReferenceInput): Promise<PaymentResult>
