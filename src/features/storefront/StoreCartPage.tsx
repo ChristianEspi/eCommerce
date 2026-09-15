@@ -9,6 +9,7 @@ import { EmptyState } from '@/shared/ui/states'
 import { TS } from '@/theme/tokens'
 import { CartLineList } from './cart/CartLineList'
 import { RequestQuoteButton } from './cart/RequestQuoteButton'
+import { ScheduleCartButton } from './cart/ScheduleCartButton'
 import { useCart } from './cart/cart-context'
 import { useQuotedCart } from './cart/useQuotedCart'
 import { useStorefront } from './hooks'
@@ -160,6 +161,8 @@ export function StoreCartPage() {
             </Button>
             {/* Cierre A3: solo se pinta para quien compra para una empresa. */}
             <RequestQuoteButton storeSlug={storeSlug} lines={cart.lines} />
+            {/* Cierre 4: igual, solo para cuentas de empresa. */}
+            <ScheduleCartButton storeSlug={storeSlug} lines={cart.lines} />
             <Button component={Link} to={`/s/${storeSlug}`} fullWidth>
               {t('store.cart.continue')}
             </Button>

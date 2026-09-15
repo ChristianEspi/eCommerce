@@ -492,6 +492,22 @@ export const ACCEPT_QUOTE_RPC = 'accept_quote'
 /** Pedir una cotización: borrador con precio de referencia del motor. */
 export const REQUEST_QUOTE_RPC = 'request_quote'
 
+// --- Cierre 4 · pedidos programados del comprador (migración 20260914130000) --
+// SIN `satisfies` hasta regenerar los tipos; la red es
+// `supabase/tests/scheduled-orders.test.ts`. El trabajo (`ebim.run_order_schedules`)
+// es de servidor y no tiene constante aquí a propósito. Ninguna acepta cuenta,
+// cliente ni tenant: la tienda por slug y la cuenta por la sesión.
+/** Plantillas, programación y propuesta vigente de la cuenta en esta tienda. */
+export const MY_ORDER_SCHEDULES_RPC = 'my_order_schedules'
+/** Alta (idempotente por clave) o edición de plantilla + programación. */
+export const SAVE_MY_ORDER_SCHEDULE_RPC = 'save_my_order_schedule'
+/** Pausar o reanudar. */
+export const SET_MY_ORDER_SCHEDULE_STATUS_RPC = 'set_my_order_schedule_status'
+export const ARCHIVE_MY_ORDER_SCHEDULE_RPC = 'archive_my_order_schedule'
+/** Pasar la propuesta al carrito: devuelve qué y cuánto, nunca un pedido. */
+export const TAKE_MY_ORDER_SCHEDULE_RUN_RPC = 'take_my_order_schedule_run'
+export const DISMISS_MY_ORDER_SCHEDULE_RUN_RPC = 'dismiss_my_order_schedule_run'
+
 // --- Cierre 8 · recuperación de carritos (migración 20260914160000) -----------
 // SIN `satisfies` hasta regenerar los tipos; la red es
 // `supabase/tests/cart-recovery.test.ts`. El encolado (`ebim.enqueue_cart_recovery`)

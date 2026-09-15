@@ -85,7 +85,7 @@ describe('textos de los avisos', () => {
       'integration.circuit_opened', 'member.access_granted', 'member.role_changed',
       'suggestion.generated', 'order.confirmed', 'order.approval_pending', 'order.approved',
       'order.rejected', 'order.shipped', 'order.delivered', 'business_account.invited',
-      'business_account.activated', 'suggestion.sent',
+      'business_account.activated', 'suggestion.sent', 'order_schedule.run_ready',
     ]
     expect([...KNOWN_KINDS].sort()).toEqual(DE_LA_BASE.sort())
   })

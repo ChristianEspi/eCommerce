@@ -31,6 +31,8 @@ const KIND_KEY: Record<string, MessageKey> = {
   'business_account.invited': 'notifications.kind.accountInvited',
   'business_account.activated': 'notifications.kind.accountActivated',
   'suggestion.sent': 'notifications.kind.suggestionSent',
+  // Cierre 4: lo genera `ebim.run_order_schedules`, no el reparto de eventos.
+  'order_schedule.run_ready': 'notifications.kind.orderScheduleReady',
 }
 
 export const KNOWN_KINDS = Object.freeze(Object.keys(KIND_KEY))
@@ -64,5 +66,6 @@ export function notificationText(
     .replace('{account_name}', valor('account_name'))
     .replace('{customer_name}', valor('customer_name'))
     .replace('{provider_code}', valor('provider_code'))
+    .replace('{template_name}', valor('template_name'))
     .replace('{role}', ROLE_KEY[rol] ? t(ROLE_KEY[rol]) : rol)
 }

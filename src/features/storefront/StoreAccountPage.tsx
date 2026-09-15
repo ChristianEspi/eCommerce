@@ -30,6 +30,7 @@ import { ConsumerAccount } from './account/ConsumerAccount'
 import { useMyPendingApprovals } from './account/approvals'
 import { MyApprovalsSection } from './account/MyApprovalsSection'
 import { MyQuotesSection } from './account/MyQuotesSection'
+import { MyScheduledOrdersSection } from './account/MyScheduledOrdersSection'
 import { MyCouponsSection } from './account/MyCouponsSection'
 import { MyOrdersSection } from './account/MyOrdersSection'
 import { MySuggestionsSection } from './account/MySuggestionsSection'
@@ -391,6 +392,15 @@ export function StoreAccountPage() {
                   label: t('account.tab.quotes'),
                   content: (
                     <MyQuotesSection storeSlug={storefront.storeSlug} storeId={storefront.store.store_id} />
+                  ),
+                },
+                // Cierre 4. `programados` es el ancla del aviso «tu pedido
+                // programado está listo»: cambiar el id rompe ese enlace.
+                {
+                  id: 'programados',
+                  label: t('account.tab.schedules'),
+                  content: (
+                    <MyScheduledOrdersSection storeSlug={storefront.storeSlug} storeId={storefront.store.store_id} />
                   ),
                 },
               ]
