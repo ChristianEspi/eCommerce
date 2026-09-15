@@ -156,6 +156,34 @@ describe('resolución de capacidades efectivas', () => {
     expect(result.unknownEntitlements).toEqual(['ecommerce.futuro', 'gmao.licitaciones'])
   })
 
+  /**
+   * Cierre D3 (20260914180000): una sociedad que el hub nunca sincronizó
+   * conserva los tres módulos que nacieron sin candado de servidor. Ninguno más.
+   */
+  it('nunca sincronizada: el fallback legado concede exactamente los tres de ADR 017', () => {
+    const legacy = CAPABILITIES.filter((c) => c.legacyUntilSynced === true).map((c) => c.id)
+    expect([...legacy].sort()).toEqual(['catalog.advanced', 'fulfillment', 'payments'])
+
+    const result = resolveCapabilities({ appActive: true, entitlements: [], synced: false })
+    expect(result.capabilities).toEqual(
+      [...BASELINE_CAPABILITY_IDS, 'catalog.advanced', 'fulfillment', 'payments'].sort(),
+    )
+  })
+
+  it('el fallback legado respeta el corte técnico y desaparece al sincronizar', () => {
+    const cut = resolveCapabilities({
+      appActive: true,
+      entitlements: [],
+      synced: false,
+      flags: { payments: false },
+    })
+    expect(cut.capabilities).not.toContain('payments')
+    expect(cut.disabledByFlag).toEqual(['payments'])
+
+    const synced = resolveCapabilities({ appActive: true, entitlements: [], synced: true })
+    expect(synced.capabilities).toEqual([...BASELINE_CAPABILITY_IDS].sort())
+  })
+
   it('`hasCapability` sin resolución responde que no', () => {
     expect(hasCapability(null, 'catalog')).toBe(false)
     expect(hasCapability(undefined, 'catalog')).toBe(false)

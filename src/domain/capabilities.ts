@@ -118,6 +118,14 @@ export interface Capability {
   readonly state: CapabilityState
   /** Qué deja de poder hacer el tenant si no la tiene. */
   readonly grants: string
+  /**
+   * Fallback de transición (cierre D3, migración `20260914180000`): la
+   * capacidad cuenta como contratada para una sociedad que el hub NUNCA
+   * sincronizó. Solo lo llevan las tres que nacieron sin candado de servidor
+   * (ADR 017); con contexto sincronizado manda la lista de entitlements.
+   * Espejo de `app_capabilities.legacy_until_synced`.
+   */
+  readonly legacyUntilSynced?: true
 }
 
 /**
@@ -218,6 +226,7 @@ export const CAPABILITIES: readonly Capability[] = [
     // y un test de paridad lo compara contra la fila de `app_capabilities`.
     state: 'implemented',
     grants: 'Variantes, atributos, unidades de venta y kits sobre un producto maestro unico.',
+    legacyUntilSynced: true,
   },
   {
     id: 'pricing.lists',
@@ -267,6 +276,7 @@ export const CAPABILITIES: readonly Capability[] = [
     // verdad es una decisión del operador (qué pasarela), no código.
     state: 'implemented',
     grants: 'Cobro en línea: autorización, captura, devolución y conciliación (P09).',
+    legacyUntilSynced: true,
   },
   {
     id: 'promotions',
@@ -476,6 +486,7 @@ export const CAPABILITIES: readonly Capability[] = [
     state: 'implemented',
     grants:
       'Zonas y métodos de entrega con tarifa server-side, ventanas, puntos de recojo, cola de preparación, seguimiento normalizado y devoluciones con reposición (P12).',
+    legacyUntilSynced: true,
   },
   {
     id: 'analytics.advanced',
@@ -550,6 +561,13 @@ export interface PlatformContextInput {
   readonly entitlements: readonly EntitlementCode[]
   /** Interruptores técnicos del tenant. Solo restan. */
   readonly flags?: Readonly<Record<string, boolean>>
+  /**
+   * ¿El hub (o el aprovisionamiento) sincronizó alguna vez esta sociedad?
+   * `false` = no hay fila en `tenant_platform_context` (`source: 'sin-contexto'`),
+   * y entonces las capacidades con `legacyUntilSynced` cuentan como
+   * contratadas. Por omisión `true`: el caso estricto.
+   */
+  readonly synced?: boolean
 }
 
 export interface CapabilityResolution {
@@ -564,7 +582,9 @@ export interface CapabilityResolution {
 }
 
 /**
- * Capacidad efectiva = app activa AND (baseline OR entitlement) AND flag ≠ false.
+ * Capacidad efectiva = app activa AND (baseline OR entitlement OR fallback
+ * legado) AND flag ≠ false, donde fallback legado = `legacyUntilSynced` y
+ * sociedad nunca sincronizada (`synced: false`).
  *
  * Tres decisiones que no son obvias y que un test fija:
  *
@@ -602,9 +622,12 @@ export function resolveCapabilities(input: PlatformContextInput): CapabilityReso
   const capabilities: CapabilityId[] = []
   const disabledByFlag: CapabilityId[] = []
 
+  const synced = input.synced ?? true
+
   for (const item of CAPABILITIES) {
     const isBaseline = item.entitlement === null
-    if (!isBaseline && !active.has(item.entitlement as string)) continue
+    const legacy = !synced && item.legacyUntilSynced === true
+    if (!isBaseline && !legacy && !active.has(item.entitlement as string)) continue
 
     entitled.push(item.id)
     if (!isBaseline && flags[item.id] === false) disabledByFlag.push(item.id)

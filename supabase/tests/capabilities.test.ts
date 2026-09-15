@@ -159,7 +159,8 @@ describe('el esquema es el que el codigo cree que es', () => {
       is_baseline: boolean
       entitlement_code: string | null
       state: string
-    }>(`select code, boundary, is_baseline, entitlement_code, state
+      legacy_until_synced: boolean
+    }>(`select code, boundary, is_baseline, entitlement_code, state, legacy_until_synced
           from public.app_capabilities order by code`)
 
     expect(rows.map((r) => r.code)).toEqual([...CAPABILITY_IDS].sort())
@@ -173,11 +174,13 @@ describe('el esquema es el que el codigo cree que es', () => {
         baseline: row.is_baseline,
         entitlement: row.entitlement_code,
         state: row.state,
+        legacy: row.legacy_until_synced,
       }).toEqual({
         boundary: item?.boundary,
         baseline: item?.entitlement === null,
         entitlement: item?.entitlement ?? null,
         state: item?.state,
+        legacy: item?.legacyUntilSynced === true,
       })
     }
   })
@@ -194,8 +197,25 @@ describe('la resolucion de SQL y la de TypeScript dicen lo mismo', () => {
     entitlements: string[]
     flags: Record<string, boolean>
     appActive: boolean
+    /** `false` = no se llama a `sync`: la sociedad queda sin fila de contexto. */
+    synced?: false
   }> = [
     { nombre: 'tenant recien creado', entitlements: [], flags: {}, appActive: true },
+    // D3 (20260914180000): el fallback legado, en las dos copias de la regla.
+    {
+      nombre: 'nunca sincronizado (fallback legado)',
+      entitlements: [],
+      flags: {},
+      appActive: true,
+      synced: false,
+    },
+    {
+      nombre: 'nunca sincronizado, con un corte tecnico sobre un modulo legado',
+      entitlements: [],
+      flags: { payments: false },
+      appActive: true,
+      synced: false,
+    },
     { nombre: 'un addon', entitlements: [WHITE_LABEL], flags: {}, appActive: true },
     {
       nombre: 'dos addons y un corte',
@@ -226,7 +246,9 @@ describe('la resolucion de SQL y la de TypeScript dicen lo mismo', () => {
 
   for (const escenario of ESCENARIOS) {
     it(escenario.nombre, async () => {
-      await sync(TENANT_A, escenario.entitlements, { appActive: escenario.appActive })
+      if (escenario.synced !== false) {
+        await sync(TENANT_A, escenario.entitlements, { appActive: escenario.appActive })
+      }
       for (const [key, value] of Object.entries(escenario.flags)) {
         await svc(
           `insert into public.tenant_feature_flags
@@ -240,6 +262,7 @@ describe('la resolucion de SQL y la de TypeScript dicen lo mismo', () => {
         appActive: escenario.appActive,
         entitlements: escenario.entitlements,
         flags: escenario.flags,
+        synced: escenario.synced !== false,
       }).capabilities
 
       const enBase: string[] = []
@@ -561,8 +584,13 @@ describe('effective_capabilities', () => {
    * Sin contexto sincronizado el origen se dice en voz alta. «Nunca hablamos
    * con el hub» y «el hub dice que no lo tienes» son incidencias distintas y
    * solo una se arregla vendiendo algo.
+   *
+   * D3 (20260914180000): sin sincronizar, además de lo baseline quedan las
+   * capacidades con fallback legado —las tres que nacieron sin candado de
+   * servidor—, para que cerrar el candado no las apague a quien ya las usaba.
+   * Ninguna otra vendible entra por esta vía.
    */
-  it('sin sincronizar nunca, lo dice y deja lo baseline', async () => {
+  it('sin sincronizar nunca, lo dice y deja lo baseline más el fallback legado', async () => {
     const data = await asRole(db, 'authenticated', claimsFor(TENANT_A), async () => {
       const result = await db.query<{ ctx: Record<string, unknown> }>(
         `select public.effective_capabilities($1) as ctx`,
@@ -571,6 +599,23 @@ describe('effective_capabilities', () => {
       return result.rows[0]?.ctx
     })
     expect(data?.source).toBe('sin-contexto')
+    expect(data?.entitlements).toEqual([])
+    expect(data?.capabilities).toEqual(
+      [...BASELINE_CAPABILITY_IDS, 'catalog.advanced', 'fulfillment', 'payments'].sort(),
+    )
+  })
+
+  /** Y en cuanto el hub sincroniza —aunque sea con la lista vacía— manda la lista. */
+  it('la primera sincronizacion retira el fallback legado', async () => {
+    await sync(TENANT_A, [])
+    const data = await asRole(db, 'authenticated', claimsFor(TENANT_A), async () => {
+      const result = await db.query<{ ctx: Record<string, unknown> }>(
+        `select public.effective_capabilities($1) as ctx`,
+        [TENANT_A.companyId],
+      )
+      return result.rows[0]?.ctx
+    })
+    expect(data?.source).toBe('hub')
     expect(data?.capabilities).toEqual([...BASELINE_CAPABILITY_IDS].sort())
   })
 

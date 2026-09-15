@@ -54,8 +54,14 @@ async function svc<T = Record<string, unknown>>(query: string): Promise<T[]> {
  * addon. Mirar solo `has_capability` daba por «gateada solo en la UI» una
  * capacidad que en realidad tiene su candado en la base.
  */
-const PORTERAS = /has_capability|company_is_entitled/
-const LLAMADA_A_PORTERA = /(?:has_capability|company_is_entitled)\s*\(([^)]*)\)/g
+/*
+ * `assert_capability` (cierre D3, 20260914180000) es la tercera forma y no un
+ * mecanismo paralelo: es `company_is_entitled` más la excepción
+ * `MODULO_NO_CONTRATADO`, para los comandos que ya autorizaron el rol. Su
+ * tercer argumento es la capacidad, igual que en las otras dos.
+ */
+const PORTERAS = /has_capability|company_is_entitled|assert_capability/
+const LLAMADA_A_PORTERA = /(?:has_capability|company_is_entitled|assert_capability)\s*\(([^)]*)\)/g
 
 /**
  * El candado INDIRECTO de la IA.
@@ -106,27 +112,14 @@ function capabilitiesMentioned(expressions: readonly string[]): Set<string> {
  * Cada entrada es deuda declarada, no una excepción de diseño: `docs/SAAS_GAPS.md`
  * la recoge como «importante». Vaciar esta lista es cerrar el hueco; añadirle
  * una entrada exige escribir por qué.
+ *
+ * VACÍA desde el cierre D3 (migraciones `20260914180000`–`180300`): los tres
+ * huecos de ADR 017 —`catalog.advanced`, `payments` y `fulfillment`— tienen
+ * candado en policies y en los guards de operador, con un fallback legado
+ * explícito para sociedades que el hub nunca sincronizó. Las pruebas de bypass
+ * de los tres viven en `capability-guards.test.ts`.
  */
-const SIN_CANDADO_DE_SERVIDOR: ReadonlyArray<{ code: string; motivo: string }> = [
-  {
-    code: 'catalog.advanced',
-    motivo:
-      'Las once tablas del PIM (variantes, atributos, unidades, kits) llevan RLS por tenant y por rol, ' +
-      'pero ninguna policy consulta la capacidad. P03-SaaS las creó antes de que P04 fijara el patrón.',
-  },
-  {
-    code: 'payments',
-    motivo:
-      'Las siete tablas del dominio de cobro llevan RLS por tenant y por rol; la capacidad solo se ' +
-      'comprueba en `routes.tsx`. La migración de capacidad (120200) registra el estado y la vista, no un candado.',
-  },
-  {
-    code: 'fulfillment',
-    motivo:
-      'Mismo caso que pagos: la oferta, el despacho y las devoluciones se protegen por tenant y por rol, ' +
-      'y la capacidad no entra en ninguna policy (150700 registra estado, conector de pruebas y vista).',
-  },
-]
+const SIN_CANDADO_DE_SERVIDOR: ReadonlyArray<{ code: string; motivo: string }> = []
 
 beforeAll(async () => {
   db = await createTestDatabase()
@@ -212,6 +205,11 @@ describe('las capacidades vendibles se hacen cumplir en el servidor', () => {
       'ai.assist',
       'ai.catalog.copy',
       'ai.insights',
+      // Cierre D3: los tres que ADR 017 dejó abiertos. Perder cualquiera de
+      // estos candados vuelve a abrir un bypass de monetización.
+      'catalog.advanced',
+      'payments',
+      'fulfillment',
     ]
     for (const code of conCandado) {
       expect([code, enforced.has(code)]).toEqual([code, true])

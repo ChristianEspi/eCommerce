@@ -471,6 +471,13 @@ export function makePlatformContext(
     organizationId?: string
     companyId?: string
     plan?: string | null
+    /**
+     * Cierre D3: en la base, `source: 'sin-contexto'` concede además los
+     * módulos `legacyUntilSynced`. El doble NO lo hace por omisión —las suites
+     * de UI usan el contexto por defecto para probar «sin el addon»—; quien
+     * quiera el fallback legado lo pide explícitamente.
+     */
+    legacyFallback?: boolean
   } = {},
 ): Record<string, unknown> {
   const {
@@ -481,9 +488,15 @@ export function makePlatformContext(
     organizationId = ORG,
     companyId = COMPANY_A,
     plan = null,
+    legacyFallback = false,
   } = overrides
 
-  const { capabilities } = resolveCapabilities({ appActive, entitlements, flags })
+  const { capabilities } = resolveCapabilities({
+    appActive,
+    entitlements,
+    flags,
+    synced: !(legacyFallback && source === 'sin-contexto'),
+  })
 
   return {
     organization_id: organizationId,

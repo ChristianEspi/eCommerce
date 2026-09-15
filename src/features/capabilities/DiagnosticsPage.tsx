@@ -185,7 +185,12 @@ function CapabilitiesSection({ context }: { context: PlatformContext }) {
             <TableBody>
               {CAPABILITIES.map((item) => {
                 const baseline = item.entitlement === null
-                const contracted = baseline || entitlements.has(item.entitlement as string)
+                // Cierre D3: una sociedad que el hub nunca sincronizó conserva
+                // por fallback legado los módulos marcados `legacyUntilSynced`.
+                // Cuenta como contratado para que su corte técnico se pueda usar.
+                const legacy = context.source === 'sin-contexto' && item.legacyUntilSynced === true
+                const contracted =
+                  baseline || legacy || entitlements.has(item.entitlement as string)
                 const active = effective.has(item.id)
                 return (
                   <TableRow key={item.id}>
