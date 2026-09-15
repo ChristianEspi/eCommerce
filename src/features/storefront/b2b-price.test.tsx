@@ -191,6 +191,38 @@ describe('el precio del acuerdo en la ficha', () => {
   })
 
   /**
+   * Visto en DEV: la tarjeta decía «S/ 55.28 · Precio convenio» y la vista
+   * rápida del mismo producto, S/ 61.42. La vista rápida ahora pregunta lo mismo
+   * que la ficha.
+   */
+  it('la VISTA RAPIDA enseña el mismo precio acordado que la tarjeta y la ficha', async () => {
+    const sesion = makeSession()
+    render(
+      backend({ session: sesion, quote: () => cotizacion(1) }),
+      '/s/casa-nordica?ver=todo&p=silla-roble',
+      sesion,
+    )
+
+    const dialogo = await screen.findByRole('dialog')
+    expect(await within(dialogo).findByText('S/ 92.00')).toBeInTheDocument()
+    expect(within(dialogo).getByText('S/ 100.00').tagName).toBe('S')
+    expect(within(dialogo).getByText('Precio acordado con tu empresa')).toBeInTheDocument()
+  })
+
+  it('en la vista rapida, sin acuerdo aplicado se ve el precio publico sin prometer nada', async () => {
+    const sesion = makeSession()
+    render(
+      backend({ session: sesion, quote: () => cotizacion(1, 'catalog') }),
+      '/s/casa-nordica?ver=todo&p=silla-roble',
+      sesion,
+    )
+
+    const dialogo = await screen.findByRole('dialog')
+    expect(await within(dialogo).findByText('S/ 100.00')).toBeInTheDocument()
+    expect(within(dialogo).queryByText('Precio acordado con tu empresa')).not.toBeInTheDocument()
+  })
+
+  /**
    * La ficha publica es la consulta mas visitada de la tienda y la inmensa
    * mayoria de sus visitas son anonimas. Un visitante sin sesion no tiene
    * acuerdo que resolver, asi que preguntarlo seria pagar una llamada por cada

@@ -14,6 +14,7 @@ import {
 } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useAgreementPrice } from '@/features/pricing/useAgreementPrice'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { formatMoney } from '@/shared/lib/format'
 import { AppBreadcrumbs } from '@/shared/ui/AppBreadcrumbs'
@@ -72,8 +73,21 @@ export function ProductQuickView({
 
   const item = product.data
   const available = item?.in_stock !== false
-  const discount = item ? discountPercent(item) : null
   const hasVariants = item?.kind === 'variant'
+
+  /**
+   * El precio del acuerdo de quien mira, igual que la ficha completa.
+   *
+   * Sin esto la tarjeta decía «S/ 55.28 · Precio convenio» y al abrir la vista
+   * rápida del MISMO producto salía S/ 61.42, el público: dos precios para una
+   * misma cosa, que es exactamente lo que hace desconfiar de la tienda. Misma
+   * regla que la tarjeta y la ficha (cotización del servidor, cantidad 1, solo
+   * si viene de una lista y mejora el público); con variantes no se pregunta.
+   */
+  const conAcuerdo = useAgreementPrice(storeSlug, item && !hasVariants ? item : null)
+  // Con acuerdo, el tachado es el precio público: el −% de la oferta abierta a
+  // todos no es el ahorro de este comprador.
+  const discount = item && !conAcuerdo ? discountPercent(item) : null
 
   return (
     <Dialog
@@ -228,17 +242,38 @@ export function ProductQuickView({
                   </Typography>
 
                   <Stack sx={{ gap: 0, mt: 0.5 }}>
-                    {discount !== null && item.compare_at_price && (
+                    {conAcuerdo ? (
                       <Typography
                         component="s"
                         sx={{ fontSize: TS.body, color: 'var(--muted)', fontWeight: 600 }}
                       >
-                        {formatMoney(Number(item.compare_at_price), item.currency, locale)}
+                        {formatMoney(Number(item.price), item.currency, locale)}
                       </Typography>
+                    ) : (
+                      discount !== null &&
+                      item.compare_at_price && (
+                        <Typography
+                          component="s"
+                          sx={{ fontSize: TS.body, color: 'var(--muted)', fontWeight: 600 }}
+                        >
+                          {formatMoney(Number(item.compare_at_price), item.currency, locale)}
+                        </Typography>
+                      )
                     )}
                     <Typography sx={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.02em' }}>
-                      {formatMoney(Number(item.price), item.currency, locale)}
+                      {formatMoney(
+                        conAcuerdo ? conAcuerdo.amount : Number(item.price),
+                        conAcuerdo?.currency ?? item.currency,
+                        locale,
+                      )}
                     </Typography>
+                    {/* Por qué ese precio y no el del catálogo: sin la línea, un
+                        número más bajo parece un error que cambiará en la caja. */}
+                    {conAcuerdo && (
+                      <Typography sx={{ fontSize: TS.label, color: 'var(--accent-deep)', fontWeight: 700 }}>
+                        {t('store.product.agreementPrice')}
+                      </Typography>
+                    )}
                   </Stack>
 
                   <Chip
