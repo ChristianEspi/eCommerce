@@ -1,4 +1,5 @@
 import AccountBalanceRoundedIcon from '@mui/icons-material/AccountBalanceRounded'
+import AltRouteRoundedIcon from '@mui/icons-material/AltRouteRounded'
 import CategoryRoundedIcon from '@mui/icons-material/CategoryRounded'
 import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded'
 import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded'
@@ -110,6 +111,20 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'nav.pricing',
     icon: <PriceChangeRoundedIcon fontSize="small" />,
     capability: 'pricing.lists',
+    group: 'catalog',
+  },
+  // --- Cierre · item 7 · Canales de venta ----------------------------------
+  {
+    // Con el catalogo y al lado de Precios: un canal decide por donde se vende
+    // el catalogo unico, y es la dimension con la que se tarifa. Capacidad
+    // `catalog` (baseline) porque los canales existen desde P10 para todos;
+    // permiso `store.manage` porque abrir un canal o cambiar el de defecto
+    // decide por donde vende la tienda publica.
+    to: '/app/channels',
+    label: 'nav.channels',
+    icon: <AltRouteRoundedIcon fontSize="small" />,
+    capability: 'catalog',
+    permission: 'store.manage',
     group: 'catalog',
   },
   {

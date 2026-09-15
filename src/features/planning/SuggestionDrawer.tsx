@@ -51,7 +51,7 @@ export function SuggestionDrawer({
           {t('planning.suggestions.readOnly')}
         </Typography>
 
-        {items.isPending && <TableSkeleton columns={3} />}
+        {items.isPending && <TableSkeleton columns={4} />}
         {items.isError && <ErrorState error={items.error} onRetry={() => void items.refetch()} />}
 
         {!items.isPending && !items.isError && (
@@ -60,6 +60,9 @@ export function SuggestionDrawer({
               <TableRow>
                 <TableCell>{t('planning.field.product')}</TableCell>
                 <TableCell align="right">{t('planning.field.quantity')}</TableCell>
+                {/* Cierre · item 11: lo disponible cuando se calculó, para que un
+                    «limitado a N disponibles» siga siendo comprobable. */}
+                <TableCell align="right">{t('planning.field.onHand')}</TableCell>
                 <TableCell>{t('planning.field.reason')}</TableCell>
               </TableRow>
             </TableHead>
@@ -77,6 +80,7 @@ export function SuggestionDrawer({
                   <TableCell align="right" sx={{ fontWeight: 800 }}>
                     {linea.suggested_quantity}
                   </TableCell>
+                  <TableCell align="right">{linea.on_hand_quantity ?? '—'}</TableCell>
                   <TableCell sx={{ color: 'var(--muted)', fontSize: 12 }}>{linea.reason}</TableCell>
                 </TableRow>
               ))}

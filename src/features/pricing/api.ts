@@ -4,7 +4,6 @@ import { tryGetSupabaseClient, tryGetStorefrontRpcClient } from '@/shared/lib/su
 import { PricingError, pricingErrorFromDb } from './errors'
 import type { ResolvedPriceRow } from './importCsv'
 import {
-  CHANNELS_TABLE,
   CUSTOMER_SEGMENTS_TABLE,
   PRICE_CHANGE_EVENTS_TABLE,
   PRICE_LISTS_TABLE,
@@ -17,7 +16,6 @@ import {
   PRODUCT_UOMS_TABLE,
   PRODUCT_VARIANTS_TABLE,
   UNITS_OF_MEASURE_TABLE,
-  channelOptionSchema,
   customerSegmentSchema,
   priceChangeEventSchema,
   priceConflictSchema,
@@ -30,7 +28,6 @@ import {
   pricedUomSchema,
   pricedVariantSchema,
   type AssignmentFormValues,
-  type ChannelOption,
   type CustomerSegment,
   type PriceChangeEvent,
   type PriceConflict,
@@ -379,16 +376,9 @@ export async function deleteAssignment(id: string): Promise<void> {
 // Canales y catálogo tarifable
 // ---------------------------------------------------------------------------
 
-export async function fetchChannels(storeId: string | null): Promise<ChannelOption[]> {
-  if (!storeId) return []
-  const { data, error } = await client()
-    .from(CHANNELS_TABLE)
-    .select('id, code, name, kind, is_default, is_active')
-    .eq('store_id', storeId)
-    .order('code')
-  if (error) throw pricingErrorFromDb(error)
-  return channelOptionSchema.array().parse(data ?? [])
-}
+// Cierre · item 7: los canales se leen desde `features/channels`, que es donde
+// ahora se administran. Precios reutiliza esa lectura para sus desplegables.
+export { fetchChannels } from '@/features/channels/api'
 
 /**
  * Búsqueda de producto para tarifar. Con LÍMITE y en el servidor: un selector

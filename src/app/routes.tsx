@@ -47,6 +47,10 @@ const PimPage = lazyPage(() =>
 const PricingPage = lazyPage(() =>
   import('@/features/pricing/PricingPage').then((m) => ({ default: m.PricingPage })),
 )
+// Cierre · item 7: administracion de canales de venta.
+const ChannelsPage = lazyPage(() =>
+  import('@/features/channels/ChannelsPage').then((m) => ({ default: m.ChannelsPage })),
+)
 const InventoryPage = lazyPage(() =>
   import('@/features/inventory/InventoryPage').then((m) => ({ default: m.InventoryPage })),
 )
@@ -181,6 +185,10 @@ export const routes: RouteObject[] = [
           // El precio por canal, segmento o cliente es el módulo vendible; el
           // precio de catálogo sigue viniendo con el producto.
           { path: 'pricing', element: gated('pricing.lists', <PricingPage />) },
+          // Cierre · item 7. Canales de venta: gateado por `catalog` (baseline),
+          // igual que su entrada de menu. Quien puede escribir lo decide la RLS
+          // (owner/admin) y `channel_set_default`, no esta ruta.
+          { path: 'channels', element: gated('catalog', <ChannelsPage />) },
           // Llevar existencia por almacen es el modulo vendible; la existencia
           // del catalogo (`products.stock`) sigue viniendo con el producto, y
           // por eso un tenant sin este addon vende igual que antes de P06.

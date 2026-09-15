@@ -5,8 +5,11 @@ import {
   DEMAND_FORECASTS_TABLE,
   ORDER_SUGGESTIONS_TABLE,
   ORDER_SUGGESTION_ITEMS_TABLE,
-  SUGGEST_ORDER_RPC,
+  PRODUCTS_TABLE,
+  SUGGEST_ORDER_V2_RPC,
   forecastSchema,
+  isSaveableLine,
+  modelOf,
   suggestedLineSchema,
   suggestionItemSchema,
   suggestionSchema,
@@ -96,15 +99,19 @@ export async function fetchSuggestionItems(
 }
 
 /**
- * Pide el sugerido al servidor. **No escribe nada**: `ebim.suggest_order`
+ * Pide el sugerido al servidor. **No escribe nada**: `suggest_order_v2`
  * devuelve filas y ya. Quien decide guardarlas es la persona que las mira.
+ *
+ * Cierre · item 11: se llama a v2, que explica cada línea (`inputs`) y cae
+ * él solo a `historic_v1` cuando no tiene datos. La pantalla no decide el
+ * modelo: lo lee de `model_code`, que es lo que se guarda.
  */
 export async function previewSuggestion(input: {
   storeId: string
   customerId: string
   days: number
 }): Promise<SuggestedLine[]> {
-  const { data, error } = await client().rpc(SUGGEST_ORDER_RPC, {
+  const { data, error } = await client().rpc(SUGGEST_ORDER_V2_RPC, {
     p_store: input.storeId,
     p_customer: input.customerId,
     p_days: input.days,
@@ -132,6 +139,9 @@ export async function saveSuggestion(input: {
   lines: SuggestedLine[]
 }): Promise<void> {
   const supabase = client()
+  // Las líneas sin disponibilidad (cantidad 0) se enseñan pero no se guardan:
+  // la base exige cantidad positiva y un sugerido de «0 unidades» no se pide.
+  const guardables = input.lines.filter(isSaveableLine)
 
   const { data, error } = await supabase
     .from(ORDER_SUGGESTIONS_TABLE)
@@ -140,15 +150,18 @@ export async function saveSuggestion(input: {
       company_id: input.scope.companyId,
       store_id: input.scope.storeId,
       customer_id: input.customerId,
+      // Con qué se calculó. Sin esto toda sugerencia nacía `historic_v1` por el
+      // default de la columna, aunque la hubiera calculado otro modelo.
+      model_code: modelOf(input.lines),
     })
     .select('id')
     .single()
 
   if (error) throw planningErrorFromDb(error)
-  if (input.lines.length === 0) return
+  if (guardables.length === 0) return
 
   const { error: itemsError } = await supabase.from(ORDER_SUGGESTION_ITEMS_TABLE).insert(
-    input.lines.map((line, index) => ({
+    guardables.map((line, index) => ({
       organization_id: input.scope.organizationId,
       company_id: input.scope.companyId,
       suggestion_id: (data as { id: string }).id,
@@ -156,6 +169,9 @@ export async function saveSuggestion(input: {
       variant_id: line.variant_id,
       suggested_quantity: line.suggested_quantity,
       last_period_quantity: line.last_period_quantity,
+      // Lo disponible cuando se calculó: es lo que hace comprobable un
+      // «limitado a 3 disponibles» semanas después.
+      on_hand_quantity: line.on_hand_quantity,
       reason: line.reason,
       position: index,
     })),
@@ -199,4 +215,32 @@ export async function fetchForecasts(): Promise<Forecast[]> {
   })
 
   return forecastSchema.array().parse(filas)
+}
+
+// ---------------------------------------------------------------------------
+// Nombres de producto para la previsualización (cierre · item 11)
+// ---------------------------------------------------------------------------
+
+export interface ProductLabel {
+  id: string
+  name: string
+  sku: string
+}
+
+/**
+ * Nombre y SKU de las líneas propuestas. El sugerido devuelve ids; una cifra
+ * junto a un uuid no se puede discutir con nadie. Lectura acotada a los ids de
+ * la propuesta, bajo la RLS de `products`.
+ */
+export async function fetchProductLabels(ids: readonly string[]): Promise<ProductLabel[]> {
+  if (ids.length === 0) return []
+  const { data, error } = await client()
+    .from(PRODUCTS_TABLE)
+    .select('id, name, sku')
+    .in('id', [...ids])
+  if (error) throw planningErrorFromDb(error)
+  return (data ?? []).map((row) => {
+    const fila = row as { id: string; name?: string | null; sku?: string | null }
+    return { id: fila.id, name: fila.name ?? '', sku: fila.sku ?? '' }
+  })
 }

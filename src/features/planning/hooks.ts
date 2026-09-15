@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import {
   fetchForecasts,
+  fetchProductLabels,
   fetchSuggestionItems,
   fetchSuggestions,
   previewSuggestion,
@@ -23,6 +24,8 @@ export const suggestionsKey = () => [...PLANNING_KEY, 'suggestions'] as const
 export const suggestionItemsKey = (id: string | null) =>
   [...PLANNING_KEY, 'items', id ?? 'none'] as const
 export const forecastsKey = () => [...PLANNING_KEY, 'forecasts'] as const
+export const productLabelsKey = (ids: readonly string[]) =>
+  [...PLANNING_KEY, 'product-labels', [...ids].sort().join(',')] as const
 
 function useInvalidatePlanning() {
   const queryClient = useQueryClient()
@@ -58,4 +61,14 @@ export function useSaveSuggestion() {
 export function useSetSuggestionStatus() {
   const invalidate = useInvalidatePlanning()
   return useMutation({ mutationFn: setSuggestionStatus, onSuccess: invalidate })
+}
+
+/** Nombres de las líneas propuestas (cierre · item 11). Solo con líneas a la vista. */
+export function useProductLabels(ids: readonly string[]) {
+  return useQuery({
+    queryKey: productLabelsKey(ids),
+    queryFn: () => fetchProductLabels(ids),
+    enabled: ids.length > 0,
+    retry: false,
+  })
 }

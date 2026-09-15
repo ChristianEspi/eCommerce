@@ -20,7 +20,6 @@ export {
   PRICE_LIST_ITEMS_TABLE,
   PRICE_LIST_ASSIGNMENTS_TABLE,
   PRICE_CHANGE_EVENTS_TABLE,
-  CHANNELS_TABLE,
   PRODUCTS_TABLE,
   PRODUCT_VARIANTS_TABLE,
   PRODUCT_UOMS_TABLE,
@@ -143,15 +142,9 @@ export const priceListAssignmentSchema = z.object({
 })
 export type PriceListAssignment = z.infer<typeof priceListAssignmentSchema>
 
-export const channelOptionSchema = z.object({
-  id: z.string().uuid(),
-  code: z.string().min(1),
-  name: z.string().min(1),
-  kind: z.enum(['b2c', 'b2b', 'internal']),
-  is_default: z.boolean(),
-  is_active: z.boolean(),
-})
-export type ChannelOption = z.infer<typeof channelOptionSchema>
+// Cierre · item 7: la forma de canal vive en `features/channels`, la unica
+// lectura de canales en el navegador. Se reexporta para no mover imports.
+export { channelOptionSchema, type ChannelOption } from '@/features/channels/types'
 
 export const priceChangeEventSchema = z.object({
   id: z.string().uuid(),

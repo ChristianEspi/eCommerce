@@ -80,6 +80,7 @@ describe('rutas base', () => {
       '/app/analytics',
       '/app/assortments',
       '/app/categories',
+      '/app/channels',
       '/app/content',
       '/app/credit',
       '/app/customers',

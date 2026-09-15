@@ -5,6 +5,8 @@ export {
   ORDER_SUGGESTION_ITEMS_TABLE,
   DEMAND_FORECASTS_TABLE,
   SUGGEST_ORDER_RPC,
+  SUGGEST_ORDER_V2_RPC,
+  PRODUCTS_TABLE,
 } from '@/shared/lib/db-schema'
 
 /**
@@ -66,15 +68,87 @@ export const suggestionItemSchema = z.object({
 })
 export type SuggestionItem = z.infer<typeof suggestionItemSchema>
 
-/** Una fila tal y como la devuelve `ebim.suggest_order`. Todavía no es nada. */
+// --- Cierre · item 11 · Sugerido v2 -----------------------------------------
+
+/** Los dos modelos que puede devolver `suggest_order_v2`. */
+export const SUGGEST_MODEL_V2 = 'history_seasonal_v2'
+export const SUGGEST_MODEL_V1 = 'historic_v1'
+
+/**
+ * Los números con los que se calculó una línea (`inputs` de v2).
+ *
+ * Todo opcional y con `catch`: es la explicación, no la cifra. Si el servidor
+ * añade un dato nuevo o el fallback trae menos, la línea se sigue pintando con
+ * su motivo en vez de romper la previsualización entera por un campo de más.
+ */
+export const suggestionInputsSchema = z
+  .object({
+    model: z.string().optional(),
+    fallback: z.boolean().optional(),
+    windows: z
+      .object({ recent_days: z.number().optional(), long_days: z.number().optional() })
+      .partial()
+      .optional(),
+    rates: z
+      .object({ recent: z.coerce.number(), long: z.coerce.number(), base: z.coerce.number() })
+      .partial()
+      .optional(),
+    blend: z.object({ recent: z.coerce.number(), long: z.coerce.number() }).partial().optional(),
+    seasonal: z
+      .object({ applied: z.boolean(), factor: z.coerce.number(), reason: z.string() })
+      .partial()
+      .optional(),
+    demand: z.coerce.number().optional(),
+    atp: z
+      .object({
+        state: z.string(),
+        available: z.coerce.number().nullable(),
+        source: z.string().nullable(),
+      })
+      .partial()
+      .optional(),
+    capped: z.boolean().optional(),
+    shortage: z.boolean().optional(),
+  })
+  .passthrough()
+export type SuggestionInputs = z.infer<typeof suggestionInputsSchema>
+
+/**
+ * Una fila tal y como la devuelve `suggest_order_v2` (o su fallback v1).
+ * Todavía no es nada: existe cuando una persona la guarda.
+ *
+ * `model_code` e `inputs` tienen valor por defecto para seguir leyendo una
+ * respuesta de v1 pelada, que no los trae.
+ */
 export const suggestedLineSchema = z.object({
   product_id: z.string().uuid(),
   variant_id: z.string().uuid().nullable().default(null),
   suggested_quantity: z.coerce.string(),
   last_period_quantity: z.coerce.string().nullable().default(null),
+  on_hand_quantity: z.coerce.string().nullable().default(null),
   reason: z.string(),
+  inputs: suggestionInputsSchema.catch({}).default({}),
+  model_code: z.string().default(SUGGEST_MODEL_V1),
 })
 export type SuggestedLine = z.infer<typeof suggestedLineSchema>
+
+/**
+ * ¿Se puede guardar esta línea? La base exige `suggested_quantity > 0`, y una
+ * línea sin disponibilidad sale con cero a propósito: se ENSEÑA para saber qué
+ * falta, pero no se guarda como algo que pedir.
+ */
+export function isSaveableLine(line: SuggestedLine): boolean {
+  const qty = Number(line.suggested_quantity)
+  return Number.isFinite(qty) && qty >= 1
+}
+
+/**
+ * El modelo de la sugerencia entera. Todas las líneas de una respuesta traen el
+ * mismo; si no hay ninguna, se guarda v2, que es lo que se pidió.
+ */
+export function modelOf(lines: readonly SuggestedLine[]): string {
+  return lines[0]?.model_code ?? SUGGEST_MODEL_V2
+}
 
 export const forecastSchema = z.object({
   id: z.string().uuid(),
