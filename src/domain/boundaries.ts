@@ -93,7 +93,9 @@ export const BOUNDARIES: readonly Boundary[] = [
     state: 'implemented',
     responsibility:
       'Qué se vende y qué ES: producto, variantes, atributos, unidades de venta, kits, categoría, imágenes y su publicación. No decide precio ni disponibilidad.',
-    paths: ['features/catalog'],
+    // Cierre · item 7: los canales son una dimension sobre el catalogo unico
+    // (visibilidad por product_channels), no una tienda aparte.
+    paths: ['features/catalog', 'features/channels'],
     serverSide: [
       'supabase/functions/catalog-product',
       'migraciones 090300, 091100, 091200',

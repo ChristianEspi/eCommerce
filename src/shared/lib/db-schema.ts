@@ -83,6 +83,7 @@ export const CUSTOMER_AGING_RPC = 'customer_aging'
 /** `ebim.suggest_order` — devuelve FILAS con su motivo; no crea nada. */
 export const SUGGEST_ORDER_RPC = 'suggest_order'
 
+
 // --- IA medida (migración 20260910100000) ----------------------------------
 // SIN `satisfies` por el mismo motivo que las capacidades, más abajo: la
 // migración todavía no está aplicada en el proyecto enlazado contra el que se
@@ -151,6 +152,13 @@ export const PRICE_LIST_ITEMS_TABLE = 'price_list_items'
 export const PRICE_LIST_ASSIGNMENTS_TABLE = 'price_list_assignments'
 export const PRICE_CHANGE_EVENTS_TABLE = 'price_change_events'
 export const CHANNELS_TABLE = 'channels'
+// --- Cierre · item 7 · Administracion de canales (20260914150000) -----------
+// Sin `satisfies` por la misma razon que el resto de este bloque: la migracion
+// aun no esta aplicada en el proyecto enlazado. La red es `channels-admin.test.ts`.
+/** Cambia el canal por defecto en una transaccion; autoriza owner/admin desde el JWT. */
+export const CHANNEL_SET_DEFAULT_RPC = 'channel_set_default'
+/** Productos declarados por canal (cero = todo el catalogo). Security invoker. */
+export const CHANNEL_CATALOG_SUMMARY_RPC = 'channel_catalog_summary'
 
 // --- Clientes y cuentas B2B (P05-SaaS, migraciones 190000-190200) -----------
 // Sin `satisfies` por la misma razón que las anteriores: `database.types.ts` se

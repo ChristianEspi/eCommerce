@@ -5,7 +5,6 @@ import {
   deletePriceItem,
   deletePriceList,
   fetchAssignments,
-  fetchChannels,
   fetchConflicts,
   fetchPriceChanges,
   fetchPriceItems,
@@ -21,7 +20,6 @@ import {
   searchPricedProducts,
 } from './api'
 import type {
-  ChannelOption,
   CustomerSegment,
   PriceChangeEvent,
   PriceConflict,
@@ -47,7 +45,6 @@ export const listsKey = (storeId: string | null) => [...PRICING_KEY, 'lists', st
 export const itemsKey = (listId: string | null) => [...PRICING_KEY, 'items', listId] as const
 export const assignmentsKey = (listId: string | null) =>
   [...PRICING_KEY, 'assignments', listId] as const
-export const channelsKey = (storeId: string | null) => [...PRICING_KEY, 'channels', storeId] as const
 export const conflictsKey = (storeId: string | null) =>
   [...PRICING_KEY, 'conflicts', storeId] as const
 export const changesKey = (storeId: string | null) => [...PRICING_KEY, 'changes', storeId] as const
@@ -98,13 +95,10 @@ export function useAssignments(listId: string | null) {
   })
 }
 
-export function useChannels(storeId: string | null) {
-  return useQuery<ChannelOption[]>({
-    queryKey: channelsKey(storeId),
-    queryFn: () => fetchChannels(storeId),
-    enabled: Boolean(storeId),
-  })
-}
+// Cierre · item 7: la lectura de canales es de `features/channels`. Se
+// reexporta con la MISMA clave de cache, asi un canal creado alli aparece en
+// los desplegables de precios sin recargar.
+export { useChannels, channelsKey } from '@/features/channels/hooks'
 
 export function useConflicts(storeId: string | null, enabled = true) {
   return useQuery<PriceConflict[]>({
