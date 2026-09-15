@@ -198,8 +198,31 @@ Reglas de propiedad: **solo el carril A** redefine `create_order`, `checkout_pla
 
 ## P3
 
-### 12. invoice.issue — [EN PROGRESO] (carril E1, worktree; rango `20260914170000`–`179999`; incluye revisión D2 pagos/fulfillment)
-### 13. Capability guards — [EN PROGRESO] (carril E2, worktree; rango `20260914180000`–`189999`)
+### 12. invoice.issue — [COMPLETADO · condicionado a proveedor fiscal] `36e0c72`, `2d108fc` (carril E1, integrado en `67fe978`)
+- Punto de ciclo de vida: comando explícito `public.invoice_request_issue(p_invoice_id)` (owner/admin + `invoicing`), no un trigger ni «pedido pagado»: cabecera y líneas se escriben en transacciones distintas y cuándo facturar depende del tenant. Exige comprobante `pending`, con líneas y totales cuadrados.
+- Reutiliza `integration_enqueue`/`integration_outbox` (reintentos, disyuntor, `integration_health`); sin segunda cola. Payload canónico v1 (`schema_version`, importes como texto); tenant en columnas del outbox, no en el cuerpo. Idempotencia `invoice.issue:<invoice_id>`.
+- Sin proveedor (o ambiguo): no falla; `pending_configuration` (`FACTURADOR_NO_CONFIGURADO`/`FACTURADOR_AMBIGUO`) + `invoice_events` + incidente `warning`; al configurar, pedir de nuevo encola y cierra el incidente.
+- UI: columna de estado de emisión y botón «Emitir» en Crédito → Comprobantes.
+- Migración `20260914170000_invoice_issue_producer.sql`. Tests: `invoice-issue.test.ts` 26, UI 2, api-gateway 2.
+- **Condición externa:** nadie consume `invoice.issue` todavía (falta adaptador `InvoicingProvider` con contrato y credenciales); los mensajes quedan `pending`.
+
+### 13. Capability guards — [COMPLETADO] `7d51dc4`, `5c95c07` (carril E2, integrado en `015bde3`)
+- Guard central `ebim.assert_capability` (sobre `company_is_entitled`, error `MODULO_NO_CONTRATADO`, después del rol: sin oráculo). Políticas con `has_capability`.
+- `catalog.advanced`: insert/update de las 11 tablas PIM. `payments`: `payment_methods` + `ebim.assert_payment_operator` (refund request/settle de operador, conciliación). `fulfillment`: tablas de configuración de entrega/devolución + `ebim.assert_fulfillment_operator` en create/assign/transition/shipment_open/track_note/return_* .
+- Abiertos a propósito (justificado en cabeceras): checkout, pasarela/transportista (hechos ya ocurridos), solicitud de devolución del comprador, lectura/borrado/desactivar.
+- **Compatibilidad:** `app_capabilities.legacy_until_synced` solo para estos tres: un tenant que el Hub nunca sincronizó los conserva; el primer `sync_platform_context` manda. Fin de la transición = un UPDATE.
+- Migraciones `20260914180000`–`180300`. Tests: `capability-guards.test.ts` 26; `SIN_CANDADO_DE_SERVIDOR` vacío; único cambio de fixture en `returns.test.ts` (tenant sincronizado → ahora recibe `ecommerce.fulfillment`).
+- **Riesgo de despliegue:** un tenant YA sincronizado sin estas capacidades las pierde al aplicar. Revisar `tenant_platform_context` en QAS/prod antes de `db push`.
+
+### D2. Pagos / Fulfillment (revisión) — [COMPLETADO · condicionado a PSP/transportista] `16d34ff`, `7497baf`, `e7da3ca`
+- **Corregido (alto) — `secret_ref` de webhooks salientes** (E1): un admin podía nombrar `SUPABASE_SERVICE_ROLE_KEY` u otro secreto del entorno. Ahora solo `EBIM_WH_<company hex>_<secret_ref>`. **Operación:** re-aprovisionar secretos de webhooks con ese nombre.
+- **Corregido (alto) — simulacro cobraba en cualquier entorno** (`7497baf`): `sandbox` y Culqi sin secreto devolvían `captured`. Ahora la pasarela solo deja cobrar a un adaptador `simulated` con `EBIM_PAYMENTS_ALLOW_SIMULATION=true`; si no, intento `failed` con `SIMULACION_NO_PERMITIDA` y `PAGO_NO_DISPONIBLE`. **Operación:** definirla en DEV/QAS/demo, nunca en producción.
+- **Corregido (alto) — cobro incompleto dejaba el pedido `paid`** (`e7da3ca`): se escribe el cobro, el pedido no pasa a pagado, nota + incidente `COBRO_INCOMPLETO`.
+- **Corregido (medio) — webhook tardío sobre intento terminal = 503 y reintento infinito**: se registra `payment.transition_ignored` y se contesta `replay` (solo orígenes de pasarela).
+- **Corregido (medio) — `shipment_open` sin la regla de no despachar sin cobro**: regla única `ebim.assert_dispatch_payment` para `fulfillment_transition` y `shipment_open`.
+- Verificado OK con evidencia (E1): HMAC sobre cuerpo crudo en tiempo constante y fail-closed; idempotencia por índices únicos de eventos/intentos; tenant desde la fila, nunca del aviso.
+- Pruebas: `payments` +4, `fulfillment` +3 (4 fallan sin la migración), `payments-provider` +3; 204/204 en las suites afectadas; `check:edge` verde.
+- **Abiertos (dependen de PSP/transportista reales o de decisión):** la compensación de un cobro capturado intenta anular en vez de devolver y la devolución de Culqi es simulada; `refunds.provider_reference` nunca se rellena y nadie consume `payment.refund`; el lote de seguimiento aplica solo el último estado (puede saltarse intermedios); ids de evento del transportista sandbox con `new Date()` (solo sandbox); sin comparación de moneda en el aviso de captura.
 
 ### 14. check:edge — [COMPLETADO] `ddc9423`
 - `npm run check:edge` → `scripts/check-edge.mjs`: `deno check` de **todos** los `.ts` de `supabase/functions` (67: entradas, `_runtime`, `_shared`; sin `*.test.ts`), con configuración propia `scripts/deno.check.json` (strict, `nodeModulesDir: none`) para no heredar el `tsconfig` del frontend ni cambiar el despliegue.
