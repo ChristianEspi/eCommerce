@@ -127,6 +127,42 @@ export async function lecturaLocalDeServicio(request: APIRequestContext, path: s
   return (await res.json()) as unknown[]
 }
 
+/**
+ * Escritura con la clave de SERVICIO, solo en una pila local (cierre ·
+ * certificación): preparar un estado que la pantalla no puede producir —una
+ * cuenta con el crédito bloqueado— y dejarlo como estaba al terminar. Misma
+ * guarda que la lectura: contra DEV/QAS esta puerta no existe.
+ */
+export async function escrituraLocalDeServicio(
+  request: APIRequestContext,
+  method: 'PATCH' | 'DELETE',
+  path: string,
+  data?: Record<string, unknown>,
+): Promise<void> {
+  const url = (process.env.E2E_SUPABASE_URL ?? '').replace(/\/$/, '')
+  const key = process.env.E2E_SERVICE_ROLE_KEY
+  if (!url || !key) throw new Error('Faltan E2E_SUPABASE_URL / E2E_SERVICE_ROLE_KEY (solo pila local)')
+  if (!['127.0.0.1', 'localhost', '::1'].includes(new URL(url).hostname)) {
+    throw new Error('escrituraLocalDeServicio solo corre contra una pila local')
+  }
+  const res = await request.fetch(`${url}${path}`, {
+    method,
+    headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    ...(data ? { data } : {}),
+  })
+  expect(res.ok(), `${method} ${path}: ${res.status()} ${await res.text()}`).toBe(true)
+}
+
+/**
+ * Vacía el carrito de SERVIDOR de un rol. Las pruebas comparten usuario y el
+ * carrito sobrevive entre ellas: sin esto, lo que una deja lo cobra la siguiente.
+ */
+export async function vaciarCarritoDe(request: APIRequestContext, rol: Rol): Promise<void> {
+  const { token } = await sesionApi(request, rol)
+  const sub = JSON.parse(Buffer.from(token.split('.')[1]!, 'base64url').toString('utf8')).sub as string
+  await escrituraLocalDeServicio(request, 'DELETE', `/rest/v1/carts?user_id=eq.${sub}&status=eq.active`)
+}
+
 /** Un importe tal como lo escribe la vitrina en es-PE, tolerante al separador. */
 export function importe(valor: number): RegExp {
   return new RegExp(valor.toFixed(2).replace('.', '[.,]'))
