@@ -26,6 +26,9 @@
  *  · **Qué se guarda del fallo.** Un código HTTP y una frase nuestra. NUNCA el
  *    cuerpo de la respuesta: lo escribe un tercero y acaba trayendo dentro
  *    datos de otros clientes suyos, y ese texto se pinta en el monitor.
+ *  · **En qué espacio se busca el secreto.** Solo en el de la sociedad del
+ *    mensaje (`webhookSecretEnvName`): el tenant nombra la variable, pero no
+ *    puede nombrar una de la plataforma ni de otra sociedad.
  *  · **Que un secreto ausente no se reintente en vano.** Si el endpoint no
  *    tiene resuelto su secreto, la entrega falla igual —el mensaje no puede
  *    salir sin firmar— pero se dice con un código propio, porque reintentarlo
@@ -64,8 +67,11 @@ export interface DispatcherPorts {
   claim(providerCode: string, worker: string, limit: number): Promise<OutboxMessage[]>
   /** El endpoint al que va este mensaje, o `null` si ya no existe. */
   resolveTarget(targetId: string): Promise<WebhookTarget | null>
-  /** Resuelve `secret_ref` contra el vault del despliegue. */
-  resolveSecret(secretRef: string): string | null
+  /**
+   * Resuelve un nombre de variable contra el vault del despliegue. Recibe el
+   * nombre YA encerrado por `webhookSecretEnvName`, nunca el `secret_ref` crudo.
+   */
+  resolveSecret(envName: string): string | null
   /** La llamada HTTP. Puerto para poder probar el ciclo sin red. */
   send(input: {
     url: string
@@ -99,6 +105,30 @@ export interface DispatchReport {
 export const WEBHOOK_PROVIDER_CODE = 'webhook'
 
 /**
+ * Nombre REAL de la variable del despliegue para el secreto de un endpoint.
+ *
+ * `webhook_endpoints.secret_ref` lo escribe el administrador del TENANT. Si se
+ * resolviera tal cual contra el entorno de la función, ese administrador podría
+ * apuntar a cualquier variable del despliegue —`SUPABASE_SERVICE_ROLE_KEY`,
+ * `EBIM_WORKER_KEY`, el secreto de webhook de una pasarela o el nombre que usa
+ * OTRA sociedad— y el trabajador firmaría con ella cuerpos que se entregan en
+ * la URL que ese mismo administrador eligió. Además, la diferencia entre
+ * «entregado» y `SECRETO_NO_CONFIGURADO` le diría qué variables existen.
+ *
+ * Por eso el nombre se ENCIERRA en el espacio de la sociedad dueña del mensaje:
+ * `EBIM_WH_<company_id en hex, mayúsculas>_<secret_ref>`. La sociedad sale de la
+ * fila del outbox —que escribe la base, no el tenant—, así que ningún
+ * `secret_ref` puede nombrar una variable fuera de su propio espacio. Devuelve
+ * `null` si algo no tiene la forma esperada: sin nombre no hay resolución.
+ */
+export function webhookSecretEnvName(companyId: string, secretRef: string): string | null {
+  const company = companyId.trim().toLowerCase()
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(company)) return null
+  if (!/^[A-Z][A-Z0-9_]{2,80}$/.test(secretRef)) return null
+  return `EBIM_WH_${company.replace(/-/g, '').toUpperCase()}_${secretRef}`
+}
+
+/**
  * Un 2xx es entrega. Todo lo demás no lo es, y da igual cuál: el receptor que
  * responde 302 a un webhook no lo procesó, y seguir la redirección sería
  * entregar datos firmados a una URL que nadie registró.
@@ -130,11 +160,12 @@ export async function dispatchWebhooks(
         continue
       }
 
-      const secret = ports.resolveSecret(target.secret_ref)
+      const envName = webhookSecretEnvName(message.company_id, target.secret_ref)
+      const secret = envName ? ports.resolveSecret(envName) : null
       if (!secret) {
         await ports.fail(
           message.id,
-          `SECRETO_NO_CONFIGURADO: falta ${target.secret_ref} en el despliegue`,
+          `SECRETO_NO_CONFIGURADO: falta ${envName ?? target.secret_ref} en el despliegue`,
           null,
         )
         failed += 1

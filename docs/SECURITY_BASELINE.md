@@ -532,6 +532,18 @@ Ni un secreto de integración vive en la base. `tenant_integrations.secret_ref` 
 `webhook_endpoints.secret_ref` guardan el **nombre de la variable** (`^[A-Z][A-Z0-9_]{2,80}$`); el
 valor lo resuelve el borde desde el vault de la plataforma.
 
+**Cierre · D2 — el nombre se resuelve en el espacio de la sociedad.** `webhook_endpoints.secret_ref`
+lo escribe el administrador del tenant; resuelto tal cual, podía nombrar cualquier variable del
+despliegue (`SUPABASE_SERVICE_ROLE_KEY`, `EBIM_WORKER_KEY`, el secreto de otra sociedad) y el
+trabajador firmaba con ella hacia la URL elegida por ese tenant. Desde este cierre el trabajador
+busca `EBIM_WH_<company_id hex en mayúsculas>_<secret_ref>`, con la sociedad tomada de la fila del
+outbox (`webhookSecretEnvName` en `supabase/functions/_shared/webhooks/dispatcher.ts`). Operación:
+los secretos de webhook se aprovisionan con ese nombre. Evidencia: `api-gateway.test.ts` «el secreto
+se busca SOLO en el espacio de la sociedad del mensaje» y «dos sociedades con el mismo secret_ref
+resuelven variables distintas». `tenant_integrations.secret_ref` no lo resuelve hoy ningún código
+(las pasarelas usan `EBIM_PAYMENT_WEBHOOK_SECRET_<CODE>` por conector): el día que se use, debe pasar
+por el mismo encierro.
+
 El secreto de un cliente de la API se guarda en **sha256**, se devuelve **una vez** y su hash no se
 puede leer **ni escribir** desde el backoffice: el GRANT es por columna en los dos sentidos. Y
 `api_authenticate` recibe el **hash** del token, no el token, para que el secreto de portador no

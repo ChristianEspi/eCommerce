@@ -101,8 +101,10 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
     // El secreto se resuelve por NOMBRE contra el entorno de la función. La
     // base guarda la referencia y nunca el valor: una tabla con secretos dentro
-    // es una filtración esperando a que alguien haga un select.
-    resolveSecret: (secretRef) => Deno.env.get(secretRef) ?? null,
+    // es una filtración esperando a que alguien haga un select. El nombre que
+    // llega ya viene encerrado en el espacio de la sociedad del mensaje
+    // (`webhookSecretEnvName`): nunca es un `secret_ref` crudo del tenant.
+    resolveSecret: (envName) => Deno.env.get(envName) ?? null,
 
     async send({ url, body, headers: sendHeaders, timeoutMs }) {
       const abort = new AbortController()
