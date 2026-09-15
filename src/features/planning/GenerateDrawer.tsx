@@ -1,17 +1,4 @@
-import {
-  Alert,
-  Box,
-  Button,
-  MenuItem,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  TextField,
-  Typography,
-} from '@mui/material'
+import { Alert, Box, Button, MenuItem, Stack, TextField, Typography } from '@mui/material'
 import { useEffect, useMemo, useState } from 'react'
 import { useCustomerOptions } from '@/features/customers/hooks'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -21,8 +8,15 @@ import { FormDrawer } from '@/shared/ui/FormDrawer'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import type { PlanningScope } from './api'
 import { PlanningError } from './errors'
-import { usePreviewSuggestion, useSaveSuggestion } from './hooks'
-import { SUGGEST_WINDOWS, type SuggestedLine } from './types'
+import { useProductLabels, usePreviewSuggestion, useSaveSuggestion } from './hooks'
+import { SuggestedLinesTable } from './SuggestedLinesTable'
+import {
+  SUGGEST_MODEL_V1,
+  SUGGEST_WINDOWS,
+  isSaveableLine,
+  modelOf,
+  type SuggestedLine,
+} from './types'
 
 /**
  * Generar un sugerido: dos pasos, y el segundo lo da una persona.
@@ -63,6 +57,18 @@ export function GenerateDrawer({
 
   const preview = usePreviewSuggestion()
   const save = useSaveSuggestion()
+
+  // Cierre · item 11: v2 explica cada línea y puede caer al modelo simple; la
+  // pantalla lo dice en vez de esconderlo, y no ofrece guardar lo que no hay.
+  const ids = useMemo(() => [...new Set((lineas ?? []).map((l) => l.product_id))], [lineas])
+  const productos = useProductLabels(ids)
+  const etiquetas = useMemo(
+    () => new Map((productos.data ?? []).map((p) => [p.id, p])),
+    [productos.data],
+  )
+  const guardables = (lineas ?? []).filter(isSaveableLine).length
+  const sinGuardar = (lineas ?? []).length - guardables
+  const esFallback = lineas !== null && lineas.length > 0 && modelOf(lineas) === SUGGEST_MODEL_V1
 
   const customers = useCustomerOptions({
     term: customerSearch,
@@ -127,7 +133,7 @@ export function GenerateDrawer({
               vista, no hay nada que guardar. */}
           <Button
             variant="contained"
-            disabled={!canWrite || lineas === null || lineas.length === 0 || save.isPending}
+            disabled={!canWrite || lineas === null || guardables === 0 || save.isPending}
             onClick={() => void guardar()}
           >
             {save.isPending ? t('common.saving') : t('planning.generate.save')}
@@ -197,27 +203,32 @@ export function GenerateDrawer({
               {t('planning.generate.proposalHint')}
             </Typography>
 
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell align="right">{t('planning.field.quantity')}</TableCell>
-                  <TableCell>{t('planning.field.reason')}</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {lineas.map((line) => (
-                  <TableRow key={`${line.product_id}-${line.variant_id ?? ''}`} hover>
-                    <TableCell align="right" sx={{ fontWeight: 800 }}>
-                      {line.suggested_quantity}
-                    </TableCell>
-                    {/* El motivo al lado de la cifra, no escondido: es lo que
-                        permite discutirla, y una cifra que no se discute no se
-                        corrige. */}
-                    <TableCell sx={{ color: 'var(--muted)' }}>{line.reason}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <Stack spacing={1} sx={{ mb: 1.5 }}>
+              {/* El modelo a la vista: sin él, la cifra no tiene procedencia. */}
+              <Typography sx={{ fontSize: 13 }}>
+                {t('planning.field.model')}:{' '}
+                <strong>
+                  {esFallback ? t('planning.v2.model.fallback') : t('planning.v2.model.seasonal')}
+                </strong>{' '}
+                <Box component="span" sx={{ color: 'var(--muted)' }}>
+                  ({modelOf(lineas)})
+                </Box>
+              </Typography>
+              {esFallback && <Alert severity="info">{t('planning.v2.fallbackNotice')}</Alert>}
+              {guardables === 0 && <Alert severity="warning">{t('planning.v2.nothingToSave')}</Alert>}
+              {guardables > 0 && sinGuardar > 0 && (
+                <Alert severity="warning">
+                  {t('planning.v2.skipped').replace('{n}', String(sinGuardar))}
+                </Alert>
+              )}
+            </Stack>
+
+            {/* El motivo al lado de la cifra, y debajo las piezas con que se
+                calculó: es lo que permite discutirla, y una cifra que no se
+                discute no se corrige. */}
+            <Box sx={{ overflowX: 'auto' }}>
+              <SuggestedLinesTable lines={lineas} labels={etiquetas} />
+            </Box>
           </Box>
         )}
       </Stack>

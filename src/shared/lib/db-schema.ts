@@ -82,6 +82,9 @@ export const DEMAND_FORECASTS_TABLE = 'demand_forecasts' satisfies TableName
 export const CUSTOMER_AGING_RPC = 'customer_aging'
 /** `ebim.suggest_order` — devuelve FILAS con su motivo; no crea nada. */
 export const SUGGEST_ORDER_RPC = 'suggest_order'
+// --- Cierre · item 11 · Sugerido v2 (20260914151000) ------------------------
+/** `ebim.suggest_order_v2` — historial en dos ventanas, temporada, surtido y ATP; cae a v1. */
+export const SUGGEST_ORDER_V2_RPC = 'suggest_order_v2'
 
 
 // --- IA medida (migración 20260910100000) ----------------------------------

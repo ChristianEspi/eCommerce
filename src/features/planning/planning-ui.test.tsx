@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '@/test/render'
@@ -53,8 +53,36 @@ beforeEach(() => {
   window.location.hash = ''
 })
 
-function backend(options: { entitlements?: string[] } = {}): FakeSupabase {
-  const { entitlements = PLANIFICACION } = options
+/** Una línea como la devuelve `suggest_order_v2` cuando SÍ tiene datos. */
+function lineaV2(extra: Record<string, unknown> = {}) {
+  return {
+    product_id: PRODUCTO,
+    variant_id: null,
+    suggested_quantity: 12,
+    last_period_quantity: 12,
+    on_hand_quantity: 40,
+    reason: 'Compro 12 en los ultimos 30 dias',
+    model_code: 'history_seasonal_v2',
+    inputs: {
+      model: 'history_seasonal_v2',
+      fallback: false,
+      windows: { recent_days: 30, long_days: 90 },
+      rates: { recent: 0.4, long: 0.4, base: 0.4 },
+      blend: { recent: 1, long: 0 },
+      seasonal: { applied: false, factor: 1, reason: 'menos_de_un_anio' },
+      demand: 12,
+      atp: { state: 'known', available: 40, source: 'catalog' },
+      capped: false,
+      shortage: false,
+    },
+    ...extra,
+  }
+}
+
+function backend(
+  options: { entitlements?: string[]; lineas?: Array<Record<string, unknown>> } = {},
+): FakeSupabase {
+  const { entitlements = PLANIFICACION, lineas = [lineaV2()] } = options
   return createFakeSupabase({
     session: makeSession(),
     tables: {
@@ -120,20 +148,16 @@ function backend(options: { entitlements?: string[] } = {}): FakeSupabase {
       ],
       order_suggestion_items: [],
       demand_forecasts: [],
+      products: [
+        { id: PRODUCTO, organization_id: ORG, company_id: COMPANY_A, store_id: STORE_A, name: 'Arroz Extra 5 kg', sku: 'ARZ-5' },
+      ],
     },
     rpc: {
       effective_capabilities: () => makePlatformContext({ entitlements, source: 'hub' }),
-      // `ebim.suggest_order` devuelve FILAS: no escribe nada, y el falso hace
-      // exactamente lo mismo.
-      suggest_order: () => [
-        {
-          product_id: PRODUCTO,
-          variant_id: null,
-          suggested_quantity: 12,
-          last_period_quantity: 12,
-          reason: 'Compro 12 en los ultimos 30 dias',
-        },
-      ],
+      // `suggest_order_v2` devuelve FILAS: no escribe nada, y el falso hace
+      // exactamente lo mismo. Desde el cierre (item 11) la pantalla llama a v2,
+      // que explica cada línea y cae él solo a `historic_v1`.
+      suggest_order_v2: () => lineas,
     },
   })
 }
@@ -235,6 +259,137 @@ describe('generar un sugerido', () => {
     await user.click(screen.getByRole('button', { name: 'Generar sugerido' }))
     await screen.findByText('Primero se ve, después se guarda.')
 
+    expect(screen.getByRole('button', { name: 'Guardar sugerido' })).toBeDisabled()
+  })
+})
+
+/**
+ * Sugerido v2 en pantalla (cierre · item 11).
+ *
+ *  · la línea enseña su producto, su motivo y las PIEZAS con que se calculó;
+ *  · lo que se guarda dice con qué modelo se calculó y cuánto había disponible
+ *    — antes toda sugerencia nacía `historic_v1` por el default de la columna;
+ *  · si el servidor cayó al modelo simple, la pantalla lo dice;
+ *  · una línea sin disponibilidad se ve, pero no se guarda.
+ */
+const OTRO_PRODUCTO = '55555555-5555-4555-5555-555555555522'
+
+async function calcularPara(user: ReturnType<typeof userEvent.setup>) {
+  await screen.findByText('Bodega Central')
+  await user.click(screen.getByRole('button', { name: 'Generar sugerido' }))
+  await screen.findByText('Primero se ve, después se guarda.')
+  await user.type(screen.getByRole('combobox', { name: /Cliente/ }), 'Bodega')
+  await user.click(await screen.findByRole('option', { name: /Bodega Central/ }))
+  await user.click(screen.getByRole('button', { name: 'Calcular' }))
+}
+
+describe('sugerido v2', () => {
+  it('enseña producto, motivo y cómo se calculó, y guarda modelo y disponible', async () => {
+    const user = userEvent.setup()
+    const fake = backend({
+      lineas: [
+        lineaV2({
+          suggested_quantity: 8,
+          on_hand_quantity: 8,
+          reason: 'Compró 12 en los últimos 30 días. Limitado a 8 disponibles',
+          inputs: {
+            ...lineaV2().inputs,
+            seasonal: { applied: true, factor: 1.5, reason: 'historial_anual' },
+            blend: { recent: 0.6, long: 0.4 },
+            capped: true,
+          },
+        }),
+      ],
+    })
+    pintar(fake)
+    await calcularPara(user)
+
+    expect(await screen.findByText('Compró 12 en los últimos 30 días. Limitado a 8 disponibles')).toBeInTheDocument()
+    expect(await screen.findByText('Arroz Extra 5 kg')).toBeInTheDocument()
+    expect(screen.getByText('Historial con temporada')).toBeInTheDocument()
+    const piezas = screen.getByRole('group', { name: 'Cómo se calculó' })
+    expect(within(piezas).getByText('Ritmo 0.4/día')).toBeInTheDocument()
+    expect(within(piezas).getByText('Mezcla 60 % reciente · 40 % 90 días')).toBeInTheDocument()
+    expect(within(piezas).getByText('Temporada ×1.5')).toBeInTheDocument()
+    expect(within(piezas).getByText('Recortado a lo disponible')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Guardar sugerido' }))
+
+    await vi.waitFor(() => expect(fake.state.tables.order_suggestions).toHaveLength(3))
+    const cabecera = fake.state.tables.order_suggestions?.at(-1)
+    expect(cabecera?.model_code).toBe('history_seasonal_v2')
+    const lineas = fake.state.tables.order_suggestion_items ?? []
+    expect(lineas).toHaveLength(1)
+    expect(lineas[0]).toMatchObject({ suggested_quantity: '8', on_hand_quantity: '8' })
+  })
+
+  it('si el servidor cayó al modelo simple, lo dice y lo guarda como historic_v1', async () => {
+    const user = userEvent.setup()
+    const fake = backend({
+      lineas: [
+        lineaV2({
+          model_code: 'historic_v1',
+          on_hand_quantity: null,
+          inputs: { model: 'historic_v1', fallback: true, fallback_reason: 'v2_sin_lineas' },
+        }),
+      ],
+    })
+    pintar(fake)
+    await calcularPara(user)
+
+    expect(
+      await screen.findByText(
+        'No había datos suficientes para el sugerido con temporada: se muestra el modelo simple, con las mismas reglas de publicación, surtido y canal.',
+      ),
+    ).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Guardar sugerido' }))
+    await vi.waitFor(() => expect(fake.state.tables.order_suggestions).toHaveLength(3))
+    expect(fake.state.tables.order_suggestions?.at(-1)?.model_code).toBe('historic_v1')
+  })
+
+  it('una línea sin disponibilidad se ve pero no se guarda', async () => {
+    const user = userEvent.setup()
+    const fake = backend({
+      lineas: [
+        lineaV2(),
+        lineaV2({
+          product_id: OTRO_PRODUCTO,
+          suggested_quantity: 0,
+          on_hand_quantity: 0,
+          reason: 'Compró 4 en los últimos 30 días. Sin disponibilidad ahora: no se propone cantidad',
+          inputs: { ...lineaV2().inputs, capped: true, shortage: true },
+        }),
+      ],
+    })
+    pintar(fake)
+    await calcularPara(user)
+
+    expect(await screen.findByText('Sin disponibilidad: no se guarda')).toBeInTheDocument()
+    expect(screen.getByText('1 líneas sin disponibilidad se muestran pero no se guardarán.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Guardar sugerido' }))
+    await vi.waitFor(() => expect(fake.state.tables.order_suggestion_items ?? []).toHaveLength(1))
+    expect(fake.state.tables.order_suggestion_items?.[0]?.product_id).toBe(PRODUCTO)
+  })
+
+  it('si ninguna línea tiene disponibilidad, no hay nada que guardar', async () => {
+    const user = userEvent.setup()
+    pintar(
+      backend({
+        lineas: [
+          lineaV2({
+            suggested_quantity: 0,
+            inputs: { ...lineaV2().inputs, capped: true, shortage: true },
+          }),
+        ],
+      }),
+    )
+    await calcularPara(user)
+
+    expect(
+      await screen.findByText('Ninguna línea tiene disponibilidad ahora: no hay nada que guardar.'),
+    ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Guardar sugerido' })).toBeDisabled()
   })
 })
