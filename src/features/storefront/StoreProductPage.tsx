@@ -32,6 +32,7 @@ import { ProductGallery } from './components/ProductGallery'
 import { ProductGrid } from './components/ProductGrid'
 import { QuantityStepper } from './components/QuantityStepper'
 import { useRelatedSections } from './relations'
+import { ProductReviews } from './reviews/ProductReviews'
 import {
   useGallery,
   usePublicProduct,
@@ -472,6 +473,10 @@ export function StoreProductPage() {
           {item.description?.trim() || t('store.product.noDescription')}
         </Typography>
       </Card>
+
+      {/* Opiniones (cierre): solo lo moderado, más la reseña propia con su
+          estado. Ver `reviews/ProductReviews.tsx`. */}
+      <ProductReviews storeSlug={storeSlug} productId={item.product_id} />
 
       {/* Primero lo que completa la compra —es lo que suma al carrito que ya se
           está decidiendo—, después la mejora y al final lo parecido. */}
