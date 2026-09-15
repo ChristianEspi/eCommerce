@@ -1,5 +1,5 @@
 import { test, expect, TIENDA, esperarCatalogo } from '../consola'
-import { CLAVES_PROHIBIDAS, comprar, entrar, pedidoDe, todasLasClaves } from './support'
+import { CLAVES_PROHIBIDAS, comprar, entrar, irATuCuenta, pedidoDe, todasLasClaves } from './support'
 
 /**
  * H09 · B2C Consumer, de la portada a su historial.
@@ -82,7 +82,7 @@ test.describe('B2C · consumidor registrado', () => {
     const pedido = await pedidoDe(respuesta)
     await expect(page).toHaveURL(/\/order\//, { timeout: 20_000 })
 
-    await page.getByRole('link', { name: 'Tu cuenta' }).click()
+    await irATuCuenta(page)
     await expect(page.getByRole('heading', { level: 1, name: 'Mi cuenta' })).toBeVisible({ timeout: 20_000 })
     await expect(page.getByText(/^Hola/)).toBeVisible()
     for (const pestana of ['Mis pedidos', 'Mis favoritos', 'Mis datos', 'Mis direcciones']) {

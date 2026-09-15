@@ -178,7 +178,17 @@ export async function entrar(page: Page, rol: Rol) {
   await page.locator('#login-password').fill(password)
   await page.getByRole('button', { name: 'Entrar' }).click()
   await expect(page).toHaveURL(new RegExp(`${TIENDA}$`), { timeout: 20_000 })
-  await expect(page.getByRole('link', { name: 'Tu cuenta' })).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByRole('button', { name: 'Tu cuenta' })).toBeVisible({ timeout: 20_000 })
+}
+
+/**
+ * «Tu cuenta» es un MENÚ desde que «Salir» vive dentro (la barra estaba
+ * cargada): se abre y se elige «Mi cuenta», como lo haría una persona.
+ */
+export async function irATuCuenta(page: Page) {
+  await page.getByRole('button', { name: 'Tu cuenta' }).click()
+  await page.getByRole('menuitem', { name: 'Mi cuenta' }).click()
+  await expect(page).toHaveURL(/\/account/, { timeout: 20_000 })
 }
 
 /** Añade `cantidad` unidades desde la ficha y espera a que la cabecera las cuente. */

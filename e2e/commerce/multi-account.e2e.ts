@@ -4,6 +4,7 @@ import {
   anadirDesdeFicha,
   comprar,
   entrar,
+  irATuCuenta,
   importe,
   pedidoDe,
   sesionApi,
@@ -77,7 +78,7 @@ test.describe('Multi-cuenta · Comprando para', () => {
     await expect(page).toHaveURL(/\/order\//, { timeout: 20_000 })
 
     // El portal: el pedido está, y dice que es de B.
-    await page.getByRole('link', { name: 'Tu cuenta' }).click()
+    await irATuCuenta(page)
     await page.getByRole('tab', { name: 'Mis pedidos' }).click()
     const fila = page.getByRole('button', { name: new RegExp(pedido.order_number) })
     await expect(fila).toBeVisible({ timeout: 20_000 })

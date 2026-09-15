@@ -4,6 +4,7 @@ import {
   anadirDesdeFicha,
   comprar,
   entrar,
+  irATuCuenta,
   pedidoDe,
   precioPublico,
   productoDe,
@@ -57,7 +58,7 @@ test.describe('Enterprise · comprador corporativo', () => {
     await expect(page.getByText(ordenDeCompra).first()).toBeVisible()
 
     // El portal de la empresa, intacto: el pedido está en SUS pedidos.
-    await page.getByRole('link', { name: 'Tu cuenta' }).click()
+    await irATuCuenta(page)
     await expect(page.getByRole('tab', { name: 'Estado de cuenta' })).toBeVisible({ timeout: 20_000 })
     await page.getByRole('tab', { name: 'Mis pedidos' }).click()
     const fila = page.getByRole('button', { name: new RegExp(pedido.order_number) })

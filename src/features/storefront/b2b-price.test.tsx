@@ -243,35 +243,51 @@ describe('la vitrina deja entrar', () => {
     expect(entrar).toHaveAttribute('href', '/login')
     // Y no la puerta del backoffice: quien entra desde una ficha quiere ESA
     // ficha con su precio.
-    expect(screen.queryByRole('link', { name: 'Tu cuenta' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Tu cuenta' })).not.toBeInTheDocument()
   })
 
-  it('con sesion, la misma casilla lleva a su cuenta y no ofrece entrar', async () => {
+  it('con sesion, la misma casilla es «Tu cuenta» (un menu) y no ofrece entrar', async () => {
     const sesion = makeSession()
     render(backend({ session: sesion }), '/s/casa-nordica/product/silla-roble', sesion)
 
-    expect(await screen.findByRole('link', { name: 'Tu cuenta' })).toBeInTheDocument()
+    const cuenta = await screen.findByRole('button', { name: 'Tu cuenta' })
+    expect(cuenta).toHaveAttribute('aria-haspopup', 'menu')
+    expect(cuenta).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByRole('link', { name: 'Entrar' })).not.toBeInTheDocument()
-  })
-
-  it('sin sesion no hay «Salir»', async () => {
-    render(backend(), '/s/casa-nordica/product/silla-roble')
-    await screen.findByRole('link', { name: 'Entrar' })
+    // La barra ya no lleva «Salir» suelto: vive dentro del menu.
     expect(screen.queryByRole('button', { name: 'Salir' })).not.toBeInTheDocument()
   })
 
-  it('con sesion, «Salir» cierra la sesion y deja al comprador en la tienda, sin entrar al backoffice', async () => {
+  it('el menu dice con quien entraste y lleva a tu cuenta y a tus pedidos', async () => {
+    const user = userEvent.setup()
+    const sesion = makeSession()
+    render(backend({ session: sesion }), '/s/casa-nordica/product/silla-roble', sesion)
+
+    await user.click(await screen.findByRole('button', { name: 'Tu cuenta' }))
+    const menu = await screen.findByRole('menu')
+    expect(within(menu).getByText(String(sesion.user.email))).toBeInTheDocument()
+    expect(within(menu).getByRole('menuitem', { name: 'Mi cuenta' })).toHaveAttribute('href', '/s/casa-nordica/account')
+    expect(within(menu).getByRole('menuitem', { name: 'Mis pedidos' })).toHaveAttribute(
+      'href',
+      '/s/casa-nordica/account#pedidos',
+    )
+    // Con el menu abierto MUI deja el resto de la pagina `aria-hidden` (es modal):
+    // el disparador se busca incluyendo lo oculto.
+    expect(screen.getByRole('button', { name: 'Tu cuenta', hidden: true })).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('«Salir» del menu cierra la sesion y deja al comprador en la tienda', async () => {
     const user = userEvent.setup()
     const sesion = makeSession()
     const fake = backend({ session: sesion })
     render(fake, '/s/casa-nordica/product/silla-roble', sesion)
 
-    await user.click(await screen.findByRole('button', { name: 'Salir' }))
+    await user.click(await screen.findByRole('button', { name: 'Tu cuenta' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Salir' }))
 
     // Vuelve a ofrecer «Entrar»: la sesión se cerró de verdad.
     expect(await screen.findByRole('link', { name: 'Entrar' })).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Tu cuenta' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Salir' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Tu cuenta' })).not.toBeInTheDocument()
     expect(fake.state.session).toBeNull()
   })
 })

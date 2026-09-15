@@ -1,17 +1,22 @@
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded'
 import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded'
 import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded'
+import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded'
 import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded'
 import LoginRoundedIcon from '@mui/icons-material/LoginRounded'
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded'
 import PersonRoundedIcon from '@mui/icons-material/PersonRounded'
+import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import ShoppingCartRoundedIcon from '@mui/icons-material/ShoppingCartRounded'
 import {
   Badge,
   Box,
   Button,
   Container,
+  Divider,
   Fab,
+  Menu,
+  MenuItem,
   Toolbar,
   Typography,
   useMediaQuery,
@@ -26,7 +31,7 @@ import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
 import { SkipToContentLink, CONTENT_ANCHOR } from '@/shared/ui/SkipToContentLink'
 import { AppearanceProvider } from '@/theme/AppearanceProvider'
 import { useAppearance } from '@/theme/appearance-context'
-import { R, TS } from '@/theme/tokens'
+import { R, SH, TS } from '@/theme/tokens'
 import { StorefrontNotFoundError } from './api'
 import { notFoundMeta } from './seo'
 import { initials } from './branding'
@@ -437,7 +442,6 @@ function StoreHeader({ store, storeSlug }: { store: PublicStore; storeSlug: stri
           <ThemeButton />
           <FavoritesButton storeSlug={storeSlug} storeId={store.store_id} />
           <AccountButton storeSlug={storeSlug} />
-          <SignOutButton storeSlug={storeSlug} />
           <CartButton />
         </Toolbar>
 
@@ -578,6 +582,8 @@ function HeaderAction({
   state,
   onClick,
   iconOnly = false,
+  trailing,
+  menu,
 }: {
   icon: ReactNode
   label: string
@@ -587,15 +593,22 @@ function HeaderAction({
   to?: string
   /** Estado de navegación del enlace, para volver a donde se estaba. */
   state?: unknown
-  onClick?: () => void
+  onClick?: (event: React.MouseEvent<HTMLElement>) => void
   /** Sin texto ni en escritorio: para lo que es utilidad y no destino. */
   iconOnly?: boolean
+  /** Detrás del texto, solo en escritorio (la flecha de un menú). */
+  trailing?: ReactNode
+  /** Cuando el botón abre un menú: para que el lector de pantalla lo anuncie. */
+  menu?: { id: string; open: boolean }
 }) {
   const { bg, fg } = ACTION_TONES[tone]
 
   return (
     <Button
       {...(to ? { component: Link, to, state } : { onClick })}
+      {...(menu
+        ? { 'aria-haspopup': 'menu' as const, 'aria-expanded': menu.open, 'aria-controls': menu.open ? menu.id : undefined }
+        : {})}
       aria-label={badge > 0 ? `${label} (${badge})` : label}
       sx={{
         flexShrink: 0,
@@ -648,6 +661,15 @@ function HeaderAction({
       {!iconOnly && (
         <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
           {label}
+        </Box>
+      )}
+      {trailing && (
+        <Box
+          component="span"
+          aria-hidden
+          sx={{ display: { xs: 'none', sm: 'inline-flex' }, ml: -0.5, color: 'var(--muted)', '& .MuiSvgIcon-root': { fontSize: 18 } }}
+        >
+          {trailing}
         </Box>
       )}
     </Button>
@@ -727,16 +749,7 @@ function AccountButton({ storeSlug }: { storeSlug: string }) {
   const { status } = useSessionContext()
   const location = useLocation()
 
-  if (status === 'authenticated') {
-    return (
-      <HeaderAction
-        to={`/s/${storeSlug}/account`}
-        icon={<PersonRoundedIcon />}
-        label={t('account.title')}
-        tone="account"
-      />
-    )
-  }
+  if (status === 'authenticated') return <AccountMenu storeSlug={storeSlug} />
 
   // Mientras se resuelve la sesión no se pinta ninguno de los dos: enseñar
   // «Entrar» a quien ya tiene sesión, aunque sea medio segundo, es decirle que
@@ -755,27 +768,112 @@ function AccountButton({ storeSlug }: { storeSlug: string }) {
 }
 
 /**
- * Salir de la sesión sin salir de la tienda.
- *
- * Solo existía en el backoffice: un comprador que entraba en la vitrina no tenía
- * por dónde cerrar su sesión, y en un equipo compartido eso deja su cuenta de
- * empresa, su precio de convenio y sus pedidos abiertos al siguiente.
- *
- * Vuelve a la PORTADA de la tienda y no a donde estaba: la página actual puede
- * ser «Tu cuenta», un pedido o el checkout, que sin sesión ya no tienen nada que
- * enseñar. Neutro, igual que el tema: no es un destino que venda.
+ * Una opción del menú de cuenta: icono en su círculo de color —el mismo
+ * lenguaje que las pastillas de la barra—, título y una línea que dice qué hay
+ * detrás. El nombre accesible es solo el título: la ayuda no se lee dos veces.
  */
-function SignOutButton({ storeSlug }: { storeSlug: string }) {
-  const { t } = useI18n()
-  const { status, signOut } = useSessionContext()
-  const navigate = useNavigate()
-  const [saliendo, setSaliendo] = useState(false)
+function AccountMenuItem({
+  icon,
+  tone,
+  title,
+  hint,
+  to,
+  onClick,
+  disabled = false,
+  danger = false,
+}: {
+  icon: ReactNode
+  tone: { bg: string; fg: string }
+  title: string
+  hint: string
+  to?: string
+  onClick: () => void
+  disabled?: boolean
+  danger?: boolean
+}) {
+  return (
+    <MenuItem
+      {...(to ? { component: Link, to } : {})}
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={title}
+      sx={{
+        gap: 1.5,
+        px: 1.25,
+        py: 1,
+        borderRadius: 'var(--sf-radius-sm, 10px)',
+        alignItems: 'center',
+        whiteSpace: 'normal',
+        '&:hover, &.Mui-focusVisible': { bgcolor: danger ? 'var(--red-soft)' : 'var(--sf-media-bg)' },
+      }}
+    >
+      <Box
+        aria-hidden
+        sx={{
+          width: 36,
+          height: 36,
+          flexShrink: 0,
+          borderRadius: 'var(--sf-pill)',
+          display: 'grid',
+          placeItems: 'center',
+          bgcolor: tone.bg,
+          color: tone.fg,
+          '& .MuiSvgIcon-root': { fontSize: 19 },
+        }}
+      >
+        {icon}
+      </Box>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography sx={{ fontSize: TS.body, fontWeight: 700, color: danger ? 'var(--red)' : 'var(--text)' }}>
+          {title}
+        </Typography>
+        <Typography aria-hidden sx={{ fontSize: TS.label, color: 'var(--muted)', lineHeight: 1.35 }}>
+          {hint}
+        </Typography>
+      </Box>
+    </MenuItem>
+  )
+}
 
-  if (status !== 'authenticated') return null
+/**
+ * «Tu cuenta» abre un menú: quién eres, a dónde ir y salir.
+ *
+ * La barra llegó a tener cuatro pastillas —tema, Tu cuenta, Salir, Carrito— y
+ * dos de ellas eran la MISMA cosa: tu sesión. Juntas en un menú la cabecera
+ * vuelve a sus tres trabajos (buscar, lo tuyo, el carrito) y «Salir» sigue a un
+ * clic, donde se busca: en tu cuenta.
+ *
+ * Salir vuelve a la PORTADA de la tienda y no a donde estaba: la página actual
+ * puede ser tu cuenta, un pedido o el checkout, que sin sesión ya no tienen nada
+ * que enseñar. Un equipo compartido no puede quedarse con la cuenta de empresa,
+ * el precio de convenio y los pedidos del anterior abiertos.
+ */
+function AccountMenu({ storeSlug }: { storeSlug: string }) {
+  const { t } = useI18n()
+  const { session, signOut } = useSessionContext()
+  const navigate = useNavigate()
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null)
+  const [saliendo, setSaliendo] = useState(false)
+  const open = anchor !== null
+  const menuId = 'store-account-menu'
+  const email = session?.user?.email ?? null
+  // El nombre, si Auth lo tiene (alta desde la tienda lo guarda); si no, la
+  // parte del correo antes de la arroba. Nunca «?» en un avatar de alguien que
+  // sí tiene sesión.
+  const metadata = (session?.user?.user_metadata ?? {}) as Record<string, unknown>
+  const nombre =
+    (typeof metadata.full_name === 'string' && metadata.full_name.trim()) ||
+    (typeof metadata.name === 'string' && metadata.name.trim()) ||
+    null
+  const primerNombre = nombre ? nombre.split(/\s+/)[0] : null
+  const avatar = initials(nombre ?? (email ? email.split('@')[0]!.replace(/[._-]+/g, ' ') : ''))
+
+  const cerrar = () => setAnchor(null)
 
   async function salir() {
     if (saliendo) return
     setSaliendo(true)
+    cerrar()
     try {
       await signOut()
     } finally {
@@ -785,12 +883,122 @@ function SignOutButton({ storeSlug }: { storeSlug: string }) {
   }
 
   return (
-    <HeaderAction
-      onClick={() => void salir()}
-      icon={<LogoutRoundedIcon />}
-      label={t('store.signOut')}
-      tone="neutral"
-    />
+    <>
+      <HeaderAction
+        onClick={(event) => setAnchor(event.currentTarget)}
+        icon={<PersonRoundedIcon />}
+        label={t('account.title')}
+        tone="account"
+        trailing={
+          <KeyboardArrowDownRoundedIcon
+            sx={{ transition: 'transform 160ms ease', transform: open ? 'rotate(180deg)' : 'none' }}
+          />
+        }
+        menu={{ id: menuId, open }}
+      />
+      <Menu
+        id={menuId}
+        anchorEl={anchor}
+        open={open}
+        onClose={cerrar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        slotProps={{
+          paper: {
+            sx: {
+              mt: 1,
+              width: 300,
+              maxWidth: 'calc(100vw - 32px)',
+              borderRadius: 'var(--sf-radius, 14px)',
+              border: '1px solid var(--border)',
+              boxShadow: SH.lg,
+              bgcolor: 'var(--card)',
+              overflow: 'hidden',
+            },
+          },
+          list: { sx: { p: 0.75 } },
+        }}
+      >
+        {email && (
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              px: 1.25,
+              pt: 1,
+              pb: 1.5,
+              mb: 0.5,
+              borderBottom: '1px solid var(--border)',
+            }}
+          >
+            <Box
+              aria-hidden
+              sx={{
+                width: 44,
+                height: 44,
+                flexShrink: 0,
+                borderRadius: 'var(--sf-pill)',
+                display: 'grid',
+                placeItems: 'center',
+                fontWeight: 800,
+                fontSize: TS.bodyStrong,
+                letterSpacing: '0.02em',
+                bgcolor: 'var(--blue-soft)',
+                color: 'var(--blue)',
+              }}
+            >
+              {avatar}
+            </Box>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ fontSize: TS.bodyStrong, fontWeight: 800, color: 'var(--text)' }}>
+                {primerNombre
+                  ? t('store.accountMenu.greeting').replace('{name}', primerNombre)
+                  : t('store.accountMenu.signedInAs')}
+              </Typography>
+              <Typography
+                title={email}
+                sx={{
+                  fontSize: TS.label,
+                  color: 'var(--muted)',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {email}
+              </Typography>
+            </Box>
+          </Box>
+        )}
+        <AccountMenuItem
+          to={`/s/${storeSlug}/account`}
+          onClick={cerrar}
+          icon={<PersonRoundedIcon />}
+          tone={ACTION_TONES.account}
+          title={t('store.accountMenu.account')}
+          hint={t('store.accountMenu.accountHint')}
+        />
+        <AccountMenuItem
+          to={`/s/${storeSlug}/account#pedidos`}
+          onClick={cerrar}
+          icon={<ReceiptLongRoundedIcon />}
+          tone={ACTION_TONES.cart}
+          title={t('account.tab.orders')}
+          hint={t('store.accountMenu.ordersHint')}
+        />
+        <Divider sx={{ my: 0.5, borderColor: 'var(--border)' }} />
+        <AccountMenuItem
+          onClick={() => void salir()}
+          disabled={saliendo}
+          icon={<LogoutRoundedIcon />}
+          tone={ACTION_TONES.favorite}
+          title={t('store.signOut')}
+          hint={t('store.accountMenu.signOutHint')}
+          danger
+        />
+      </Menu>
+    </>
   )
 }
 

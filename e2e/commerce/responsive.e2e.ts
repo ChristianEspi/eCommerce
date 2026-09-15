@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import { test, expect, TIENDA } from '../consola'
-import { entrar } from './support'
+import { entrar, irATuCuenta } from './support'
 
 /**
  * H12 · Las pantallas nuevas a 1440, 1024 y 390 px.
@@ -23,7 +23,7 @@ for (const ancho of ANCHOS) {
 
     test('consumidor: Mi cuenta sin desbordar, un h1 y todas las pestañas alcanzables', async ({ page }) => {
       await entrar(page, 'CONSUMER')
-      await page.getByRole('link', { name: 'Tu cuenta' }).click()
+      await irATuCuenta(page)
       await expect(page.getByRole('heading', { level: 1, name: 'Mi cuenta' })).toBeVisible({ timeout: 20_000 })
 
       expect(await desbordamiento(page)).toBeLessThanOrEqual(1)

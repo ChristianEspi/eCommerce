@@ -1,5 +1,5 @@
 import { test, expect, TIENDA } from '../consola'
-import { comprar, lecturaLocalDeServicio, pedidoDe } from './support'
+import { comprar, irATuCuenta, lecturaLocalDeServicio, pedidoDe } from './support'
 
 /**
  * N02 · Una persona que llega a la tienda y se crea una cuenta.
@@ -39,7 +39,7 @@ test.describe('B2C · registro de consumidor', () => {
 
     // Vuelve a la tienda de la que vino, con sesión, y nunca al backoffice.
     await expect(page).toHaveURL(new RegExp(`${TIENDA}$`), { timeout: 20_000 })
-    await page.getByRole('link', { name: 'Tu cuenta' }).click()
+    await irATuCuenta(page)
     await expect(page.getByRole('heading', { level: 1, name: 'Mi cuenta' })).toBeVisible({ timeout: 20_000 })
     await expect(page.getByText('Hola, Carla')).toBeVisible()
     await expect(page.getByRole('tab', { name: 'Estado de cuenta' })).toHaveCount(0)
@@ -81,7 +81,7 @@ test.describe('B2C · registro de consumidor', () => {
     await expect(page.getByRole('button', { name: /carrito \(\d+\)/i })).toBeVisible({ timeout: 20_000 })
     await pedidoDe((await comprar(page)).respuesta)
     await expect(page).toHaveURL(/\/order\//, { timeout: 20_000 })
-    await page.getByRole('link', { name: 'Tu cuenta' }).click()
+    await irATuCuenta(page)
     await page.getByRole('tab', { name: 'Mis direcciones' }).click()
     await expect(page.getByText('Usadas en tus pedidos')).toBeVisible({ timeout: 20_000 })
     await expect(page.getByText('Av. Arequipa 100').first()).toBeVisible()
@@ -130,7 +130,7 @@ test.describe('B2C · registro de consumidor', () => {
     await expect(page).toHaveURL(/\/order\//, { timeout: 20_000 })
 
     // Mis pedidos: el pedido. Mis direcciones: la libreta intacta, sin duplicar la usada.
-    await page.getByRole('link', { name: 'Tu cuenta' }).click()
+    await irATuCuenta(page)
     await expect(page.getByRole('button', { name: new RegExp(pedido.order_number) })).toBeVisible({ timeout: 20_000 })
     await page.getByRole('tab', { name: 'Mis direcciones' }).click()
     await expect(page.getByRole('heading', { name: 'Casa' })).toBeVisible()
