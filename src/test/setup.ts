@@ -1,5 +1,16 @@
 import '@testing-library/jest-dom/vitest'
 import { configure } from '@testing-library/dom'
+import { registerBackofficeMessages } from '@/shared/i18n/messages'
+import { esBackoffice } from '@/shared/i18n/messages.es.backoffice'
+
+/**
+ * El español del backoffice, ya cargado (cierre · certificación).
+ *
+ * En la aplicación lo trae la ruta `/app` antes de pintar. Las pruebas montan
+ * las pantallas sin pasar por esa ruta, así que aquí se registra de entrada:
+ * es el estado en el que cualquier pantalla del backoffice se pinta de verdad.
+ */
+registerBackofficeMessages(esBackoffice)
 
 /**
  * Margen de espera de los `findBy*`.

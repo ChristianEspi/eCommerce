@@ -3,6 +3,7 @@ import { createBrowserRouter, type RouteObject } from 'react-router-dom'
 import type { CapabilityId } from '@/domain'
 import { ProtectedArea } from '@/features/auth/ProtectedArea'
 import { CapabilityGate } from '@/features/capabilities/CapabilityGate'
+import { loadBackofficeMessages } from '@/shared/i18n/messages'
 import { LoadingState } from '@/shared/ui/states'
 import { lazyPage } from './lazyPage'
 import { NotFoundPage } from './NotFoundPage'
@@ -23,11 +24,21 @@ const ForgotPasswordPage = lazyPage(() =>
 const ResetPasswordPage = lazyPage(() =>
   import('@/features/auth/ResetPasswordPage').then((m) => ({ default: m.ResetPasswordPage })),
 )
+/**
+ * Las dos puertas del backoffice esperan a su parte del diccionario
+ * (`loadBackofficeMessages`, cierre · certificación): la vitrina ya no la
+ * descarga, y una pantalla de `/app` no puede pintar antes de tener sus textos.
+ * Todas las páginas de `/app` cuelgan de `AdminLayout`, así que basta con él.
+ */
 const OnboardingPage = lazyPage(() =>
-  import('@/features/onboarding/OnboardingPage').then((m) => ({ default: m.OnboardingPage })),
+  Promise.all([import('@/features/onboarding/OnboardingPage'), loadBackofficeMessages()]).then(([m]) => ({
+    default: m.OnboardingPage,
+  })),
 )
 const AdminLayout = lazyPage(() =>
-  import('@/features/admin/AdminLayout').then((m) => ({ default: m.AdminLayout })),
+  Promise.all([import('@/features/admin/AdminLayout'), loadBackofficeMessages()]).then(([m]) => ({
+    default: m.AdminLayout,
+  })),
 )
 const DashboardPage = lazyPage(() =>
   import('@/features/admin/DashboardPage').then((m) => ({ default: m.DashboardPage })),

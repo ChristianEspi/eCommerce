@@ -14,7 +14,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAgreementPrice } from '@/features/pricing/useAgreementPrice'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -32,7 +32,16 @@ import { ProductGallery } from './components/ProductGallery'
 import { ProductGrid } from './components/ProductGrid'
 import { QuantityStepper } from './components/QuantityStepper'
 import { useRelatedSections } from './relations'
-import { ProductReviews } from './reviews/ProductReviews'
+
+/**
+ * Las opiniones van por `lazy`: están debajo del pliegue y traen el formulario
+ * (`Rating`, `LinearProgress`…), que ya no cabía en el techo de la ficha
+ * (`docs/performance-budget.md`). El primer pintado —foto, precio, comprar— no
+ * espera por ellas.
+ */
+const ProductReviews = lazy(() =>
+  import('./reviews/ProductReviews').then((module) => ({ default: module.ProductReviews })),
+)
 import {
   useGallery,
   usePublicProduct,
@@ -476,7 +485,9 @@ export function StoreProductPage() {
 
       {/* Opiniones (cierre): solo lo moderado, más la reseña propia con su
           estado. Ver `reviews/ProductReviews.tsx`. */}
-      <ProductReviews storeSlug={storeSlug} productId={item.product_id} />
+      <Suspense fallback={null}>
+        <ProductReviews storeSlug={storeSlug} productId={item.product_id} />
+      </Suspense>
 
       {/* Primero lo que completa la compra —es lo que suma al carrito que ya se
           está decidiendo—, después la mejora y al final lo parecido. */}

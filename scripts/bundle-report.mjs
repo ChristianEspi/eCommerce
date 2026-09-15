@@ -58,7 +58,13 @@ const JOURNEYS = [
   {
     name: 'backoffice · panel',
     entry: 'index.html',
-    routes: ['src/features/admin/AdminLayout.tsx', 'src/features/admin/DashboardPage.tsx'],
+    // El diccionario del backoffice llega por import() al entrar en /app, pero
+    // se descarga SIEMPRE antes de pintar: cuenta para este recorrido.
+    routes: [
+      'src/features/admin/AdminLayout.tsx',
+      'src/features/admin/DashboardPage.tsx',
+      'src/shared/i18n/messages.es.backoffice.ts',
+    ],
     budgetKb: 430,
   },
 ]

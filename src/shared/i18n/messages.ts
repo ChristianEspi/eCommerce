@@ -1,4 +1,5 @@
-import { es } from './messages.es'
+import { es as esCore } from './messages.es'
+import type { esBackoffice } from './messages.es.backoffice'
 
 /**
  * Registro de diccionarios de la suite (P15-SaaS).
@@ -26,13 +27,41 @@ import { es } from './messages.es'
 
 export const LOCALES = ['es', 'en'] as const
 export type Locale = (typeof LOCALES)[number]
-export type MessageKey = keyof typeof es
+export type MessageKey = keyof typeof esCore | keyof typeof esBackoffice
 export type Dictionary = Readonly<Record<MessageKey, string>>
 
 /** El idioma que viaja SIEMPRE en el bundle y del que cuelga el fallback. */
 export const DEFAULT_LOCALE: Locale = 'es'
 
-export { es }
+/**
+ * El español que está en memoria. Nace con la parte de la VITRINA y gana la del
+ * backoffice cuando `loadBackofficeMessages` la trae (cierre · certificación).
+ *
+ * Es UN objeto y se completa en el sitio a propósito: `translate`, el proveedor
+ * y su fallback leen `es`, y así ninguno necesita saber que llegó en dos partes.
+ * El tipo dice el diccionario entero porque, cuando una pantalla del backoffice
+ * pinta, su parte ya está: la ruta la espera antes de renderizar.
+ */
+export const es = { ...esCore } as Record<string, string> as Dictionary
+
+let backoffice: Promise<void> | null = null
+
+/** Añade la parte del backoffice. Idempotente y síncrona para quien ya la tiene. */
+export function registerBackofficeMessages(messages: Readonly<Record<string, string>>): void {
+  Object.assign(es as Record<string, string>, messages)
+}
+
+/**
+ * Trae la parte del backoffice (`messages.es.backoffice.ts`) y la mezcla en `es`.
+ * La piden las rutas `/app` y `/onboarding` ANTES de pintar. Llamarla dos veces
+ * no pide dos veces.
+ */
+export function loadBackofficeMessages(): Promise<void> {
+  backoffice ??= import('./messages.es.backoffice').then((module) =>
+    registerBackofficeMessages(module.esBackoffice),
+  )
+  return backoffice
+}
 
 /**
  * Cargadores de los idiomas que NO son el de por defecto. Añadir uno es añadir

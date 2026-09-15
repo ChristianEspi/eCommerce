@@ -1,6 +1,10 @@
 import { en } from './messages.en'
-import { es } from './messages.es'
+import { es as esCore } from './messages.es'
+import { esBackoffice } from './messages.es.backoffice'
 import type { Dictionary, Locale } from './messages'
+
+/** El español ENTERO: vitrina + backoffice, como lo ve una pantalla ya cargada. */
+const es: Dictionary = { ...esCore, ...esBackoffice }
 
 /**
  * Los dos diccionarios juntos, para los TESTS de paridad.
