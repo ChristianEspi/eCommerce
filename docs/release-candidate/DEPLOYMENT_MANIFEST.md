@@ -24,8 +24,8 @@
   `tenant_platform_context` y comprobar que sus `tenant_entitlements` incluyen `ecommerce.payments`,
   `ecommerce.fulfillment` y `ecommerce.catalog.advanced` si usan esos módulos. Un tenant sincronizado sin ellos
   **pierde** esos módulos al aplicar; uno nunca sincronizado los conserva.
-- [ ] **Postgres 15 en DEV/QAS.** La certificación corrió en Postgres 17.6 local y en PGlite. Revisión heurística sin
-  sintaxis de 16/17 en las 19 migraciones; no probado en un 15 real.
+- [x] **Versión de Postgres.** Comprobado el 2026-09-15: el proyecto enlazado `ehxlxbhtlmfgneiagdcj` corre
+  **PostgreSQL 17.6**, la misma versión de la certificación local (el «15» venía de un documento anterior).
 - [ ] **Node del build:** `engine-strict=true` + una dependencia de ESLint (`eslint-visitor-keys@5`) exigen Node
   ≥ 22.13; `npm ci` falla en 22.12. Usar Node 24 (`RUNTIME.md`) o subir `engines`.
 - [ ] Ventana sin tráfico de compra: la migración 1 añade un trigger a `orders` y la 19 recrea `cart_open`.

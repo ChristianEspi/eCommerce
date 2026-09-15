@@ -231,6 +231,16 @@ Reglas de propiedad: **solo el carril A** redefine `create_order`, `checkout_pla
 - **Defectos reales encontrados en la primera pasada y corregidos:** `catalog-copy` lanzaba `notFound` con el texto como código (el navegador recibía una frase); `_shared/userProvisioning.ts` no compilaba con TS 6 de Deno.
 - Pruebas: verde sobre el árbol; **rojo (exit 1) con un error de tipos plantado** y retirado; `scripts/check-edge.test.mjs` 7/7; `create-user`, catálogo, `secret-scan`, `qas-smoke`: 198/198; `tsc` y `lint` limpios.
 - Pendiente: la primera ejecución sin caché descarga Deno y los `npm:` del borde (red necesaria en CI).
+### Despliegue en DEV (`ehxlxbhtlmfgneiagdcj`) — [EN PROGRESO] orden del operador 2026-09-15
+- **Hecho:**
+  - Comprobaciones previas en solo lectura: prerrequisito `20260913160000` aplicado; Postgres 17.6; C6 sin riesgo (ningún tenant sincronizado por el Hub; `miquimica` ya tiene `payments`, `fulfillment` y `catalog.advanced`); 3 webhooks salientes de demo sin secreto configurado ni con el nombre viejo ni con el nuevo (ya no entregaban antes del cambio).
+  - **Las 19 migraciones del cierre aplicadas** con `scripts/aplicar-migracion.mjs`, en orden, todas sin error. Verificado por REST: `my_quotes`, `my_order_schedules`, `my_cart_reminders` responden 401 a anon (existen y exigen sesión); `product_relations_for_slug` y `product_reviews_for_slug` responden 200.
+  - Edge Function **`catalog-copy` desplegada**.
+- **Bloqueado por permisos de la herramienta (no por error):**
+  - Secreto `EBIM_PAYMENTS_ALLOW_SIMULATION=true` (escritura en el almacén de secretos).
+  - Despliegue de `integration-worker`, `notifications-dispatch`, `notifications-test`, `auth-email-hook`, `create-user`, `api`, y **retenidos a propósito** `checkout` y `payments-webhook` hasta que exista el secreto (sin él, el `checkout` nuevo deja de cobrar con `sandbox`).
+- **Estado coherente mientras tanto:** la base nueva funciona con las funciones anteriores ya desplegadas (mismas firmas; el crédito bloqueado lo rechaza el trigger, con error genérico hasta desplegar `checkout`).
+
 ### 15. E2E y certificación final P07/P08 — [COMPLETADO · dictamen GO CONDICIONADO] `4f490f5`, `39f3d68`, `c5066af`
 - Documentos: `docs/release-candidate/FINAL_CERTIFICATION.md` (gates, cobertura, seguridad, matriz de defectos D-01…D-11, condiciones C1…C9), `RELEASE_NOTES.md`, `DEPLOYMENT_MANIFEST.md` (19 migraciones con SHA-256 verificado contra el contenido versionado, 9 Edge Functions clasificadas, secretos nuevos).
 - Gates sobre `c5066af`: typecheck, lint, `npm test` **233 archivos · 4 380 ✓ · 0 ✗**, `check:edge` 67 archivos, build, `bundle:report` (portada 399,6/405, ficha 384,6/400), `scan:secrets` PASS, `npm audit` 4 moderadas aceptadas / 0 high-critical. `npm ci` falla en Node 22.12 (condición C8).
