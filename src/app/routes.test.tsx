@@ -122,6 +122,7 @@ describe('rutas base', () => {
       '/s/:storeSlug/pedido-rapido',
       '/s/:storeSlug/product/:productSlug',
       '/s/:storeSlug/register',
+      '/s/:storeSlug/unsubscribe',
     ])
     expect(paths(admin?.children ?? [], '/app')).not.toContain('/app/cart')
   })

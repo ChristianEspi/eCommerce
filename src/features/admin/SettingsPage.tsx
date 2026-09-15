@@ -44,6 +44,8 @@ import GroupRoundedIcon from '@mui/icons-material/GroupRounded'
 import { useSessionContext } from '@/features/auth/session-context'
 import { MembersSection } from './settings/MembersSection'
 import { MailSettingsSection } from '@/features/notifications/MailSettingsSection'
+import { CartRecoverySection } from '@/features/notifications/CartRecoverySection'
+import RemoveShoppingCartRoundedIcon from '@mui/icons-material/RemoveShoppingCartRounded'
 import { StorefrontDesignSection } from './settings/StorefrontDesignSection'
 import { TaxesSection } from './settings/TaxesSection'
 import { useFeedback } from '@/shared/ui/feedback-context'
@@ -832,6 +834,20 @@ export function SettingsPage() {
                       padded
                     >
                       <MailSettingsSection />
+                    </SectionCard>
+                  </CardContent>
+                </Card>
+                {/* Cierre 8. Va con el correo porque ES correo: sale por la misma
+                    cola y sin el envío configurado no sale nada. */}
+                <Card sx={{ mt: 2.5 }}>
+                  <CardContent>
+                    <SectionCard
+                      icon={<RemoveShoppingCartRoundedIcon />}
+                      title={t('cartRecovery.title')}
+                      subtitle={t('cartRecovery.subtitle')}
+                      padded
+                    >
+                      <CartRecoverySection storeId={storeId} />
                     </SectionCard>
                   </CardContent>
                 </Card>
