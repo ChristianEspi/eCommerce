@@ -78,7 +78,10 @@
 -- ## Payload canonico, version 1
 --
 -- Formato de cable en snake_case, importes como TEXTO (regla del repositorio
--- desde P02) y `schema_version` para que el adaptador sepa que lee. La forma la
+-- desde P02) y `schema_version` para que el adaptador sepa que lee. El tenant
+-- NO va dentro del payload: viaja en las columnas `organization_id`/`company_id`
+-- de la fila del outbox, que escribe esta funcion. Un adaptador que leyera el
+-- tenant del cuerpo estaria confiando en un dato que no es la clave. La forma la
 -- declara tambien `INVOICE_ISSUE_PAYLOAD_KEYS` en `src/domain/ports/invoicing.ts`
 -- y un test comprueba que las dos coinciden.
 -- =============================================================================
@@ -332,8 +335,6 @@ begin
     'schema_version',  c_version,
     'operation',       'invoice.issue',
     'idempotency_key', v_key,
-    'organization_id', v_inv.organization_id,
-    'company_id',      v_inv.company_id,
     'store_id',        v_inv.store_id,
     'invoice_id',      v_inv.id,
     'order_id',        v_inv.order_id,

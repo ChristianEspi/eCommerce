@@ -70,6 +70,9 @@ export const INVOICING_OPERATIONS: readonly ProviderOperation[] = ['invoice.issu
  * `InvoicingProvider` lo traduce a `InvoiceRequest` y comprueba
  * `schema_version` antes de leer nada más. Un cambio incompatible sube la
  * versión; nunca se reinterpreta un campo existente.
+ *
+ * La sociedad NO viaja en el cuerpo: es la de la fila del outbox, que escribe
+ * la base. El adaptador la toma de ahí y nunca de un campo del payload.
  */
 export const INVOICE_ISSUE_SCHEMA_VERSION = 1
 
@@ -88,8 +91,6 @@ export interface InvoiceIssuePayloadV1 {
   readonly operation: 'invoice.issue'
   /** `invoice.issue:<invoice_id>`: un mensaje por comprobante. */
   readonly idempotency_key: string
-  readonly organization_id: string
-  readonly company_id: string
   readonly store_id: string
   readonly invoice_id: string
   readonly order_id: string
@@ -110,8 +111,6 @@ export const INVOICE_ISSUE_PAYLOAD_KEYS = [
   'schema_version',
   'operation',
   'idempotency_key',
-  'organization_id',
-  'company_id',
   'store_id',
   'invoice_id',
   'order_id',

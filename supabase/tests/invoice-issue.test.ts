@@ -398,8 +398,6 @@ describe('con proveedor: un mensaje por comprobante, en la cola de siempre', () 
     expect(payload).toMatchObject({
       operation: 'invoice.issue',
       idempotency_key: `invoice.issue:${inv}`,
-      organization_id: TENANT_A.organizationId,
-      company_id: TENANT_A.companyId,
       store_id: stores.get(TENANT_A.organizationId),
       invoice_id: inv,
       series: 'F001',
@@ -508,16 +506,18 @@ describe('tenant: de la fila, nunca de quien llama', () => {
     const invB = await invoice(TENANT_B)
     const result = await request(TENANT_B, invB)
     const [row] = await sql(
-      `select organization_id, company_id, payload->>'organization_id' as p_org,
-              payload->>'company_id' as p_company
+      `select organization_id, company_id,
+              payload ? 'organization_id' as p_org, payload ? 'company_id' as p_company
          from public.integration_outbox where id = $1`,
       [result.outbox_id],
     )
+    // La sociedad es la de la FILA; el cuerpo no la lleva, así que ningún
+    // adaptador puede leerla de un sitio que no es la clave.
     expect(row).toEqual({
       organization_id: TENANT_B.organizationId,
       company_id: TENANT_B.companyId,
-      p_org: TENANT_B.organizationId,
-      p_company: TENANT_B.companyId,
+      p_org: false,
+      p_company: false,
     })
   })
 

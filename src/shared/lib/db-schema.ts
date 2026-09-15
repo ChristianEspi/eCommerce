@@ -68,6 +68,13 @@ export const AR_RECEIPTS_TABLE = 'ar_receipts' satisfies TableName
 export const AR_APPLICATIONS_TABLE = 'ar_applications' satisfies TableName
 export const INVOICES_TABLE = 'invoices' satisfies TableName
 export const INVOICE_ITEMS_TABLE = 'invoice_items' satisfies TableName
+// --- Cierre · D1 · Emision de comprobantes (20260914170000) -----------------
+// Sin `satisfies`: la migracion aun no esta aplicada en el proyecto enlazado y
+// `database.types.ts` no se edita a mano. La red es `invoice-issue.test.ts`.
+/** Estado de emision por comprobante (security invoker). */
+export const INVOICE_ISSUE_STATUS_VIEW = 'invoice_issue_status'
+/** Pide emitir un comprobante completo; el tenant sale de la fila, no del cliente. */
+export const INVOICE_REQUEST_ISSUE_RPC = 'invoice_request_issue'
 
 export const QUOTES_TABLE = 'quotes' satisfies TableName
 export const QUOTE_ITEMS_TABLE = 'quote_items' satisfies TableName

@@ -3,10 +3,12 @@ import {
   fetchAging,
   fetchArDocuments,
   fetchArReceipts,
+  fetchInvoiceIssueStatuses,
   fetchInvoices,
   registerReceipt,
+  requestInvoiceIssue,
 } from './api'
-import type { Aging, ArDocument, ArReceipt, Invoice } from './types'
+import type { Aging, ArDocument, ArReceipt, Invoice, InvoiceIssueStatus } from './types'
 
 /**
  * Estado de crédito en el cliente.
@@ -48,6 +50,24 @@ export function useAging(customerId: string | null): UseQueryResult<Aging | null
 
 export function useInvoices(): UseQueryResult<Invoice[]> {
   return useQuery({ queryKey: invoicesKey(), queryFn: fetchInvoices, retry: false })
+}
+
+export const invoiceIssueKey = () => [...CREDIT_KEY, 'invoice-issue'] as const
+
+export function useInvoiceIssueStatuses(): UseQueryResult<InvoiceIssueStatus[]> {
+  return useQuery({ queryKey: invoiceIssueKey(), queryFn: fetchInvoiceIssueStatuses, retry: false })
+}
+
+/** Pedir la emisión cambia el estado de emisión y, a veces, el proveedor del comprobante. */
+export function useRequestInvoiceIssue() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: requestInvoiceIssue,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: invoiceIssueKey() })
+      await queryClient.invalidateQueries({ queryKey: invoicesKey() })
+    },
+  })
 }
 
 export function useRegisterReceipt() {

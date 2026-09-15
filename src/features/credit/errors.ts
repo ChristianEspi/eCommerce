@@ -25,6 +25,14 @@ export function mapCreditCode(code: string): MessageKey {
       return 'credit.error.issued'
     case 'COMPROBANTE_ACEPTADO':
       return 'credit.error.accepted'
+    case 'COMPROBANTE_SIN_LINEAS':
+      return 'credit.error.noLines'
+    case 'COMPROBANTE_DESCUADRADO':
+      return 'credit.error.unbalanced'
+    case 'COMPROBANTE_NO_EMITIBLE':
+      return 'credit.error.notIssuable'
+    case 'COMPROBANTE_NO_ENCONTRADO':
+      return 'credit.error.notFound'
     case 'DUPLICADO':
     case '23505':
       return 'credit.error.duplicate'

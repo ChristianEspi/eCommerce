@@ -7,14 +7,20 @@ import {
   AR_RECEIPTS_TABLE,
   CUSTOMER_AGING_RPC,
   INVOICES_TABLE,
+  INVOICE_ISSUE_STATUS_VIEW,
+  INVOICE_REQUEST_ISSUE_RPC,
   agingSchema,
   arDocumentSchema,
   arReceiptSchema,
+  invoiceIssueResultSchema,
+  invoiceIssueStatusSchema,
   invoiceSchema,
   type Aging,
   type ArDocument,
   type ArReceipt,
   type Invoice,
+  type InvoiceIssueResult,
+  type InvoiceIssueStatus,
   type ReceiptFormValues,
 } from './types'
 
@@ -170,4 +176,27 @@ export async function fetchInvoices(): Promise<Invoice[]> {
 
   if (error) throw creditErrorFromDb(error)
   return invoiceSchema.array().parse(data ?? [])
+}
+
+/** Estado de emisión de cada comprobante visible. La RLS pone el tenant. */
+export async function fetchInvoiceIssueStatuses(): Promise<InvoiceIssueStatus[]> {
+  const { data, error } = await client()
+    .from(INVOICE_ISSUE_STATUS_VIEW)
+    .select('invoice_id, issue_state, blocked_code')
+
+  if (error) throw creditErrorFromDb(error)
+  return invoiceIssueStatusSchema.array().parse(data ?? [])
+}
+
+/**
+ * Pide emitir el comprobante. Solo viaja el id: la sociedad la toma la base de
+ * la fila, y sin proveedor fiscal la respuesta es `pending_configuration`, no
+ * un error.
+ */
+export async function requestInvoiceIssue(invoiceId: string): Promise<InvoiceIssueResult> {
+  const { data, error } = await client().rpc(INVOICE_REQUEST_ISSUE_RPC, {
+    p_invoice_id: invoiceId,
+  })
+  if (error) throw creditErrorFromDb(error)
+  return invoiceIssueResultSchema.parse(data)
 }

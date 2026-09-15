@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { InvoiceIssueState } from '@/domain/ports/invoicing'
 
 export {
   AR_DOCUMENTS_TABLE,
@@ -6,6 +7,8 @@ export {
   AR_APPLICATIONS_TABLE,
   INVOICES_TABLE,
   INVOICE_ITEMS_TABLE,
+  INVOICE_ISSUE_STATUS_VIEW,
+  INVOICE_REQUEST_ISSUE_RPC,
   CUSTOMER_AGING_RPC,
 } from '@/shared/lib/db-schema'
 
@@ -88,6 +91,34 @@ export const invoiceSchema = z.object({
   reject_reason: z.string().nullable().default(null),
 })
 export type Invoice = z.infer<typeof invoiceSchema>
+
+/**
+ * Estado de EMISIÓN (vista `invoice_issue_status`, migración 20260914170000).
+ * Distinto del estado fiscal del comprobante: dice si se pidió emitir y qué
+ * pasó con el mensaje en la cola de integraciones.
+ */
+export const INVOICE_ISSUE_STATES = [
+  'not_requested',
+  'pending_configuration',
+  'pending',
+  'in_flight',
+  'succeeded',
+  'failed',
+  'dead',
+] as const satisfies readonly InvoiceIssueState[]
+
+export const invoiceIssueStatusSchema = z.object({
+  invoice_id: z.string().uuid(),
+  issue_state: z.enum(INVOICE_ISSUE_STATES).catch('not_requested'),
+  blocked_code: z.string().nullable().default(null),
+})
+export type InvoiceIssueStatus = z.infer<typeof invoiceIssueStatusSchema>
+
+export const invoiceIssueResultSchema = z.object({
+  state: z.enum(['enqueued', 'pending_configuration']),
+  replay: z.boolean().catch(false),
+})
+export type InvoiceIssueResult = z.infer<typeof invoiceIssueResultSchema>
 
 // ---------------------------------------------------------------------------
 // El formulario del cobro

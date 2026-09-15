@@ -73,7 +73,14 @@ function doc(id: string, numero: string, vence: string, importe: string, saldo: 
   }
 }
 
-function backend(options: { entitlements?: string[] } = {}): FakeSupabase {
+function backend(
+  options: {
+    entitlements?: string[]
+    invoices?: Record<string, unknown>[]
+    issue?: Record<string, unknown>[]
+    requestIssue?: (args: Record<string, unknown>) => unknown
+  } = {},
+): FakeSupabase {
   const { entitlements = COBRANZA } = options
   return createFakeSupabase({
     session: makeSession(),
@@ -106,10 +113,12 @@ function backend(options: { entitlements?: string[] } = {}): FakeSupabase {
       ],
       ar_receipts: [],
       ar_applications: [],
-      invoices: [],
+      invoices: options.invoices ?? [],
+      invoice_issue_status: options.issue ?? [],
     },
     rpc: {
       effective_capabilities: () => makePlatformContext({ entitlements, source: 'hub' }),
+      ...(options.requestIssue ? { invoice_request_issue: options.requestIssue } : {}),
     },
   })
 }
@@ -243,5 +252,71 @@ describe('la pestaña de comprobantes', () => {
     // son dos cosas que se contratan por separado.
     const panel = await screen.findByRole('tabpanel')
     expect(within(panel).queryByRole('table')).not.toBeInTheDocument()
+  })
+})
+
+describe('la emisión de un comprobante', () => {
+  const FACTURA = '99999999-9999-4999-9999-999999999931'
+  const factura = {
+    id: FACTURA,
+    organization_id: ORG,
+    company_id: COMPANY_A,
+    order_id: '99999999-9999-4999-9999-999999999932',
+    series: 'F001',
+    number: null,
+    status: 'pending',
+    currency: 'PEN',
+    issued_at: '2026-09-14T10:00:00Z',
+    customer_name: 'Bodega Central',
+    customer_tax_id: null,
+    net_total: '100.00',
+    tax_total: '18.00',
+    gross_total: '118.00',
+    reject_reason: null,
+  }
+
+  async function abrirComprobantes(fake: FakeSupabase) {
+    const user = userEvent.setup()
+    pintar(fake)
+    await screen.findByText('F001-100')
+    await user.click(screen.getByRole('tab', { name: 'Comprobantes' }))
+    await screen.findByText('Bodega Central', { selector: 'td' })
+    return user
+  }
+
+  it('sin proveedor fiscal lo dice en la fila, sin error', async () => {
+    const fake = backend({
+      entitlements: [...COBRANZA, 'ecommerce.invoicing'],
+      invoices: [factura],
+      issue: [
+        {
+          invoice_id: FACTURA,
+          organization_id: ORG,
+          company_id: COMPANY_A,
+          issue_state: 'pending_configuration',
+          blocked_code: 'FACTURADOR_NO_CONFIGURADO',
+        },
+      ],
+    })
+    await abrirComprobantes(fake)
+
+    expect(await screen.findByText('Falta proveedor')).toBeInTheDocument()
+    expect(screen.getByText('La sociedad no tiene un proveedor fiscal activo.')).toBeInTheDocument()
+  })
+
+  it('«Emitir» manda SOLO el id del comprobante: la sociedad la pone la base', async () => {
+    const fake = backend({
+      entitlements: [...COBRANZA, 'ecommerce.invoicing'],
+      invoices: [factura],
+      requestIssue: () => ({ state: 'enqueued', replay: false }),
+    })
+    const user = await abrirComprobantes(fake)
+
+    expect(await screen.findByText('Sin solicitar')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Emitir comprobante F001' }))
+
+    const llamadas = fake.state.rpcCalls.filter((c) => c.name === 'invoice_request_issue')
+    expect(llamadas).toEqual([{ name: 'invoice_request_issue', args: { p_invoice_id: FACTURA } }])
+    expect(await screen.findByText('Emisión encolada')).toBeInTheDocument()
   })
 })

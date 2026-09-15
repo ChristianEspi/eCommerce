@@ -2,6 +2,7 @@ import ReceiptRoundedIcon from '@mui/icons-material/ReceiptRounded'
 import {
   Alert,
   Box,
+  Button,
   Card,
   Stack,
   Table,
@@ -12,6 +13,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useMemo, useState } from 'react'
+import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { formatMoney } from '@/shared/lib/format'
@@ -20,10 +22,12 @@ import { SearchField } from '@/shared/ui/SearchField'
 import { StatusChip } from '@/shared/ui/StatusChip'
 import { TablePager } from '@/shared/ui/TablePager'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
+import { useFeedback } from '@/shared/ui/feedback-context'
 import { usePagedRows } from '@/shared/ui/usePagedRows'
 import { EmptyState, ErrorState } from '@/shared/ui/states'
-import { useInvoices } from './hooks'
-import type { InvoiceStatus } from './types'
+import { CreditError } from './errors'
+import { useInvoiceIssueStatuses, useInvoices, useRequestInvoiceIssue } from './hooks'
+import type { Invoice, InvoiceIssueStatus, InvoiceStatus } from './types'
 
 /**
  * Comprobantes emitidos.
@@ -34,18 +38,44 @@ import type { InvoiceStatus } from './types'
  * acepta, y se corrige con una nota. Poner aquí un botón de editar sería
  * ofrecer algo que va a fallar.
  *
- * ## Y avisa de lo que todavía no hay
+ * ## La única acción: pedir la emisión
  *
- * La emisión sale por el outbox de integraciones, y ese productor **aún no está
- * cableado** (deuda D3 de la auditoría). Decirlo en la pantalla es lo honesto:
- * una tabla vacía sin explicación se lee como «no hay comprobantes», cuando lo
- * cierto es «todavía no se emiten desde aquí».
+ * «Emitir» encola `invoice.issue` en el outbox de integraciones
+ * (`invoice_request_issue`, migración 20260914170000). Sin proveedor fiscal no
+ * es un error: la columna de emisión lo dice («Falta proveedor») y el pedido
+ * queda registrado. El botón solo se ofrece a quien puede administrar la
+ * sociedad y en comprobantes pendientes; la autoridad sigue siendo la base.
  */
 export function InvoicesSection() {
   const { t, locale } = useI18n()
   const [search, setSearch] = useState('')
 
   const query = useInvoices()
+  const issueQuery = useInvoiceIssueStatuses()
+  const requestIssue = useRequestInvoiceIssue()
+  const { can } = useTenant()
+  const { notify } = useFeedback()
+  const canIssue = can('tenant.manage')
+  const [serverError, setServerError] = useState<MessageKey | null>(null)
+
+  const issueByInvoice = useMemo(() => {
+    const map = new Map<string, InvoiceIssueStatus>()
+    for (const row of issueQuery.data ?? []) map.set(row.invoice_id, row)
+    return map
+  }, [issueQuery.data])
+
+  async function emitir(invoice: Invoice) {
+    setServerError(null)
+    try {
+      const result = await requestIssue.mutateAsync(invoice.id)
+      notify(
+        t(result.state === 'enqueued' ? 'credit.toast.issueQueued' : 'credit.toast.issuePendingConfig'),
+        result.state === 'enqueued' ? 'success' : 'warning',
+      )
+    } catch (error) {
+      setServerError(error instanceof CreditError ? error.key : 'credit.error.generic')
+    }
+  }
 
   const invoices = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -73,8 +103,12 @@ export function InvoicesSection() {
     <Stack spacing={2}>
       <Typography sx={{ color: 'var(--muted)' }}>{t('credit.invoices.help')}</Typography>
 
-      {/* Lo que falta se dice, no se esconde. */}
-      <Alert severity="info">{t('credit.invoices.pendingWiring')}</Alert>
+      <Alert severity="info">{t('credit.invoices.issueHelp')}</Alert>
+      {serverError && (
+        <Alert severity="error" onClose={() => setServerError(null)}>
+          {t(serverError)}
+        </Alert>
+      )}
 
       <FilterBar>
         <Box sx={{ minWidth: { xs: '100%', sm: 300 } }}>
@@ -88,7 +122,7 @@ export function InvoicesSection() {
       </FilterBar>
 
       <Card>
-        {query.isPending && <TableSkeleton columns={6} />}
+        {query.isPending && <TableSkeleton columns={8} />}
         {query.isError && <ErrorState error={query.error} onRetry={() => void query.refetch()} />}
         {isEmpty && (
           <EmptyState
@@ -109,6 +143,7 @@ export function InvoicesSection() {
                 <TableCell align="right">{t('credit.field.tax')}</TableCell>
                 <TableCell align="right">{t('credit.field.gross')}</TableCell>
                 <TableCell>{t('common.status')}</TableCell>
+                <TableCell>{t('credit.field.issue')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -150,6 +185,15 @@ export function InvoicesSection() {
                       )}
                     </Stack>
                   </TableCell>
+                  <TableCell sx={{ maxWidth: 240 }}>
+                    <IssueCell
+                      invoice={invoice}
+                      issue={issueByInvoice.get(invoice.id)}
+                      canIssue={canIssue}
+                      busy={requestIssue.isPending}
+                      onIssue={() => void emitir(invoice)}
+                    />
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -165,6 +209,65 @@ export function InvoicesSection() {
           />
         )}
       </Card>
+    </Stack>
+  )
+}
+
+function IssueCell({
+  invoice,
+  issue,
+  canIssue,
+  busy,
+  onIssue,
+}: {
+  invoice: Invoice
+  issue: InvoiceIssueStatus | undefined
+  canIssue: boolean
+  busy: boolean
+  onIssue: () => void
+}) {
+  const { t } = useI18n()
+  const state = issue?.issue_state ?? 'not_requested'
+  const tone =
+    state === 'succeeded'
+      ? ('success' as const)
+      : state === 'dead' || state === 'failed'
+        ? ('error' as const)
+        : state === 'pending_configuration'
+          ? ('warning' as const)
+          : state === 'not_requested'
+            ? ('default' as const)
+            : ('info' as const)
+  // Solo los códigos que la base declara tienen frase; uno nuevo no pinta la clave.
+  const blockedKey: MessageKey | null =
+    state === 'pending_configuration' &&
+    (issue?.blocked_code === 'FACTURADOR_NO_CONFIGURADO' || issue?.blocked_code === 'FACTURADOR_AMBIGUO')
+      ? `credit.issueBlocked.${issue.blocked_code}`
+      : null
+  // Se ofrece pedirla mientras no haya mensaje en la cola: sin solicitar, o
+  // solicitada y a la espera de proveedor (volver a pedirla es idempotente).
+  const offer =
+    canIssue &&
+    invoice.status === 'pending' &&
+    (state === 'not_requested' || state === 'pending_configuration')
+
+  return (
+    <Stack spacing={0.5} sx={{ alignItems: 'flex-start' }}>
+      <StatusChip tone={tone} label={t(`credit.issueState.${state}` as MessageKey)} />
+      {blockedKey && (
+        <Typography sx={{ fontSize: 11, color: 'var(--muted)' }}>{t(blockedKey)}</Typography>
+      )}
+      {offer && (
+        <Button
+          size="small"
+          variant="outlined"
+          disabled={busy}
+          onClick={onIssue}
+          aria-label={t('credit.invoices.issueAria').replace('{series}', invoice.series)}
+        >
+          {t('credit.invoices.issue')}
+        </Button>
+      )}
     </Stack>
   )
 }
