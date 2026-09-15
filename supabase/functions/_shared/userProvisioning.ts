@@ -55,7 +55,9 @@ export const LARGO_CONTRASENA = 16
  * para poder probar el mapeo al alfabeto sin depender del azar.
  */
 export function contrasenaTemporal(
-  aleatorio: (bytes: Uint8Array) => Uint8Array = (bytes) => crypto.getRandomValues(bytes),
+  // `Uint8Array<ArrayBuffer>`: `getRandomValues` no acepta un búfer compartido,
+  // y el runtime de Deno (TS 6) lo exige en la firma.
+  aleatorio: (bytes: Uint8Array<ArrayBuffer>) => Uint8Array = (bytes) => crypto.getRandomValues(bytes),
 ): string {
   const bytes = aleatorio(new Uint8Array(LARGO_CONTRASENA))
   return Array.from(bytes, (b) => ALFABETO_SIN_CONFUSOS[b % ALFABETO_SIN_CONFUSOS.length]).join('')

@@ -18,6 +18,7 @@
     "test:db": "vitest run supabase/tests",
     "bundle:report": "node scripts/bundle-report.mjs",
     "scan:secrets": "node scripts/secret-scan.mjs",
+    "check:edge": "node scripts/check-edge.mjs",
     "smoke:qas": "node scripts/qas-smoke.mjs"
   },
   "dependencies": {

@@ -71,7 +71,9 @@ const handler = serveJson(
       .maybeSingle()
 
     if (error) throw fromDatabaseError(error)
-    if (!producto) throw notFound('El producto no existe o no es de esta sociedad')
+    // Código estable primero: sin él, el texto viajaba como `code` y el navegador
+    // no lo sabía traducir. Lo encontró `npm run check:edge`.
+    if (!producto) throw notFound('PRODUCTO_NO_ENCONTRADO', 'El producto no existe o no es de esta sociedad')
 
     const sinBorrador = (motivo: Motivo) => ({
       status: 200,
