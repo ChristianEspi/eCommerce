@@ -3,6 +3,7 @@ import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded'
 import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded'
 import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded'
 import LoginRoundedIcon from '@mui/icons-material/LoginRounded'
+import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded'
 import PersonRoundedIcon from '@mui/icons-material/PersonRounded'
 import ShoppingCartRoundedIcon from '@mui/icons-material/ShoppingCartRounded'
 import {
@@ -16,7 +17,7 @@ import {
   useMediaQuery,
 } from '@mui/material'
 import { lazy, Suspense, useState, type ReactNode } from 'react'
-import { Link, Outlet, useLocation, useParams } from 'react-router-dom'
+import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ErrorBoundary } from '@/app/ErrorBoundary'
 import { useSessionContext } from '@/features/auth/session-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -436,6 +437,7 @@ function StoreHeader({ store, storeSlug }: { store: PublicStore; storeSlug: stri
           <ThemeButton />
           <FavoritesButton storeSlug={storeSlug} storeId={store.store_id} />
           <AccountButton storeSlug={storeSlug} />
+          <SignOutButton storeSlug={storeSlug} />
           <CartButton />
         </Toolbar>
 
@@ -748,6 +750,46 @@ function AccountButton({ storeSlug }: { storeSlug: string }) {
       icon={<LoginRoundedIcon />}
       label={t('store.signIn')}
       tone="account"
+    />
+  )
+}
+
+/**
+ * Salir de la sesión sin salir de la tienda.
+ *
+ * Solo existía en el backoffice: un comprador que entraba en la vitrina no tenía
+ * por dónde cerrar su sesión, y en un equipo compartido eso deja su cuenta de
+ * empresa, su precio de convenio y sus pedidos abiertos al siguiente.
+ *
+ * Vuelve a la PORTADA de la tienda y no a donde estaba: la página actual puede
+ * ser «Tu cuenta», un pedido o el checkout, que sin sesión ya no tienen nada que
+ * enseñar. Neutro, igual que el tema: no es un destino que venda.
+ */
+function SignOutButton({ storeSlug }: { storeSlug: string }) {
+  const { t } = useI18n()
+  const { status, signOut } = useSessionContext()
+  const navigate = useNavigate()
+  const [saliendo, setSaliendo] = useState(false)
+
+  if (status !== 'authenticated') return null
+
+  async function salir() {
+    if (saliendo) return
+    setSaliendo(true)
+    try {
+      await signOut()
+    } finally {
+      setSaliendo(false)
+      navigate(`/s/${storeSlug}`, { replace: true })
+    }
+  }
+
+  return (
+    <HeaderAction
+      onClick={() => void salir()}
+      icon={<LogoutRoundedIcon />}
+      label={t('store.signOut')}
+      tone="neutral"
     />
   )
 }

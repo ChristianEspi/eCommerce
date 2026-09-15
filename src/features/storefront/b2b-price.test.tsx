@@ -253,6 +253,27 @@ describe('la vitrina deja entrar', () => {
     expect(await screen.findByRole('link', { name: 'Tu cuenta' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Entrar' })).not.toBeInTheDocument()
   })
+
+  it('sin sesion no hay «Salir»', async () => {
+    render(backend(), '/s/casa-nordica/product/silla-roble')
+    await screen.findByRole('link', { name: 'Entrar' })
+    expect(screen.queryByRole('button', { name: 'Salir' })).not.toBeInTheDocument()
+  })
+
+  it('con sesion, «Salir» cierra la sesion y deja al comprador en la tienda, sin entrar al backoffice', async () => {
+    const user = userEvent.setup()
+    const sesion = makeSession()
+    const fake = backend({ session: sesion })
+    render(fake, '/s/casa-nordica/product/silla-roble', sesion)
+
+    await user.click(await screen.findByRole('button', { name: 'Salir' }))
+
+    // Vuelve a ofrecer «Entrar»: la sesión se cerró de verdad.
+    expect(await screen.findByRole('link', { name: 'Entrar' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Tu cuenta' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Salir' })).not.toBeInTheDocument()
+    expect(fake.state.session).toBeNull()
+  })
 })
 
 describe('el panel del carrito dice lo mismo que la pagina', () => {
