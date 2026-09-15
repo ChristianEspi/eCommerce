@@ -404,9 +404,18 @@ describe('el ciclo completo: recibir, inspeccionar, reponer y cerrar', () => {
     // activa aqui y no en el arranque por la misma razon que el almacen: hasta
     // este bloque, la tienda vende con `products.stock` como cualquier tenant
     // sin el addon.
+    //
+    // Cierre D3 (20260914180000): en cuanto el hub SINCRONIZA la sociedad, el
+    // fallback legado de `fulfillment` desaparece y manda la lista. Una
+    // sociedad sincronizada que procesa devoluciones tiene que tener el addon,
+    // así que se declara aquí junto al de multialmacén.
     await svc(
       `select public.sync_platform_context($1, $2, true, $3, 'hub'::public.entitlement_source, null)`,
-      [TENANT_A.organizationId, TENANT_A.companyId, ['ecommerce.inventory.multiwarehouse']],
+      [
+        TENANT_A.organizationId,
+        TENANT_A.companyId,
+        ['ecommerce.inventory.multiwarehouse', 'ecommerce.fulfillment'],
+      ],
     )
     await asUser(adminA(), `select public.seed_inventory_from_catalog($1, $2) as result`, [
       warehouseA,
