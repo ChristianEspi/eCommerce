@@ -280,6 +280,46 @@ describe('abrir el carrito', () => {
     expect(first.owned).toBe(true)
   })
 
+  /**
+   * Cierre · certificación (20260914191000). Dos `cart_open` a la vez de un
+   * comprador sin carrito activo —el estado justo después de pagar— veían «no
+   * hay» y los dos insertaban; el perdedor abortaba con el índice único y la
+   * vitrina recibía un 409. Reproducido en Postgres 17.6 con 20 llamadas
+   * simultáneas (hasta 19 fallaban).
+   *
+   * PGlite no tiene concurrencia real, así que se SIMULA la ganadora: un trigger
+   * inserta el carrito rival justo en el instante en que `cart_open` inserta el
+   * suyo. Sin el arreglo, esto aborta con `carts_one_active_per_user`.
+   */
+  it('si otra llamada crea el carrito a la vez, se devuelve ESE, sin fallar', async () => {
+    const RACER = { ...BUYER, sub: '0c000000-0000-4000-8000-0000000000d9' }
+    await sql(`
+      create or replace function public.test_cart_rival() returns trigger language plpgsql as $$
+      begin
+        if pg_trigger_depth() = 1 and new.user_id = '${RACER.sub}'::uuid and new.status = 'active' then
+          insert into public.carts (organization_id, company_id, store_id, channel_id, user_id, currency, expires_at)
+          values (new.organization_id, new.company_id, new.store_id, new.channel_id, new.user_id, new.currency, new.expires_at);
+        end if;
+        return new;
+      end $$`)
+    await sql(`create trigger test_cart_rival before insert on public.carts
+                 for each row execute function public.test_cart_rival()`)
+    try {
+      const abierto = await openCart(STORE_A_SLUG, null, RACER)
+      const activos = await svc(
+        `select id from public.carts where user_id = $1 and status = 'active'`,
+        [RACER.sub],
+      )
+      // Uno solo, y es el que devolvió la llamada que «perdió».
+      expect(activos).toHaveLength(1)
+      expect(abierto.cart_id).toBe(activos[0]?.id)
+      expect(abierto.owned).toBe(true)
+    } finally {
+      await sql(`drop trigger test_cart_rival on public.carts`)
+      await sql(`drop function public.test_cart_rival()`)
+    }
+  })
+
   it('el carrito vacio de un invitado dura dos horas, no un mes', async () => {
     const cart = await openCart(STORE_A_SLUG)
     const [row] = await svc(
