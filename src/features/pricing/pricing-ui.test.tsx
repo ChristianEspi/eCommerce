@@ -158,9 +158,10 @@ function backend(options: { entitlements?: string[] } = {}): FakeSupabase {
         },
       ],
       channels: [],
-      products: [
+      // ADR 018: lo que se tarifa en la tienda es la PUBLICACIÓN del maestro.
+      admin_store_products: [
         {
-          id: PRODUCT_A,
+          product_id: PRODUCT_A,
           organization_id: ORG,
           company_id: COMPANY_A,
           store_id: STORE_A,
@@ -169,7 +170,7 @@ function backend(options: { entitlements?: string[] } = {}): FakeSupabase {
           kind: 'simple',
         },
         {
-          id: PRODUCT_B,
+          product_id: PRODUCT_B,
           organization_id: ORG,
           company_id: COMPANY_A,
           store_id: STORE_A,

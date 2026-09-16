@@ -121,11 +121,12 @@ describe('el buscador del alcance consulta cada tabla como es', () => {
     expect(captura.filtros).not.toContain('store_id')
   })
 
-  it('el producto SÍ se filtra por tienda y su código es `sku`', async () => {
+  it('el producto se busca entre las PUBLICACIONES de la tienda y su código es `sku`', async () => {
+    // ADR 018: el maestro no tiene tienda; la publicación sí, y expone `product_id`.
     await searchScopeTargets({ storeId: STORE, kind: 'product', term: 'ali' })
 
-    expect(captura.tabla).toBe('products')
-    expect(captura.select).toBe('id, name, sku')
+    expect(captura.tabla).toBe('admin_store_products')
+    expect(captura.select).toBe('product_id, name, sku')
     expect(captura.filtros).toContain('store_id')
   })
 

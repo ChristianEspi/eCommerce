@@ -3,6 +3,7 @@ import { buildTextSearchFilter } from '@/shared/lib/search'
 import { tryGetSupabaseClient } from '@/shared/lib/supabase'
 import { PromotionsError, promotionsErrorFromDb } from './errors'
 import {
+  ADMIN_STORE_PRODUCTS_VIEW,
   BRANDS_TABLE,
   CATEGORIES_TABLE,
   PRODUCTS_TABLE,
@@ -242,26 +243,30 @@ export async function searchScopeTargets(input: {
 
   // Cada tabla tiene su propia forma, y darla por supuesta se paga con un 400:
   //
-  //  · `products` y `categories` cuelgan de una TIENDA y se filtran por ella;
+  //  · `categories` cuelga de una TIENDA y se filtra por ella;
   //  · `brands` cuelga de la SOCIEDAD —no tiene `store_id`— y su código se
   //    llama `code`, no `slug`. Filtrarla por tienda pedía una columna que no
   //    existe, y el buscador de marcas respondía 400 sin decir nada en pantalla.
   //
   // El aislamiento de la marca no se pierde por no filtrar aquí: lo garantiza su
   // RLS por `organization_id`/`company_id`, que es donde tiene que estar.
+  //  · el producto es un MAESTRO de la sociedad (ADR 018): lo que tiene tienda
+  //    es su publicación, `admin_store_products`, que lo expone como
+  //    `product_id`. Un alcance solo puede apuntar a lo publicado aquí (la clave
+  //    ajena lo exige).
   const porTipo = {
-    category: { tabla: CATEGORIES_TABLE, codigo: 'slug', porTienda: true },
-    brand: { tabla: BRANDS_TABLE, codigo: 'code', porTienda: false },
-    product: { tabla: PRODUCTS_TABLE, codigo: 'sku', porTienda: true },
-    variant: { tabla: PRODUCTS_TABLE, codigo: 'sku', porTienda: true },
+    category: { tabla: CATEGORIES_TABLE, id: 'id', codigo: 'slug', porTienda: true },
+    brand: { tabla: BRANDS_TABLE, id: 'id', codigo: 'code', porTienda: false },
+    product: { tabla: ADMIN_STORE_PRODUCTS_VIEW, id: 'product_id', codigo: 'sku', porTienda: true },
+    variant: { tabla: ADMIN_STORE_PRODUCTS_VIEW, id: 'product_id', codigo: 'sku', porTienda: true },
   } as const satisfies Record<
     Exclude<ScopeKind, 'all'>,
-    { tabla: string; codigo: string; porTienda: boolean }
+    { tabla: string; id: string; codigo: string; porTienda: boolean }
   >
 
-  const { tabla, codigo, porTienda } = porTipo[input.kind]
+  const { tabla, id, codigo, porTienda } = porTipo[input.kind]
 
-  let query = client().from(tabla).select(`id, name, ${codigo}`).order('name').limit(20)
+  let query = client().from(tabla).select(`${id}, name, ${codigo}`).order('name').limit(20)
   if (porTienda) query = query.eq('store_id', input.storeId)
 
   const filtro = buildTextSearchFilter(input.term, ['name', codigo])
@@ -274,7 +279,7 @@ export async function searchScopeTargets(input: {
     const row = fila as Record<string, unknown>
     const code = row[codigo]
     return {
-      id: String(row.id),
+      id: String(row[id]),
       name: String(row.name),
       code: typeof code === 'string' ? code : null,
     }

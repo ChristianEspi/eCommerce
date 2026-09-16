@@ -3,6 +3,7 @@ import { buildTextSearchFilter } from '@/shared/lib/search'
 import { tryGetSupabaseClient, tryGetStorefrontRpcClient } from '@/shared/lib/supabase'
 import { PricingError, pricingErrorFromDb } from './errors'
 import type { ResolvedPriceRow } from './importCsv'
+import { ADMIN_STORE_PRODUCTS_VIEW } from '@/shared/lib/db-schema'
 import {
   CUSTOMER_SEGMENTS_TABLE,
   PRICE_CHANGE_EVENTS_TABLE,
@@ -12,7 +13,6 @@ import {
   PRICE_LIST_CONFLICTS_RPC,
   PROMOTION_QUOTE_PUBLIC_RPC,
   PRICE_QUOTE_RPC,
-  PRODUCTS_TABLE,
   PRODUCT_UOMS_TABLE,
   PRODUCT_VARIANTS_TABLE,
   UNITS_OF_MEASURE_TABLE,
@@ -391,9 +391,11 @@ export async function searchPricedProducts(input: {
   term: string
 }): Promise<PricedProduct[]> {
   if (!input.storeId) return []
+  // ADR 018: se tarifa lo PUBLICADO en la tienda. El maestro no tiene tienda;
+  // la vista de publicaciones sí, y expone el producto como `product_id`.
   let query = client()
-    .from(PRODUCTS_TABLE)
-    .select('id, sku, name, kind')
+    .from(ADMIN_STORE_PRODUCTS_VIEW)
+    .select('product_id, sku, name, kind')
     .eq('store_id', input.storeId)
     .order('name')
     .limit(20)
@@ -403,7 +405,13 @@ export async function searchPricedProducts(input: {
 
   const { data, error } = await query
   if (error) throw pricingErrorFromDb(error)
-  return pricedProductSchema.array().parse(data ?? [])
+  return pricedProductSchema.array().parse((data ?? []).map(publicationToProduct))
+}
+
+/** Una fila de `admin_store_products` con la forma de `PricedProduct`. */
+function publicationToProduct(row: unknown): Record<string, unknown> {
+  const { product_id: productId, ...rest } = row as Record<string, unknown>
+  return { ...rest, id: productId }
 }
 
 export async function fetchProductVariants(productId: string | null): Promise<PricedVariant[]> {
@@ -469,21 +477,30 @@ export async function fetchPricingCatalog(storeId: string | null): Promise<{
   if (!storeId) return { products: [], variants: [], uoms: [] }
   const supabase = client()
 
+  // ADR 018: los productos son las PUBLICACIONES de la tienda. Variantes y
+  // presentaciones son del maestro (sin tienda): se piden por la RLS de la
+  // sociedad y se quedan solo las de productos publicados aquí. El filtro va en
+  // el cliente a propósito: un `in` con miles de ids no cabe en una URL.
   const [productsRes, variantsRes, uomsRes, unitsRes] = await Promise.all([
-    supabase.from(PRODUCTS_TABLE).select('id, sku, name, kind').eq('store_id', storeId),
-    supabase.from(PRODUCT_VARIANTS_TABLE).select('id, product_id, sku, name').eq('store_id', storeId),
-    supabase.from(PRODUCT_UOMS_TABLE).select('uom_id, product_id, factor::text').eq('store_id', storeId),
+    supabase.from(ADMIN_STORE_PRODUCTS_VIEW).select('product_id, sku, name, kind').eq('store_id', storeId),
+    supabase.from(PRODUCT_VARIANTS_TABLE).select('id, product_id, sku, name'),
+    supabase.from(PRODUCT_UOMS_TABLE).select('uom_id, product_id, factor::text'),
     supabase.from(UNITS_OF_MEASURE_TABLE).select('id, code'),
   ])
 
   const failure = productsRes.error ?? variantsRes.error ?? uomsRes.error ?? unitsRes.error
   if (failure) throw pricingErrorFromDb(failure)
 
+  const products = (productsRes.data ?? []).map(publicationToProduct)
+  const published = new Set(products.map((row) => String(row.id)))
+  const isPublished = (row: unknown) => published.has(String((row as { product_id: string }).product_id))
+
   const codes = new Map(
     (unitsRes.data ?? []).map((unit) => [String((unit as { id: string }).id), String((unit as { code: string }).code)]),
   )
 
   const uoms = (uomsRes.data ?? [])
+    .filter(isPublished)
     .map((row) => {
       const uomId = String((row as { uom_id: string }).uom_id)
       const code = codes.get(uomId)
@@ -494,8 +511,8 @@ export async function fetchPricingCatalog(storeId: string | null): Promise<{
     .filter((row): row is { uom_id: string; product_id: string; code: string; factor: string } => row !== null)
 
   return {
-    products: pricedProductSchema.array().parse(productsRes.data ?? []),
-    variants: pricedVariantSchema.array().parse(variantsRes.data ?? []),
+    products: pricedProductSchema.array().parse(products),
+    variants: pricedVariantSchema.array().parse((variantsRes.data ?? []).filter(isPublished)),
     uoms: pricedUomSchema.array().parse(uoms),
   }
 }

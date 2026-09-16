@@ -141,6 +141,8 @@ export function mapQuoteCode(code: string): MessageKey {
     case 'COTIZACION_MONEDA_INCONSISTENTE':
     case 'COTIZACION_CANTIDAD_NO_ENTERA':
     case 'COTIZACION_UOM_NO_DISPONIBLE':
+    case 'COTIZACION_PRODUCTO_NO_DISPONIBLE': // ADR 018: ya no publicado en esta tienda
+
       return 'account.quotes.error.notAcceptable'
     case 'SIN_PERMISO':
       return 'account.quotes.error.forbidden'

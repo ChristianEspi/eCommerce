@@ -132,7 +132,11 @@ function backend(options: { entitlements?: string[]; role?: string } = {}): Fake
       promotion_overview: [CAMPAIGN, COUPON_CAMPAIGN],
       promotions: [CAMPAIGN, COUPON_CAMPAIGN],
       products: [
-        { id: PRODUCT_ID, store_id: STORE_A, name: 'Alitraq Polvo Oral', sku: 'QS-565341', kind: 'simple' },
+        { id: PRODUCT_ID, name: 'Alitraq Polvo Oral', sku: 'QS-565341', kind: 'simple' },
+      ],
+      // ADR 018: el buscador del alcance lee las publicaciones de la tienda.
+      admin_store_products: [
+        { product_id: PRODUCT_ID, store_id: STORE_A, name: 'Alitraq Polvo Oral', sku: 'QS-565341', kind: 'simple' },
       ],
       promotion_scopes: [],
       promotion_tiers: [],
