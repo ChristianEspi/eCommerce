@@ -29,6 +29,12 @@ orden, grafo de dependencias, riesgos y estado por fase en
   `/app/stores` (grupo Sistema junto a Configuración, sin capacidad, permiso `store.manage`): listado, alta, edición, activar/suspender y
   «Usar esta tienda». Pruebas: `supabase/tests/store-management.test.ts` (13),
   `src/features/stores/stores-ui.test.tsx` (8).
+- **Fase 03 (maestro + publicación, base):** `20260917110000_product_master_expand.sql` y
+  `20260917120000_product_master_read_models.sql` (**sin aplicar en DEV**). `store_products` y
+  `store_price_overrides` con RLS, relleno 1:1 verificado, SKU único por sociedad con marca de conflicto
+  heredado, PIM con FK al maestro, vistas públicas por publicación y ATP por almacenes de cada tienda.
+  Transición: la tienda de origen queda sincronizada con las columnas legacy hasta la fase 05.
+  `supabase/tests/product-master.test.ts` (17); base completa 2 618 pruebas en verde.
 
 ## Importación del catálogo desde Excel (2026-09-16)
 

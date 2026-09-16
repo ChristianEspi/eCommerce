@@ -90,9 +90,13 @@ variantes, dos fichas que divergen y dos historiales de venta que no se pueden s
 14. **Las columnas legacy de publicación en `products`** (`slug`, `category_id`, `status`,
     `published_at`, `price`, `compare_at_price`, `currency`) y los precios propios de
     `product_variants`/`product_uoms` **quedan como fachada de escritura durante la transición**: lo
-    que se escribe en ellas se traslada a la publicación (o al precio propio) de la tienda de origen y
-    la columna queda en `NULL`. Así **nadie puede leer un dato viejo creyendo que es el vigente**, y
-    los clientes y fixtures que aún escriben la forma antigua siguen funcionando. `products.store_id`
+    que se escribe en ellas se traslada a la publicación (o al precio propio) de la tienda de origen.
+    Mientras los lectores legacy de comercio no se migran (fases 03–04), la tienda de origen se
+    mantiene **sincronizada en los dos sentidos** con su publicación —dejarlas en `NULL` antes habría
+    roto medio centenar de funciones a la vez—. En la contracción de la fase 05 la sincronía inversa
+    se retira y la columna pasa a quedar en `NULL`, de modo que **nadie pueda leer un dato viejo
+    creyendo que es el vigente**; los clientes y fixtures que aún escriben la forma antigua siguen
+    funcionando. `products.store_id`
     pasa a significar «tienda de origen» y deja de ser obligatorio. Su retirada física es la migración
     de contracción, condicionada a que no quede ningún escritor (ver plan §9).
 15. **Las imágenes no se mueven en Storage.** La fila de `product_images` pasa a ser del maestro; el

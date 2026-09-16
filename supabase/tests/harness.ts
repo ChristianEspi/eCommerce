@@ -106,17 +106,34 @@ export function readMigration(file: string): string {
  * banco de pruebas tiene que dar si alguien usa una extensión que el proyecto
  * real no tendría.
  */
-export async function createTestDatabase(): Promise<PGlite> {
+export async function createTestDatabase(options: { before?: string } = {}): Promise<PGlite> {
   const db = await PGlite.create({ extensions: { pg_trgm } })
   await db.exec(SUPABASE_PRELUDE)
+  await applyMigrations(db, { before: options.before })
+  return db
+}
+
+/**
+ * Aplica un TRAMO de migraciones, por prefijo de nombre de archivo.
+ *
+ * Existe para las migraciones que transforman datos: con
+ * `createTestDatabase({ before: X })` se siembra la forma ANTIGUA y con
+ * `applyMigrations(db, { from: X })` se aplica el resto, exactamente como
+ * ocurre en una base que ya tenía datos. Sin opciones, todas.
+ */
+export async function applyMigrations(
+  db: PGlite,
+  options: { from?: string; before?: string } = {},
+): Promise<void> {
   for (const file of migrationFiles()) {
+    if (options.from && file < options.from) continue
+    if (options.before && file >= options.before) continue
     try {
       await db.exec(readMigration(file))
     } catch (error) {
       throw new Error(`Migración ${file} falló: ${(error as Error).message}`)
     }
   }
-  return db
 }
 
 /** Ejecuta como `anon` o `authenticated` con los claims dados, y siempre restaura. */

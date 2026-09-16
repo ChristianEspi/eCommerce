@@ -292,7 +292,51 @@ Cada archivo es nuevo; ninguna migración aplicada se edita.
 |---|---|
 | 01 — auditoría, ADR y plan | hecha (este documento) |
 | 02 — tiendas autoservicio | hecha: `20260917100000_store_management.sql`, `/app/stores` |
-| 03 — maestro + publicación (base) | pendiente |
+| 03 — maestro + publicación (base) | hecha: `20260917110000_product_master_expand.sql` y `20260917120000_product_master_read_models.sql` (ver §12) |
 | 04 — backoffice de maestro | pendiente |
 | 05 — consumidores y contracción | pendiente |
 | 06 — certificación | pendiente |
+
+## 12. Implementado en la fase 03 (2026-09-17)
+
+**Expand + migrate — `20260917110000_product_master_expand.sql`**
+
+- `store_products` (publicación): slug único por tienda, categoría con FK `(category_id, store_id)`,
+  estado, fecha, precio de catálogo y moneda; FKs compuestas con organización y sociedad hacia tienda
+  y maestro; `unique (product_id, store_id)` como destino de las FKs de la fase 05; RLS forzada con
+  policies de miembro/catálogo y lectura anónima de lo publicado en tienda activa.
+- `store_price_overrides`: precio propio de variante o de presentación por tienda.
+- Relleno idempotente 1:1 desde `products` y desde `product_variants.price`/`product_uoms.price`,
+  con verificación que aborta la migración si no cuadra (conteos, productos sin publicación,
+  publicaciones cruzadas entre sociedades).
+- `products.store_id`, `slug` y `price` pasan a nullable; el `store_id` de las tablas PIM también, y
+  cada una gana su FK contra el maestro `(product_id, organization_id, company_id)`.
+- Imágenes: el CHECK de ruta pasa a trigger (`{org}/{tienda de la sociedad}/…`); ningún objeto se
+  mueve.
+- SKU único por sociedad entre productos y variantes: `legacy_sku_conflict`, índices parciales y
+  trigger que rechaza duplicados nuevos y desmarca al renombrar.
+- **Transición:** triggers de sincronía de la tienda de ORIGEN en los dos sentidos (publicación ↔
+  columnas legacy; precio propio ↔ precio de variante/presentación), con `pg_trigger_depth()` contra
+  el eco. Se retiran en la contracción (fase 05).
+
+**Modelos de lectura — `20260917120000_product_master_read_models.sql`**
+
+- `ebim.atp` y `ebim.expand_stock_lines` reconocen el producto por la sociedad de la tienda, no por
+  su tienda de origen.
+- `ebim.store_product_is_available` y `ebim.store_bundle_is_available`, con la tienda explícita.
+- `ebim.variant_public_options`: ejes del maestro si está publicado en alguna tienda activa.
+- `ebim.product_is_public` y policies anónimas de `products`, `product_images`, `product_variants` y
+  `brands` contra la publicación.
+- `ebim.public_unit_prices` por tienda; `public_products` y `public_product_variants` recompuestas
+  sobre la publicación con las MISMAS columnas.
+- `admin_store_products`: una fila por publicación para el backoffice. `admin_products` conserva su
+  forma hasta la fase 04.
+
+**Compatibilidad restante:** las ~40 funciones de comercio siguen leyendo las columnas legacy de la
+tienda de origen, válidas gracias a la sincronía. `ebim.product_is_available` y
+`ebim.bundle_is_available` con la firma antigua siguen existiendo, sin llamantes en las vistas; se
+retiran en la fase 05. Las FKs `(product_id, store_id)` siguen apuntando a `products` hasta la fase 05.
+
+**Pruebas:** `supabase/tests/product-master.test.ts` (17) siembra datos con la forma legacy ANTES de
+aplicar la migración (`createTestDatabase({ before })` + `applyMigrations`). Suite de base completa:
+104 archivos, 2 618 pruebas, 0 fallos.
