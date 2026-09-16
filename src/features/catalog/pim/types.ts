@@ -275,8 +275,10 @@ export type BundleItemFormValues = z.infer<typeof bundleItemFormSchema>
  */
 export function effectiveVariantPrice(
   variant: Pick<ProductVariant, 'price'>,
-  productPrice: string,
-): string {
+  productPrice: string | null,
+): string | null {
+  // Sin precio propio ni precio base (el maestro no está publicado en su tienda
+  // de origen) no hay nada que heredar: `null`, no un cero que parezca un precio.
   return variant.price ?? productPrice
 }
 
@@ -312,9 +314,10 @@ const FACTOR_SCALE = 6
  */
 export function effectiveUomPrice(
   uom: Pick<ProductUom, 'price' | 'factor'>,
-  basePrice: string,
-): string {
+  basePrice: string | null,
+): string | null {
   if (uom.price !== null) return uom.price
+  if (basePrice === null) return null
   const cents = toScaledInt(basePrice, 2)
   const micros = toScaledInt(uom.factor, FACTOR_SCALE)
   if (!Number.isFinite(cents) || !Number.isFinite(micros)) return basePrice

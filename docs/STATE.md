@@ -35,6 +35,15 @@ orden, grafo de dependencias, riesgos y estado por fase en
   heredado, PIM con FK al maestro, vistas públicas por publicación y ATP por almacenes de cada tienda.
   Transición: la tienda de origen queda sincronizada con las columnas legacy hasta la fase 05.
   `supabase/tests/product-master.test.ts` (17); base completa 2 618 pruebas en verde.
+- **Fase 04 (backoffice del maestro):** `20260917130000_product_master_commands.sql` y
+  `20260917140000_product_master_import.sql` (**sin aplicar en DEV**). `/app/products` lista maestros de
+  la sociedad activa (tiendas activas, estado agregado, sin precio global); el cajón separa «General»
+  (maestro) de «Tiendas» (publicar, editar y quitar por tienda con sus propias categorías). Comandos
+  `publish_product`, `update_product_publication`, `unpublish_product`, `product_store_publications`
+  y `delete_product_master` (niega borrar lo publicado o con pedidos), todos INVOKER y con tenant del
+  JWT. La importación en una segunda tienda publica el maestro existente en vez de duplicarlo. El PIM
+  se ancla en base a la tienda de origen. `product-master-commands.test.ts` (27); UI reescrita en
+  `ProductsPage.test.tsx`.
 
 ## Importación del catálogo desde Excel (2026-09-16)
 

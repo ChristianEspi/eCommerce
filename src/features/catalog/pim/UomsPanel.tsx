@@ -25,7 +25,7 @@ import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
-import { formatMoney } from '@/shared/lib/format'
+import { formatMoneyOrDash } from '@/shared/lib/format'
 import { LoadingState } from '@/shared/ui/states'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { CatalogError } from '../api/errors'
@@ -37,7 +37,7 @@ import {
   type ProductUom,
   type ProductUomFormValues,
 } from './types'
-import type { Product } from '../types'
+import type { PimProduct } from '../types'
 
 /**
  * Unidades de venta del producto.
@@ -57,7 +57,7 @@ export function UomsPanel({
   storeId,
   canWrite,
 }: {
-  product: Product | null
+  product: PimProduct | null
   organizationId: string
   companyId: string
   storeId: string
@@ -173,11 +173,7 @@ export function UomsPanel({
                   {uom.factor}
                 </TableCell>
                 <TableCell align="right" className="tnum">
-                  {formatMoney(
-                    Number(effectiveUomPrice(uom, product.price)),
-                    product.currency,
-                    locale,
-                  )}
+                  {formatMoneyOrDash(effectiveUomPrice(uom, product.price), product.currency, locale)}
                 </TableCell>
                 <TableCell>{uom.is_sellable ? t('common.yes') : t('common.no')}</TableCell>
                 <TableCell align="right">

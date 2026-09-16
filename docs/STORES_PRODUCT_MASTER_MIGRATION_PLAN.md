@@ -293,7 +293,7 @@ Cada archivo es nuevo; ninguna migración aplicada se edita.
 | 01 — auditoría, ADR y plan | hecha (este documento) |
 | 02 — tiendas autoservicio | hecha: `20260917100000_store_management.sql`, `/app/stores` |
 | 03 — maestro + publicación (base) | hecha: `20260917110000_product_master_expand.sql` y `20260917120000_product_master_read_models.sql` (ver §12) |
-| 04 — backoffice de maestro | pendiente |
+| 04 — backoffice de maestro | hecha: `20260917130000_product_master_commands.sql`, `20260917140000_product_master_import.sql`, `/app/products` (ver §13) |
 | 05 — consumidores y contracción | pendiente |
 | 06 — certificación | pendiente |
 
@@ -340,3 +340,41 @@ retiran en la fase 05. Las FKs `(product_id, store_id)` siguen apuntando a `prod
 **Pruebas:** `supabase/tests/product-master.test.ts` (17) siembra datos con la forma legacy ANTES de
 aplicar la migración (`createTestDatabase({ before })` + `applyMigrations`). Suite de base completa:
 104 archivos, 2 618 pruebas, 0 fallos.
+
+## 13. Implementado en la fase 04 (2026-09-17)
+
+**Comandos — `20260917130000_product_master_commands.sql`** (todo `SECURITY INVOKER`, tenant de
+`ebim.org_id()` + `ebim.active_company()`, ningún parámetro de organización o sociedad)
+
+- `admin_product_masters`: un maestro por fila de la sociedad ACTIVA con `publication_count`,
+  `published_count`, `published_store_names`, `store_ids`, `category_ids` y `publication_state`
+  agregado. Sin precio.
+- `product_store_publications(product)`: todas las tiendas de la sociedad y la publicación en cada una.
+- `publish_product` / `update_product_publication` / `unpublish_product`: guardas
+  `ebim.assert_catalog_editor` (owner/admin/catalog, no operador), `ebim.catalog_master` y
+  `ebim.catalog_store` (sociedad activa), categoría de ESA tienda, moneda de la tienda, códigos
+  `SLUG_DUPLICADO`, `PUBLICACION_DUPLICADA`, `CATEGORIA_FUERA_DE_TIENDA`, `PUBLICACION_NO_ENCONTRADA`.
+- `delete_product_master`: niega `PRODUCTO_PUBLICADO`, `PRODUCTO_CON_HISTORIA`, `PRODUCTO_EN_KIT`.
+  `product_deletion_usage` suma `publications`.
+- **Transición:** `ebim.adopt_origin_store` — un maestro creado sin tienda adopta como origen la
+  primera tienda donde se publica (y re-ancla su PIM), para que los lectores de comercio aún no
+  migrados lo encuentren. `ebim.anchor_pim_origin_store` — el `store_id` de variantes, ficha,
+  presentaciones, kits, relaciones e imágenes lo fija la base (tienda de origen o NULL), no la tienda
+  activa del cliente; así el PIM se edita desde cualquier tienda sin chocar con las FKs legacy.
+
+**Importación — `20260917140000_product_master_import.sql`:** el SKU se busca en la sociedad; en una
+tienda que no es la de origen, el maestro recibe nombre/descripción/marca/familia/stock y la
+publicación de ESA tienda recibe slug/categoría/estado/precio (se crea si falta); el precio de variante
+va a `store_price_overrides` de esa tienda. En la tienda de origen se comporta como antes.
+
+**Edge Function `catalog-product`:** alta sin `store_id` = solo maestro (rechaza campos de
+publicación); con `store_id` = maestro + publicación inicial, como antes.
+
+**Backoffice:** `/app/products` lista maestros (tiendas activas y cuáles, estado agregado, sin precio);
+el cajón separa «General» (maestro, con publicación inicial opcional en la tienda activa solo al dar
+de alta) de «Tiendas» (`StorePublicationsPanel`: una tarjeta por tienda con dirección, categoría de esa
+tienda, estado, precio y enlace a la vitrina). Variantes/presentaciones avisan que su precio propio es
+el de la tienda de origen. `CategoriesPage` sigue siendo de la tienda activa.
+
+**Pruebas:** `supabase/tests/product-master-commands.test.ts` (27); `ProductsPage.test.tsx` (38,
+reescrito para maestros y publicaciones), `pim-ui.test.tsx`, `catalog.test.ts`.

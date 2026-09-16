@@ -1,5 +1,5 @@
 import { toCsv } from '@/shared/lib/csv'
-import type { Category, Product } from './types'
+import type { ProductMaster } from './types'
 
 /**
  * Exportación del catálogo. El escapado y la descarga viven en
@@ -7,22 +7,26 @@ import type { Category, Product } from './types'
  */
 export { escapeCsvField, downloadCsv } from '@/shared/lib/csv'
 
-const HEADERS = ['sku', 'name', 'slug', 'category', 'price', 'currency', 'stock', 'status'] as const
+/**
+ * Lo mismo que se ve en el listado de maestros (ADR 018). Sin precio, slug ni
+ * categoría: son de cada tienda, y una sola columna de precio en un CSV de
+ * maestros sería el precio de ninguna tienda en concreto.
+ */
+const HEADERS = ['sku', 'name', 'kind', 'brand', 'family', 'stock', 'published_stores', 'stores', 'state'] as const
 
-export function productsToCsv(products: Product[], categories: Category[]): string {
-  const nameById = new Map(categories.map((category) => [category.id, category.name]))
-
+export function productsToCsv(products: ProductMaster[]): string {
   return toCsv(
     HEADERS,
     products.map((product) => [
       product.sku,
       product.name,
-      product.slug,
-      product.category_id ? (nameById.get(product.category_id) ?? '') : '',
-      product.price,
-      product.currency,
+      product.kind,
+      product.brand_name ?? '',
+      product.family_name ?? '',
       String(product.stock),
-      product.status,
+      String(product.published_count),
+      product.published_store_names.join(' | '),
+      product.publication_state,
     ]),
   )
 }

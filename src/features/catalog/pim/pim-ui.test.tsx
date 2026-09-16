@@ -12,7 +12,7 @@ import {
   makeSession,
   type FakeSupabase,
 } from '@/test/supabaseMock'
-import type { Product } from '../types'
+import type { ProductMaster } from '../types'
 
 /**
  * El PIM en pantalla (P03-SaaS).
@@ -48,30 +48,53 @@ const UNIT_ID = '99999999-9999-4999-8999-999999999955'
 
 const ADVANCED = ['ecommerce.catalog.advanced']
 
+/** El producto MAESTRO (ADR 018): sin precio propio, publicado en su tienda de origen. */
 function variantProduct() {
   return {
     id: PRODUCT_ID,
     organization_id: ORG,
     company_id: COMPANY_A,
-    store_id: STORE_A,
-    category_id: null,
+    origin_store_id: STORE_A,
     sku: 'A-CAMISETA',
     name: 'Camiseta',
-    slug: 'camiseta',
     description: null,
-    status: 'draft' as const,
-    price: '60.00',
-    compare_at_price: null,
-    currency: 'PEN',
     stock: 0,
-    published_at: null,
     updated_at: '2026-08-27T00:00:00.000Z',
     kind: 'variant',
     brand_id: null,
+    brand_name: null,
     family_id: null,
+    family_name: null,
     // Sin categoria fiscal propia: manda la que la sociedad marco por defecto.
     tax_category_id: null,
-  } satisfies Product
+    legacy_sku_conflict: false,
+    publication_count: 1,
+    published_count: 0,
+    store_ids: [STORE_A],
+    published_store_names: [],
+    category_ids: [],
+    publication_state: 'draft',
+  } satisfies ProductMaster
+}
+
+/** La publicación de origen, de donde las variantes heredan el precio base. */
+const ORIGIN_PUBLICATION = {
+  store_id: STORE_A,
+  store_name: 'Mi Negocio',
+  store_slug: 'mi-negocio',
+  store_status: 'active',
+  store_currency: 'PEN',
+  is_origin: true,
+  publication_id: '99999999-9999-4999-8999-999999999977',
+  category_id: null,
+  category_name: null,
+  slug: 'camiseta',
+  status: 'draft',
+  published_at: null,
+  price: '60.00',
+  compare_at_price: null,
+  currency: 'PEN',
+  updated_at: '2026-08-27T00:00:00.000Z',
 }
 
 function backend(options: { entitlements?: string[] } = {}): FakeSupabase {
@@ -180,6 +203,7 @@ function backend(options: { entitlements?: string[] } = {}): FakeSupabase {
     },
     rpc: {
       effective_capabilities: () => makePlatformContext({ entitlements, source: 'hub' }),
+      product_store_publications: () => [ORIGIN_PUBLICATION],
     },
   })
 }
@@ -196,7 +220,7 @@ function renderPim(fake: FakeSupabase) {
   )
 }
 
-function renderDrawer(fake: FakeSupabase, product: Product | null) {
+function renderDrawer(fake: FakeSupabase, product: ProductMaster | null) {
   holder.client = fake
   return renderWithProviders(
     <TenantProvider>
@@ -209,6 +233,7 @@ function renderDrawer(fake: FakeSupabase, product: Product | null) {
           organizationId={ORG}
           companyId={COMPANY_A}
           storeId={STORE_A}
+          storeName="Mi Negocio"
           currency="PEN"
           canWrite
           onClose={() => {}}
@@ -309,6 +334,7 @@ describe('El cajón del producto se gatea por `catalog.advanced`', () => {
     await waitFor(() =>
       expect(within(drawer).getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
         'General',
+        'Tiendas',
         'Imágenes',
         'Variantes',
         'Unidades',
@@ -325,6 +351,7 @@ describe('El cajón del producto se gatea por `catalog.advanced`', () => {
     await waitFor(() =>
       expect(within(drawer).getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
         'General',
+        'Tiendas',
         'Imágenes',
       ]),
     )

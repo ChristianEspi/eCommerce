@@ -27,7 +27,7 @@ import { relationPositionsAfterMove } from './api'
 import { PanelHint } from './VariantsPanel'
 import { useAddRelation, useDeleteRelation, useRelations, useReorderRelations } from './hooks'
 import { PRODUCT_RELATION_KINDS, type ProductRelationKind } from './types'
-import type { Product } from '../types'
+import type { PimProduct, ProductCandidate } from '../types'
 
 const RELATION_LABEL: Record<ProductRelationKind, MessageKey> = {
   related: 'pim.relation.related',
@@ -58,8 +58,8 @@ export function RelationsPanel({
   storeId,
   canWrite,
 }: {
-  product: Product | null
-  products: Product[]
+  product: PimProduct | null
+  products: ProductCandidate[]
   organizationId: string
   companyId: string
   storeId: string

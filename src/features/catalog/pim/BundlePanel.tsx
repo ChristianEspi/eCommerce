@@ -31,7 +31,7 @@ import {
   bundleItemFormSchema,
   type BundleItemFormValues,
 } from './types'
-import type { Product } from '../types'
+import type { PimProduct, ProductCandidate } from '../types'
 
 /**
  * Componentes del kit.
@@ -55,9 +55,9 @@ export function BundlePanel({
   storeId,
   canWrite,
 }: {
-  product: Product | null
+  product: PimProduct | null
   /** Catálogo de la tienda, ya cargado por el listado que abrió este cajón. */
-  products: Product[]
+  products: ProductCandidate[]
   organizationId: string
   companyId: string
   storeId: string
@@ -222,7 +222,7 @@ function BundleItemForm({
   onCancel,
   onSubmit,
 }: {
-  candidates: Product[]
+  candidates: ProductCandidate[]
   units: Array<{ id: string; code: string; name: string }>
   onCancel: () => void
   onSubmit: (values: BundleItemFormValues) => Promise<void>

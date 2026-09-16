@@ -4,7 +4,9 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   CircularProgress,
+  FormControlLabel,
   InputAdornment,
   MenuItem,
   Stack,
@@ -30,6 +32,7 @@ import { useFeedback } from '@/shared/ui/feedback-context'
 import { CatalogError } from './api/errors'
 import { CategoryPicker } from './CategoryPicker'
 import { ProductImagesPanel } from './ProductImagesPanel'
+import { StorePublicationsPanel } from './StorePublicationsPanel'
 import { BundlePanel } from './pim/BundlePanel'
 import { ProductAttributesPanel } from './pim/ProductAttributesPanel'
 import { RelationsPanel } from './pim/RelationsPanel'
@@ -44,12 +47,14 @@ import {
   productFormSchema,
   productToForm,
   type Category,
-  type Product,
+  type PimProduct,
+  type ProductCandidate,
   type ProductFormValues,
   type ProductKind,
+  type ProductMaster,
   type ProductStatus,
 } from './types'
-import { useSaveProduct } from './useProducts'
+import { useProductPublications, useSaveProduct } from './useProducts'
 
 const STATUS_LABEL: Record<ProductStatus, MessageKey> = {
   draft: 'catalog.status.draft',
@@ -89,19 +94,23 @@ export function ProductDrawer({
   organizationId,
   companyId,
   storeId,
+  storeName,
   currency,
   canWrite,
   onClose,
 }: {
   open: boolean
   /** Null = alta. */
-  product: Product | null
+  product: ProductMaster | null
+  /** Categorías de la tienda ACTIVA: solo para la publicación inicial del alta. */
   categories: Category[]
   /** Catálogo cargado por el listado: candidatos de kit y de relacionados. */
-  products: Product[]
+  products: ProductCandidate[]
   organizationId: string
   companyId: string
+  /** Tienda activa: contexto inicial del alta, nunca dueña del maestro. */
   storeId: string
+  storeName: string
   currency: string
   canWrite: boolean
   onClose: () => void
@@ -119,6 +128,26 @@ export function ProductDrawer({
   const [almacenInicial, setAlmacenInicial] = useState('')
 
   const brands = useBrands(open && advanced)
+
+  /*
+   * El precio base que heredan variantes y presentaciones es el de la tienda de
+   * ORIGEN mientras dure la transición (ADR 018). Sale de la misma consulta que
+   * pinta la pestaña «Tiendas»; sin publicación de origen no hay precio que
+   * heredar y los paneles pintan «—» en vez de inventarlo.
+   */
+  const publications = useProductPublications(open && product ? product.id : null)
+  const origin =
+    (publications.data ?? []).find((row) => row.is_origin && row.publication_id !== null) ?? null
+  const pimProduct: PimProduct | null = product
+    ? {
+        id: product.id,
+        sku: product.sku,
+        name: product.name,
+        kind: product.kind,
+        price: origin?.price ?? null,
+        currency: origin?.currency ?? origin?.store_currency ?? currency,
+      }
+    : null
   const families = useFamilies(open && advanced)
 
   // Las categorías fiscales las administra Configuración; aquí solo se elige
@@ -230,6 +259,7 @@ export function ProductDrawer({
 
   const busy = isSubmitting || save.isPending
   const kind = watch('kind')
+  const publish = watch('publish')
 
   /**
    * El borrador de la ficha, que es una SUGERENCIA y no un guardado.
@@ -268,6 +298,7 @@ export function ProductDrawer({
   const tabs = useMemo(() => {
     const items: Array<{ id: string; label: string }> = [
       { id: 'general', label: t('catalog.tab.general') },
+      { id: 'tiendas', label: t('catalog.tab.stores') },
       { id: 'imagenes', label: t('catalog.tab.images') },
     ]
     if (advanced) {
@@ -358,26 +389,15 @@ export function ProductDrawer({
             })}
           />
 
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <TextField
-              label={t('catalog.field.sku')}
-              fullWidth
-              disabled={!canWrite}
-              error={Boolean(errors.sku)}
-              helperText={fieldError('sku')}
-              inputProps={{ spellCheck: false }}
-              {...register('sku')}
-            />
-            <TextField
-              label={t('catalog.field.slug')}
-              fullWidth
-              disabled={!canWrite}
-              error={Boolean(errors.slug)}
-              helperText={fieldError('slug') ?? t('catalog.field.slug.help')}
-              inputProps={{ spellCheck: false }}
-              {...register('slug', { onChange: () => setSlugEdited(true) })}
-            />
-          </Stack>
+          <TextField
+            label={t('catalog.field.sku')}
+            fullWidth
+            disabled={!canWrite}
+            error={Boolean(errors.sku)}
+            helperText={fieldError('sku') ?? t('catalog.master.skuHelp')}
+            inputProps={{ spellCheck: false }}
+            {...register('sku')}
+          />
 
           <Stack sx={{ gap: 0.75 }}>
             <TextField
@@ -430,20 +450,6 @@ export function ProductDrawer({
               </Alert>
             )}
           </Stack>
-
-          {/* Con RUTA y agrupado por su raíz: en una lista de cuarenta, dos
-              «Cuidado» sueltos no se distinguen, y saber de qué madre cuelga
-              cada uno es justo lo que evita clasificar mal el producto. */}
-          <CategoryPicker
-            label={t('catalog.field.category')}
-            nodes={arbol}
-            value={watch('category_id')}
-            onChange={(next) => setValue('category_id', next, { shouldValidate: true })}
-            noneLabel={t('common.none')}
-            disabled={!canWrite}
-            error={Boolean(errors.category_id)}
-            helperText={fieldError('category_id')}
-          />
 
           {advanced && (
             <>
@@ -505,18 +511,6 @@ export function ProductDrawer({
           )}
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <TextField
-              label={t('catalog.field.price')}
-              fullWidth
-              disabled={!canWrite}
-              error={Boolean(errors.price)}
-              helperText={fieldError('price')}
-              InputProps={{
-                startAdornment: <InputAdornment position="start">{currency}</InputAdornment>,
-              }}
-              inputProps={{ inputMode: 'decimal' }}
-              {...register('price')}
-            />
             <TextField
               label={t('catalog.field.stock')}
               fullWidth
@@ -601,24 +595,106 @@ export function ProductDrawer({
             </TextField>
           )}
 
-          <TextField
-            select
-            label={t('catalog.field.status')}
-            fullWidth
-            disabled={!canWrite}
-            value={watch('status')}
-            error={Boolean(errors.status)}
-            helperText={fieldError('status')}
-            {...register('status')}
-          >
-            {PRODUCT_STATUSES.map((status) => (
-              <MenuItem key={status} value={status}>
-                {t(STATUS_LABEL[status])}
-              </MenuItem>
-            ))}
-          </TextField>
+          {/* La publicación INICIAL, solo en el alta y en la tienda activa. Es
+              contexto, no propiedad: el producto es de la sociedad, y el resto
+              de tiendas se decide después en «Tiendas». Al editar no aparece:
+              precio, dirección y estado de cada tienda viven en su tarjeta. */}
+          {product === null && (
+            <Box
+              component="fieldset"
+              sx={{ border: '1px solid var(--border)', borderRadius: 2, p: 2, m: 0 }}
+            >
+              <Typography component="legend" sx={{ px: 0.5, fontWeight: 700, fontSize: 14 }}>
+                {t('catalog.master.initialPublication')}
+              </Typography>
+              <Stack spacing={2}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={publish}
+                      disabled={!canWrite}
+                      onChange={(event) =>
+                        setValue('publish', event.target.checked, { shouldValidate: false })
+                      }
+                    />
+                  }
+                  label={t('catalog.master.publishIn').replace('{store}', storeName)}
+                />
+
+                {publish ? (
+                  <>
+                    <TextField
+                      label={t('catalog.field.slug')}
+                      fullWidth
+                      disabled={!canWrite}
+                      error={Boolean(errors.slug)}
+                      helperText={fieldError('slug') ?? t('catalog.field.slug.help')}
+                      inputProps={{ spellCheck: false }}
+                      {...register('slug', { onChange: () => setSlugEdited(true) })}
+                    />
+
+                    {/* Con RUTA y agrupado por su raíz: dos «Cuidado» sueltos no
+                        se distinguen. Solo las categorías de ESTA tienda. */}
+                    <CategoryPicker
+                      label={t('catalog.field.category')}
+                      nodes={arbol}
+                      value={watch('category_id')}
+                      onChange={(next) => setValue('category_id', next, { shouldValidate: true })}
+                      noneLabel={t('common.none')}
+                      disabled={!canWrite}
+                      error={Boolean(errors.category_id)}
+                      helperText={fieldError('category_id')}
+                    />
+
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                      <TextField
+                        label={t('catalog.field.price')}
+                        fullWidth
+                        disabled={!canWrite}
+                        error={Boolean(errors.price)}
+                        helperText={fieldError('price')}
+                        InputProps={{
+                          startAdornment: <InputAdornment position="start">{currency}</InputAdornment>,
+                        }}
+                        inputProps={{ inputMode: 'decimal' }}
+                        {...register('price')}
+                      />
+                      <TextField
+                        select
+                        label={t('catalog.field.status')}
+                        fullWidth
+                        disabled={!canWrite}
+                        value={watch('status')}
+                        error={Boolean(errors.status)}
+                        helperText={fieldError('status')}
+                        {...register('status')}
+                      >
+                        {PRODUCT_STATUSES.map((status) => (
+                          <MenuItem key={status} value={status}>
+                            {t(STATUS_LABEL[status])}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Stack>
+                  </>
+                ) : (
+                  <Typography sx={{ fontSize: 13, color: 'var(--muted)' }}>
+                    {t('catalog.master.noPublicationHelp')}
+                  </Typography>
+                )}
+              </Stack>
+            </Box>
+          )}
         </Stack>
       </Box>
+
+      {active === 'tiendas' && (
+        <StorePublicationsPanel
+          productId={product?.id ?? null}
+          productName={product?.name ?? ''}
+          canWrite={canWrite}
+        />
+      )}
 
       {active === 'imagenes' && (
         <ProductImagesPanel
@@ -630,14 +706,24 @@ export function ProductDrawer({
         />
       )}
 
-      {active === 'variantes' && <VariantsPanel product={product} {...scope} />}
-      {active === 'componentes' && (
-        <BundlePanel product={product} products={products} {...scope} />
+      {/* Variantes y presentaciones son del MAESTRO: publicar en otra tienda
+          no las copia. Su precio propio, en cambio, es el de la tienda de
+          origen; las demás tiendas usan su lista o su precio de publicación. */}
+      {(active === 'variantes' || active === 'unidades') && product && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          {origin
+            ? t('catalog.master.pimPriceScope').replace('{store}', origin.store_name)
+            : t('catalog.master.pimNoOrigin')}
+        </Alert>
       )}
-      {active === 'unidades' && <UomsPanel product={product} {...scope} />}
-      {active === 'ficha' && <ProductAttributesPanel product={product} {...scope} />}
+      {active === 'variantes' && <VariantsPanel product={pimProduct} {...scope} />}
+      {active === 'componentes' && (
+        <BundlePanel product={pimProduct} products={products} {...scope} />
+      )}
+      {active === 'unidades' && <UomsPanel product={pimProduct} {...scope} />}
+      {active === 'ficha' && <ProductAttributesPanel product={pimProduct} {...scope} />}
       {active === 'relacionados' && (
-        <RelationsPanel product={product} products={products} {...scope} />
+        <RelationsPanel product={pimProduct} products={products} {...scope} />
       )}
     </FormDrawer>
   )

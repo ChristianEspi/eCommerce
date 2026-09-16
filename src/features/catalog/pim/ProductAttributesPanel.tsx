@@ -21,7 +21,7 @@ import {
 } from './hooks'
 import type { ProductAttributeInput } from './api'
 import type { AttributeValue, ProductAttributeValue } from './types'
-import type { Product } from '../types'
+import type { PimProduct } from '../types'
 
 /**
  * Ficha técnica del producto: un valor por atributo declarado.
@@ -43,7 +43,7 @@ export function ProductAttributesPanel({
   storeId,
   canWrite,
 }: {
-  product: Product | null
+  product: PimProduct | null
   organizationId: string
   companyId: string
   storeId: string

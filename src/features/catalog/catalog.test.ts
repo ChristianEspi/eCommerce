@@ -15,9 +15,8 @@ import {
   productFormSchema,
   productSchema,
   productToForm,
-  type Category,
-  type Product,
   type ProductImage,
+  type ProductMaster,
 } from './types'
 
 const ORG = '11111111-1111-4111-8111-111111111111'
@@ -69,6 +68,8 @@ describe('dinero del catalogo', () => {
 })
 
 describe('validacion del formulario de producto', () => {
+  // Alta con publicación inicial: slug y precio se validan porque `publish`
+  // está marcado.
   const valid = {
     name: 'Silla ergonomica',
     slug: 'silla-ergonomica',
@@ -83,7 +84,12 @@ describe('validacion del formulario de producto', () => {
     family_id: '',
     // Vacio = la categoria fiscal por defecto de la sociedad.
     tax_category_id: '',
+    publish: true,
   }
+
+  it('sin publicación inicial, slug y precio no se exigen: son de cada tienda', () => {
+    expect(productFormSchema.safeParse({ ...valid, publish: false, slug: '', price: '' }).success).toBe(true)
+  })
 
   it('acepta un producto bien formado', () => {
     expect(productFormSchema.safeParse(valid).success).toBe(true)
@@ -126,8 +132,8 @@ describe('validacion del formulario de producto', () => {
     expect(result.error?.issues[0]?.message).toMatch(/^catalog\.error\./)
   })
 
-  it('el formulario de alta arranca en borrador y con stock cero', () => {
-    expect(productToForm(null)).toMatchObject({ status: 'draft', stock: '0', price: '' })
+  it('el formulario de alta arranca en borrador, con stock cero y publicando en la tienda activa', () => {
+    expect(productToForm(null)).toMatchObject({ status: 'draft', stock: '0', price: '', publish: true })
   })
 
   it('la categoria es opcional: la cadena vacia es valida', () => {
@@ -297,39 +303,31 @@ describe('traduccion de errores', () => {
 })
 
 describe('exportar a CSV', () => {
-  const product = (over: Partial<Product>): Product => ({
+  const product = (over: Partial<ProductMaster>): ProductMaster => ({
     id: PRODUCT,
     organization_id: ORG,
     company_id: ORG,
-    store_id: STORE,
-    category_id: null,
+    origin_store_id: STORE,
     sku: 'A-1',
     name: 'Silla',
-    slug: 'silla',
     description: null,
-    status: 'draft',
-    price: '199.90',
-    compare_at_price: null,
-    currency: 'PEN',
     stock: 4,
-    published_at: null,
     updated_at: '2026-08-27T00:00:00.000Z',
     kind: 'simple',
     brand_id: null,
+    brand_name: null,
     family_id: null,
+    family_name: null,
     tax_category_id: null,
+    legacy_sku_conflict: false,
+    publication_count: 0,
+    published_count: 0,
+    store_ids: [],
+    published_store_names: [],
+    category_ids: [],
+    publication_state: 'draft',
     ...over,
   })
-
-  const category: Category = {
-    id: '77777777-7777-4777-8777-777777777777',
-    store_id: STORE,
-    parent_id: null,
-    slug: 'sillas',
-    name: 'Sillas',
-    position: 0,
-    is_active: true,
-  }
 
   it('neutraliza las celdas que Excel interpretaria como formula', () => {
     expect(escapeCsvField('=1+1')).toBe(`"'=1+1"`)
@@ -341,16 +339,19 @@ describe('exportar a CSV', () => {
     expect(escapeCsvField('Silla "premium"')).toBe('"Silla ""premium"""')
   })
 
-  it('resuelve el nombre de la categoria y saca el precio como texto', () => {
-    const csv = productsToCsv([product({ category_id: category.id })], [category])
+  it('exporta maestros con sus tiendas y SIN un precio global', () => {
+    const csv = productsToCsv([
+      product({ published_count: 2, published_store_names: ['Tienda A1', 'Tienda A2'], publication_state: 'published' }),
+    ])
     const [header, row] = csv.split('\r\n')
-    expect(header).toBe('sku,name,slug,category,price,currency,stock,status')
-    expect(row).toContain('"Sillas"')
-    expect(row).toContain('"199.90"')
+    expect(header).toBe('sku,name,kind,brand,family,stock,published_stores,stores,state')
+    expect(header).not.toContain('price')
+    expect(row).toContain('"Tienda A1 | Tienda A2"')
+    expect(row).toContain('"published"')
   })
 
-  it('un producto sin categoria deja la celda vacia, no un "null"', () => {
-    const csv = productsToCsv([product({})], [category])
-    expect(csv.split('\r\n')[1]).toContain('"silla","",')
+  it('un producto sin marca deja la celda vacia, no un "null"', () => {
+    const csv = productsToCsv([product({})])
+    expect(csv.split('\r\n')[1]).toContain('"simple","","",')
   })
 })

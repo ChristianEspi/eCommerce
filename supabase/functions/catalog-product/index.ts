@@ -1,6 +1,13 @@
 /**
  * catalog-product — alta y edición de producto desde el backoffice.
  *
+ * Producto MAESTRO de sociedad (ADR 018): sin `store_id`, el alta crea solo el
+ * maestro; con `store_id`, además lo publica en esa tienda. La edición del
+ * maestro (nombre, SKU, descripción, tipo, marca, familia, impuesto, stock) no
+ * necesita tienda. Lo que es de una tienda concreta —slug, categoría, estado,
+ * precio— se administra con los RPC `publish_product`,
+ * `update_product_publication` y `unpublish_product`.
+ *
  * NO usa `service_role`. Actúa con el JWT del usuario contra la clave
  * publicable: quien decide si puede escribir es la RLS (`products_*_catalog`),
  * no este archivo. Aquí solo se valida la forma del payload y se traduce el
@@ -93,7 +100,42 @@ const handler = serveJson(
     const client = userClient(request, trace)
     const status = body.status === undefined ? 'draft' : requireEnum(body, 'status', PRODUCT_STATUS)
 
+    if (action === 'create' && body.store_id === undefined) {
+      // Alta del MAESTRO sin publicarlo en ninguna tienda (ADR 018). Slug,
+      // precio, categoría y estado son de la publicación: sin tienda no hay
+      // dónde guardarlos, y aceptarlos en silencio sería perderlos.
+      for (const field of ['slug', 'price', 'compare_at_price', 'currency', 'status', 'category_id']) {
+        if (field in body) {
+          throw badRequest('CAMPO_INVALIDO', `\`${field}\` es de la publicacion: indica \`store_id\``)
+        }
+      }
+
+      const insert = {
+        organization_id: context.organizationId,
+        company_id: context.companyId,
+        sku: requireText(body, 'sku', { min: 1, max: 64 }),
+        name: requireText(body, 'name', { min: 2, max: 240 }),
+        description: optionalText(body, 'description', 8000),
+        stock: requireStock(body),
+        kind: body.kind === undefined ? 'simple' : requireEnum(body, 'kind', PRODUCT_KIND),
+        brand_id: optionalUuid(body, 'brand_id'),
+        family_id: optionalUuid(body, 'family_id'),
+        tax_category_id: optionalUuid(body, 'tax_category_id'),
+      }
+
+      const { data, error } = await client
+        .from('products')
+        .insert(insert)
+        .select('id, store_id, sku, name, stock, status, kind')
+        .single()
+
+      if (error) throw fromDatabaseError(error)
+      return { status: 201, body: { data } }
+    }
+
     if (action === 'create') {
+      // Alta con publicación inicial en la tienda indicada: la forma de siempre.
+      // La sincronía de la tienda de origen crea su fila en `store_products`.
       const storeId = requireUuid(body, 'store_id')
 
       // La tienda tiene que ser del tenant del token. La RLS ya lo garantiza,

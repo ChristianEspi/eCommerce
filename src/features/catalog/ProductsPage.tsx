@@ -1,9 +1,6 @@
 import { RowActions } from '@/shared/ui/RowActions'
-import ArchiveRoundedIcon from '@mui/icons-material/ArchiveRounded'
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded'
 import EditRoundedIcon from '@mui/icons-material/EditRounded'
-import VisibilityOffRoundedIcon from '@mui/icons-material/VisibilityOffRounded'
-import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded'
 import { FilterBar } from '@/shared/ui/FilterBar'
 import { TablePager } from '@/shared/ui/TablePager'
 import { StatusChip } from '@/shared/ui/StatusChip'
@@ -24,6 +21,7 @@ import {
   TableSortLabel,
   Tabs,
   TextField,
+  Typography,
   MenuItem,
   LinearProgress,
 } from '@mui/material'
@@ -31,7 +29,6 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
-import { formatMoney } from '@/shared/lib/format'
 import { ConfirmDeleteDialog } from '@/shared/ui/ConfirmDeleteDialog'
 import { PageHeader } from '@/shared/ui/PageHeader'
 import { SearchField } from '@/shared/ui/SearchField'
@@ -49,12 +46,12 @@ import { CatalogError } from './api/errors'
 import { ProductDrawer } from './ProductDrawer'
 import { downloadCsv, productsToCsv } from './exportCsv'
 import { categoryDescendants, categoryTree } from './types'
-import type { Product, ProductKind, ProductStatus } from './types'
+import type { ProductKind, ProductMaster, ProductStatus } from './types'
 import { CategoryPicker } from './CategoryPicker'
 import { CatalogImportAction } from './import/CatalogImportAction'
 import { useCategories } from './useCategories'
 import { useBrands } from './pim/hooks'
-import { useDeleteProduct, useProductUsage, useProducts, useSetProductStatus } from './useProducts'
+import { useDeleteProduct, useProductUsage, useProducts } from './useProducts'
 
 const STATUS_LABEL: Record<ProductStatus, MessageKey> = {
   draft: 'catalog.status.draft',
@@ -86,7 +83,17 @@ function errorKeyOf(error: unknown): MessageKey {
 }
 
 /**
- * Listado de productos del backoffice.
+ * Listado de productos MAESTROS de la sociedad activa (ADR 018).
+ *
+ * Una fila por producto aunque se venda en varias tiendas. No hay columna de
+ * precio: el precio es de cada publicación (y de cada lista), y un importe único
+ * aquí afirmaría algo que deja de ser cierto en cuanto dos tiendas difieren. Lo
+ * que se ve es EN CUÁNTAS tiendas se vende; cada tienda se administra en la
+ * pestaña «Tiendas» del cajón. El estado es agregado: «Publicado» = se vende en
+ * al menos una tienda.
+ *
+ * Categoría es de la tienda activa: filtra los maestros publicados en ella bajo
+ * esa rama.
  *
  * ## La excepción a la regla del buscador único
  *
@@ -127,7 +134,7 @@ const SIN_FILTROS: Filtros = { search: '', categoryId: '', brandId: '', minStock
 const FORM_FILTROS = 'filtros-productos'
 
 export function ProductsPage() {
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const { notify } = useFeedback()
   const { activeStore, activeCompanyId, tenant, status: tenantStatus, can } = useTenant()
   const canWrite = can('catalog.write')
@@ -149,11 +156,11 @@ export function ProductsPage() {
    */
   const [borrador, setBorrador] = useState<Filtros>(SIN_FILTROS)
   const [aplicados, setAplicados] = useState<Filtros>(SIN_FILTROS)
-  const [drawer, setDrawer] = useState<{ open: boolean; product: Product | null }>({
+  const [drawer, setDrawer] = useState<{ open: boolean; product: ProductMaster | null }>({
     open: false,
     product: null,
   })
-  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<ProductMaster | null>(null)
 
   const storeId = activeStore?.id ?? null
 
@@ -203,7 +210,7 @@ export function ProductsPage() {
   // `limpiar` ya la reinician, que es cuando de verdad cambia el resultado.
   useEffect(() => {
     setPage(0)
-  }, [status, storeId])
+  }, [status, storeId, activeCompanyId])
 
   /**
    * Pulsar una columna la ordena; volver a pulsarla la invierte.
@@ -223,7 +230,7 @@ export function ProductsPage() {
   }
 
   const products = useProducts({
-    storeId,
+    companyId: activeCompanyId ?? null,
     search: aplicados.search,
     status,
     page,
@@ -245,13 +252,7 @@ export function ProductsPage() {
   const refrescando = products.isFetching && !products.isPending
 
   const usage = useProductUsage(deleteTarget?.id ?? null)
-  const changeStatus = useSetProductStatus()
   const removeProduct = useDeleteProduct()
-
-  const categoryName = useMemo(
-    () => new Map((categories.data ?? []).map((category) => [category.id, category.name])),
-    [categories.data],
-  )
 
   // Mientras el espacio de trabajo se resuelve NO se dice "no tienes tiendas":
   // sería afirmar algo que todavía no se sabe (mismo criterio que la sesión).
@@ -279,15 +280,6 @@ export function ProductsPage() {
         </Card>
       </>
     )
-  }
-
-  async function onChangeStatus(product: Product, next: ProductStatus, toast: MessageKey) {
-    try {
-      await changeStatus.mutateAsync({ productId: product.id, status: next })
-      notify(t(toast))
-    } catch (error) {
-      notify(t(errorKeyOf(error)), 'error')
-    }
   }
 
   async function onDelete() {
@@ -318,8 +310,8 @@ export function ProductsPage() {
               disabled={list.length === 0}
               onClick={() =>
                 downloadCsv(
-                  `productos-${activeStore?.slug ?? 'tienda'}.csv`,
-                  productsToCsv(list, categories.data ?? []),
+                  'productos.csv',
+                  productsToCsv(list),
                 )
               }
             >
@@ -497,16 +489,16 @@ export function ProductsPage() {
                   <Ordenable columna="name" sort={sort} onSort={ordenarPor}>
                     {t('catalog.field.name')}
                   </Ordenable>
-                  <Ordenable columna="category_name" sort={sort} onSort={ordenarPor}>
-                    {t('catalog.field.category')}
+                  <Ordenable columna="brand_name" sort={sort} onSort={ordenarPor}>
+                    {t('catalog.field.brand')}
                   </Ordenable>
-                  <Ordenable columna="price" sort={sort} onSort={ordenarPor} align="right">
-                    {t('common.price')}
+                  <Ordenable columna="published_count" sort={sort} onSort={ordenarPor}>
+                    {t('catalog.products.column.stores')}
                   </Ordenable>
                   <Ordenable columna="stock" sort={sort} onSort={ordenarPor} align="right">
                     {t('catalog.field.stock')}
                   </Ordenable>
-                  <Ordenable columna="status" sort={sort} onSort={ordenarPor}>
+                  <Ordenable columna="publication_state" sort={sort} onSort={ordenarPor}>
                     {t('common.status')}
                   </Ordenable>
                   <TableCell align="right">{t('common.actions')}</TableCell>
@@ -531,12 +523,10 @@ export function ProductsPage() {
                       )}
                     </TableCell>
                     <TableCell sx={{ color: 'var(--muted)' }}>
-                      {product.category_id
-                        ? (categoryName.get(product.category_id) ?? t('common.none'))
-                        : t('common.none')}
+                      {product.brand_name ?? t('common.none')}
                     </TableCell>
-                    <TableCell align="right" className="tnum">
-                      {formatMoney(Number(product.price), product.currency, locale)}
+                    <TableCell>
+                      <StoresSummary product={product} />
                     </TableCell>
                     <TableCell align="right" className="tnum">
                       {/* Un maestro de variantes y un kit no llevan existencia
@@ -545,20 +535,13 @@ export function ProductsPage() {
                     </TableCell>
                     <TableCell>
                       <StatusChip
-                        tone={STATUS_COLOR[product.status]}
-                        label={t(STATUS_LABEL[product.status])}
+                        tone={STATUS_COLOR[product.publication_state]}
+                        label={t(STATUS_LABEL[product.publication_state])}
                       />
                     </TableCell>
-                    {/* El menu de tres puntos escondia CUATRO acciones detras de
-                        un icono que no dice ninguna: para saber si un producto
-                        se puede despublicar habia que abrirlo. Aqui se ven, y
-                        el color lo pone lo que cada una HACE.
-
-                        Archivar va en neutro y no en rojo aunque retire el
-                        producto: es reversible y conserva el registro. El rojo
-                        se guarda para lo que no tiene vuelta —despublicar, que
-                        lo saca de la tienda ya mismo, y borrar—, porque un rojo
-                        que sale en todo deja de avisar de nada. */}
+                    {/* Publicar, despublicar y archivar ya no están en la fila:
+                        son de UNA tienda, y en un listado de maestros «Publicar»
+                        no diría dónde. Se hacen en la pestaña «Tiendas». */}
                     <TableCell align="right">
                       <RowActions
                         actions={[
@@ -568,34 +551,6 @@ export function ProductsPage() {
                             label: `${t('common.edit')}: ${product.name}`,
                             tone: 'neutral',
                             onClick: () => setDrawer({ open: true, product }),
-                          },
-                          {
-                            id: 'publish',
-                            icon:
-                              product.status === 'published' ? (
-                                <VisibilityOffRoundedIcon fontSize="small" />
-                              ) : (
-                                <VisibilityRoundedIcon fontSize="small" />
-                              ),
-                            label:
-                              product.status === 'published'
-                                ? t('catalog.action.unpublish')
-                                : t('catalog.action.publish'),
-                            tone: product.status === 'published' ? 'danger' : 'accent',
-                            disabled: !canWrite,
-                            onClick: () =>
-                              product.status === 'published'
-                                ? void onChangeStatus(product, 'draft', 'catalog.toast.unpublished')
-                                : void onChangeStatus(product, 'published', 'catalog.toast.published'),
-                          },
-                          {
-                            id: 'archive',
-                            icon: <ArchiveRoundedIcon fontSize="small" />,
-                            label: t('catalog.action.archive'),
-                            tone: 'neutral',
-                            disabled: !canWrite || product.status === 'archived',
-                            onClick: () =>
-                              void onChangeStatus(product, 'archived', 'catalog.toast.archived'),
                           },
                           {
                             id: 'delete',
@@ -638,6 +593,7 @@ export function ProductsPage() {
         organizationId={tenant.organization_id}
         companyId={activeCompanyId}
         storeId={storeId}
+        storeName={activeStore?.name ?? ''}
         currency={activeStore?.currency ?? 'PEN'}
         canWrite={canWrite}
         onClose={() => setDrawer({ open: false, product: null })}
@@ -654,21 +610,52 @@ export function ProductsPage() {
           { label: t('catalog.delete.usage.images'), count: usage.data?.images ?? 0 },
           { label: t('catalog.delete.usage.variants'), count: usage.data?.variants ?? 0 },
           { label: t('catalog.delete.usage.bundles'), count: usage.data?.bundles ?? 0 },
+          { label: t('catalog.delete.usage.publications'), count: usage.data?.publications ?? 0 },
         ]}
-        safeActionLabel={
-          deleteTarget?.status === 'archived' ? undefined : t('catalog.action.archive')
-        }
-        safeActionHint={t('catalog.delete.archiveHint')}
+        // La alternativa segura ya no es «archivar» —eso es de cada tienda—:
+        // es abrir el producto y quitarlo o archivarlo en sus tiendas. El
+        // servidor niega el borrado mientras siga publicado en alguna.
+        safeActionLabel={t('catalog.delete.manageStores')}
+        safeActionHint={t('catalog.delete.storesHint')}
         onSafeAction={() => {
           if (!deleteTarget) return
-          void onChangeStatus(deleteTarget, 'archived', 'catalog.toast.archived')
+          setDrawer({ open: true, product: deleteTarget })
           setDeleteTarget(null)
         }}
         onDelete={() => void onDelete()}
         onClose={() => setDeleteTarget(null)}
-        isBusy={removeProduct.isPending || changeStatus.isPending}
+        isBusy={removeProduct.isPending}
       />
     </>
+  )
+}
+
+/**
+ * En cuántas tiendas se vende, dicho con palabras y con sus nombres: «2 tiendas
+ * activas» y debajo cuáles. Un maestro sin publicar lo dice también, porque es
+ * justo el que hay que ir a publicar.
+ */
+function StoresSummary({ product }: { product: ProductMaster }) {
+  const { t } = useI18n()
+  if (product.publication_count === 0) {
+    return <Typography sx={{ fontSize: 13, color: 'var(--muted)' }}>{t('catalog.products.stores.none')}</Typography>
+  }
+  const count = product.published_count
+  const label =
+    count === 0
+      ? t('catalog.products.stores.noneActive').replace('{n}', String(product.publication_count))
+      : count === 1
+        ? t('catalog.products.stores.one')
+        : t('catalog.products.stores.many').replace('{n}', String(count))
+  return (
+    <Box>
+      <Typography sx={{ fontSize: 13, fontWeight: 700 }}>{label}</Typography>
+      {product.published_store_names.length > 0 && (
+        <Typography sx={{ fontSize: 12, color: 'var(--muted)' }}>
+          {product.published_store_names.join(' · ')}
+        </Typography>
+      )}
+    </Box>
   )
 }
 

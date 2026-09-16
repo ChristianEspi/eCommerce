@@ -345,6 +345,20 @@ class FakeQuery implements PromiseLike<QueryResult> {
     return this
   }
 
+  /**
+   * `ov` de PostgREST: la columna es un array y comparte al menos un valor con
+   * la lista. Lo usa el listado de maestros para filtrar por las categorías de
+   * sus publicaciones.
+   */
+  overlaps(column: string, values: unknown[]): this {
+    const wanted = new Set(values)
+    this.rows = this.rows.filter((row) => {
+      const cell = row[column]
+      return Array.isArray(cell) && cell.some((value) => wanted.has(value))
+    })
+    return this
+  }
+
   limit(count: number): this {
     this.rows = this.rows.slice(0, count)
     return this

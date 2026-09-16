@@ -15,6 +15,15 @@ export function formatMoney(amount: number, currency: string, locale: Locale = '
   }
 }
 
+/**
+ * Importe en texto o raya cuando no hay importe. Un precio que no existe se
+ * pinta «—», nunca «S/ 0.00»: un cero en una columna de precios se lee como
+ * «gratis».
+ */
+export function formatMoneyOrDash(amount: string | null, currency: string, locale: Locale = 'es'): string {
+  return amount === null ? '—' : formatMoney(Number(amount), currency, locale)
+}
+
 export function formatDate(value: string | Date, locale: Locale = 'es'): string {
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) return '—'

@@ -374,7 +374,7 @@ describe('eliminacion segura (contrato §4.2)', () => {
   // informativo —la FK del componente es `restrict` y decide si el borrado
   // puede ocurrir—. Se sigue comparando el objeto ENTERO para que una clave
   // nueva no entre sin que nadie la mire.
-  it('el conteo de uso del producto es el real: lineas, imagenes, variantes y kits', async () => {
+  it('el conteo de uso del producto es el real: lineas, imagenes, variantes, kits y tiendas', async () => {
     const rows = await asRole(db, 'authenticated', claimsFor(TENANT_A), () =>
       sql(`select public.product_deletion_usage($1) as usage`, [productA]),
     )
@@ -384,6 +384,8 @@ describe('eliminacion segura (contrato §4.2)', () => {
       images: 3,
       variants: 0,
       bundles: 0,
+      // ADR 018: publicado en su tienda de siempre.
+      publications: 1,
     })
   })
 

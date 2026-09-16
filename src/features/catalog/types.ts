@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { moneyText } from '@/shared/lib/money'
 import type { MessageKey } from '@/shared/i18n/messages'
-import { PRODUCT_KINDS as PIM_PRODUCT_KINDS } from './pim/types'
+import { PRODUCT_KINDS as PIM_PRODUCT_KINDS, type ProductKind } from './pim/types'
 
 /** Nombres reales de las tablas. Fuente unica: `shared/lib/db-schema.ts`. */
 export {
@@ -70,6 +70,85 @@ export const productSchema = z.object({
 })
 export type Product = z.infer<typeof productSchema>
 
+/**
+ * Producto MAESTRO de la sociedad activa (ADR 018), tal como lo lista
+ * `admin_product_masters`: una fila por producto aunque se venda en varias
+ * tiendas.
+ *
+ * No trae precio, slug, categoría ni estado propios porque no los tiene: son de
+ * cada publicación. `publication_state` es un estado AGREGADO («publicado en al
+ * menos una tienda»), no un estado global que alguien pueda creer vigente en
+ * todas.
+ */
+export const productMasterSchema = z.object({
+  id: z.string().uuid(),
+  organization_id: z.string().uuid(),
+  company_id: z.string().uuid(),
+  origin_store_id: z.string().uuid().nullable().default(null),
+  sku: z.string(),
+  name: z.string(),
+  description: z.string().nullable().default(null),
+  kind: z.enum(PIM_PRODUCT_KINDS).default('simple'),
+  brand_id: z.string().uuid().nullable().default(null),
+  brand_name: z.string().nullable().default(null),
+  family_id: z.string().uuid().nullable().default(null),
+  family_name: z.string().nullable().default(null),
+  tax_category_id: z.string().uuid().nullable().default(null),
+  stock: z.number().int(),
+  legacy_sku_conflict: z.boolean().default(false),
+  updated_at: z.string(),
+  publication_count: z.number().int().nonnegative().default(0),
+  published_count: z.number().int().nonnegative().default(0),
+  store_ids: z.array(z.string().uuid()).default([]),
+  published_store_names: z.array(z.string()).default([]),
+  category_ids: z.array(z.string().uuid()).default([]),
+  publication_state: z.enum(PRODUCT_STATUSES).default('draft'),
+})
+export type ProductMaster = z.infer<typeof productMasterSchema>
+
+/**
+ * Lo que los paneles del PIM necesitan del producto. `price`/`currency` son los
+ * de la tienda de ORIGEN —la que hereda el precio propio de variantes y
+ * presentaciones durante la transición—; `price` nulo cuando el maestro no está
+ * publicado ahí, y entonces no se inventa un precio heredado.
+ */
+export interface PimProduct {
+  id: string
+  sku: string
+  name: string
+  kind: ProductKind
+  price: string | null
+  currency: string
+}
+
+/** Candidato de kit o de relacionado: lo mínimo para reconocerlo. */
+export type ProductCandidate = Pick<PimProduct, 'id' | 'sku' | 'name' | 'kind'> & { stock: number }
+
+/**
+ * Una tienda de la sociedad y la publicación del producto en ella
+ * (`product_store_publications`). Los campos de la publicación son nulos cuando
+ * el producto no está en esa tienda.
+ */
+export const productPublicationSchema = z.object({
+  store_id: z.string().uuid(),
+  store_name: z.string(),
+  store_slug: z.string(),
+  store_status: z.string(),
+  store_currency: z.string(),
+  is_origin: z.boolean().default(false),
+  publication_id: z.string().uuid().nullable().default(null),
+  category_id: z.string().uuid().nullable().default(null),
+  category_name: z.string().nullable().default(null),
+  slug: z.string().nullable().default(null),
+  status: z.enum(PRODUCT_STATUSES).nullable().default(null),
+  published_at: z.string().nullable().default(null),
+  price: moneyText.nullable().default(null),
+  compare_at_price: moneyText.nullable().default(null),
+  currency: z.string().nullable().default(null),
+  updated_at: z.string().nullable().default(null),
+})
+export type ProductPublication = z.infer<typeof productPublicationSchema>
+
 export const categorySchema = z.object({
   id: z.string().uuid(),
   store_id: z.string().uuid(),
@@ -106,6 +185,8 @@ export const productUsageSchema = z.object({
    */
   variants: z.number().int().nonnegative().default(0),
   bundles: z.number().int().nonnegative().default(0),
+  /** Tiendas donde sigue publicado (ADR 018). Con más de cero el servidor niega el borrado. */
+  publications: z.number().int().nonnegative().default(0),
 })
 export type ProductUsage = z.infer<typeof productUsageSchema>
 
@@ -128,34 +209,64 @@ export const MONEY_RE = /^\d{1,12}(\.\d{1,2})?$/
 
 const errorKey = (key: MessageKey) => key
 
-export const productFormSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(2, errorKey('catalog.error.name'))
-    .max(240, errorKey('catalog.error.name')),
+/**
+ * Formulario del producto MAESTRO, con la publicación inicial opcional.
+ *
+ * Los datos del maestro (nombre, SKU, descripción, tipo, marca, familia,
+ * impuesto, stock) se validan siempre. Slug, categoría, precio y estado son de
+ * la publicación en la tienda activa: solo se validan cuando `publish` está
+ * marcado, que solo ocurre en el alta. Al editar, cada tienda se administra en
+ * la pestaña «Tiendas».
+ */
+export const productFormSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(2, errorKey('catalog.error.name'))
+      .max(240, errorKey('catalog.error.name')),
+    sku: z
+      .string()
+      .trim()
+      .min(1, errorKey('catalog.error.sku'))
+      .max(64, errorKey('catalog.error.sku')),
+    description: z.string().trim().max(8000, errorKey('catalog.error.description')),
+    stock: z
+      .string()
+      .trim()
+      .regex(/^\d{1,9}$/, errorKey('catalog.error.stock')),
+    kind: z.enum(PIM_PRODUCT_KINDS),
+    /** Cadena vacía = sin marca. El `null` lo pone la capa de datos. */
+    brand_id: z.string(),
+    family_id: z.string(),
+    /** Cadena vacía = la categoría fiscal por defecto de la sociedad. */
+    tax_category_id: z.string(),
+    /** Publicar ya en la tienda activa. Solo tiene sentido en el alta. */
+    publish: z.boolean(),
+    slug: z.string().trim().toLowerCase(),
+    category_id: z.string(),
+    price: z.string().trim(),
+    status: z.enum(PRODUCT_STATUSES),
+  })
+  .superRefine((values, ctx) => {
+    if (!values.publish) return
+    if (!SLUG_RE.test(values.slug)) {
+      ctx.addIssue({ code: 'custom', path: ['slug'], message: errorKey('catalog.error.slug') })
+    }
+    if (!MONEY_RE.test(values.price)) {
+      ctx.addIssue({ code: 'custom', path: ['price'], message: errorKey('catalog.error.price') })
+    }
+  })
+export type ProductFormValues = z.infer<typeof productFormSchema>
+
+/** Formulario de la publicación de UNA tienda (pestaña «Tiendas»). */
+export const publicationFormSchema = z.object({
   slug: z.string().trim().toLowerCase().regex(SLUG_RE, errorKey('catalog.error.slug')),
-  sku: z
-    .string()
-    .trim()
-    .min(1, errorKey('catalog.error.sku'))
-    .max(64, errorKey('catalog.error.sku')),
-  description: z.string().trim().max(8000, errorKey('catalog.error.description')),
   category_id: z.string(),
   price: z.string().trim().regex(MONEY_RE, errorKey('catalog.error.price')),
-  stock: z
-    .string()
-    .trim()
-    .regex(/^\d{1,9}$/, errorKey('catalog.error.stock')),
   status: z.enum(PRODUCT_STATUSES),
-  kind: z.enum(PIM_PRODUCT_KINDS),
-  /** Cadena vacía = sin marca. El `null` lo pone la capa de datos. */
-  brand_id: z.string(),
-  family_id: z.string(),
-  /** Cadena vacía = la categoría fiscal por defecto de la sociedad. */
-  tax_category_id: z.string(),
 })
-export type ProductFormValues = z.infer<typeof productFormSchema>
+export type PublicationFormValues = z.infer<typeof publicationFormSchema>
 
 export const categoryFormSchema = z.object({
   name: z
@@ -177,20 +288,33 @@ export const categoryFormSchema = z.object({
 export type CategoryFormValues = z.infer<typeof categoryFormSchema>
 
 /** Valores de partida del formulario a partir de un producto existente. */
-export function productToForm(product: Product | null): ProductFormValues {
+export function productToForm(product: ProductMaster | null): ProductFormValues {
   return {
     name: product?.name ?? '',
-    slug: product?.slug ?? '',
     sku: product?.sku ?? '',
     description: product?.description ?? '',
-    category_id: product?.category_id ?? '',
-    price: product?.price ?? '',
     stock: String(product?.stock ?? 0),
-    status: product?.status ?? 'draft',
     kind: product?.kind ?? 'simple',
     brand_id: product?.brand_id ?? '',
     family_id: product?.family_id ?? '',
     tax_category_id: product?.tax_category_id ?? '',
+    // El alta publica en la tienda activa por defecto: es el flujo de siempre y
+    // lo que espera quien crea un producto para venderlo. Al editar no aplica.
+    publish: product === null,
+    slug: '',
+    category_id: '',
+    price: '',
+    status: 'draft',
+  }
+}
+
+/** Valores de partida de la publicación de una tienda. */
+export function publicationToForm(publication: ProductPublication | null): PublicationFormValues {
+  return {
+    slug: publication?.slug ?? '',
+    category_id: publication?.category_id ?? '',
+    price: publication?.price ?? '',
+    status: publication?.status ?? 'draft',
   }
 }
 

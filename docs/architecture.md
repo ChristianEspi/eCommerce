@@ -72,10 +72,12 @@ Nueve tablas en `supabase/migrations`, todas con `organization_id uuid` + `compa
 ```
 tenants (PK = organization_id del hub)
   └── tenant_members (usuario × sociedad × rol de app)
+  └── products (MAESTRO de la sociedad, ADR 018) ── product_images · PIM
   └── stores (N por sociedad desde 2026-09-17: `create_store`; slug/dominio públicos)
         ├── store_settings (1:1 — branding publicable + config interna)
         ├── categories (árbol dentro de la misma tienda)
-        ├── products ──── product_images (ruta en Storage)
+        ├── store_products (publicación del maestro: slug, categoría, estado, precio)
+        │     └── store_price_overrides (precio propio de variante/presentación)
         └── orders ────── order_items (snapshot completo; line_total GENERATED)
                      ├── order_events        linea de tiempo de los 4 ejes (P08)
                      ├── order_notes/tags    anotaciones internas (P08)
@@ -104,6 +106,17 @@ tenants (PK = organization_id del hub)
   `analytics_events`, `audit_log` y `ops_events` en P13-SaaS; y las siete de la superficie
   empresarial —tres de webhooks y cuatro de la API de socio— en P14-SaaS. **`audit_log` deja de ser un
   pendiente**: existe desde P13 y es append-only para todos, incluido `service_role`.
+
+### Producto maestro de sociedad y publicación por tienda (ADR 018, 2026-09-17)
+
+`products` es el maestro de la SOCIEDAD (SKU único por sociedad) y `store_products` su publicación
+en cada tienda. El backoffice (`/app/products`) lista maestros sin precio global y administra cada
+tienda en la pestaña «Tiendas» con `publish_product`, `update_product_publication` y
+`unpublish_product` (INVOKER, tenant del JWT). La vitrina resuelve siempre por
+`tienda + store_products.slug`. Durante la transición, `products.store_id` es la tienda de ORIGEN,
+sincronizada con su publicación, y el `store_id` del PIM lo ancla la base a ese origen; la fase 05
+migra los consumidores de comercio y retira la sincronía. Detalle en
+[`STORES_PRODUCT_MASTER_MIGRATION_PLAN.md`](STORES_PRODUCT_MASTER_MIGRATION_PLAN.md).
 
 ### PIM: variantes, atributos, unidades y kits (P03-SaaS)
 

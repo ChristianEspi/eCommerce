@@ -12,6 +12,7 @@ import {
   makeSession,
   type FakeSupabase,
 } from '@/test/supabaseMock'
+import { can } from '@/shared/lib/roles'
 import { TENANT_FIELDS } from '../../../supabase/functions/_shared/auth'
 
 const holder = vi.hoisted(() => ({ client: null as unknown }))
@@ -29,12 +30,156 @@ const { TenantProvider } = await import('@/features/tenant/TenantProvider')
 const { CapabilitiesProvider } = await import('@/features/capabilities/CapabilitiesProvider')
 const { ProductsPage } = await import('./ProductsPage')
 
+/**
+ * Listado de productos MAESTROS y administración de su publicación por tienda
+ * (Stores + Product Master, fase 04).
+ *
+ * El doble sirve la vista `admin_product_masters` (una fila por maestro) y un
+ * pequeño estado en memoria detrás de los RPC de publicación, para que publicar,
+ * editar y quitar se vean reflejados como en la base. Quién puede hacer qué y el
+ * aislamiento entre sociedades lo prueba Postgres de verdad en
+ * `supabase/tests/product-master-commands.test.ts`.
+ */
+
 const PRODUCT_ID = '88888888-8888-4888-8888-888888888888'
 const CATEGORY_ID = '77777777-7777-4777-8777-777777777777'
+const CATEGORY_B_ID = '77777777-7777-4777-8777-7777777777bb'
 const TAX_DEFAULT_ID = '66666666-6666-4666-8666-666666666661'
 const TAX_EXEMPT_ID = '66666666-6666-4666-8666-666666666662'
+const BRAND_ID = '77777777-7777-4777-8777-777777777771'
+/** Una categoria HIJA: es la que demuestra que elegir la madre la incluye. */
+const SUBCATEGORY_ID = '88888888-8888-4888-8888-888888888801'
+const WAREHOUSE_ID = '66666666-6666-4666-8666-666666666666'
+const STORE_B = '55555555-5555-4555-8555-5555555555bb'
+const PUBLICATION_A = '44444444-4444-4444-8444-4444444444aa'
 
-function backend(role: 'admin' | 'viewer' = 'admin', products = defaultProducts()): FakeSupabase {
+type Fila = Record<string, unknown>
+
+function master(over: Fila = {}): Fila {
+  return {
+    id: PRODUCT_ID,
+    organization_id: ORG,
+    company_id: COMPANY_A,
+    origin_store_id: STORE_A,
+    sku: 'A-1',
+    name: 'Silla A',
+    description: null,
+    kind: 'simple',
+    brand_id: BRAND_ID,
+    brand_name: 'Nordica',
+    family_id: null,
+    family_name: null,
+    tax_category_id: null,
+    stock: 4,
+    legacy_sku_conflict: false,
+    updated_at: '2026-08-27T00:00:00.000Z',
+    publication_count: 1,
+    published_count: 0,
+    store_ids: [STORE_A],
+    published_store_names: [],
+    category_ids: [CATEGORY_ID],
+    publication_state: 'draft',
+    ...over,
+  }
+}
+
+function defaultMasters(): Fila[] {
+  return [master()]
+}
+
+/**
+ * Tres maestros, para poder comprobar que un filtro DEJA FUERA algo. El segundo
+ * no tiene marca ni categoría; el tercero cuelga de la HIJA de «Sillas».
+ */
+function catalogoAmplio(): Fila[] {
+  return [
+    ...defaultMasters(),
+    master({
+      id: '99999999-9999-4999-8999-999999999999',
+      sku: 'Z-9',
+      name: 'Mesa Z',
+      brand_id: null,
+      brand_name: null,
+      stock: 40,
+      category_ids: [],
+      updated_at: '2026-08-28T00:00:00.000Z',
+    }),
+    master({
+      id: '11111111-2222-4333-8444-555555555555',
+      sku: 'O-1',
+      name: 'Banqueta O',
+      brand_id: null,
+      brand_name: null,
+      stock: 12,
+      category_ids: [SUBCATEGORY_ID],
+      updated_at: '2026-08-29T00:00:00.000Z',
+    }),
+  ]
+}
+
+interface Publicacion {
+  store_id: string
+  store_name: string
+  store_slug: string
+  store_currency: string
+  is_origin: boolean
+  publication_id: string | null
+  category_id: string | null
+  slug: string | null
+  status: string | null
+  price: string | null
+}
+
+/** Las dos tiendas de la sociedad: el producto está en A y todavía no en B. */
+function tiendasIniciales(): Publicacion[] {
+  return [
+    {
+      store_id: STORE_A,
+      store_name: 'Mi Negocio',
+      store_slug: 'mi-negocio',
+      store_currency: 'PEN',
+      is_origin: true,
+      publication_id: PUBLICATION_A,
+      category_id: CATEGORY_ID,
+      slug: 'silla-a',
+      status: 'published',
+      price: '199.90',
+    },
+    {
+      store_id: STORE_B,
+      store_name: 'Outlet',
+      store_slug: 'outlet',
+      store_currency: 'PEN',
+      is_origin: false,
+      publication_id: null,
+      category_id: null,
+      slug: null,
+      status: null,
+      price: null,
+    },
+  ]
+}
+
+function backend(
+  role: 'admin' | 'viewer' | 'catalog' = 'admin',
+  masters = defaultMasters(),
+  tiendas = tiendasIniciales(),
+): FakeSupabase {
+  const nombreCategoria = new Map([
+    [CATEGORY_ID, 'Sillas'],
+    [CATEGORY_B_ID, 'Liquidación'],
+  ])
+  const filas = () =>
+    tiendas.map((tienda) => ({
+      ...tienda,
+      store_status: 'active',
+      category_name: tienda.category_id ? (nombreCategoria.get(tienda.category_id) ?? null) : null,
+      published_at: tienda.status === 'published' ? '2026-09-01T00:00:00.000Z' : null,
+      compare_at_price: null,
+      currency: tienda.publication_id ? tienda.store_currency : null,
+      updated_at: tienda.publication_id ? '2026-09-01T00:00:00.000Z' : null,
+    }))
+
   return createFakeSupabase({
     session: makeSession(),
     tables: {
@@ -53,8 +198,6 @@ function backend(role: 'admin' | 'viewer' = 'admin', products = defaultProducts(
           currency: 'PEN',
         },
       ],
-      // Las tres del tenant, con la general marcada por defecto: es lo que la
-      // ficha nombra cuando el producto no elige ninguna.
       tax_categories: [
         { id: TAX_DEFAULT_ID, code: 'igv18', name: 'IGV general (18%)', is_default: true },
         { id: TAX_EXEMPT_ID, code: 'exonerado', name: 'Exonerado', is_default: false },
@@ -70,16 +213,9 @@ function backend(role: 'admin' | 'viewer' = 'admin', products = defaultProducts(
           is_active: true,
         },
       ],
+      // Las categorías son de CADA tienda: A tiene su árbol y B el suyo.
       categories: [
-        {
-          id: CATEGORY_ID,
-          store_id: STORE_A,
-          parent_id: null,
-          slug: 'sillas',
-          name: 'Sillas',
-          position: 0,
-          is_active: true,
-        },
+        { id: CATEGORY_ID, store_id: STORE_A, parent_id: null, slug: 'sillas', name: 'Sillas', position: 0, is_active: true },
         {
           id: SUBCATEGORY_ID,
           store_id: STORE_A,
@@ -89,37 +225,62 @@ function backend(role: 'admin' | 'viewer' = 'admin', products = defaultProducts(
           position: 0,
           is_active: true,
         },
+        { id: CATEGORY_B_ID, store_id: STORE_B, parent_id: null, slug: 'liquidacion', name: 'Liquidación', position: 0, is_active: true },
       ],
-      products,
-      // La VISTA que lee el listado. Añade dos columnas a la tabla: el nombre
-      // de la categoría y el de la marca, que es lo que permite buscar
-      // «Sillas» o «Nordica» en la misma caja. Se deriva de las mismas filas
-      // para que el doble no pueda contradecirse con la tabla.
-      admin_products: products.map((row) => ({
-        ...row,
-        category_name: NOMBRE_DE_CATEGORIA.get(String(row.category_id ?? '')) ?? null,
-        brand_name: row.brand_id === BRAND_ID ? 'Nordica' : null,
-      })),
+      products: masters,
+      admin_product_masters: masters,
       product_images: [],
     },
     rpc: {
-      product_deletion_usage: () => ({ name: 'Silla A', order_lines: 2, images: 3 }),
+      product_deletion_usage: () => ({
+        name: 'Silla A',
+        order_lines: 2,
+        images: 3,
+        variants: 0,
+        bundles: 0,
+        publications: 1,
+      }),
+      delete_product_master: () => {
+        throw { message: 'PRODUCTO_PUBLICADO: quitalo de todas las tiendas antes de borrarlo' }
+      },
+      product_store_publications: () => filas(),
+      publish_product: (args) => {
+        const tienda = tiendas.find((row) => row.store_id === args.p_store_id)
+        if (!tienda) throw { message: 'TIENDA_NO_ENCONTRADA: no' }
+        Object.assign(tienda, {
+          publication_id: '44444444-4444-4444-8444-4444444444bb',
+          slug: args.p_slug,
+          price: args.p_price,
+          status: args.p_status,
+          category_id: args.p_category_id,
+        })
+        return {}
+      },
+      update_product_publication: (args) => {
+        const tienda = tiendas.find((row) => row.store_id === args.p_store_id)
+        if (!tienda) throw { message: 'PUBLICACION_NO_ENCONTRADA: no' }
+        if (args.p_slug) tienda.slug = String(args.p_slug)
+        if (args.p_price) tienda.price = String(args.p_price)
+        if (args.p_status) tienda.status = String(args.p_status)
+        if (args.p_category_id) tienda.category_id = String(args.p_category_id)
+        if (args.p_clear_category) tienda.category_id = null
+        return {}
+      },
+      unpublish_product: (args) => {
+        const tienda = tiendas.find((row) => row.store_id === args.p_store_id)
+        if (tienda) Object.assign(tienda, { publication_id: null, slug: null, price: null, status: null, category_id: null })
+        return null
+      },
     },
     functions: {
-      'catalog-product': (body) => ({ id: String(body.product_id ?? PRODUCT_ID), status: 'draft' }),
+      'catalog-product': (body) => ({ id: String(body.product_id ?? PRODUCT_ID) }),
     },
   })
 }
 
-const BRAND_ID = '77777777-7777-4777-8777-777777777777'
-/** Una categoria HIJA: es la que demuestra que elegir la madre la incluye. */
-const SUBCATEGORY_ID = '88888888-8888-4888-8888-888888888888'
-const WAREHOUSE_ID = '66666666-6666-4666-8666-666666666666'
-
 /**
- * El mismo tenant, pero con un almacen sirviendo a la tienda y el addon de
- * multialmacen contratado: es el momento en que la vitrina deja de leer
- * `products.stock` y pasa a sumar `inventory_levels`.
+ * El mismo tenant, con un almacén sirviendo a la tienda y el addon de
+ * multialmacén contratado.
  */
 function conAlmacenes(): FakeSupabase {
   const fake = backend()
@@ -159,101 +320,6 @@ function conAlmacenes(): FakeSupabase {
   return fake
 }
 
-const NOMBRE_DE_CATEGORIA = new Map([
-  [CATEGORY_ID, 'Sillas'],
-  [SUBCATEGORY_ID, 'Sillas de oficina'],
-])
-
-type FilaDeProducto = Record<string, unknown>
-
-function defaultProducts(): FilaDeProducto[] {
-  return [
-    {
-      id: PRODUCT_ID,
-      organization_id: ORG,
-      company_id: COMPANY_A,
-      store_id: STORE_A,
-      category_id: CATEGORY_ID,
-      brand_id: BRAND_ID,
-      sku: 'A-1',
-      name: 'Silla A',
-      slug: 'silla-a',
-      description: null,
-      status: 'draft',
-      price: '199.90',
-      compare_at_price: null,
-      currency: 'PEN',
-      stock: 4,
-      published_at: null,
-      updated_at: '2026-08-27T00:00:00.000Z',
-    },
-  ]
-}
-
-/**
- * Dos productos, para poder comprobar que un filtro DEJA FUERA algo.
- *
- * Va aparte del catálogo por defecto a propósito: los tests de borrado cuentan
- * las filas de la tabla y el del listado cuenta los chips de estado, así que
- * meter aquí un segundo producto los rompería sin que tenga nada que ver con
- * lo que ellos comprueban.
- *
- * El segundo no tiene categoría ni marca: es el que demuestra que el listado no
- * lo esconde y que ordenar por categoría lo manda al final en vez de llenar con
- * él la primera pantalla.
- */
-function catalogoAmplio(): FilaDeProducto[] {
-  return [
-    ...defaultProducts(),
-    {
-      id: '99999999-9999-4999-8999-999999999999',
-      organization_id: ORG,
-      company_id: COMPANY_A,
-      store_id: STORE_A,
-      category_id: null,
-      brand_id: null,
-      sku: 'Z-9',
-      name: 'Mesa Z',
-      slug: 'mesa-z',
-      description: null,
-      status: 'draft',
-      price: '850.00',
-      compare_at_price: null,
-      currency: 'PEN',
-      stock: 40,
-      published_at: null,
-      updated_at: '2026-08-28T00:00:00.000Z',
-    },
-    // Cuelga de la HIJA de «Sillas»: elegir la madre tiene que traerlo.
-    {
-      id: '11111111-2222-4333-8444-555555555555',
-      organization_id: ORG,
-      company_id: COMPANY_A,
-      store_id: STORE_A,
-      category_id: SUBCATEGORY_ID,
-      brand_id: null,
-      sku: 'O-1',
-      name: 'Banqueta O',
-      slug: 'banqueta-o',
-      description: null,
-      status: 'draft',
-      price: '120.00',
-      compare_at_price: null,
-      currency: 'PEN',
-      stock: 12,
-      published_at: null,
-      updated_at: '2026-08-29T00:00:00.000Z',
-    },
-  ]
-}
-
-/**
- * El `CapabilitiesProvider` va aqui desde P03-SaaS: el cajon de producto
- * pregunta si la sociedad tiene `catalog.advanced` para decidir si ensena las
- * pestanas del PIM. El doble sirve por defecto un tenant con eCommerce activo y
- * SOLO lo baseline, que es exactamente el tenant de antes del PIM: estos tests
- * siguen comprobando el catalogo simple sin el modulo vendible.
- */
 function renderPage(fake: FakeSupabase) {
   holder.client = fake
   return renderWithProviders(
@@ -266,34 +332,62 @@ function renderPage(fake: FakeSupabase) {
   )
 }
 
-/**
- * Acciones de la fila de «Silla A».
- *
- * Antes vivian detras de un menu de tres puntos y habia que abrirlo; ahora
- * son botones con icono en la propia fila, asi que se consultan dentro de su
- * `<tr>`. Acotar al `<tr>` no es un detalle: «Archivar» tambien existe en el
- * dialogo de borrado, y sin acotar la consulta encontraria dos.
- */
-async function rowActions() {
-  const row = (await screen.findByText('Silla A')).closest('tr')
+async function rowActions(name = 'Silla A') {
+  const row = (await screen.findByText(name)).closest('tr')
   return within(row as HTMLElement)
+}
+
+/** Abre el cajón del producto en la pestaña «Tiendas». */
+async function abrirTiendas(user: ReturnType<typeof userEvent.setup>) {
+  const row = await rowActions()
+  await user.click(row.getByRole('button', { name: /Editar: Silla A/ }))
+  const drawer = await screen.findByRole('dialog')
+  await user.click(within(drawer).getByRole('tab', { name: 'Tiendas' }))
+  await within(drawer).findByText('Outlet')
+  return drawer
 }
 
 beforeEach(() => {
   holder.client = null
 })
 
-describe('ProductsPage — listado', () => {
-  it('muestra los productos de la tienda activa con precio, stock y estado', async () => {
-    renderPage(backend())
+describe('ProductsPage — listado de maestros', () => {
+  it('lista el maestro UNA vez aunque esté en dos tiendas, con cuántas y cuáles', async () => {
+    renderPage(
+      backend('admin', [
+        master({
+          publication_count: 2,
+          published_count: 2,
+          store_ids: [STORE_A, STORE_B],
+          published_store_names: ['Mi Negocio', 'Outlet'],
+          publication_state: 'published',
+        }),
+      ]),
+    )
 
     expect(await screen.findByText('Silla A')).toBeInTheDocument()
     const table = within(screen.getByRole('table'))
+    expect(table.getAllByText('Silla A')).toHaveLength(1)
+    expect(table.getAllByRole('row')).toHaveLength(2) // cabecera + un maestro
+    expect(table.getByText('2 tiendas activas')).toBeInTheDocument()
+    expect(table.getByText('Mi Negocio · Outlet')).toBeInTheDocument()
+    expect(table.getByText('Publicado')).toBeInTheDocument()
+  })
+
+  it('no muestra un precio global: ni columna de precio ni importes', async () => {
+    renderPage(backend())
+    await screen.findByText('Silla A')
+    const table = within(screen.getByRole('table'))
+    expect(table.queryByRole('button', { name: 'Precio' })).not.toBeInTheDocument()
+    expect(table.queryByText(/S\/|PEN/)).not.toBeInTheDocument()
     expect(table.getByText('A-1')).toBeInTheDocument()
-    expect(table.getByText('Sillas')).toBeInTheDocument()
-    expect(table.getByText('Borrador')).toBeInTheDocument()
+    expect(table.getByText('Nordica')).toBeInTheDocument()
     expect(table.getByText('4')).toBeInTheDocument()
-    expect(table.getByText('S/ 199.90')).toBeInTheDocument()
+  })
+
+  it('un maestro que no está en ninguna tienda lo dice', async () => {
+    renderPage(backend('admin', [master({ publication_count: 0, store_ids: [], category_ids: [] })]))
+    expect(await screen.findByText('Sin publicar')).toBeInTheDocument()
   })
 
   it('mientras se resuelve el espacio muestra esqueleto, no "no tienes tiendas"', () => {
@@ -314,9 +408,15 @@ describe('ProductsPage — listado', () => {
     expect(screen.queryByRole('button', { name: 'Nuevo producto' })).not.toBeInTheDocument()
   })
 
-  it('el rol de catalogo si lo ve', async () => {
-    renderPage(backend())
+  it('el rol catalog edita productos y publicaciones, pero no administra tiendas', async () => {
+    expect(can('catalog', 'catalog.write')).toBe(true)
+    expect(can('catalog', 'store.manage')).toBe(false)
+
+    const user = userEvent.setup()
+    renderPage(backend('catalog'))
     expect(await screen.findByRole('button', { name: 'Nuevo producto' })).toBeInTheDocument()
+    const drawer = await abrirTiendas(user)
+    expect(within(drawer).getByRole('button', { name: 'Publicar en esta tienda: Outlet' })).toBeInTheDocument()
   })
 
   it('ofrece un unico buscador general, sin panel de filtros multi-campo', async () => {
@@ -325,42 +425,24 @@ describe('ProductsPage — listado', () => {
     expect(screen.getAllByRole('searchbox')).toHaveLength(1)
   })
 
-  /**
-   * El buscador alcanza lo que se VE en la tabla.
-   *
-   * Miraba nombre, SKU y slug —las tres columnas propias de `products`— y la
-   * categoría y la marca viven en otras tablas. O sea que escribir en la caja
-   * lo que uno está leyendo en la columna de al lado no devolvía nada, que es
-   * la peor respuesta que puede dar un buscador.
-   */
-  it('busca tambien por categoria y por marca, no solo por nombre', async () => {
+  it('busca tambien por marca, no solo por nombre', async () => {
     const user = userEvent.setup()
     renderPage(backend('admin', catalogoAmplio()))
     await screen.findByText('Silla A')
 
-    await user.type(screen.getByRole('searchbox'), 'Sillas')
+    await user.type(screen.getByRole('searchbox'), 'Nordica')
     await user.click(screen.getByRole('button', { name: 'Filtrar' }))
 
     expect(await screen.findByText('Silla A')).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByText('Mesa Z')).not.toBeInTheDocument())
   })
 
-  /**
-   * Escribir no consulta.
-   *
-   * El listado pagina en el servidor, así que mientras el término entraba
-   * directo en la consulta cada tecla era una petición. Con el botón de por
-   * medio, teclear no cuesta ni un viaje: la tabla sigue enseñando lo de antes
-   * hasta que alguien pide el cambio.
-   */
   it('escribir no consulta: la tabla no cambia hasta pulsar Filtrar', async () => {
     const user = userEvent.setup()
     renderPage(backend('admin', catalogoAmplio()))
     await screen.findByText('Mesa Z')
 
     await user.type(screen.getByRole('searchbox'), 'Silla')
-
-    // Sigue estando: nadie ha pedido filtrar todavía.
     expect(screen.getByText('Mesa Z')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Filtrar' }))
@@ -388,32 +470,23 @@ describe('ProductsPage — listado', () => {
     await user.type(screen.getByLabelText('Stock mínimo'), '10')
     await user.click(screen.getByRole('button', { name: 'Filtrar' }))
 
-    // Mesa Z tiene 40; Silla A tiene 4.
     expect(await screen.findByText('Mesa Z')).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByText('Silla A')).not.toBeInTheDocument())
   })
 
-  /**
-   * Elegir una familia enseña lo que hay DENTRO.
-   *
-   * Los productos cuelgan de las hojas y casi nunca de la raíz, así que filtrar
-   * por «Sillas» con una igualdad devolvía solo lo que alguien colgó
-   * directamente de ella y dejaba fuera toda su descendencia. Quien abre una
-   * familia quiere lo que hay dentro.
-   */
-  it('elegir una categoria madre incluye a sus hijas', async () => {
+  it('elegir una categoria madre de la tienda activa incluye a sus hijas', async () => {
     const user = userEvent.setup()
     renderPage(backend('admin', catalogoAmplio()))
     await screen.findByText('Banqueta O')
 
     await user.click(screen.getByRole('combobox', { name: 'Categoría' }))
+    // Solo las categorías de la tienda activa: la de la otra tienda no se ofrece.
+    expect(screen.queryByRole('option', { name: 'Liquidación' })).not.toBeInTheDocument()
     await user.click(await screen.findByRole('option', { name: 'Sillas' }))
     await user.click(screen.getByRole('button', { name: 'Filtrar' }))
 
-    // La madre trae lo suyo y lo de su hija.
     expect(await screen.findByText('Silla A')).toBeInTheDocument()
     expect(screen.getByText('Banqueta O')).toBeInTheDocument()
-    // Y deja fuera lo que no cuelga de ella.
     await waitFor(() => expect(screen.queryByText('Mesa Z')).not.toBeInTheDocument())
   })
 
@@ -438,19 +511,12 @@ describe('ProductsPage — listado', () => {
     renderPage(backend('admin', catalogoAmplio()))
     await screen.findByText('Silla A')
 
-    const precio = screen.getByRole('button', { name: 'Precio' })
-    await user.click(precio)
+    const tiendas = screen.getByRole('button', { name: 'Tiendas' })
+    await user.click(tiendas)
+    await waitFor(() => expect(tiendas.closest('th')).toHaveAttribute('aria-sort', 'ascending'))
 
-    // La celda de la cabecera anuncia el orden: sin `aria-sort`, quien no ve la
-    // flecha no tiene forma de saber por donde esta ordenada la tabla.
-    await waitFor(() =>
-      expect(precio.closest('th')).toHaveAttribute('aria-sort', 'ascending'),
-    )
-
-    await user.click(precio)
-    await waitFor(() =>
-      expect(precio.closest('th')).toHaveAttribute('aria-sort', 'descending'),
-    )
+    await user.click(tiendas)
+    await waitFor(() => expect(tiendas.closest('th')).toHaveAttribute('aria-sort', 'descending'))
   })
 
   it('las pestanas de estado son las tres del enum mas "Todos"', async () => {
@@ -461,8 +527,8 @@ describe('ProductsPage — listado', () => {
   })
 })
 
-describe('ProductsPage — alta y edicion', () => {
-  it('el alta manda `create` con la tienda y SIN tenant en el cuerpo', async () => {
+describe('ProductsPage — alta y edicion del maestro', () => {
+  it('el alta publicando en la tienda activa manda `create` con la tienda y SIN tenant', async () => {
     const user = userEvent.setup()
     const fake = backend()
     renderPage(fake)
@@ -470,6 +536,7 @@ describe('ProductsPage — alta y edicion', () => {
     await user.click(await screen.findByRole('button', { name: 'Nuevo producto' }))
     const drawer = await screen.findByRole('dialog')
 
+    expect(within(drawer).getByRole('checkbox', { name: 'Publicar ya en Mi Negocio' })).toBeChecked()
     await user.type(within(drawer).getByLabelText('Nombre'), 'Mesa nueva')
     await user.type(within(drawer).getByLabelText('SKU'), 'MES-001')
     await user.type(within(drawer).getByLabelText('Precio'), '349.50')
@@ -485,25 +552,38 @@ describe('ProductsPage — alta y edicion', () => {
       store_id: STORE_A,
       sku: 'MES-001',
       name: 'Mesa nueva',
+      slug: 'mesa-nueva',
       price: '349.50',
       stock: 7,
       status: 'draft',
     })
-    // La regla bloqueante del contrato §3: el tenant NO viaja en el cuerpo.
     for (const field of TENANT_FIELDS) {
       expect(invocation?.body).not.toHaveProperty(field)
     }
   })
 
-  /**
-   * La categoria fiscal, que hasta ahora no se podia elegir.
-   *
-   * `products.tax_category_id` es el PRIMER escalon de
-   * `ebim.effective_tax_rate`, y sin pantalla el catalogo entero caia en la
-   * categoria que la sociedad marco por defecto: no habia forma de vender un
-   * exonerado y un gravado en el mismo catalogo, que es justo lo que la pantalla
-   * de Impuestos promete.
-   */
+  it('el alta sin publicar crea solo el maestro: sin tienda, precio ni dirección', async () => {
+    const user = userEvent.setup()
+    const fake = backend()
+    renderPage(fake)
+
+    await user.click(await screen.findByRole('button', { name: 'Nuevo producto' }))
+    const drawer = await screen.findByRole('dialog')
+    await user.click(within(drawer).getByRole('checkbox', { name: 'Publicar ya en Mi Negocio' }))
+    expect(within(drawer).queryByLabelText('Precio')).not.toBeInTheDocument()
+
+    await user.type(within(drawer).getByLabelText('Nombre'), 'Mesa maestra')
+    await user.type(within(drawer).getByLabelText('SKU'), 'MES-010')
+    await user.click(within(drawer).getByRole('button', { name: 'Guardar' }))
+
+    await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
+    const body = fake.state.invocations[0]?.body as Record<string, unknown>
+    expect(body).toMatchObject({ action: 'create', sku: 'MES-010', name: 'Mesa maestra' })
+    for (const field of ['store_id', 'price', 'slug', 'status', 'category_id']) {
+      expect(body).not.toHaveProperty(field)
+    }
+  })
+
   it('el impuesto elegido viaja con el producto', async () => {
     const user = userEvent.setup()
     const fake = backend()
@@ -524,13 +604,6 @@ describe('ProductsPage — alta y edicion', () => {
     expect(fake.state.invocations[0]?.body).toMatchObject({ tax_category_id: TAX_EXEMPT_ID })
   })
 
-  /**
-   * Y vacio NO es «sin impuesto»: es «la de siempre».
-   *
-   * Viaja `null` para que la base baje al siguiente escalon de la cascada. Si se
-   * omitiera el campo, un producto exonerado no podria volver nunca a la tasa
-   * general — el `patch` solo toca lo que llega.
-   */
   it('sin elegir impuesto viaja null, no se omite', async () => {
     const user = userEvent.setup()
     const fake = backend()
@@ -550,14 +623,6 @@ describe('ProductsPage — alta y edicion', () => {
     expect(body.tax_category_id).toBeNull()
   })
 
-  /**
-   * El fallo que esto fija: con almacenes, `ebim.atp` deja de mirar
-   * `products.stock` y suma `inventory_levels`. Un producto recien creado no
-   * tenia ninguna fila ahi, asi que nacia con cero disponible y la vitrina lo
-   * pintaba «Sin stock» aunque el campo dijera cuarenta. Quien lo daba de alta
-   * rellenaba el unico campo que el formulario ofrecia y se encontraba un
-   * producto que no se podia comprar, sin nada que se lo explicara.
-   */
   it('con almacenes, el alta carga la existencia inicial en el almacen elegido', async () => {
     const user = userEvent.setup()
     const fake = conAlmacenes()
@@ -572,8 +637,6 @@ describe('ProductsPage — alta y edicion', () => {
     await user.clear(within(drawer).getByLabelText('Stock'))
     await user.type(within(drawer).getByLabelText('Stock'), '12')
 
-    // El de MAYOR prioridad viene ya elegido: en una tienda con uno solo,
-    // preguntar seria un tramite.
     expect(within(drawer).getByLabelText('Almacén de entrada')).toHaveTextContent('ALM-1')
 
     await user.click(within(drawer).getByRole('button', { name: 'Guardar' }))
@@ -586,8 +649,6 @@ describe('ProductsPage — alta y edicion', () => {
       p_warehouse_id: WAREHOUSE_ID,
       p_product_id: PRODUCT_ID,
       p_quantity: 12,
-      // `receipt` y no `adjustment`: es una entrada de mercaderia, y el
-      // movimiento tiene que decir por que subio la existencia.
       p_kind: 'receipt',
     })
   })
@@ -603,8 +664,6 @@ describe('ProductsPage — alta y edicion', () => {
     await user.type(within(drawer).getByLabelText('Nombre'), 'Mesa nueva')
     await user.type(within(drawer).getByLabelText('SKU'), 'MES-003')
     await user.type(within(drawer).getByLabelText('Precio'), '349.50')
-
-    // Ni siquiera se pregunta: sin almacenes la pregunta no tiene sentido.
     expect(within(drawer).queryByLabelText('Almacén de entrada')).not.toBeInTheDocument()
 
     await user.click(within(drawer).getByRole('button', { name: 'Guardar' }))
@@ -615,8 +674,7 @@ describe('ProductsPage — alta y edicion', () => {
 
   it('el slug se sugiere desde el nombre y viaja en minusculas con guiones', async () => {
     const user = userEvent.setup()
-    const fake = backend()
-    renderPage(fake)
+    renderPage(backend())
 
     await user.click(await screen.findByRole('button', { name: 'Nuevo producto' }))
     const drawer = await screen.findByRole('dialog')
@@ -638,13 +696,11 @@ describe('ProductsPage — alta y edicion', () => {
     await user.type(within(drawer).getByLabelText('Precio'), '19,90')
     await user.click(within(drawer).getByRole('button', { name: 'Guardar' }))
 
-    expect(
-      await within(drawer).findByText(/importe con hasta 2 decimales/i),
-    ).toBeInTheDocument()
+    expect(await within(drawer).findByText(/importe con hasta 2 decimales/i)).toBeInTheDocument()
     expect(fake.state.invocations).toHaveLength(0)
   })
 
-  it('al editar se abre el panel con los datos del producto', async () => {
+  it('al editar, «Datos del producto» es del maestro: sin precio, dirección ni estado de tienda', async () => {
     const user = userEvent.setup()
     renderPage(backend())
 
@@ -654,82 +710,210 @@ describe('ProductsPage — alta y edicion', () => {
     const drawer = await screen.findByRole('dialog')
     expect(within(drawer).getByLabelText('Nombre')).toHaveValue('Silla A')
     expect(within(drawer).getByLabelText('SKU')).toHaveValue('A-1')
-    expect(within(drawer).getByLabelText('Precio')).toHaveValue('199.90')
+    expect(within(drawer).queryByLabelText('Precio')).not.toBeInTheDocument()
+    expect(within(drawer).queryByLabelText('Dirección del producto')).not.toBeInTheDocument()
+    expect(within(drawer).queryByRole('checkbox', { name: /Publicar ya/ })).not.toBeInTheDocument()
   })
 
-  it('el producto sin guardar todavia no ofrece subir imagenes', async () => {
-    const user = userEvent.setup()
-    renderPage(backend())
-
-    await user.click(await screen.findByRole('button', { name: 'Nuevo producto' }))
-    const drawer = await screen.findByRole('dialog')
-    // Desde P03-SaaS el cajon va por pestanas: las imagenes viven en la suya.
-    await user.click(within(drawer).getByRole('tab', { name: 'Imágenes' }))
-    expect(
-      await within(drawer).findByText(/Guarda el producto y podrás subir sus imágenes/),
-    ).toBeInTheDocument()
-  })
-
-  it('el cajon se organiza en pestanas y no en un formulario monolitico', async () => {
-    const user = userEvent.setup()
-    renderPage(backend())
-
-    await user.click(await screen.findByRole('button', { name: 'Nuevo producto' }))
-    const drawer = await screen.findByRole('dialog')
-
-    // Sin `catalog.advanced` contratado solo hay dos: General e Imagenes. Las
-    // del PIM aparecen con el modulo, y eso lo comprueba `pim.test.tsx`.
-    expect(within(drawer).getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
-      'General',
-      'Imágenes',
-    ])
-  })
-})
-
-describe('ProductsPage — publicar y despublicar', () => {
-  it('publicar manda solo el estado, sin fecha inventada ni tenant', async () => {
+  it('editar el nombre del maestro manda solo campos del maestro, sin tienda', async () => {
     const user = userEvent.setup()
     const fake = backend()
     renderPage(fake)
 
     const row = await rowActions()
-    await user.click(row.getByRole('button', { name: 'Publicar' }))
+    await user.click(row.getByRole('button', { name: /Editar: Silla A/ }))
+    const drawer = await screen.findByRole('dialog')
+    await user.clear(within(drawer).getByLabelText('Nombre'))
+    await user.type(within(drawer).getByLabelText('Nombre'), 'Silla Pro')
+    await user.click(within(drawer).getByRole('button', { name: 'Guardar' }))
 
     await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
-    expect(fake.state.invocations[0]?.body).toEqual({
-      action: 'update',
-      product_id: PRODUCT_ID,
-      status: 'published',
-    })
+    const body = fake.state.invocations[0]?.body as Record<string, unknown>
+    expect(body).toMatchObject({ action: 'update', product_id: PRODUCT_ID, name: 'Silla Pro' })
+    for (const field of ['store_id', 'price', 'slug', 'status', 'category_id', ...TENANT_FIELDS]) {
+      expect(body).not.toHaveProperty(field)
+    }
   })
 
-  it('un producto publicado ofrece despublicar en vez de publicar', async () => {
-    // Sin `userEvent`: esta prueba ya no pulsa nada. Antes hacia falta para
-    // abrir el menu; ahora las dos acciones se ven sin abrir nada, que es
-    // justo lo que se comprueba.
-    const published = defaultProducts()
-    published[0]!.status = 'published'
-    const fake = backend('admin', published)
-    renderPage(fake)
-
-    const row = await rowActions()
-    expect(row.getByRole('button', { name: 'Despublicar' })).toBeInTheDocument()
-    expect(row.queryByRole('button', { name: 'Publicar' })).not.toBeInTheDocument()
-  })
-
-  it('confirma con un aviso al usuario', async () => {
+  it('el producto sin guardar todavia no ofrece subir imagenes ni tiendas', async () => {
     const user = userEvent.setup()
     renderPage(backend())
 
-    const row = await rowActions()
-    await user.click(row.getByRole('button', { name: 'Publicar' }))
+    await user.click(await screen.findByRole('button', { name: 'Nuevo producto' }))
+    const drawer = await screen.findByRole('dialog')
+    await user.click(within(drawer).getByRole('tab', { name: 'Imágenes' }))
+    expect(await within(drawer).findByText(/Guarda el producto y podrás subir sus imágenes/)).toBeInTheDocument()
+    await user.click(within(drawer).getByRole('tab', { name: 'Tiendas' }))
+    expect(await within(drawer).findByText(/Guarda el producto y podrás elegir en qué tiendas/)).toBeInTheDocument()
+  })
 
-    expect(await screen.findByText('Producto publicado')).toBeInTheDocument()
+  it('el cajon se organiza en pestanas: datos, tiendas e imagenes', async () => {
+    const user = userEvent.setup()
+    renderPage(backend())
+
+    await user.click(await screen.findByRole('button', { name: 'Nuevo producto' }))
+    const drawer = await screen.findByRole('dialog')
+
+    expect(within(drawer).getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'General',
+      'Tiendas',
+      'Imágenes',
+    ])
+  })
+})
+
+describe('ProductsPage — publicación por tienda', () => {
+  it('muestra cada tienda de la sociedad con el estado del producto en ella', async () => {
+    const user = userEvent.setup()
+    renderPage(backend())
+    const drawer = await abrirTiendas(user)
+
+    const a = within(within(drawer).getByRole('region', { name: 'Mi Negocio' }))
+    expect(a.getByText('Publicado')).toBeInTheDocument()
+    expect(a.getByText('/silla-a')).toBeInTheDocument()
+    expect(a.getByText('Sillas')).toBeInTheDocument()
+    expect(a.getByText('S/ 199.90')).toBeInTheDocument()
+    expect(a.getByRole('link', { name: 'Ver en la vitrina: Mi Negocio' })).toHaveAttribute(
+      'href',
+      '/s/mi-negocio/product/silla-a',
+    )
+
+    const b = within(within(drawer).getByRole('region', { name: 'Outlet' }))
+    expect(b.getByText('No publicado')).toBeInTheDocument()
+  })
+
+  it('agregar la tienda B publica el MISMO producto, sin crear otro', async () => {
+    const user = userEvent.setup()
+    const fake = backend()
+    renderPage(fake)
+    const drawer = await abrirTiendas(user)
+
+    await user.click(within(drawer).getByRole('button', { name: 'Publicar en esta tienda: Outlet' }))
+    const form = await within(drawer).findByRole('form', { name: 'Publicar en esta tienda: Outlet' })
+    // La dirección se sugiere desde el nombre del maestro.
+    expect(within(form).getByLabelText('Dirección del producto')).toHaveValue('silla-a')
+    await user.type(within(form).getByLabelText('Precio'), '149.90')
+    await user.click(within(form).getByRole('button', { name: 'Publicar' }))
+
+    await waitFor(() => expect(fake.state.rpcCalls.some((call) => call.name === 'publish_product')).toBe(true))
+    const call = fake.state.rpcCalls.find((entry) => entry.name === 'publish_product')
+    expect(call?.args).toMatchObject({
+      p_product_id: PRODUCT_ID,
+      p_store_id: STORE_B,
+      p_slug: 'silla-a',
+      p_price: '149.90',
+      p_status: 'draft',
+    })
+    for (const field of TENANT_FIELDS) expect(call?.args).not.toHaveProperty(field)
+    // Ninguna alta de producto: el maestro es el mismo.
+    expect(fake.state.invocations).toHaveLength(0)
+    expect(await within(within(drawer).getByRole('region', { name: 'Outlet' })).findByText('/silla-a')).toBeInTheDocument()
+  })
+
+  it('las categorías del formulario son solo las de ESA tienda', async () => {
+    const user = userEvent.setup()
+    renderPage(backend())
+    const drawer = await abrirTiendas(user)
+
+    await user.click(within(drawer).getByRole('button', { name: 'Publicar en esta tienda: Outlet' }))
+    const form = await within(drawer).findByRole('form', { name: 'Publicar en esta tienda: Outlet' })
+    await user.click(within(form).getByRole('combobox', { name: 'Categoría' }))
+
+    expect(await screen.findByRole('option', { name: 'Liquidación' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Sillas' })).not.toBeInTheDocument()
+  })
+
+  it('cambiar la dirección y la categoría de A manda solo A y solo lo que cambió', async () => {
+    const user = userEvent.setup()
+    const fake = backend()
+    renderPage(fake)
+    const drawer = await abrirTiendas(user)
+
+    await user.click(within(drawer).getByRole('button', { name: 'Editar publicación: Mi Negocio' }))
+    const form = await within(drawer).findByRole('form', { name: 'Editar publicación: Mi Negocio' })
+    const slug = within(form).getByLabelText('Dirección del producto')
+    await user.clear(slug)
+    await user.type(slug, 'silla-a-2026')
+    await user.click(within(form).getByRole('combobox', { name: 'Categoría' }))
+    await user.click(await screen.findByRole('option', { name: 'Sillas de oficina' }))
+    await user.click(within(form).getByRole('button', { name: 'Guardar' }))
+
+    await waitFor(() =>
+      expect(fake.state.rpcCalls.some((call) => call.name === 'update_product_publication')).toBe(true),
+    )
+    const call = fake.state.rpcCalls.find((entry) => entry.name === 'update_product_publication')
+    expect(call?.args).toMatchObject({
+      p_product_id: PRODUCT_ID,
+      p_store_id: STORE_A,
+      p_slug: 'silla-a-2026',
+      p_category_id: SUBCATEGORY_ID,
+      p_clear_category: false,
+      p_status: null,
+      p_price: null,
+    })
+  })
+
+  it('quitar de A pide confirmación, llama solo para A y B sigue igual', async () => {
+    const user = userEvent.setup()
+    const tiendas = tiendasIniciales()
+    // B ya publicada también: quitar A no puede tocarla.
+    Object.assign(tiendas[1]!, {
+      publication_id: '44444444-4444-4444-8444-4444444444bb',
+      slug: 'silla-outlet',
+      status: 'published',
+      price: '149.90',
+    })
+    const fake = backend('admin', defaultMasters(), tiendas)
+    renderPage(fake)
+    const drawer = await abrirTiendas(user)
+
+    await user.click(within(drawer).getByRole('button', { name: 'Quitar de esta tienda: Mi Negocio' }))
+    const confirm = await screen.findByRole('dialog', { name: '¿Quitar de Mi Negocio?' })
+    await user.click(within(confirm).getByRole('button', { name: 'Quitar de esta tienda' }))
+
+    await waitFor(() => expect(fake.state.rpcCalls.some((call) => call.name === 'unpublish_product')).toBe(true))
+    const calls = fake.state.rpcCalls.filter((entry) => entry.name === 'unpublish_product')
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.args).toEqual({ p_product_id: PRODUCT_ID, p_store_id: STORE_A })
+
+    await waitFor(() =>
+      expect(within(within(drawer).getByRole('region', { name: 'Mi Negocio' })).getByText('No publicado')).toBeInTheDocument(),
+    )
+    const b = within(within(drawer).getByRole('region', { name: 'Outlet' }))
+    expect(b.getByText('Publicado')).toBeInTheDocument()
+    expect(b.getByText('/silla-outlet')).toBeInTheDocument()
+  })
+
+  it('un error del servidor se muestra traducido y el formulario sigue abierto', async () => {
+    const user = userEvent.setup()
+    const fake = backend()
+    fake.state.rpc.publish_product = () => {
+      throw { message: 'SLUG_DUPLICADO: la tienda ya tiene un producto con ese slug' }
+    }
+    renderPage(fake)
+    const drawer = await abrirTiendas(user)
+
+    await user.click(within(drawer).getByRole('button', { name: 'Publicar en esta tienda: Outlet' }))
+    const form = await within(drawer).findByRole('form', { name: 'Publicar en esta tienda: Outlet' })
+    await user.type(within(form).getByLabelText('Precio'), '10.00')
+    await user.click(within(form).getByRole('button', { name: 'Publicar' }))
+
+    expect(await within(form).findByText('Esa dirección ya la usa otro producto en esta tienda.')).toBeInTheDocument()
+  })
+
+  it('un rol de solo lectura ve las tiendas pero no puede publicar, editar ni quitar', async () => {
+    const user = userEvent.setup()
+    renderPage(backend('viewer'))
+    const drawer = await abrirTiendas(user)
+
+    expect(within(drawer).queryByRole('button', { name: /Publicar en esta tienda/ })).not.toBeInTheDocument()
+    expect(within(drawer).queryByRole('button', { name: /Editar publicación/ })).not.toBeInTheDocument()
+    expect(within(drawer).queryByRole('button', { name: /Quitar de esta tienda/ })).not.toBeInTheDocument()
   })
 })
 
 describe('ProductsPage — eliminacion segura (contrato §4.2)', () => {
-  it('antes de borrar enseña el conteo REAL de uso y ofrece archivar', async () => {
+  it('antes de borrar enseña el conteo REAL de uso, incluidas las tiendas', async () => {
     const user = userEvent.setup()
     renderPage(backend())
 
@@ -740,26 +924,11 @@ describe('ProductsPage — eliminacion segura (contrato §4.2)', () => {
     expect(within(dialog).getByText('Uso real de este registro')).toBeInTheDocument()
     await within(dialog).findByText('2') // líneas de pedido
     expect(within(dialog).getByText('3')).toBeInTheDocument() // imágenes
-    expect(within(dialog).getByRole('button', { name: 'Archivar' })).toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: 'Eliminar de todas formas' })).toBeInTheDocument()
+    expect(within(dialog).getByText('Tiendas donde está publicado')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Gestionar tiendas' })).toBeInTheDocument()
   })
 
-  it('archivar en vez de borrar conserva la fila y solo cambia el estado', async () => {
-    const user = userEvent.setup()
-    const fake = backend()
-    renderPage(fake)
-
-    const row = await rowActions()
-    await user.click(row.getByRole('button', { name: /Eliminar: Silla A/ }))
-    const dialog = await screen.findByRole('dialog')
-    await user.click(within(dialog).getByRole('button', { name: 'Archivar' }))
-
-    await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
-    expect(fake.state.invocations[0]?.body).toMatchObject({ status: 'archived' })
-    expect(fake.state.tables.products).toHaveLength(1)
-  })
-
-  it('eliminar borra la fila de verdad', async () => {
+  it('borrar pasa por el comando del servidor, que lo niega si sigue publicado', async () => {
     const user = userEvent.setup()
     const fake = backend()
     renderPage(fake)
@@ -769,7 +938,23 @@ describe('ProductsPage — eliminacion segura (contrato §4.2)', () => {
     const dialog = await screen.findByRole('dialog')
     await user.click(within(dialog).getByRole('button', { name: 'Eliminar de todas formas' }))
 
-    await waitFor(() => expect(fake.state.tables.products).toHaveLength(0))
+    await waitFor(() => expect(fake.state.rpcCalls.some((call) => call.name === 'delete_product_master')).toBe(true))
+    expect(
+      await screen.findByText('Sigue publicado en alguna tienda. Quítalo de todas antes de borrarlo.'),
+    ).toBeInTheDocument()
+  })
+
+  it('sin publicaciones ni historia, eliminar confirma el borrado', async () => {
+    const user = userEvent.setup()
+    const fake = backend()
+    fake.state.rpc.delete_product_master = () => null
+    renderPage(fake)
+
+    const row = await rowActions()
+    await user.click(row.getByRole('button', { name: /Eliminar: Silla A/ }))
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: 'Eliminar de todas formas' }))
+
     expect(await screen.findByText('Producto eliminado')).toBeInTheDocument()
   })
 })

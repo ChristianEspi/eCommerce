@@ -20,12 +20,30 @@ export class CatalogError extends UiError {
 export function mapCatalogCode(code: string): MessageKey {
   switch (code) {
     case 'DUPLICADO':
+    case 'SKU_DUPLICADO':
     case '23505':
       return 'catalog.error.duplicate'
+    case 'SLUG_DUPLICADO':
+      return 'catalog.publications.error.slugTaken'
+    case 'PUBLICACION_DUPLICADA':
+      return 'catalog.publications.error.alreadyPublished'
+    case 'CATEGORIA_FUERA_DE_TIENDA':
+      return 'catalog.publications.error.categoryStore'
+    case 'PRODUCTO_PUBLICADO':
+      return 'catalog.delete.blocked.published'
+    case 'PRODUCTO_CON_HISTORIA':
+      return 'catalog.delete.blocked.history'
+    case 'PRODUCTO_EN_KIT':
+      return 'catalog.delete.blocked.bundle'
     case 'SIN_PERMISO':
     case 'NO_AUTENTICADO':
+    case 'SIN_CONTEXTO':
+    case 'OPERADOR_NO_ES_ACTOR':
+    case 'TIENDA_FUERA_DE_SOCIEDAD_ACTIVA':
+    case 'PRODUCTO_FUERA_DE_SOCIEDAD_ACTIVA':
     case '42501':
       return 'catalog.error.forbidden'
+    case 'PUBLICACION_NO_ENCONTRADA':
     case 'PRODUCTO_NO_ENCONTRADO':
     case 'CATEGORIA_NO_ENCONTRADA':
     case 'IMAGEN_NO_ENCONTRADA':
@@ -38,6 +56,8 @@ export function mapCatalogCode(code: string): MessageKey {
     case 'DATOS_INVALIDOS':
     case 'TENANT_NO_ADMITIDO':
     case 'ITEMS_REQUERIDOS':
+    case 'SLUG_INVALIDO':
+    case 'PRECIO_INVALIDO':
     case '23503':
     case '23514':
       return 'catalog.error.invalid'

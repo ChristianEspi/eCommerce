@@ -538,6 +538,20 @@ export const CREATE_STORE_RPC = 'create_store'
 export const UPDATE_STORE_RPC = 'update_store'
 export const SET_STORE_STATUS_RPC = 'set_store_status'
 
+// --- Stores + Product Master · fase 04 (20260917130000) ---------------------
+// El producto MAESTRO de la sociedad y su publicación por tienda. Sin
+// `satisfies` hasta aplicar la migración y regenerar los tipos; la red es
+// `supabase/tests/product-master-commands.test.ts`.
+/** Un maestro por fila (sociedad activa) con el resumen de sus tiendas. */
+export const ADMIN_PRODUCT_MASTERS_VIEW = 'admin_product_masters'
+/** Todas las tiendas de la sociedad y la publicación del producto en cada una. */
+export const PRODUCT_STORE_PUBLICATIONS_RPC = 'product_store_publications'
+export const PUBLISH_PRODUCT_RPC = 'publish_product'
+export const UPDATE_PRODUCT_PUBLICATION_RPC = 'update_product_publication'
+export const UNPUBLISH_PRODUCT_RPC = 'unpublish_product'
+/** Borrado del maestro: el servidor lo niega si sigue publicado o tiene historia. */
+export const DELETE_PRODUCT_MASTER_RPC = 'delete_product_master'
+
 // Importación del catálogo desde Excel (20260916100000). Las tres simulan con
 // `p_dry_run = true` y aplican todo o nada con `false`. Red de seguridad:
 // `supabase/tests/catalog-import.test.ts`.

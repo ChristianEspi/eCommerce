@@ -25,7 +25,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
-import { formatMoney } from '@/shared/lib/format'
+import { formatMoneyOrDash } from '@/shared/lib/format'
 import { LoadingState } from '@/shared/ui/states'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { CatalogError } from '../api/errors'
@@ -48,7 +48,7 @@ import {
   type ProductVariant,
   type VariantFormValues,
 } from './types'
-import type { Product } from '../types'
+import type { PimProduct } from '../types'
 
 /**
  * Variantes del producto.
@@ -68,7 +68,7 @@ export function VariantsPanel({
   storeId,
   canWrite,
 }: {
-  product: Product | null
+  product: PimProduct | null
   organizationId: string
   companyId: string
   storeId: string
@@ -234,11 +234,7 @@ export function VariantsPanel({
                     .join(' · ') || t('common.none')}
                 </TableCell>
                 <TableCell align="right" className="tnum">
-                  {formatMoney(
-                    Number(effectiveVariantPrice(variant, product.price)),
-                    product.currency,
-                    locale,
-                  )}
+                  {formatMoneyOrDash(effectiveVariantPrice(variant, product.price), product.currency, locale)}
                   {variant.price === null && (
                     <Typography component="span" sx={{ color: 'var(--muted)', fontSize: 11, ml: 0.5 }}>
                       {t('pim.variants.inherited')}
