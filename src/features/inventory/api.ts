@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildTextSearchFilter } from '@/shared/lib/search'
 import { tryGetSupabaseClient, tryGetStorefrontClient } from '@/shared/lib/supabase'
 import { InventoryError, inventoryErrorFromDb } from './errors'
+import { ADMIN_PRODUCT_MASTERS_VIEW } from '@/shared/lib/db-schema'
 import {
   ADJUST_INVENTORY_RPC,
   AVAILABILITY_PUBLIC_RPC,
@@ -165,6 +166,20 @@ export async function linkStoreWarehouse(input: {
   if (error) throw inventoryErrorFromDb(error)
 }
 
+/**
+ * Los almacenes que sirven a la tienda, o `null` si la tienda no declara
+ * ninguno (entonces la sirven todos los de la sociedad, como `ebim.serving_warehouses`).
+ *
+ * ADR 018: la existencia es de almacén × producto maestro. Su `store_id` es solo
+ * un ancla informativa, así que «lo de esta tienda» se lee por los almacenes que
+ * la sirven, no por esa columna.
+ */
+async function servingWarehouseIds(storeId: string): Promise<string[] | null> {
+  const links = await fetchStoreWarehouses(storeId)
+  const active = links.filter((link) => link.is_active).map((link) => link.warehouse_id)
+  return links.length === 0 ? null : active
+}
+
 export async function unlinkStoreWarehouse(id: string): Promise<void> {
   const { error } = await client().from(STORE_WAREHOUSES_TABLE).delete().eq('id', id)
   if (error) throw inventoryErrorFromDb(error)
@@ -194,7 +209,10 @@ export async function fetchLevels(input: {
   if (!input.storeId) return []
   const supabase = client()
 
-  let query = supabase.from(INVENTORY_LEVELS_TABLE).select(LEVEL_SELECT).eq('store_id', input.storeId)
+  const serving = await servingWarehouseIds(input.storeId)
+  if (serving !== null && serving.length === 0) return []
+  let query = supabase.from(INVENTORY_LEVELS_TABLE).select(LEVEL_SELECT)
+  if (serving !== null) query = query.in('warehouse_id', serving)
   if (input.warehouseId) query = query.eq('warehouse_id', input.warehouseId)
 
   const { data, error } = await query.limit(500)
@@ -263,10 +281,12 @@ export async function searchStockProducts(input: {
   term: string
 }): Promise<StockProduct[]> {
   if (!input.storeId) return []
+  // ADR 018: la existencia física es del MAESTRO de la sociedad (almacén ×
+  // producto), no de una tienda: se ofrece cualquier producto de la sociedad
+  // activa, esté publicado donde esté. La vista ya se limita a esa sociedad.
   let query = client()
-    .from(PRODUCTS_TABLE)
+    .from(ADMIN_PRODUCT_MASTERS_VIEW)
     .select('id, sku, name, kind')
-    .eq('store_id', input.storeId)
     // Un kit no lleva existencia propia: la lleva cada componente. Ofrecerlo
     // aquí sería ofrecer un movimiento que el servidor rechaza.
     .neq('kind', 'bundle')
@@ -310,10 +330,10 @@ export async function fetchMovements(input: {
   warehouseId?: string | null
 }): Promise<InventoryMovement[]> {
   if (!input.storeId) return []
-  let query = client()
-    .from(INVENTORY_MOVEMENTS_TABLE)
-    .select(MOVEMENT_SELECT)
-    .eq('store_id', input.storeId)
+  const serving = await servingWarehouseIds(input.storeId)
+  if (serving !== null && serving.length === 0) return []
+  let query = client().from(INVENTORY_MOVEMENTS_TABLE).select(MOVEMENT_SELECT)
+  if (serving !== null) query = query.in('warehouse_id', serving)
   if (input.warehouseId) query = query.eq('warehouse_id', input.warehouseId)
 
   const { data, error } = await query.order('occurred_at', { ascending: false }).limit(200)
@@ -464,11 +484,18 @@ const ALERT_SELECT =
 
 export async function fetchAlerts(storeId: string | null): Promise<InventoryAlert[]> {
   if (!storeId) return []
-  const { data, error } = await client()
-    .from(INVENTORY_ALERTS_VIEW)
-    .select(ALERT_SELECT)
-    .eq('store_id', storeId)
-    .limit(200)
+  // Las alertas con almacén van por los almacenes que sirven a la tienda; las de
+  // «publicado sin existencia» no tienen almacén y se leen por la tienda de su
+  // publicación.
+  const serving = await servingWarehouseIds(storeId)
+  let query = client().from(INVENTORY_ALERTS_VIEW).select(ALERT_SELECT)
+  query =
+    serving === null
+      ? query.or(`warehouse_id.not.is.null,store_id.eq.${storeId}`)
+      : serving.length === 0
+        ? query.eq('store_id', storeId).is('warehouse_id', null)
+        : query.or(`warehouse_id.in.(${serving.join(',')}),store_id.eq.${storeId}`)
+  const { data, error } = await query.limit(200)
   if (error) throw inventoryErrorFromDb(error)
   return inventoryAlertSchema.array().parse(data ?? [])
 }
