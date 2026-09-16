@@ -530,6 +530,13 @@ export const MY_ORDER_SCHEDULES_RPC = 'my_order_schedules'
 export const SAVE_MY_ORDER_SCHEDULE_RPC = 'save_my_order_schedule'
 /** Revisión previa (20260914192000): cada línea con ok/rechazada y su motivo. No escribe. */
 export const CHECK_MY_ORDER_SCHEDULE_LINES_RPC = 'check_my_order_schedule_lines'
+
+// Importación del catálogo desde Excel (20260916100000). Las tres simulan con
+// `p_dry_run = true` y aplican todo o nada con `false`. Red de seguridad:
+// `supabase/tests/catalog-import.test.ts`.
+export const IMPORT_CATALOG_VOCABULARY_RPC = 'import_catalog_vocabulary'
+export const IMPORT_CATALOG_CATEGORIES_RPC = 'import_catalog_categories'
+export const IMPORT_CATALOG_PRODUCTS_RPC = 'import_catalog_products'
 /** Pausar o reanudar. */
 export const SET_MY_ORDER_SCHEDULE_STATUS_RPC = 'set_my_order_schedule_status'
 export const ARCHIVE_MY_ORDER_SCHEDULE_RPC = 'archive_my_order_schedule'

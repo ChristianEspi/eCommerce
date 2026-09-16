@@ -11,6 +11,24 @@ el recorrido SaaS P00–P17 queda cerrado)
 > (`claude-saas-opus/config/phases.json`), que se identifica siempre como «P0x-SaaS». No son la misma
 > serie: el P12 histórico es el framework de integraciones; el P12-SaaS es fulfillment y devoluciones.
 
+## Importación del catálogo desde Excel (2026-09-16)
+
+Botón **Importar** en *Catálogo avanzado*, *Categorías* y *Productos*, con plantilla .xlsx descargable,
+vista previa fila a fila y aplicación todo o nada. Pedido del operador para cargar Biel.
+
+- Migración `20260916100000_catalog_import.sql` (**sin aplicar en DEV**): `import_catalog_vocabulary`
+  (marcas, familias, unidades, atributos y valores, en un libro de hojas), `import_catalog_categories`
+  (madre por slug, cualquier orden) e `import_catalog_products` (una fila por variante; los ejes de la
+  sociedad son columnas). Simular y aplicar son la misma ejecución con `p_dry_run`.
+- Decisiones del operador: crear y actualizar por clave de negocio (SKU, slug, código); una celda
+  vacía conserva el valor; un Excel por pantalla; una fila por variante; sin imágenes.
+- Lo que la hoja no decide: tenant, moneda ni ids. Roles owner/admin/catalog; marcas, familias y
+  variantes exigen `catalog.advanced` (fila a fila en productos). El stock escribe el de catálogo y la
+  respuesta avisa si la tienda sirve desde almacenes.
+- Librerías nuevas: `read-excel-file` 9.3.10 y `write-excel-file` 4.1.1 (MIT), cargadas con `import()`
+  solo al importar. Se instalaron con `--engine-strict=false` por la condición C8 (Node local 22.12).
+- Pruebas: `supabase/tests/catalog-import.test.ts` (18), `src/features/catalog/import/*.test.ts(x)` (16).
+
 ## Hardening multi-commerce (2026-09-13, rama `feature/demo-commerce-hardening-v1`)
 
 Tres experiencias sobre la MISMA vitrina, el mismo motor de precios y el mismo checkout: B2C

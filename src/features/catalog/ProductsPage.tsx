@@ -51,6 +51,7 @@ import { downloadCsv, productsToCsv } from './exportCsv'
 import { categoryDescendants, categoryTree } from './types'
 import type { Product, ProductKind, ProductStatus } from './types'
 import { CategoryPicker } from './CategoryPicker'
+import { CatalogImportAction } from './import/CatalogImportAction'
 import { useCategories } from './useCategories'
 import { useBrands } from './pim/hooks'
 import { useDeleteProduct, useProductUsage, useProducts, useSetProductStatus } from './useProducts'
@@ -324,6 +325,7 @@ export function ProductsPage() {
             >
               {t('common.export')}
             </Button>
+            {canWrite && <CatalogImportAction kind="products" storeId={activeStore?.id ?? null} />}
             {canWrite && (
               <Button
                 variant="contained"

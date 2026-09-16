@@ -8,6 +8,7 @@ import { PageHeader } from '@/shared/ui/PageHeader'
 import { SectionTabs } from '@/shared/ui/SectionTabs'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { EmptyState } from '@/shared/ui/states'
+import { CatalogImportAction } from '../import/CatalogImportAction'
 import { AttributesSection } from './AttributesSection'
 import { CatalogEntrySection } from './CatalogEntrySection'
 import { UnitsSection } from './UnitsSection'
@@ -28,7 +29,7 @@ import { UnitsSection } from './UnitsSection'
  */
 export function PimPage() {
   const { t } = useI18n()
-  const { activeStore, activeCompanyId, tenant, status } = useTenant()
+  const { activeStore, activeCompanyId, tenant, status, can } = useTenant()
 
   const items = useMemo(
     () => [
@@ -74,7 +75,12 @@ export function PimPage() {
 
   return (
     <>
-      <PageHeader icon={<TuneRoundedIcon />} title={t('pim.title')} subtitle={activeStore?.name ?? t('pim.subtitle')} />
+      <PageHeader
+        icon={<TuneRoundedIcon />}
+        title={t('pim.title')}
+        subtitle={activeStore?.name ?? t('pim.subtitle')}
+        actions={can('catalog.write') ? <CatalogImportAction kind="vocabulary" /> : undefined}
+      />
       <SectionTabs items={items} ariaLabel={t('pim.title')} />
     </>
   )

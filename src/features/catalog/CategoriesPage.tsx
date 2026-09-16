@@ -34,6 +34,7 @@ import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState, ErrorState } from '@/shared/ui/states'
 import { CatalogError } from './api/errors'
 import { CategoryDrawer } from './CategoryDrawer'
+import { CatalogImportAction } from './import/CatalogImportAction'
 import type { Category } from './types'
 import {
   useCategories,
@@ -153,9 +154,12 @@ export function CategoriesPage() {
         subtitle={activeStore?.name}
         actions={
           canWrite ? (
-            <Button variant="contained" onClick={() => setDrawer({ open: true, category: null })}>
-              {t('catalog.categories.new')}
-            </Button>
+            <>
+              <CatalogImportAction kind="categories" storeId={storeId} />
+              <Button variant="contained" onClick={() => setDrawer({ open: true, category: null })}>
+                {t('catalog.categories.new')}
+              </Button>
+            </>
           ) : undefined
         }
       />
