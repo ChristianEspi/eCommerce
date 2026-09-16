@@ -81,6 +81,12 @@ orden, grafo de dependencias, riesgos y estado por fase en
     lo agrega una vez por (tienda, producto): `price_from` de 17 s a 0,4 s; búsqueda como `anon`
     dentro de 3 s (biel 192, categoría `mujer-blusas` 12, miquimica 578). Aplicada en QAS con
     registro; `test:db` 109 archivos / 2 691 en verde.
+  - Segundo síntoma: la ficha (`public_products?store_id=…&slug=…`) seguía cerca del límite porque
+    cualquier unión con `ebim.public_unit_prices` resuelve TODAS las listas. `20260917210000_public_unit_price_per_row.sql`
+    añade `ebim.public_unit_price(tienda, producto, variante)` (misma resolución acotada por índices,
+    definer, sin tenant de entrada) y las dos vistas públicas la usan por fila: ficha ~0,2 s netos,
+    variantes igual, búsquedas dentro de 3 s como `anon`, totales de vitrina idénticos. Aplicada en
+    QAS con registro; `test:db` 109 / 2 691 en verde.
   - Sin push: los commits siguen locales.
 
 ## Importación del catálogo desde Excel (2026-09-16)
