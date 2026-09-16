@@ -11,6 +11,17 @@ el recorrido SaaS P00–P17 queda cerrado)
 > (`claude-saas-opus/config/phases.json`), que se identifica siempre como «P0x-SaaS». No son la misma
 > serie: el P12 histórico es el framework de integraciones; el P12-SaaS es fulfillment y devoluciones.
 
+## N tiendas por sociedad + producto maestro de sociedad (desde 2026-09-16)
+
+Trabajo por fases 01–06 (`_EBIM_PROMPTS/prompts`). Decisiones en
+[`adr/018-stores-product-master-company-scope.md`](adr/018-stores-product-master-company-scope.md);
+orden, grafo de dependencias, riesgos y estado por fase en
+[`STORES_PRODUCT_MASTER_MIGRATION_PLAN.md`](STORES_PRODUCT_MASTER_MIGRATION_PLAN.md).
+
+- **Fase 01 (auditoría):** línea base en `712ad8e` toda en verde (238 archivos / 4 451 pruebas);
+  grafo medido sobre el esquema efectivo (38 FKs, 5 vistas, 40 funciones); auditoría de SKU
+  `scripts/audit/product-sku-conflicts.sql` con **0 conflictos en DEV**.
+
 ## Importación del catálogo desde Excel (2026-09-16)
 
 Botón **Importar** en *Catálogo avanzado*, *Categorías* y *Productos*, con plantilla .xlsx descargable,
