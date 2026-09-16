@@ -74,6 +74,13 @@ orden, grafo de dependencias, riesgos y estado por fase en
     pedidos (46), líneas (72), inventario (3 774) y listas (2 816) intactos; vitrina visible idéntica
     a la previa (biel 192, miquimica 578, tienda-tenant-b 1).
   - Edge Function desplegada: `catalog-product` (única cambiada desde el 15-09).
+  - **Incidente y arreglo (mismo día):** la vitrina de Biel devolvía 500 / `57014` en
+    `catalog_search_for_slug` (~18 s contra el `statement_timeout` de 3 s de `anon`). Causa: el
+    resumen de variantes de `public_products` era un `left join lateral` sobre
+    `ebim.public_unit_prices`, que Postgres re-evaluaba por producto. `20260917200000_public_products_variant_aggregate.sql`
+    lo agrega una vez por (tienda, producto): `price_from` de 17 s a 0,4 s; búsqueda como `anon`
+    dentro de 3 s (biel 192, categoría `mujer-blusas` 12, miquimica 578). Aplicada en QAS con
+    registro; `test:db` 109 archivos / 2 691 en verde.
   - Sin push: los commits siguen locales.
 
 ## Importación del catálogo desde Excel (2026-09-16)
