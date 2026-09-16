@@ -56,8 +56,25 @@ orden, grafo de dependencias, riesgos y estado por fase en
   con los 7 casos de aceptación, invariantes de tiendas/maestro/comercio, migración legacy y gates.
   Evidencia en `supabase/tests/stores-product-master-certification.test.ts` (23), que siembra la forma
   legacy, aplica todas las migraciones hasta la contracción y recorre el flujo completo. Conclusión:
-  lista para QAS tras auditar SKU en destino y correr el golden path allí. **Nada aplicado en
-  DEV/QAS/PRD; sin push.**
+  lista para QAS tras auditar SKU en destino y correr el golden path allí.
+- **Despliegue en QAS (`ehxlxbhtlmfgneiagdcj`, 2026-09-17, a pedido del operador).** No hay base DEV:
+  el entorno local apunta a QAS.
+  - Antes: auditoría SKU 0 conflictos; snapshot local de 27 tablas; último backup automático
+    2026-09-16 06:04.
+  - QAS tenía registradas 145 migraciones (hasta `20260911150000`). Se aplicó `20260912100000`; la
+    siguiente falló sin efecto porque `notifications` ya existía: 31 migraciones
+    (`20260912110000`…`20260914192000` y `20260916120000`) estaban aplicadas a mano con
+    `scripts/aplicar-migracion.mjs`, que no registra el historial. Comparación completa de funciones,
+    vistas y columnas contra una base local construida hasta el mismo corte: idénticas. Se registraron
+    sin ejecutarlas.
+  - Aplicadas con registro, una transacción por migración: `20260916100000_catalog_import` y las 9 de
+    Stores + Product Master (`20260917100000`…`20260917190000`).
+  - Verificación: esquema remoto = repo (497 funciones, 24 vistas, 2 667 columnas); 187 migraciones
+    registradas; 781 productos = 781 publicaciones; 0 columnas legacy con datos; 0 FKs sin validar;
+    pedidos (46), líneas (72), inventario (3 774) y listas (2 816) intactos; vitrina visible idéntica
+    a la previa (biel 192, miquimica 578, tienda-tenant-b 1).
+  - Edge Function desplegada: `catalog-product` (única cambiada desde el 15-09).
+  - Sin push: los commits siguen locales.
 
 ## Importación del catálogo desde Excel (2026-09-16)
 

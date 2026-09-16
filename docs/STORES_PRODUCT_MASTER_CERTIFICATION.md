@@ -36,7 +36,9 @@
 | `20260917180000_product_master_storefront_b2b.sql` | Búsqueda, favoritos por tienda, reseñas, relacionados, pedido rápido, programados, sugeridos, KPIs y sus FKs |
 | `20260917190000_product_master_contract.sql` | Contracción: columnas legacy en NULL como fachada, claves e índices por tienda fuera, `set null` al borrar tienda |
 
-**Estado de despliegue:** ninguna aplicada en DEV/QAS/PRD (no hubo orden de despliegue).
+**Estado de despliegue:** aplicadas en **QAS** (`ehxlxbhtlmfgneiagdcj`) el 2026-09-17 a pedido del
+operador, con esquema remoto verificado idéntico al repo y datos cuadrados (detalle en
+`docs/STATE.md`); Edge Function `catalog-product` desplegada. PRD sin tocar.
 
 ## 3. Arquitectura final
 
