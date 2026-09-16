@@ -544,6 +544,12 @@ export const SET_STORE_STATUS_RPC = 'set_store_status'
 // `supabase/tests/product-master-commands.test.ts`.
 /** Un maestro por fila (sociedad activa) con el resumen de sus tiendas. */
 export const ADMIN_PRODUCT_MASTERS_VIEW = 'admin_product_masters'
+/**
+ * Una fila por publicación (tienda × maestro) con sku, nombre, kind, marca y la
+ * categoría/slug/estado/precio de ESA tienda. Es lo que ofrecen los selectores
+ * de producto de pantallas por tienda (listas de precio, promociones, surtidos).
+ */
+export const ADMIN_STORE_PRODUCTS_VIEW = 'admin_store_products'
 /** Todas las tiendas de la sociedad y la publicación del producto en cada una. */
 export const PRODUCT_STORE_PUBLICATIONS_RPC = 'product_store_publications'
 export const PUBLISH_PRODUCT_RPC = 'publish_product'
