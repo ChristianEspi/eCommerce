@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { PRODUCTS_TABLE } from '@/shared/lib/db-schema'
+import { ADMIN_STORE_PRODUCTS_VIEW } from '@/shared/lib/db-schema'
 import { buildTextSearchFilter } from '@/shared/lib/search'
 import { tryGetSupabaseClient } from '@/shared/lib/supabase'
 import { TradeError, tradeErrorFromDb } from './errors'
@@ -251,9 +251,11 @@ export async function searchTradeProducts(input: {
 }): Promise<TradeProductOption[]> {
   if (!input.storeId) return []
 
+  // ADR 018: surtidos y cotizaciones de una tienda ofrecen lo PUBLICADO en
+  // ella. La vista de publicaciones expone el producto como `product_id`.
   let query = client()
-    .from(PRODUCTS_TABLE)
-    .select('id, sku, name')
+    .from(ADMIN_STORE_PRODUCTS_VIEW)
+    .select('product_id, sku, name')
     .eq('store_id', input.storeId)
     .order('name')
     .limit(20)
@@ -263,7 +265,10 @@ export async function searchTradeProducts(input: {
 
   const { data, error } = await query
   if (error) throw tradeErrorFromDb(error)
-  return (data ?? []) as unknown as TradeProductOption[]
+  return (data ?? []).map((row) => {
+    const { product_id: id, sku, name } = row as { product_id: string; sku: string; name: string }
+    return { id, sku, name }
+  })
 }
 
 // ---------------------------------------------------------------------------

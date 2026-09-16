@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { z } from 'zod'
 import { AppError } from '@/domain/errors'
 import { codeFromDbError } from '@/shared/lib/appError'
-import { ORDERS_TABLE, PRODUCTS_TABLE } from '@/shared/lib/db-schema'
+import { ADMIN_PRODUCT_MASTERS_VIEW, ORDERS_TABLE } from '@/shared/lib/db-schema'
 import { buildTextSearchFilter } from '@/shared/lib/search'
 import { tryGetSupabaseClient } from '@/shared/lib/supabase'
 
@@ -53,7 +53,9 @@ export async function searchEverything(
     'customer_name',
     'customer_email',
   ])
-  const productFilter = buildTextSearchFilter(term, ['name', 'sku', 'slug'])
+  // ADR 018: el atajo lleva a `/app/products`, que lista los MAESTROS de la
+  // sociedad activa; se busca ahí, por lo que se ve en esa pantalla.
+  const productFilter = buildTextSearchFilter(term, ['name', 'sku'])
   if (!orderFilter && !productFilter) return []
 
   const [orders, products] = await Promise.all([
@@ -68,9 +70,8 @@ export async function searchEverything(
       : Promise.resolve({ data: [], error: null }),
     productFilter
       ? supabase
-          .from(PRODUCTS_TABLE)
+          .from(ADMIN_PRODUCT_MASTERS_VIEW)
           .select('id, sku, name')
-          .eq('store_id', storeId)
           .or(productFilter)
           .order('name')
           .limit(HITS_PER_GROUP)

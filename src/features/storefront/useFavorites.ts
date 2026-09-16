@@ -138,7 +138,7 @@ export function useFavorites(storeId: string | null) {
       }
 
       try {
-        await toggleServerFavorite(productId)
+        await toggleServerFavorite(productId, storeId)
       } catch {
         // Vuelta atras: el corazon no puede decir que guardo algo que el
         // servidor rechazo.

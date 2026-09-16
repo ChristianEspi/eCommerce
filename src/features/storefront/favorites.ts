@@ -95,11 +95,16 @@ export async function fetchServerFavorites(storeId: string): Promise<string[]> {
 }
 
 /** Interruptor del servidor. Devuelve el estado NUEVO. */
-export async function toggleServerFavorite(productId: string): Promise<boolean> {
+export async function toggleServerFavorite(productId: string, storeId: string): Promise<boolean> {
   const supabase = client()
   if (!supabase) return false
 
-  const { data, error } = await supabase.rpc(TOGGLE_FAVORITE_RPC, { p_product_id: productId })
+  // ADR 018: el mismo producto se vende en varias tiendas; el favorito es de
+  // ESTA tienda.
+  const { data, error } = await supabase.rpc(TOGGLE_FAVORITE_RPC, {
+    p_product_id: productId,
+    p_store_id: storeId,
+  })
   if (error) throw error
   return Boolean(data)
 }
@@ -119,7 +124,7 @@ export async function mergeLocalFavorites(storeId: string): Promise<string[]> {
   for (const productId of local) {
     if (remote.has(productId)) continue
     try {
-      await toggleServerFavorite(productId)
+      await toggleServerFavorite(productId, storeId)
       remote.add(productId)
     } catch {
       // Un producto que ya no está publicado no se puede guardar. No es un
