@@ -294,7 +294,7 @@ Cada archivo es nuevo; ninguna migración aplicada se edita.
 | 02 — tiendas autoservicio | hecha: `20260917100000_store_management.sql`, `/app/stores` |
 | 03 — maestro + publicación (base) | hecha: `20260917110000_product_master_expand.sql` y `20260917120000_product_master_read_models.sql` (ver §12) |
 | 04 — backoffice de maestro | hecha: `20260917130000_product_master_commands.sql`, `20260917140000_product_master_import.sql`, `/app/products` (ver §13) |
-| 05 — consumidores y contracción | pendiente |
+| 05 — consumidores y contracción | hecha: `20260917160000`…`20260917190000` (ver §14) |
 | 06 — certificación | pendiente |
 
 ## 12. Implementado en la fase 03 (2026-09-17)
@@ -378,3 +378,86 @@ el de la tienda de origen. `CategoriesPage` sigue siendo de la tienda activa.
 
 **Pruebas:** `supabase/tests/product-master-commands.test.ts` (27); `ProductsPage.test.tsx` (38,
 reescrito para maestros y publicaciones), `pim-ui.test.tsx`, `catalog.test.ts`.
+
+## 14. Implementado en la fase 05 (2026-09-17)
+
+El grafo se rehízo contra HEAD con introspección del esquema efectivo (`pg_get_functiondef` de toda
+función que toca `products`, `product_variants`, `product_uoms` o `inventory_levels`, más vistas,
+FKs, policies e índices). Cada función se redefinió partiendo de su definición vigente.
+
+**A · Precios, promociones, canales y cotizaciones — `20260917160000_product_master_pricing_promotions.sql`**
+
+| Dependencia | Estado |
+|---|---|
+| `ebim.resolve_prices` | migrada: precio y moneda de la publicación; precio propio de variante/presentación desde `store_price_overrides` de ESA tienda |
+| `ebim.build_quote`, `public.request_quote` | migradas: exigen publicación (pública: publicada y vigente) |
+| `ebim.evaluate_promotions` | migrada: categoría de la publicación, marca del maestro |
+| `public.accept_quote` | guarda nueva `COTIZACION_PRODUCTO_NO_DISPONIBLE` |
+| `ebim.store_currency_in_use` | migrada a publicaciones |
+| FKs `product_channels`, `price_list_items`, `promotion_scopes` | → `store_products (product_id, store_id)` cascade |
+| `pricing/api.ts`, `promotions/api.ts` | selectores sobre `admin_store_products` |
+
+**B · Carrito, pedido, inventario y API — `20260917170000_product_master_orders_inventory.sql`**
+
+| Dependencia | Estado |
+|---|---|
+| `cart_replace_lines`, `create_order`, `availability_for_slug` | migradas: publicación vigente y moneda de la publicación |
+| `ebim.cart_payload` | slug de la publicación de la tienda del carrito |
+| `ebim.hold_stock` / `ebim.consume_stock` | publicación / maestro por sociedad de la tienda |
+| `ebim.ensure_level` | `store_id` = ancla (origen o primera tienda); nada filtra por ella |
+| `seed_inventory_from_catalog` | lo publicado en la tienda, sin duplicar niveles |
+| `api_order_create`, `api_stock_read`, `api_products_list` | SKU del maestro dentro de lo publicado; lista publicaciones |
+| vista `inventory_alerts` | sin columnas legacy |
+| FKs `cart_items` | producto → publicación; variante → (id, product_id) |
+| FKs `order_items`, `inventory_levels` | → maestro (org, company); pedidos `set null` como antes |
+| `inventory/api.ts` | productos de la sociedad; existencias/movimientos/alertas por almacenes que sirven a la tienda |
+
+**C · Vitrina, B2B, engagement y analítica — `20260917180000_product_master_storefront_b2b.sql`**
+
+| Dependencia | Estado |
+|---|---|
+| `ebim.search_catalog` | universo = publicaciones de la tienda |
+| `toggle_product_favorite` | nueva firma `(product, store default null)`; unicidad (usuario, tienda, producto) |
+| `my_product_favorites`, `review_product` | publicación vigente |
+| `product_relations_for_slug`, `track_events_for_slug` | relacionado/producto publicado en la tienda |
+| `dashboard_kpis`, `category_deletion_usage` | cuentan publicaciones |
+| `resolve_order_lines_for_slug`, `order_schedule_line_issue`, `order_template_view`, `suggest_order_v2` | SKU del maestro dentro de lo publicado; slug y moneda de la publicación |
+| FKs `content_block_items`, `product_favorites` | → publicación cascade |
+| FK `product_reviews` | → maestro (la opinión sobrevive a despublicar) |
+| `storefront/favorites.ts`, `trade/api.ts`, `search/searchApi.ts` | tienda en favoritos; surtidos sobre publicaciones; buscador global sobre maestros |
+
+**D · Contracción — `20260917190000_product_master_contract.sql`**
+
+- Se retira la sincronía inversa publicación → `products`. Las columnas de publicación de `products`
+  quedan en NULL y son **fachada de escritura** (crean/actualizan la publicación de origen). Por la
+  fachada no se puede vaciar un campo: para eso están los comandos.
+- `status`/`currency` sin default ni NOT NULL; fuera `products_category_fk` y
+  `products_published_needs_date` (reglas de la publicación).
+- `search_vector` regenerado sin slug.
+- `admin_products` conserva su forma leyendo la publicación de origen (compatibilidad `catalog-copy`).
+- Fuera FKs legacy del PIM `(x, store_id)`, `products_store_key`, `product_variants_store_key`, SKU y
+  slug por tienda e índices por tienda; `products_kind_idx` pasa a `(org, company, kind)`.
+- FKs de tienda de `products` y del PIM: `on delete set null (store_id)`.
+- Fuera `ebim.product_is_available(uuid, uuid, numeric)` y `ebim.bundle_is_available(uuid)`.
+
+**Introspección final:** fuera de la maquinaria de transición (`sync_origin_publication`,
+`adopt_origin_store`, `anchor_pim_origin_store`, sincronía de precio de variante/presentación) no queda
+ninguna función ni vista que lea columnas de publicación de `products`. `products.stock`/`product_variants.stock`
+se leen como stock del maestro (correcto). `import_catalog_products` escribe por la fachada en la tienda
+de origen y por publicación en las demás.
+
+**Compatibilidad y deuda restante (con evidencia):**
+
+| Pieza | Por qué se queda | Retirada |
+|---|---|---|
+| `product_variants.price/compare_at_price`, `product_uoms.price` ↔ `store_price_overrides` de la tienda de origen | los paneles PIM y la importación escriben el precio propio ahí; ningún lector de comercio lo usa | cuando los paneles de variantes/presentaciones editen overrides por tienda |
+| Columnas de publicación en `products` (siempre NULL) | fachada para seed, fixtures (~120 escrituras), importación y clientes antiguos | cuando no quede escritor legacy |
+| `products.store_id` y `store_id` del PIM | ancla de origen de la fachada y de la sincronía de precios | con la anterior |
+| `inventory_levels.store_id` NOT NULL con FK de tienda `cascade` | `inventory_movements.store_id` NOT NULL la copia | cuando movimientos acepten ancla nula |
+| `product_variants_barcode_key (store_id, barcode)` | pasarlo a sociedad podría chocar con datos heredados | auditoría de códigos de barras |
+
+**Pruebas nuevas:** `product-master-pricing` (7), `product-master-orders` (8),
+`product-master-storefront` (8); ajustadas a la contracción: `product-master`, `product-master-commands`,
+`catalog-import`, `catalog-admin`, `rls-tenant-isolation`, `demo-fixtures` (lecturas de columnas que
+ahora viven en la publicación).
+

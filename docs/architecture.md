@@ -113,9 +113,11 @@ tenants (PK = organization_id del hub)
 en cada tienda. El backoffice (`/app/products`) lista maestros sin precio global y administra cada
 tienda en la pestaña «Tiendas» con `publish_product`, `update_product_publication` y
 `unpublish_product` (INVOKER, tenant del JWT). La vitrina resuelve siempre por
-`tienda + store_products.slug`. Durante la transición, `products.store_id` es la tienda de ORIGEN,
-sincronizada con su publicación, y el `store_id` del PIM lo ancla la base a ese origen; la fase 05
-migra los consumidores de comercio y retira la sincronía. Detalle en
+`tienda + store_products.slug`. Precios (`resolve_prices`), carrito, pedido, promociones, búsqueda,
+favoritos (por tienda), pedido rápido y API de socio leen la publicación; pedidos, reseñas e
+inventario referencian el maestro. Las columnas de publicación de `products` están siempre en NULL
+y solo sirven de fachada de escritura hacia la publicación de la tienda de origen
+(`products.store_id`, informativa). Detalle en
 [`STORES_PRODUCT_MASTER_MIGRATION_PLAN.md`](STORES_PRODUCT_MASTER_MIGRATION_PLAN.md).
 
 ### PIM: variantes, atributos, unidades y kits (P03-SaaS)

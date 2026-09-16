@@ -96,7 +96,11 @@ variantes, dos fichas que divergen y dos historiales de venta que no se pueden s
     roto medio centenar de funciones a la vez—. En la contracción de la fase 05 la sincronía inversa
     se retira y la columna pasa a quedar en `NULL`, de modo que **nadie pueda leer un dato viejo
     creyendo que es el vigente**; los clientes y fixtures que aún escriben la forma antigua siguen
-    funcionando. `products.store_id`
+    funcionando (hecho en `20260917190000_product_master_contract.sql`). **Excepción documentada:**
+    el precio propio de variante y presentación conserva la sincronía con la tienda de origen
+    (`product_variants.price`/`product_uoms.price` ↔ `store_price_overrides`) porque los paneles PIM
+    y la importación aún lo escriben por ahí; ningún lector de comercio usa esas columnas.
+    `products.store_id`
     pasa a significar «tienda de origen» y deja de ser obligatorio. Su retirada física es la migración
     de contracción, condicionada a que no quede ningún escritor (ver plan §9).
 15. **Las imágenes no se mueven en Storage.** La fila de `product_images` pasa a ser del maestro; el

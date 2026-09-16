@@ -239,8 +239,8 @@ describe('un maestro, varias tiendas', () => {
 
     expect(await anon(`select store_id from public.public_products where product_id = $1`, [ID.p1])).toEqual([{ store_id: storeA2 }])
     expect(await svc(`select count(*)::int as n from public.products where id = $1`, [ID.p1])).toEqual([{ n: 1 }])
-    // Transición: la columna legacy de la tienda de origen sigue a su publicación.
-    expect(await svc(`select status::text from public.products where id = $1`, [ID.p1])).toEqual([{ status: 'draft' }])
+    // Contracción (fase 05): la columna legacy ya no refleja ninguna tienda.
+    expect(await svc(`select status::text from public.products where id = $1`, [ID.p1])).toEqual([{ status: null }])
 
     await svc(`update public.store_products set status = 'published' where product_id = $1 and store_id = $2`, [ID.p1, storeA1])
   })
@@ -322,8 +322,8 @@ describe('disponibilidad por los almacenes de CADA tienda', () => {
 })
 
 // ---------------------------------------------------------------------------
-describe('transición: la forma antigua sigue escribiendo', () => {
-  it('insertar con tienda crea su publicación; editar cualquiera de los dos lados se refleja', async () => {
+describe('fachada: la forma antigua sigue escribiendo', () => {
+  it('insertar con tienda crea su publicación; la columna legacy queda vacía y escribirla edita la publicación', async () => {
     const [nuevo] = await svc(
       `insert into public.products (organization_id, company_id, store_id, sku, slug, name, price, status, published_at)
        values ($1, $2, $3, 'LEG-1', 'legacy', 'Legacy', '12.00', 'published', now()) returning id`,
@@ -333,11 +333,23 @@ describe('transición: la forma antigua sigue escribiendo', () => {
       { slug: 'legacy', price: '12.00' },
     ])
 
-    await svc(`update public.store_products set price = '15.00' where product_id = $1`, [nuevo?.id])
-    expect(await svc(`select price::text from public.products where id = $1`, [nuevo?.id])).toEqual([{ price: '15.00' }])
+    // Contracción: nadie puede leer un dato de publicación desde el maestro.
+    expect(
+      await svc(`select slug, price, status, currency, published_at from public.products where id = $1`, [nuevo?.id]),
+    ).toEqual([{ slug: null, price: null, status: null, currency: null, published_at: null }])
 
+    // Editar la publicación no se copia al maestro.
+    await svc(`update public.store_products set price = '15.00' where product_id = $1`, [nuevo?.id])
+    expect(await svc(`select price from public.products where id = $1`, [nuevo?.id])).toEqual([{ price: null }])
+
+    // Escribir la columna legacy edita SOLO la publicación de origen y vuelve a NULL.
     await svc(`update public.products set slug = 'legacy-2' where id = $1`, [nuevo?.id])
-    expect(await svc(`select slug from public.store_products where product_id = $1`, [nuevo?.id])).toEqual([{ slug: 'legacy-2' }])
+    expect(await svc(`select slug, price::text from public.store_products where product_id = $1`, [nuevo?.id])).toEqual([
+      { slug: 'legacy-2', price: '15.00' },
+    ])
+    expect(await svc(`select slug from public.products where id = $1`, [nuevo?.id])).toEqual([{ slug: null }])
+    await svc(`update public.products set status = 'draft' where id = $1`, [nuevo?.id])
+    expect(await anon(`select 1 from public.public_products where product_id = $1`, [nuevo?.id])).toEqual([])
   })
 
   it('el precio legacy de una variante sigue a su tienda de origen', async () => {

@@ -64,7 +64,8 @@ describe('los fixtures de la demo se aplican sobre el esquema real', () => {
     // Publicados, un borrador y un archivado: es lo que hace visible que la
     // vitrina filtra por estado.
     expect(await count('products', `store_id = '${STORE}'`)).toBe(10)
-    expect(await count('products', `store_id = '${STORE}' and status = 'published'`)).toBe(8)
+    // ADR 018: el estado es de la publicación en la tienda.
+    expect(await count('store_products', `store_id = '${STORE}' and status = 'published'`)).toBe(8)
     expect(await count('categories', `store_id = '${STORE}' and is_active`)).toBe(3)
   })
 

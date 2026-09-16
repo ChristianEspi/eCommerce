@@ -149,9 +149,10 @@ describe('publicar un maestro en varias tiendas', () => {
     const row = await publish(member('catalog'), master, storeA1, 'polo-x', '50.00', categoryA1)
     expect(row).toMatchObject({ store_id: storeA1, product_id: master, slug: 'polo-x', price: '50.00', currency: 'PEN', status: 'published' })
     expect(row.published_at).not.toBeNull()
-    // La primera tienda donde se publica pasa a ser la de origen (transición).
-    expect(await svc(`select store_id, slug, price::text from public.products where id = $1`, [master]))
-      .toEqual([{ store_id: storeA1, slug: 'polo-x', price: '50.00' }])
+    // La primera tienda donde se publica pasa a ser la de origen (ancla
+    // informativa); el maestro no guarda datos de publicación.
+    expect(await svc(`select store_id, slug, price from public.products where id = $1`, [master]))
+      .toEqual([{ store_id: storeA1, slug: null, price: null }])
   })
 
   it('publicar en A2 no duplica el producto: mismo id, otra publicación con su propio precio', async () => {

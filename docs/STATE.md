@@ -44,6 +44,14 @@ orden, grafo de dependencias, riesgos y estado por fase en
   JWT. La importación en una segunda tienda publica el maestro existente en vez de duplicarlo. El PIM
   se ancla en base a la tienda de origen. `product-master-commands.test.ts` (27); UI reescrita en
   `ProductsPage.test.tsx`.
+- **Fase 05 (comercio sobre la publicación + contracción):** `20260917160000` (precios, listas,
+  canales, promociones, cotizaciones), `20260917170000` (carrito, pedido, inventario, API de socio),
+  `20260917180000` (búsqueda, favoritos por tienda, reseñas, relacionados, pedido rápido, programados,
+  sugeridos, KPIs) y `20260917190000` (contracción), **sin aplicar en DEV**. Ninguna función de
+  comercio lee ya columnas de publicación de `products`; esas columnas quedan en NULL como fachada de
+  escritura; FKs de lo vendido/mostrado en tienda → `store_products`, de la historia → maestro.
+  Deuda documentada (plan §14): precio propio de variante/presentación sincronizado con la tienda de
+  origen. Tests cross-store: `product-master-pricing` (7), `-orders` (8), `-storefront` (8).
 
 ## Importación del catálogo desde Excel (2026-09-16)
 

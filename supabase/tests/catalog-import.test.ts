@@ -311,12 +311,15 @@ describe('import_catalog_products', () => {
 
     expect(result).toMatchObject({ applied: true, created: 1, errors: 0, inventory_by_warehouse: false })
     const producto = await svc(
-      `select p.slug, p.price::text, p.currency::text, p.stock, p.kind::text, p.status::text,
-              p.published_at is not null as publicado, c.slug as categoria, b.code as marca
+      // ADR 018: slug, precio, moneda, estado y categoría son de la publicación
+      // en la tienda; stock, tipo y marca, del maestro.
+      `select sp.slug, sp.price::text, sp.currency::text, p.stock, p.kind::text, sp.status::text,
+              sp.published_at is not null as publicado, c.slug as categoria, b.code as marca
          from public.products p
-         left join public.categories c on c.id = p.category_id
+         join public.store_products sp on sp.product_id = p.id and sp.store_id = $1
+         left join public.categories c on c.id = sp.category_id
          left join public.brands b on b.id = p.brand_id
-        where p.store_id = $1 and p.sku = 'BIE-BLU-0001'`,
+        where p.sku = 'BIE-BLU-0001'`,
       [storeA],
     )
     expect(producto[0]).toEqual({
@@ -359,7 +362,10 @@ describe('import_catalog_products', () => {
 
     expect(result).toMatchObject({ applied: true, created: 0, updated: 1 })
     const producto = await svc(
-      `select name, price::text, stock, status::text from public.products where store_id = $1 and sku = 'BIE-BLU-0001'`,
+      `select p.name, sp.price::text, p.stock, sp.status::text
+         from public.products p
+         join public.store_products sp on sp.product_id = p.id and sp.store_id = $1
+        where p.sku = 'BIE-BLU-0001'`,
       [storeA],
     )
     expect(producto[0]).toEqual({ name: 'Blusa Aurora de lino', price: '99.90', stock: 12, status: 'published' })

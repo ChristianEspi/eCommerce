@@ -186,8 +186,10 @@ describe('tenant A no ve ni toca datos de tenant B', () => {
     )
     expect(rows).toHaveLength(0)
 
+    // ADR 018: el precio vive en la publicación; la escritura legacy de A no
+    // la alcanzó.
     const [check] = await asRole(db, 'service_role', null, () =>
-      sql(`select price from public.products where id = $1`, [publishedB]),
+      sql(`select price from public.store_products where product_id = $1`, [publishedB]),
     )
     expect(check?.price).toBe('80.00')
   })
@@ -481,9 +483,13 @@ describe('storefront publico (anon)', () => {
 
     // Y el catálogo sigue exactamente como estaba.
     const rows = await asRole(db, 'service_role', null, () =>
-      sql(`select id, price::text as price, stock, status from public.products where id = $1`, [
-        publishedA,
-      ]),
+      // ADR 018: precio y estado de la publicación; stock del maestro.
+      sql(
+        `select p.id, sp.price::text as price, p.stock, sp.status
+           from public.products p join public.store_products sp on sp.product_id = p.id
+          where p.id = $1`,
+        [publishedA],
+      ),
     )
     expect(rows[0]).toMatchObject({ price: '199.90', status: 'published' })
   })
