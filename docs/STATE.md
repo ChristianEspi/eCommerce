@@ -21,6 +21,14 @@ orden, grafo de dependencias, riesgos y estado por fase en
 - **Fase 01 (auditoría):** línea base en `712ad8e` toda en verde (238 archivos / 4 451 pruebas);
   grafo medido sobre el esquema efectivo (38 FKs, 5 vistas, 40 funciones); auditoría de SKU
   `scripts/audit/product-sku-conflicts.sql` con **0 conflictos en DEV**.
+- **Fase 02 (tiendas autoservicio):** migración `20260917100000_store_management.sql` (**sin aplicar
+  en DEV**) con `create_store` (org/company del JWT, nace `draft`, `store_settings` 1:1, canal por
+  defecto por el trigger de siempre), `update_store` (nombre, slug, dominio con marca blanca, moneda
+  solo sin datos) y `set_store_status`; trigger que impide mover una tienda de sociedad y otro que
+  reinicia la verificación del dominio al cambiarlo. Sin borrado autoservicio. Pantalla
+  `/app/stores` (grupo Sistema junto a Configuración, sin capacidad, permiso `store.manage`): listado, alta, edición, activar/suspender y
+  «Usar esta tienda». Pruebas: `supabase/tests/store-management.test.ts` (13),
+  `src/features/stores/stores-ui.test.tsx` (8).
 
 ## Importación del catálogo desde Excel (2026-09-16)
 

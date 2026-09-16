@@ -460,8 +460,14 @@ export const BOUNDARIES: readonly Boundary[] = [
     state: 'implemented',
     responsibility:
       'Qué organización, sociedad y tienda están activas. Siempre derivado del JWT, nunca declarado por el cliente.',
-    paths: ['features/tenant'],
-    serverSide: ['ebim.can_access y ebim.has_role (090000)', 'tenant_members (090100)'],
+    // Stores + Product Master, fase 02: administrar las tiendas de la sociedad
+    // es parte de «qué tienda está activa», no un dominio de comercio.
+    paths: ['features/tenant', 'features/stores'],
+    serverSide: [
+      'ebim.can_access y ebim.has_role (090000)',
+      'tenant_members (090100)',
+      'create_store, update_store y set_store_status (20260917100000)',
+    ],
   },
   {
     id: 'entitlements',

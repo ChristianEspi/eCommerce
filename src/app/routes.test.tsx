@@ -101,6 +101,8 @@ describe('rutas base', () => {
       '/app/reviews',
       '/app/sales',
       '/app/settings',
+      // Stores + Product Master, fase 02: tiendas de la sociedad activa.
+      '/app/stores',
     ])
     // P06 anade la confirmacion, P05-SaaS el area de cuenta del comprador B2B,
     // P11-SaaS la pagina administrable y los favoritos su lista: catalogo,

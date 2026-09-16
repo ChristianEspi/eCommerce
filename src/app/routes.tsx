@@ -67,6 +67,10 @@ const PricingPage = lazyPage(() =>
 const ChannelsPage = lazyPage(() =>
   import('@/features/channels/ChannelsPage').then((m) => ({ default: m.ChannelsPage })),
 )
+// Stores + Product Master, fase 02: tiendas de la sociedad activa.
+const StoresPage = lazyPage(() =>
+  import('@/features/stores/StoresPage').then((m) => ({ default: m.StoresPage })),
+)
 const InventoryPage = lazyPage(() =>
   import('@/features/inventory/InventoryPage').then((m) => ({ default: m.InventoryPage })),
 )
@@ -213,6 +217,10 @@ export const routes: RouteObject[] = [
           // igual que su entrada de menu. Quien puede escribir lo decide la RLS
           // (owner/admin) y `channel_set_default`, no esta ruta.
           { path: 'channels', element: gated('catalog', <ChannelsPage />) },
+          // Sin capacidad, igual que Ajustes: tener tiendas no es un módulo
+          // vendible. El permiso `store.manage` lo exige la pantalla y, sobre
+          // todo, cada comando de la base.
+          { path: 'stores', element: <StoresPage /> },
           // Llevar existencia por almacen es el modulo vendible; la existencia
           // del catalogo (`products.stock`) sigue viniendo con el producto, y
           // por eso un tenant sin este addon vende igual que antes de P06.

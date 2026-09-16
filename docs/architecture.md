@@ -72,7 +72,7 @@ Nueve tablas en `supabase/migrations`, todas con `organization_id uuid` + `compa
 ```
 tenants (PK = organization_id del hub)
   └── tenant_members (usuario × sociedad × rol de app)
-  └── stores (una tienda por sociedad; slug/dominio públicos)
+  └── stores (N por sociedad desde 2026-09-17: `create_store`; slug/dominio públicos)
         ├── store_settings (1:1 — branding publicable + config interna)
         ├── categories (árbol dentro de la misma tienda)
         ├── products ──── product_images (ruta en Storage)

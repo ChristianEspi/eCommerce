@@ -291,7 +291,7 @@ Cada archivo es nuevo; ninguna migración aplicada se edita.
 | Fase | Estado |
 |---|---|
 | 01 — auditoría, ADR y plan | hecha (este documento) |
-| 02 — tiendas autoservicio | pendiente |
+| 02 — tiendas autoservicio | hecha: `20260917100000_store_management.sql`, `/app/stores` |
 | 03 — maestro + publicación (base) | pendiente |
 | 04 — backoffice de maestro | pendiente |
 | 05 — consumidores y contracción | pendiente |

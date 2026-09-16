@@ -20,6 +20,7 @@ import PaymentsRoundedIcon from '@mui/icons-material/PaymentsRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded'
 import SpaceDashboardRoundedIcon from '@mui/icons-material/SpaceDashboardRounded'
+import StorefrontRoundedIcon from '@mui/icons-material/StorefrontRounded'
 import TuneRoundedIcon from '@mui/icons-material/TuneRounded'
 import WarehouseRoundedIcon from '@mui/icons-material/WarehouseRounded'
 import type { ReactNode } from 'react'
@@ -243,6 +244,17 @@ export const NAV_ITEMS: NavItem[] = [
     icon: <InsightsRoundedIcon fontSize="small" />,
     capability: 'analytics.basic',
     group: 'store',
+  },
+  {
+    // Stores + Product Master, fase 02. En SISTEMA, junto a Configuración y no
+    // en el bloque Tienda: no depende de ningún módulo (tener tiendas no se
+    // vende) y tiene que seguir a mano aunque todo lo contratado se apague.
+    // Permiso `store.manage`, el mismo que exige la base en `create_store`.
+    to: '/app/stores',
+    label: 'nav.stores',
+    icon: <StorefrontRoundedIcon fontSize="small" />,
+    permission: 'store.manage',
+    group: 'system',
   },
   {
     to: '/app/settings',

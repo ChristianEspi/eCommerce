@@ -531,6 +531,13 @@ export const SAVE_MY_ORDER_SCHEDULE_RPC = 'save_my_order_schedule'
 /** Revisión previa (20260914192000): cada línea con ok/rechazada y su motivo. No escribe. */
 export const CHECK_MY_ORDER_SCHEDULE_LINES_RPC = 'check_my_order_schedule_lines'
 
+// Tiendas en autoservicio (20260917100000). Owner/admin de la sociedad ACTIVA;
+// ninguna manda organización ni sociedad. Red de seguridad:
+// `supabase/tests/store-management.test.ts`.
+export const CREATE_STORE_RPC = 'create_store'
+export const UPDATE_STORE_RPC = 'update_store'
+export const SET_STORE_STATUS_RPC = 'set_store_status'
+
 // Importación del catálogo desde Excel (20260916100000). Las tres simulan con
 // `p_dry_run = true` y aplican todo o nada con `false`. Red de seguridad:
 // `supabase/tests/catalog-import.test.ts`.

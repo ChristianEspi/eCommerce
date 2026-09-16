@@ -226,6 +226,8 @@ describe('navegación del backoffice', () => {
   it('Configuración, Operación, Integraciones y Diagnóstico siguen estando sin ni un módulo activo', () => {
     const items = visibleNavItems(NAV_ITEMS, { can: allow, has: deny, capabilitiesReady: true })
     expect(items.map((i) => i.to)).toEqual([
+      // Stores + Product Master, fase 02: tener tiendas no es un módulo.
+      '/app/stores',
       '/app/settings',
       '/app/operations',
       '/app/integrations',
