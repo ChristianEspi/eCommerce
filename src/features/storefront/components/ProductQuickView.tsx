@@ -22,10 +22,12 @@ import { ErrorState } from '@/shared/ui/states'
 import { R, TS } from '@/theme/tokens'
 import { track } from '../analytics'
 import { useAddToCart } from '../cart/useAddToCart'
-import { useGallery, usePublicProduct } from '../hooks'
+import { useGallery, usePublicProduct, usePublicVariants } from '../hooks'
 import { discountPercent } from '../types'
 import { ProductGallery } from './ProductGallery'
 import { QuantityStepper } from './QuantityStepper'
+import { useVariantChoice } from '../useVariantChoice'
+import { VariantPicker } from './VariantPicker'
 
 /**
  * Vista rápida del producto, en un diálogo sobre el catálogo.
@@ -40,9 +42,13 @@ import { QuantityStepper } from './QuantityStepper'
  * botón de atrás lo CIERRA, que es lo que todo el mundo intenta, y el enlace se
  * puede pegar en un chat.
  *
- * **Comprar variantes NO se hace aquí.** Elegir color o medida es una decisión
- * con consecuencias sobre el precio y el stock, y un diálogo que se cierra al
- * pulsar fuera es mal sitio para tomarla: esos productos llevan al detalle.
+ * **Las variantes se eligen aquí también.** Antes este diálogo mandaba a la
+ * ficha para elegir talla o color, con el argumento de que era una decisión con
+ * consecuencias sobre precio y stock. Con botones de opción a la vista esa
+ * decisión se toma con la misma información que en la ficha —cada talla marcada,
+ * las agotadas tachadas y el precio de la elegida en grande—, y obligar a cambiar
+ * de página para pulsar «M» era un paso que solo costaba ventas. Es el mismo
+ * selector y la misma regla que la ficha (`VariantPicker`), no una copia.
  *
  * Ancho `md` y no `lg`: a lo ancho de 1200 px la mitad derecha se quedaba en
  * blanco. El diálogo se dimensiona por lo que hay dentro, no por lo que cabe en
@@ -66,14 +72,20 @@ export function ProductQuickView({
 
   const product = usePublicProduct(storeId, slug ?? undefined)
   const gallery = useGallery(product.data?.product_id ?? null)
+  const variants = usePublicVariants(product.data)
 
   // La cantidad vuelve a uno al cambiar de producto. Heredar la del anterior
   // es el camino corto a comprar seis de algo que se miraba de pasada.
   useEffect(() => setQuantity(1), [slug])
 
   const item = product.data
-  const available = item?.in_stock !== false
   const hasVariants = item?.kind === 'variant'
+  const { selected, select } = useVariantChoice(variants.data ?? [], hasVariants)
+  const variantsPending = hasVariants && variants.isPending
+  // Con variante elegida, lo que se enseña y lo que se compra es ELLA: su
+  // precio, su tachado y su disponibilidad. El maestro solo manda sin elección.
+  const available = hasVariants && selected ? selected.in_stock !== false : item?.in_stock !== false
+  const canBuy = available && (!hasVariants || selected !== null)
 
   /**
    * El precio del acuerdo de quien mira, igual que la ficha completa.
@@ -87,7 +99,8 @@ export function ProductQuickView({
   const conAcuerdo = useAgreementPrice(storeSlug, item && !hasVariants ? item : null)
   // Con acuerdo, el tachado es el precio público: el −% de la oferta abierta a
   // todos no es el ahorro de este comprador.
-  const discount = item && !conAcuerdo ? discountPercent(item) : null
+  const shown = item && hasVariants && selected ? { ...item, price: selected.price, compare_at_price: selected.compare_at_price } : item
+  const discount = shown && !conAcuerdo ? discountPercent(shown) : null
 
   return (
     <Dialog
@@ -96,8 +109,15 @@ export function ProductQuickView({
       fullWidth
       maxWidth="md"
       aria-label={item?.name ?? t('store.product.quickView')}
+      // `sf-scope` en el papel: el diálogo se monta en un portal colgado de
+      // `body`, fuera del ámbito de la tienda, y sin la clase cada `var(--sf-*)`
+      // de dentro —radios, líneas— resolvía a nada. Se notaba en los botones de
+      // talla: borde negro y esquinas rectas. Misma razón que `MyOrderDrawer`.
       slotProps={{
-        paper: { sx: { borderRadius: 'var(--sf-radius)', bgcolor: 'var(--bg)', backgroundImage: 'none' } },
+        paper: {
+          className: 'sf-scope',
+          sx: { borderRadius: 'var(--sf-radius)', bgcolor: 'var(--bg)', backgroundImage: 'none' },
+        },
       }}
     >
       {/* Migas a la izquierda y cerrar a la derecha: dónde estás y por dónde
@@ -251,18 +271,28 @@ export function ProductQuickView({
                       </Typography>
                     ) : (
                       discount !== null &&
-                      item.compare_at_price && (
+                      shown?.compare_at_price && (
                         <Typography
                           component="s"
                           sx={{ fontSize: TS.body, color: 'var(--muted)', fontWeight: 600 }}
                         >
-                          {formatMoney(Number(item.compare_at_price), item.currency, locale)}
+                          {formatMoney(Number(shown.compare_at_price), item.currency, locale)}
                         </Typography>
                       )
                     )}
-                    <Typography sx={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.02em' }}>
+                    {/* Sin variante elegida todavía, el precio del maestro es un
+                        «desde»: anunciarlo a secas sería prometer uno que quizá
+                        no es el de la talla que se va a pulsar. */}
+                    {hasVariants && !selected && item.variant_count > 1 && (
+                      <Typography sx={{ fontSize: TS.body, color: 'var(--muted)', fontWeight: 700 }}>
+                        {t('store.product.priceFrom')}
+                      </Typography>
+                    )}
+                    <Typography
+                      sx={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}
+                    >
                       {formatMoney(
-                        conAcuerdo ? conAcuerdo.amount : Number(item.price),
+                        conAcuerdo ? conAcuerdo.amount : Number(shown?.price ?? item.price),
                         conAcuerdo?.currency ?? item.currency,
                         locale,
                       )}
@@ -292,55 +322,73 @@ export function ProductQuickView({
                     }}
                   />
 
-                  {/* Cantidad y compra, juntos y en una sola fila. Es UNA
-                      decisión, así que se anuncian como un grupo. */}
+                  {/* La variante, la cantidad y la compra son UNA decisión, así
+                      que se anuncian como un grupo. La variante va encima, a
+                      todo el ancho: una fila de tallas no cabe al lado de un
+                      botón. */}
                   <Stack
                     role="group"
                     aria-label={t('store.product.buyGroup')}
-                    direction="row"
-                    sx={{ gap: 1, mt: 1.5, flexWrap: 'wrap', alignItems: 'center' }}
+                    sx={{ gap: 1.5, mt: 1.5 }}
                   >
-                    {!hasVariants && (
-                      <>
-                        <QuantityStepper
-                          value={quantity}
-                          onChange={setQuantity}
-                          disabled={!available}
+                    {hasVariants &&
+                      (variantsPending ? (
+                        <Skeleton variant="rounded" height={44} />
+                      ) : (
+                        <VariantPicker
+                          productName={item.name}
+                          variants={variants.data ?? []}
+                          selected={selected}
+                          onSelect={select}
                         />
-                        <Button
-                          variant="contained"
-                          startIcon={
-                            pending ? (
-                              <CircularProgress size={14} color="inherit" />
-                            ) : (
-                              <ShoppingCartRoundedIcon />
-                            )
-                          }
-                          disabled={!available || pending}
-                          onClick={() => {
-                            void agregar(item, quantity, null)
-                            track(storeSlug, {
-                              type: 'add_to_cart',
-                              product_id: item.product_id,
-                              quantity,
-                            })
-                            onClose()
-                          }}
-                          sx={{ textTransform: 'none', fontWeight: 700 }}
-                        >
-                          {t('store.product.addToCart')}
-                        </Button>
-                      </>
+                      ))}
+
+                    {hasVariants && selected?.in_stock === false && (
+                      <Typography sx={{ fontSize: TS.body, color: 'var(--muted)', fontWeight: 600 }}>
+                        {t('store.product.combinationOutOfStock')}
+                      </Typography>
                     )}
-                    <Button
-                      component={Link}
-                      to={`/s/${storeSlug}/product/${item.slug}`}
-                      variant={hasVariants ? 'contained' : 'outlined'}
-                      endIcon={<OpenInFullRoundedIcon />}
-                      sx={{ textTransform: 'none', fontWeight: 700 }}
-                    >
-                      {hasVariants ? t('store.product.chooseOptions') : t('store.product.detail')}
-                    </Button>
+
+                    <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <QuantityStepper
+                        value={quantity}
+                        onChange={setQuantity}
+                        disabled={!canBuy}
+                      />
+                      <Button
+                        variant="contained"
+                        startIcon={
+                          pending ? (
+                            <CircularProgress size={14} color="inherit" />
+                          ) : (
+                            <ShoppingCartRoundedIcon />
+                          )
+                        }
+                        disabled={!canBuy || pending}
+                        onClick={() => {
+                          void agregar(item, quantity, hasVariants ? selected : null)
+                          track(storeSlug, {
+                            type: 'add_to_cart',
+                            product_id: item.product_id,
+                            ...(hasVariants && selected ? { variant_id: selected.variant_id } : {}),
+                            quantity,
+                          })
+                          onClose()
+                        }}
+                        sx={{ textTransform: 'none', fontWeight: 700 }}
+                      >
+                        {t('store.product.addToCart')}
+                      </Button>
+                      <Button
+                        component={Link}
+                        to={`/s/${storeSlug}/product/${item.slug}`}
+                        variant="outlined"
+                        endIcon={<OpenInFullRoundedIcon />}
+                        sx={{ textTransform: 'none', fontWeight: 700 }}
+                      >
+                        {t('store.product.detail')}
+                      </Button>
+                    </Stack>
                   </Stack>
                 </Stack>
               </Card>

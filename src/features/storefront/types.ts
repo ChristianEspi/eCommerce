@@ -181,6 +181,23 @@ export const publicProductSchema = z.object({
 export type PublicProduct = z.infer<typeof publicProductSchema>
 
 /**
+ * Un eje de la variante con el valor que toma: «Talla = M».
+ *
+ * Sale de `ebim.variant_public_options`, que solo responde por variantes que la
+ * vitrina ya enseña. Los CÓDIGOS identifican (dos valores pueden llamarse igual
+ * en atributos distintos); las etiquetas y el orden son para pintar.
+ */
+export const variantOptionSchema = z.object({
+  code: z.string().min(1),
+  name: z.string().min(1),
+  position: z.number().int().default(0),
+  value_code: z.string().min(1),
+  label: z.string().min(1),
+  value_position: z.number().int().default(0),
+})
+export type VariantOption = z.infer<typeof variantOptionSchema>
+
+/**
  * Variante publicada. El precio ya llega HEREDADO desde la vista: resolverlo
  * en el navegador significaría tener la regla escrita dos veces, y la copia del
  * cliente es la que nadie comprueba.
@@ -196,6 +213,15 @@ export const publicVariantSchema = z.object({
   price: moneyText,
   compare_at_price: moneyText.nullable().default(null),
   currency: z.string().length(3),
+  /**
+   * Su combinación de ejes. `[]` si la variante no tiene ninguno declarado: la
+   * ficha cae entonces a elegir por nombre, que es lo que hacía antes.
+   */
+  options: z
+    .array(variantOptionSchema)
+    .nullable()
+    .default([])
+    .transform((value) => value ?? []),
 })
 export type PublicVariant = z.infer<typeof publicVariantSchema>
 

@@ -164,7 +164,13 @@ const VARIANT_SELECT = [
   'price::text',
   'compare_at_price::text',
   'currency',
-].join(', ')
+]
+
+/**
+ * Los ejes de cada variante llegan con la migración 20260916120000. Se piden
+ * aparte de la lista base para poder caer a ella: ver `fetchPublicVariants`.
+ */
+const VARIANT_SELECT_WITH_OPTIONS = [...VARIANT_SELECT, 'options'].join(', ')
 
 /** Una referencia de branding externa se pinta tal cual; una ruta hay que firmarla. */
 function isExternalAsset(value: string): boolean {
@@ -359,12 +365,24 @@ export async function fetchPublicProduct(input: {
 export async function fetchPublicVariants(productId: string | null): Promise<PublicVariant[]> {
   if (!productId) return []
 
-  const { data, error } = await storefront()
-    .from(PUBLIC_PRODUCT_VARIANTS_VIEW)
-    .select(VARIANT_SELECT)
-    .eq('product_id', productId)
-    .order('position')
-    .order('name')
+  const consultar = (columnas: string) =>
+    storefront()
+      .from(PUBLIC_PRODUCT_VARIANTS_VIEW)
+      .select(columnas)
+      .eq('product_id', productId)
+      .order('position')
+      .order('name')
+
+  let { data, error } = await consultar(VARIANT_SELECT_WITH_OPTIONS)
+
+  // Base sin la migración de ejes todavía (el front se desplegó antes, o se
+  // prueba en local contra un proyecto sin actualizar). Pedir una columna que no
+  // existe tumba la consulta ENTERA, y la ficha se quedaba sin variantes y con
+  // el botón de compra gris: peor que antes del cambio. Se repite sin `options`
+  // y la ficha elige por nombre, que es exactamente lo que hacía.
+  if (error?.code === '42703') {
+    ;({ data, error } = await consultar(VARIANT_SELECT.join(', ')))
+  }
 
   if (error) throw new StorefrontError(error)
   return publicVariantSchema.array().parse(data ?? [])

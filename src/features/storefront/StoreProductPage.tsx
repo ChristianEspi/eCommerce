@@ -9,9 +9,8 @@ import {
   Card,
   Chip,
   CircularProgress,
-  MenuItem,
+  Skeleton,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material'
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
@@ -31,7 +30,9 @@ import { useAddToCart } from './cart/useAddToCart'
 import { ProductGallery } from './components/ProductGallery'
 import { ProductGrid } from './components/ProductGrid'
 import { QuantityStepper } from './components/QuantityStepper'
+import { VariantPicker } from './components/VariantPicker'
 import { useRelatedSections } from './relations'
+import { useVariantChoice } from './useVariantChoice'
 
 /**
  * Las opiniones van por `lazy`: están debajo del pliegue y traen el formulario
@@ -51,7 +52,6 @@ import {
   useThumbnails,
 } from './hooks'
 import {
-  defaultVariant,
   discountPercent,
   pickRelated,
   type CatalogQuery,
@@ -574,9 +574,10 @@ function SheetRow({ label, value }: { label: string; value: string | null }) {
  * componentes del kit, según el tipo—. Y aunque alguien lo forzara, la base
  * vuelve a comprobar el stock al crear el pedido.
  *
- * Con variantes, el botón exige elegir una. NO se elige "la primera" en
- * silencio: preseleccionar es cómodo, pero comprar sin haber elegido es recibir
- * la talla que no era.
+ * Con variantes, se elige con botones de opción por eje (talla, color) y llega
+ * preseleccionada la de por defecto. Preseleccionar es aceptable porque la
+ * elección está A LA VISTA, marcada y con su precio, justo encima del botón; lo
+ * que no se hace es cambiarla a espaldas del comprador (ver `chooseValue`).
  */
 function AddToCart({
   product,
@@ -593,23 +594,9 @@ function AddToCart({
   const { storeSlug } = useStorefront()
   const { agregar, pending } = useAddToCart()
   const [quantity, setQuantity] = useState(1)
-  const [variantId, setVariantId] = useState('')
 
   const hasVariants = product.kind === 'variant'
-
-  // Preselección: la marcada por defecto, o la primera disponible. Se aplica
-  // cuando llegan las variantes y no antes, para no fijar una elección sobre
-  // una lista vacía.
-  useEffect(() => {
-    if (!hasVariants || variants.length === 0) return
-    setVariantId((current) =>
-      current && variants.some((variant) => variant.variant_id === current)
-        ? current
-        : (defaultVariant(variants)?.variant_id ?? ''),
-    )
-  }, [hasVariants, variants])
-
-  const selected = variants.find((variant) => variant.variant_id === variantId) ?? null
+  const { selected, select } = useVariantChoice(variants, hasVariants)
   const canBuy = available && (!hasVariants || (selected !== null && selected.in_stock !== false))
 
   return (
@@ -622,28 +609,24 @@ function AddToCart({
       aria-label={t('store.product.buyGroup')}
       sx={{ gap: 1.5, mt: 1 }}
     >
-      {hasVariants && (
-        <TextField
-          select
-          size="small"
-          label={t('store.product.chooseVariant')}
-          value={variantId}
-          disabled={variantsPending || variants.length === 0}
-          onChange={(event) => setVariantId(event.target.value)}
-          sx={{ maxWidth: 320 }}
-        >
-          <MenuItem value="">{t('store.product.variantRequired')}</MenuItem>
-          {variants.map((variant) => (
-            <MenuItem
-              key={variant.variant_id}
-              value={variant.variant_id}
-              disabled={variant.in_stock === false}
-            >
-              {variant.name} · {formatMoney(Number(variant.price), variant.currency, locale)}
-              {variant.in_stock === false && ` · ${t('store.product.variantOutOfStock')}`}
-            </MenuItem>
-          ))}
-        </TextField>
+      {hasVariants &&
+        (variantsPending ? (
+          <Skeleton variant="rounded" height={44} sx={{ maxWidth: 320 }} />
+        ) : (
+          <VariantPicker
+            productName={product.name}
+            variants={variants}
+            selected={selected}
+            onSelect={select}
+          />
+        ))}
+
+      {/* Elegida y agotada: el botón ya se deshabilita, pero un botón gris sin
+          motivo parece una tienda rota. */}
+      {hasVariants && selected?.in_stock === false && (
+        <Typography sx={{ fontSize: TS.body, color: 'var(--muted)', fontWeight: 600 }}>
+          {t('store.product.combinationOutOfStock')}
+        </Typography>
       )}
 
       {hasVariants && selected && (

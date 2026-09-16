@@ -951,38 +951,47 @@ function backendConVariantes() {
 }
 
 describe('ficha de un producto con variantes', () => {
-  it('anuncia el precio "desde" y ofrece elegir', async () => {
+  it('anuncia el precio "desde" y ofrece elegir con botones, no con un desplegable', async () => {
     renderStorefront(backendConVariantes(), '/s/casa-nordica/product/camiseta')
 
     expect(await screen.findByRole('heading', { name: 'Camiseta', level: 1 })).toBeInTheDocument()
     expect(screen.getByText('Desde')).toBeInTheDocument()
-    expect(await screen.findByLabelText('Elige una opción')).toBeInTheDocument()
+    const grupo = await screen.findByRole('group', { name: 'Elige una opción' })
+    expect(within(grupo).getAllByRole('radio')).toHaveLength(2)
+    const compra = screen.getByRole('group', { name: 'Comprar' })
+    expect(within(compra).queryByRole('combobox')).not.toBeInTheDocument()
   })
 
   it('preselecciona la variante por defecto y enseña SU precio', async () => {
     renderStorefront(backendConVariantes(), '/s/casa-nordica/product/camiseta')
 
-    const selector = await screen.findByLabelText('Elige una opción')
-    await waitFor(() => expect(selector).toHaveTextContent('Roja'))
+    const roja = await screen.findByRole('radio', { name: /^Roja/ })
+    await waitFor(() => expect(roja).toBeChecked())
   })
 
-  it('una variante sin stock no se puede elegir', async () => {
-    const user = userEvent.setup()
+  it('una variante sin stock no se puede elegir, y se dice por qué', async () => {
     renderStorefront(backendConVariantes(), '/s/casa-nordica/product/camiseta')
 
-    await user.click(await screen.findByLabelText('Elige una opción'))
-    const opciones = await screen.findAllByRole('option')
-    const azul = opciones.find((option) => option.textContent?.includes('Azul'))
-    expect(azul).toHaveAttribute('aria-disabled', 'true')
-    expect(azul?.textContent).toContain('sin stock')
+    const azul = await screen.findByRole('radio', { name: /^Azul/ })
+    expect(azul).toBeDisabled()
+    // El tachado es visual; el lector de pantalla necesita oírlo.
+    expect(azul).toHaveAccessibleName(expect.stringContaining('sin stock'))
+  })
+
+  it('con precios distintos, cada botón lleva el suyo', async () => {
+    renderStorefront(backendConVariantes(), '/s/casa-nordica/product/camiseta')
+
+    const azul = await screen.findByRole('radio', { name: /^Azul/ })
+    expect(azul.closest('label')).toHaveTextContent('69.90')
   })
 
   it('agregar al carrito manda la variante elegida, no el maestro', async () => {
     const user = userEvent.setup()
     renderStorefront(backendConVariantes(), '/s/casa-nordica/product/camiseta')
 
-    await screen.findByLabelText('Elige una opción')
-    await user.click(await screen.findByRole('button', { name: /Agregar al carrito/ }))
+    const roja = await screen.findByRole('radio', { name: /^Roja/ })
+    await waitFor(() => expect(roja).toBeChecked())
+    await user.click(botonComprarDeLaFicha())
 
     // El nombre de la variante va en su propia línea: es lo que distingue dos
     // líneas del mismo producto en el carrito. Se comprueba sobre lo GUARDADO y
@@ -994,13 +1003,167 @@ describe('ficha de un producto con variantes', () => {
     })
   })
 
+  it('el nombre del producto repetido delante de la variante no sale en el botón', async () => {
+    const importadas = variantes().map((row) => ({ ...row, name: `Camiseta · ${row.name}` }))
+    renderStorefront(
+      backend({ public_products: [...catalogo(), camiseta()], public_product_variants: importadas }),
+      '/s/casa-nordica/product/camiseta',
+    )
+
+    expect(await screen.findByRole('radio', { name: /^Roja/ })).toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: /^Camiseta/ })).not.toBeInTheDocument()
+  })
+
   it('un producto simple no pide elegir nada: la vitrina de siempre', async () => {
     renderStorefront(backendConVariantes(), '/s/casa-nordica/product/silla-roble')
 
     expect(
       await screen.findByRole('heading', { name: 'Silla de roble', level: 1 }),
     ).toBeInTheDocument()
-    expect(screen.queryByLabelText('Elige una opción')).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Elige una opción' })).not.toBeInTheDocument()
     expect(screen.queryByText('Desde')).not.toBeInTheDocument()
+  })
+})
+
+/**
+ * El «Agregar al carrito» de la ficha. Las tarjetas de «también te puede
+ * interesar» tienen un botón con el mismo nombre; el de la ficha es el que vive
+ * dentro del grupo «Comprar».
+ */
+function botonComprarDeLaFicha() {
+  return within(screen.getByRole('group', { name: 'Comprar' })).getByRole('button', {
+    name: /Agregar al carrito/,
+  })
+}
+
+/** Cuatro variantes con ejes declarados: Color (Rojo, Azul) × Talla (S, M). */
+const V_ROJO_S = 'eeee3333-1111-4111-8111-111111111111'
+const V_ROJO_M = 'eeee4444-1111-4111-8111-111111111111'
+const V_AZUL_S = 'eeee5555-1111-4111-8111-111111111111'
+const V_AZUL_M = 'eeee6666-1111-4111-8111-111111111111'
+
+function variantesConEjes() {
+  const fila = (
+    variant_id: string,
+    color: string,
+    talla: string,
+    position: number,
+    extra: { in_stock?: boolean; is_default?: boolean; price?: string } = {},
+  ) => ({
+    variant_id,
+    product_id: P_CAMISETA,
+    store_id: STORE,
+    name: `${color} · ${talla}`,
+    position,
+    is_default: extra.is_default ?? false,
+    in_stock: extra.in_stock ?? true,
+    price: extra.price ?? '60.00',
+    compare_at_price: null,
+    currency: 'PEN',
+    options: [
+      { code: 'color', name: 'Color', position: 1, value_code: color.toLowerCase(), label: color, value_position: 0 },
+      { code: 'talla', name: 'Talla', position: 2, value_code: talla.toLowerCase(), label: talla, value_position: 0 },
+    ],
+  })
+  return [
+    fila(V_ROJO_S, 'Rojo', 'S', 0, { is_default: true }),
+    fila(V_ROJO_M, 'Rojo', 'M', 1, { in_stock: false }),
+    fila(V_AZUL_S, 'Azul', 'S', 2, { price: '64.00' }),
+    fila(V_AZUL_M, 'Azul', 'M', 3),
+  ]
+}
+
+function backendConEjes() {
+  return backend({
+    public_products: [...catalogo(), { ...camiseta(), variant_count: 4 }],
+    public_product_variants: variantesConEjes(),
+  })
+}
+
+describe('ficha con ejes: un grupo de botones por atributo', () => {
+  it('pinta «Color» y «Talla» por separado, con lo elegido en el título del grupo', async () => {
+    renderStorefront(backendConEjes(), '/s/casa-nordica/product/camiseta')
+
+    expect(await screen.findByRole('group', { name: 'Color: Rojo' })).toBeInTheDocument()
+    const talla = screen.getByRole('group', { name: 'Talla: S' })
+    expect(within(talla).getAllByRole('radio')).toHaveLength(2)
+  })
+
+  it('pulsar otro color conserva la talla y cambia el precio', async () => {
+    const user = userEvent.setup()
+    renderStorefront(backendConEjes(), '/s/casa-nordica/product/camiseta')
+
+    await user.click(await screen.findByRole('radio', { name: /^Azul/ }))
+
+    expect(await screen.findByRole('group', { name: 'Color: Azul' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Talla: S' })).toBeInTheDocument()
+    expect(screen.getAllByText(/64\.00/).length).toBeGreaterThan(0)
+  })
+
+  it('una talla agotada solo en este color se puede pulsar, y se avisa de la combinación', async () => {
+    const user = userEvent.setup()
+    renderStorefront(backendConEjes(), '/s/casa-nordica/product/camiseta')
+
+    await screen.findByRole('group', { name: 'Color: Rojo' })
+    const m = screen.getByRole('radio', { name: /^M/ })
+    // Rojo·M está agotado pero Azul·M no: «M» se vende.
+    expect(m).toBeEnabled()
+    expect(m).toHaveAccessibleName(expect.stringContaining('no disponible con lo elegido'))
+
+    await user.click(m)
+    // No se cambia el color a espaldas del comprador: queda Rojo·M, agotado.
+    expect(await screen.findByRole('group', { name: 'Talla: M' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Color: Rojo' })).toBeInTheDocument()
+    expect(
+      screen.getByText('Esta combinación está agotada. Prueba con otra opción.'),
+    ).toBeInTheDocument()
+    expect(botonComprarDeLaFicha()).toBeDisabled()
+  })
+
+  it('al carrito va la combinación elegida', async () => {
+    const user = userEvent.setup()
+    renderStorefront(backendConEjes(), '/s/casa-nordica/product/camiseta')
+
+    await user.click(await screen.findByRole('radio', { name: /^Azul/ }))
+    await user.click(await screen.findByRole('radio', { name: /^M/ }))
+    const comprar = botonComprarDeLaFicha()
+    await waitFor(() => expect(comprar).toBeEnabled())
+    await user.click(comprar)
+
+    await waitFor(() => {
+      const guardado = localStorage.getItem(`ebim.ecommerce.cart.v1:${STORE}`)
+      expect(guardado).toContain(V_AZUL_M)
+    })
+  })
+})
+
+describe('vista rápida de un producto con variantes', () => {
+  it('se elige y se compra sin salir del catálogo', async () => {
+    const user = userEvent.setup()
+    renderStorefront(backendConEjes(), '/s/casa-nordica?p=camiseta')
+
+    const dialogo = await screen.findByRole('dialog', {}, { timeout: 4000 })
+    await user.click(await within(dialogo).findByRole('radio', { name: /^Azul/ }))
+    await user.click(within(dialogo).getByRole('radio', { name: /^M/ }))
+    const comprar = within(dialogo).getByRole('button', { name: /Agregar al carrito/ })
+    await waitFor(() => expect(comprar).toBeEnabled())
+    await user.click(comprar)
+
+    await waitFor(() => {
+      const guardado = localStorage.getItem(`ebim.ecommerce.cart.v1:${STORE}`)
+      expect(guardado).toContain(V_AZUL_M)
+    })
+  })
+
+  it('la ficha completa sigue a un clic, pero ya no es el único camino para elegir', async () => {
+    renderStorefront(backendConEjes(), '/s/casa-nordica?p=camiseta')
+
+    const dialogo = await screen.findByRole('dialog', {}, { timeout: 4000 })
+    expect(await within(dialogo).findByRole('group', { name: 'Color: Rojo' })).toBeInTheDocument()
+    expect(within(dialogo).getByRole('link', { name: /Ver ficha completa/ })).toHaveAttribute(
+      'href',
+      '/s/casa-nordica/product/camiseta',
+    )
+    expect(within(dialogo).queryByRole('link', { name: /Elegir opciones/ })).not.toBeInTheDocument()
   })
 })

@@ -812,6 +812,74 @@ describe('modelo de lectura público', () => {
     ])
   })
 
+  /**
+   * La ficha pinta un selector por eje («Color: Rojo Azul», «Talla: M») y para
+   * eso necesita saber QUÉ ES cada variante. Llega en `options`, calculado por
+   * una función definer: el anónimo sigue sin permiso sobre las tablas de
+   * atributos (lo comprueba «el vocabulario del catálogo... no es público»).
+   */
+  it('cada variante pública trae su combinación de ejes, en orden', async () => {
+    const rows = await asRole(db, 'anon', null, () =>
+      sql(
+        `select name, options
+           from public.public_product_variants
+          where product_id = $1 order by name`,
+        [shirtA],
+      ),
+    )
+    const combinacion = (row: Row | undefined) =>
+      (row?.options as Array<Record<string, unknown>>).map(
+        (o) => `${o.name}:${o.code}=${o.label}(${o.value_code})`,
+      )
+    expect(combinacion(rows[0])).toEqual(['Color:color=Azul(azul)', 'Talla:talla=M(m)'])
+    expect(combinacion(rows[1])).toEqual(['Color:color=Rojo(rojo)', 'Talla:talla=M(m)'])
+  })
+
+  it('la combinación no sale del tenant: solo código, nombre, etiqueta y orden', async () => {
+    const [row] = await asRole(db, 'anon', null, () =>
+      sql(`select options from public.public_product_variants where variant_id = $1`, [shirtRed]),
+    )
+    const claves = Object.keys((row?.options as Array<Record<string, unknown>>)[0] ?? {}).sort()
+    expect(claves).toEqual(['code', 'label', 'name', 'position', 'value_code', 'value_position'])
+  })
+
+  it('llamada a mano, la función no responde por variantes que la vitrina no enseña', async () => {
+    // Es `SECURITY DEFINER` y `anon` puede ejecutarla: la autorización tiene
+    // que estar DENTRO, o con un uuid cualquiera se leerían los ejes de un
+    // producto en borrador o de una variante retirada.
+    const publica = await asRole(db, 'anon', null, () =>
+      sql(`select ebim.variant_public_options($1) as o`, [shirtRed]),
+    )
+    expect(publica[0]?.o).toHaveLength(2)
+
+    await svc(`update public.product_variants set is_active = false where id = $1`, [shirtBlue])
+    const retirada = await asRole(db, 'anon', null, () =>
+      sql(`select ebim.variant_public_options($1) as o`, [shirtBlue]),
+    )
+    expect(retirada[0]?.o).toEqual([])
+    await svc(`update public.product_variants set is_active = true where id = $1`, [shirtBlue])
+
+    await svc(`update public.products set status = 'draft', published_at = null where id = $1`, [
+      shirtA,
+    ])
+    const borrador = await asRole(db, 'anon', null, () =>
+      sql(`select ebim.variant_public_options($1) as o`, [shirtRed]),
+    )
+    expect(borrador[0]?.o).toEqual([])
+    await svc(
+      `update public.products set status = 'published', published_at = now() where id = $1`,
+      [shirtA],
+    )
+
+    const [definicion] = await svc(
+      `select p.prosecdef as definer, p.proconfig[1] as config
+         from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'ebim' and p.proname = 'variant_public_options'`,
+    )
+    expect(definicion?.definer).toBe(true)
+    expect(definicion?.config).toBe('search_path=""')
+  })
+
   it('las variantes de un producto NO publicado no salen a la vitrina', async () => {
     await svc(`update public.products set status = 'draft', published_at = null where id = $1`, [
       shirtA,

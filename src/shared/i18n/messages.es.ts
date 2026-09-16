@@ -992,6 +992,8 @@ export const es = {
     'store.product.variantRequired': 'Elige una opción para continuar',
     'store.product.priceFrom': 'Desde',
     'store.product.variantOutOfStock': 'sin stock',
+    'store.product.notInCombination': 'no disponible con lo elegido',
+    'store.product.combinationOutOfStock': 'Esta combinación está agotada. Prueba con otra opción.',
     'orders.status.pending': 'Pendiente',
     'orders.summary.shown': 'pedidos en esta vista',
     'orders.summary.total': 'Suma',

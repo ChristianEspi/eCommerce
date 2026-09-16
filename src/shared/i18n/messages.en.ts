@@ -1291,6 +1291,8 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.product.variantRequired': 'Choose an option to continue',
     'store.product.priceFrom': 'From',
     'store.product.variantOutOfStock': 'out of stock',
+    'store.product.notInCombination': 'not available with your selection',
+    'store.product.combinationOutOfStock': 'This combination is out of stock. Try another option.',
     // --- P07 · Orders --------------------------------------------------------
     'admin.orders.emptyBody':
       'When someone buys from your storefront, the order will show up here.',
@@ -3911,7 +3913,6 @@ export const en: Readonly<Record<MessageKey, string>> = {
   'planning.v2.seasonalWhy.menos_de_un_anio': 'less than a year of history',
   'planning.v2.seasonalWhy.pocos_pedidos': 'few orders in the year',
   'planning.v2.seasonalWhy.sin_ventas_en_el_anio': 'no sales in the last year',
-}
   'catalogImport.action': 'Import',
   'catalogImport.title.vocabulary': 'Import advanced catalog',
   'catalogImport.title.categories': 'Import categories',
@@ -3985,3 +3986,4 @@ export const en: Readonly<Record<MessageKey, string>> = {
   'catalogImport.reason.CATEGORIA_CICLO': 'That parent would create a loop in the tree',
   'catalogImport.reason.MODULO_NO_CONTRATADO': 'Requires the advanced catalog',
   'catalogImport.reason.DESCONOCIDO': 'Unidentified error',
+}

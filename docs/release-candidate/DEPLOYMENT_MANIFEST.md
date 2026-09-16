@@ -57,6 +57,7 @@
 | 18 | `20260914190000_payment_dispatch_hardening.sql` | `285a02a3a80cfcdd164611aecad885add009b3ce61f08889e542db6923211f19` | **recrea `payment_apply_outcome`**, `fulfillment_transition`, `shipment_open`; `ebim.assert_dispatch_payment` |
 | 19 | `20260914191000_cart_open_concurrency.sql` | `511e68440f318c9ef1bd75896e286380fb405805d06b33ec0a64f6c01e19e4c6` | recrea `cart_open` (concurrente sin 409) |
 | 20 | `20260914192000_order_schedule_line_check.sql` | `9f23941b7100027206d81f6413e20575a7055253a4dac6e52cce4e3a10ac89b4` | `ebim.order_schedule_line_issue`, `check_my_order_schedule_lines` (revisión previa por línea); **recrea `save_my_order_schedule`** con el motivo concreto |
+| 21 | `20260916120000_storefront_variant_options.sql` | `1f31daa22ff1319158b37d1f8d3e636c312647ce4b42ca26fc69b26b3ce81f18` | `ebim.variant_public_options` (definer, solo lectura, autorización dentro); **recrea `public_product_variants`** con la columna `options` al final. Aplicada en DEV el 2026-09-16 |
 
 Superficie anónima tras aplicar: **23** funciones (`security-baseline.test.ts`, `docs/SECURITY_BASELINE.md` §1.6).
 
