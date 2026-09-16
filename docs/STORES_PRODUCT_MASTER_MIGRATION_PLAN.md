@@ -295,7 +295,7 @@ Cada archivo es nuevo; ninguna migración aplicada se edita.
 | 03 — maestro + publicación (base) | hecha: `20260917110000_product_master_expand.sql` y `20260917120000_product_master_read_models.sql` (ver §12) |
 | 04 — backoffice de maestro | hecha: `20260917130000_product_master_commands.sql`, `20260917140000_product_master_import.sql`, `/app/products` (ver §13) |
 | 05 — consumidores y contracción | hecha: `20260917160000`…`20260917190000` (ver §14) |
-| 06 — certificación | pendiente |
+| 06 — certificación | hecha: [`STORES_PRODUCT_MASTER_CERTIFICATION.md`](STORES_PRODUCT_MASTER_CERTIFICATION.md) |
 
 ## 12. Implementado en la fase 03 (2026-09-17)
 

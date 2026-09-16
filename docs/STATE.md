@@ -52,6 +52,12 @@ orden, grafo de dependencias, riesgos y estado por fase en
   escritura; FKs de lo vendido/mostrado en tienda → `store_products`, de la historia → maestro.
   Deuda documentada (plan §14): precio propio de variante/presentación sincronizado con la tienda de
   origen. Tests cross-store: `product-master-pricing` (7), `-orders` (8), `-storefront` (8).
+- **Fase 06 (certificación):** [`STORES_PRODUCT_MASTER_CERTIFICATION.md`](STORES_PRODUCT_MASTER_CERTIFICATION.md)
+  con los 7 casos de aceptación, invariantes de tiendas/maestro/comercio, migración legacy y gates.
+  Evidencia en `supabase/tests/stores-product-master-certification.test.ts` (23), que siembra la forma
+  legacy, aplica todas las migraciones hasta la contracción y recorre el flujo completo. Conclusión:
+  lista para QAS tras auditar SKU en destino y correr el golden path allí. **Nada aplicado en
+  DEV/QAS/PRD; sin push.**
 
 ## Importación del catálogo desde Excel (2026-09-16)
 
