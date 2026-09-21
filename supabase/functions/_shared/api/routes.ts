@@ -15,7 +15,7 @@
  */
 import type { ApiScope } from './contract.ts'
 
-export type ApiParamKind = 'string' | 'integer' | 'timestamp'
+export type ApiParamKind = 'string' | 'integer' | 'timestamp' | 'boolean'
 
 export interface ApiParam {
   readonly name: string
@@ -45,6 +45,19 @@ export interface ApiRoute {
    */
   readonly requiresIdempotencyKey?: boolean
   readonly requestExample?: Record<string, unknown>
+  /** Estado de una escritura correcta. Por defecto 201 (alta). */
+  readonly successStatus?: 200 | 201
+  /**
+   * Operación por lotes que devuelve un informe `{ dry_run, applied, … }`. Un
+   * lote real no aplicado es 422 CON el informe: el socio necesita saber qué
+   * fila falló, y un error genérico no se lo dice.
+   */
+  readonly batchReport?: boolean
+  /** Tope del cuerpo en bytes. Por defecto 512 000. */
+  readonly maxBodyBytes?: number
+  /** Esquemas de `components.schemas` del cuerpo y de la respuesta. */
+  readonly requestSchema?: string
+  readonly responseSchema?: string
 }
 
 const LIMIT: ApiParam = {
@@ -162,6 +175,42 @@ export const API_ROUTES: readonly ApiRoute[] = [
         arg: 'p_cursor',
       },
     ],
+  },
+  {
+    method: 'POST',
+    path: '/v1/catalog/products:batch',
+    operationId: 'upsertCatalogProducts',
+    summary:
+      'Crea o actualiza productos en lote: upsert por SKU en el maestro de la sociedad, publicación por tienda y precio de variante por tienda. Todo o nada; con `dry_run=true` valida sin escribir.',
+    scope: 'catalog.write',
+    rpc: 'api_catalog_upsert',
+    query: [
+      {
+        name: 'dry_run',
+        kind: 'boolean',
+        description: 'Simula: valida y devuelve el informe sin escribir nada.',
+        arg: 'p_dry_run',
+      },
+    ],
+    requiresIdempotencyKey: true,
+    successStatus: 200,
+    batchReport: true,
+    maxBodyBytes: 5_000_000,
+    requestSchema: 'CatalogBatchRequest',
+    responseSchema: 'CatalogBatchReport',
+    requestExample: {
+      products: [
+        {
+          sku: 'QS-514574',
+          gtin: '4005800077937',
+          name: 'Bloqueador Solar FPS 50 150 ml',
+          kind: 'simple',
+          stock: 181,
+          custom_fields: { codigo_qs: '514574' },
+          publications: [{ store: 'mi-tienda', status: 'published', price: '111.29' }],
+        },
+      ],
+    },
   },
 ]
 

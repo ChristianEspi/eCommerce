@@ -1,13 +1,12 @@
 openapi: 3.1.0
 info:
-  title: eCommerce by EBIM · Ingesta de catálogo (PROPUESTA)
-  version: v1-draft
+  title: eCommerce by EBIM · Ingesta de catálogo
+  version: v1
   description: |
-    **Estado: PROPUESTA, sin implementar.** Este documento es el contrato que se
-    acuerda ANTES de construir. La API real publica su especificación generada en
-    `GET /v1/openapi.json`; esta ruta entrará ahí cuando exista su implementación.
-    Mientras tanto, se puede probar contra un servidor simulado (Prism) con este mismo
-    archivo. Guía completa: `docs/integrations/catalog-ingest.md`.
+    Contrato de la ingesta de catálogo, para probar contra un servidor simulado (Prism).
+    La API real lo implementa (`public.api_catalog_upsert`) y publica su especificación
+    generada en `GET /v1/openapi.json`, que es la fuente de verdad del servicio.
+    Guía completa: `docs/integrations/catalog-ingest.md`.
 
     - **Autenticación:** OAuth 2.0 `client_credentials` (la misma de la API de socio).
       El permiso nuevo es `catalog.write`.
@@ -19,7 +18,7 @@ info:
     - **Omitido = no tocar.** `null` explícito = vaciar (solo en campos opcionales).
 servers:
   - url: https://ehxlxbhtlmfgneiagdcj.supabase.co/functions/v1/api
-    description: QAS (cuando esté implementada)
+    description: QAS
   - url: http://127.0.0.1:4010
     description: Servidor simulado local (Prism)
 security:
@@ -225,7 +224,7 @@ components:
       description: Identificador del artículo, único en la sociedad (productos y variantes comparten espacio).
     Code:
       type: string
-      pattern: '^[a-z0-9][a-z0-9-]{0,80}$'
+      pattern: '^[a-z0-9][a-z0-9_-]{0,40}$'
       description: Código del vocabulario de la sociedad (marca, familia, atributo, valor, categoría).
 
     BatchRequest:
@@ -259,11 +258,11 @@ components:
         family_code: { oneOf: [{ $ref: '#/components/schemas/Code' }, { type: 'null' }] }
         tax_category_code:
           type: [string, 'null']
-          description: Categoría fiscal; `null` = la categoría por defecto de la sociedad.
+          description: Código de la categoría fiscal; `null` la quita.
         stock:
           type: integer
           minimum: 0
-          description: Stock de catálogo (sin almacenes). Con almacenes se ignora; la existencia va por inventario.
+          description: Stock de catálogo del producto simple. Si la sociedad trabaja con almacenes, la disponibilidad sale del inventario.
         attributes:
           type: object
           description: 'Ficha técnica, `{codigo_atributo: codigo_valor | texto | número}`. Solo atributos existentes.'
@@ -395,6 +394,18 @@ components:
             - CATEGORIA_NO_ENCONTRADA
             - MONEDA_INCONSISTENTE
             - SLUG_DUPLICADO
+            - CAMPO_NO_PERMITIDO
+            - SLUG_INVALIDO
+            - TIENDA_REPETIDA
+            - PUBLICACION_FALTANTE
+            - VARIANTE_DE_OTRO_PRODUCTO
+            - CATEGORIA_FISCAL_NO_ENCONTRADA
+            - ES_EJE
+            - MODULO_NO_CONTRATADO
+            - FORMATO_INVALIDO
+            - REFERENCIA_INVALIDA
+            - DUPLICADO
+            - ERROR_INTERNO
         field: { type: string, description: 'Ruta JSON del campo, p. ej. `products[3].publications[0].price`.' }
         message: { type: string }
 

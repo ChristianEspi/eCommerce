@@ -14,12 +14,16 @@
  */
 import { API_ERROR_CODES, API_ERROR_STATUS, API_SCOPES, API_VERSION, IDEMPOTENCY_HEADER, CORRELATION_HEADER } from './contract.ts'
 import { API_ROUTES, type ApiParam, type ApiRoute } from './routes.ts'
+import { CATALOG_SCHEMAS } from './catalogSchemas.ts'
 
 const TYPE_BY_KIND: Record<ApiParam['kind'], Record<string, unknown>> = {
   string: { type: 'string' },
   integer: { type: 'integer' },
   timestamp: { type: 'string', format: 'date-time' },
+  boolean: { type: 'boolean' },
 }
+
+const schemaRef = (name: string): Record<string, unknown> => ({ $ref: `#/components/schemas/${name}` })
 
 function parameterOf(param: ApiParam, location: 'path' | 'query'): Record<string, unknown> {
   return {
@@ -80,11 +84,35 @@ function operationOf(route: ApiRoute): Record<string, unknown> {
   }
 
   if (route.method === 'POST') {
+    const responses = operation.responses as Record<string, unknown>
+    if (route.successStatus === 200) {
+      delete responses['200']
+      responses['200'] = route.responseSchema
+        ? {
+            description: 'Correcto',
+            content: { 'application/json': { schema: schemaRef(route.responseSchema) } },
+          }
+        : { description: 'Correcto' }
+    } else {
+      delete responses['200']
+      responses['201'] = { description: 'Creado' }
+    }
+    if (route.batchReport) {
+      responses['413'] = errorResponse('Lote demasiado grande; envíalo en partes')
+      responses['422'] = {
+        description: 'Una o más filas no pasan la validación; no se escribió nada',
+        content: {
+          'application/json': {
+            schema: route.responseSchema ? schemaRef(route.responseSchema) : { type: 'object' },
+          },
+        },
+      }
+    }
     operation.requestBody = {
       required: true,
       content: {
         'application/json': {
-          schema: { type: 'object' },
+          schema: route.requestSchema ? schemaRef(route.requestSchema) : { type: 'object' },
           ...(route.requestExample ? { example: route.requestExample } : {}),
         },
       },
@@ -164,6 +192,7 @@ export function buildOpenApiDocument(serverUrl = '/'): Record<string, unknown> {
         bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'opaque' },
       },
       schemas: {
+        ...CATALOG_SCHEMAS,
         Error: {
           type: 'object',
           required: ['error'],

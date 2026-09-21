@@ -134,6 +134,13 @@ function argsFor(route: ApiRoute, params: Record<string, string>, url: URL): Rec
       args[param.arg] = value
       return
     }
+    if (param.kind === 'boolean') {
+      if (raw !== 'true' && raw !== 'false') {
+        throw new ApiError('PETICION_INVALIDA', `El parámetro ${param.name} es true o false`)
+      }
+      args[param.arg] = raw === 'true'
+      return
+    }
     if (param.kind === 'timestamp') {
       if (Number.isNaN(Date.parse(raw))) {
         throw new ApiError('PETICION_INVALIDA', `El parámetro ${param.name} no es una fecha válida`)
@@ -149,13 +156,23 @@ function argsFor(route: ApiRoute, params: Record<string, string>, url: URL): Rec
   return args
 }
 
-async function readJsonBody(request: Request): Promise<Record<string, unknown>> {
+const DEFAULT_MAX_BODY_BYTES = 512_000
+
+async function readJsonBody(
+  request: Request,
+  maxBytes: number = DEFAULT_MAX_BODY_BYTES,
+): Promise<Record<string, unknown>> {
   const contentType = request.headers.get('content-type') ?? ''
   if (!contentType.includes('application/json')) {
     throw new ApiError('PETICION_INVALIDA', 'Se espera application/json')
   }
   const raw = await request.text()
-  if (raw.length > 512_000) {
+  if (raw.length > maxBytes) {
+    // Una ruta que declara su propio tope es un lote: pasarse se dice con 413
+    // para que el socio parta el envío en vez de reintentarlo tal cual.
+    if (maxBytes !== DEFAULT_MAX_BODY_BYTES) {
+      throw new ApiError('LOTE_DEMASIADO_GRANDE', `El lote supera ${maxBytes} bytes; envíalo en partes`)
+    }
     throw new ApiError('PETICION_INVALIDA', 'El cuerpo de la petición es demasiado grande')
   }
   let parsed: unknown
@@ -304,11 +321,18 @@ export async function handleApiRequest(
       )
     }
 
-    const body = await readJsonBody(request)
+    // Los parámetros declarados se validan ANTES de reservar la clave: un
+    // `dry_run=quizas` es un 400 que no gasta la clave del socio.
+    const args = argsFor(route, params, url)
+    const body = await readJsonBody(request, route.maxBodyBytes)
     // La huella se calcula sobre el cuerpo REORDENADO por clave: dos envíos con
     // las mismas claves en otro orden son la misma petición, y tratarlos como
-    // distintas devolvería un 409 a un cliente que no hizo nada mal.
-    const requestHash = await ports.hash(stableStringify(body))
+    // distintas devolvería un 409 a un cliente que no hizo nada mal. Si la
+    // ruta declara parámetros, entran en la huella: la misma clave no puede
+    // devolver una simulación a quien ahora pide aplicar.
+    const requestHash = await ports.hash(
+      stableStringify(Object.keys(args).length > 0 ? { body, query: args } : body),
+    )
 
     const reserved = await ports.idempotencyBegin({
       apiClientId: auth.api_client_id,
@@ -332,17 +356,19 @@ export async function handleApiRequest(
 
     const data = await ports.callResource(route.rpc, {
       p_api_client_id: auth.api_client_id,
+      ...args,
       p_payload: body,
     })
 
+    const status = writeStatus(route, data)
     await ports.idempotencyFinish({
       apiClientId: auth.api_client_id,
       key,
-      status: 201,
+      status,
       response: data,
     })
-    await ports.completeRequest(requestId, 201)
-    return { status: 201, body: data, headers }
+    await ports.completeRequest(requestId, status)
+    return { status, body: data, headers }
   } catch (error) {
     const apiError = toApiError(error)
     if (requestId) {
@@ -356,6 +382,19 @@ export async function handleApiRequest(
     }
     return { status: apiError.status, body: errorBody(apiError, trace), headers }
   }
+}
+
+/**
+ * Estado de una escritura. Un lote real que no se aplicó es 422 y lleva el
+ * informe: se guarda así también en la idempotencia, para que el reintento con
+ * la misma clave reciba el mismo 422 y no un 200 engañoso.
+ */
+function writeStatus(route: ApiRoute, data: unknown): number {
+  if (route.batchReport && data !== null && typeof data === 'object') {
+    const report = data as { applied?: unknown; dry_run?: unknown }
+    if (report.applied === false && report.dry_run === false) return 422
+  }
+  return route.successStatus ?? 201
 }
 
 /**

@@ -452,6 +452,104 @@ describe('la puerta: idempotencia de las escrituras', () => {
   })
 })
 
+describe('la puerta: lote de catálogo', () => {
+  const PATH = '/v1/catalog/products:batch'
+  const lote = { products: [{ sku: 'A-1', name: 'Uno' }] }
+  const report = (applied: boolean, dryRun: boolean) => ({
+    dry_run: dryRun,
+    applied,
+    summary: { received: 1, created: applied ? 1 : 0, updated: 0, unchanged: 0, rejected: applied || dryRun ? 0 : 1 },
+    items: [],
+  })
+
+  it('un lote aplicado es 200 y la simulación llega a la base como dry_run', async () => {
+    const { ports, log } = makePorts({
+      callResource: async (rpc, args) => {
+        log.resources.push({ rpc, args })
+        return report(args.p_dry_run !== true, args.p_dry_run === true)
+      },
+    })
+    const aplicado = await handleApiRequest(jsonPost(PATH, lote, { 'idempotency-key': 'lote-0001' }), ports, TRACE)
+    expect(aplicado.status).toBe(200)
+    expect(log.resources[0]).toEqual({
+      rpc: 'api_catalog_upsert',
+      args: { p_api_client_id: AUTH.api_client_id, p_payload: lote },
+    })
+
+    const simulado = await handleApiRequest(
+      jsonPost(`${PATH}?dry_run=true`, lote, { 'idempotency-key': 'lote-0002' }),
+      ports,
+      TRACE,
+    )
+    expect(simulado.status).toBe(200)
+    expect(log.resources[1]?.args).toMatchObject({ p_dry_run: true })
+  })
+
+  it('un lote rechazado es 422 CON el informe, y así se guarda para el reintento', async () => {
+    const { ports, log } = makePorts({ callResource: async () => report(false, false) })
+    const result = await handleApiRequest(jsonPost(PATH, lote, { 'idempotency-key': 'lote-0003' }), ports, TRACE)
+    expect(result.status).toBe(422)
+    expect(result.body).toMatchObject({ applied: false, summary: { rejected: 1 } })
+    expect(log.finished).toEqual([{ key: 'lote-0003', status: 422 }])
+    expect(log.completed.at(-1)?.status).toBe(422)
+  })
+
+  it('un dry_run mal escrito es 400 y no gasta la clave', async () => {
+    let reserved = false
+    const { ports, log } = makePorts({
+      idempotencyBegin: async () => {
+        reserved = true
+        return { status: 'nuevo' }
+      },
+    })
+    const result = await handleApiRequest(
+      jsonPost(`${PATH}?dry_run=quizas`, lote, { 'idempotency-key': 'lote-0004' }),
+      ports,
+      TRACE,
+    )
+    expect(result.status).toBe(400)
+    expect(reserved).toBe(false)
+    expect(log.resources).toEqual([])
+  })
+
+  it('la misma clave con dry_run distinto es otra huella', async () => {
+    const hashes: string[] = []
+    const { ports } = makePorts({
+      idempotencyBegin: async ({ requestHash }) => {
+        hashes.push(requestHash)
+        return { status: 'nuevo' }
+      },
+      callResource: async () => report(true, false),
+    })
+    await handleApiRequest(jsonPost(`${PATH}?dry_run=true`, lote, { 'idempotency-key': 'lote-0005' }), ports, TRACE)
+    await handleApiRequest(jsonPost(PATH, lote, { 'idempotency-key': 'lote-0005' }), ports, TRACE)
+    expect(hashes[0]).not.toBe(hashes[1])
+  })
+
+  it('un lote que pasa su tope es 413 y no llega a la base', async () => {
+    const { ports, log } = makePorts()
+    const enorme = { products: [{ sku: 'A-1', name: 'x'.repeat(5_000_001) }] }
+    const result = await handleApiRequest(jsonPost(PATH, enorme, { 'idempotency-key': 'lote-0006' }), ports, TRACE)
+    expect(result.status).toBe(413)
+    expect((result.body as { error: { code: string } }).error.code).toBe('LOTE_DEMASIADO_GRANDE')
+    expect(log.resources).toEqual([])
+  })
+
+  it('la documentación describe el cuerpo, el informe y el 422', () => {
+    const document = buildOpenApiDocument() as {
+      paths: Record<string, { post?: { responses: Record<string, unknown>; requestBody: unknown } }>
+      components: { schemas: Record<string, unknown> }
+    }
+    const operation = document.paths[PATH]?.post
+    expect(Object.keys(operation?.responses ?? {})).toEqual(expect.arrayContaining(['200', '413', '422']))
+    expect(JSON.stringify(operation?.requestBody)).toContain('#/components/schemas/CatalogBatchRequest')
+    expect(document.components.schemas.CatalogBatchReport).toBeDefined()
+    // Todo esquema al que se apunta existe.
+    const refs = [...JSON.stringify(document).matchAll(/#\/components\/schemas\/(\w+)/g)].map((m) => m[1] as string)
+    expect(refs.filter((name) => !(name in document.components.schemas))).toEqual([])
+  })
+})
+
 describe('los errores nunca filtran internos', () => {
   it('un error crudo de la base sale como ERROR_INTERNO y sin su texto', async () => {
     const { ports } = makePorts({

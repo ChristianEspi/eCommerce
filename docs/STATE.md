@@ -11,6 +11,18 @@ el recorrido SaaS P00–P17 queda cerrado)
 > (`claude-saas-opus/config/phases.json`), que se identifica siempre como «P0x-SaaS». No son la misma
 > serie: el P12 histórico es el framework de integraciones; el P12-SaaS es fulfillment y devoluciones.
 
+## Ingesta de catálogo por la API de socio (2026-09-21)
+
+`POST /v1/catalog/products:batch` con scope nuevo `catalog.write`:
+- upsert por SKU en el maestro de la sociedad de la credencial, con publicación por tienda y precio de
+  variante por tienda;
+- todo o nada, con `dry_run`, 200/422 con informe fila por fila y 413 por tamaño;
+- GTIN verificado, guardado en la columna nueva `products.gtin`.
+
+Contrato, guía y colección Bruno en [`integrations/catalog-ingest.md`](integrations/catalog-ingest.md).
+Migración `20260921100000_api_catalog_ingest.sql`, **sin aplicar en QAS** y con la Edge Function `api` sin
+redesplegar. Pruebas: `supabase/tests/api-catalog-ingest.test.ts` (17) y `api-gateway.test.ts` (+6).
+
 ## N tiendas por sociedad + producto maestro de sociedad (desde 2026-09-16)
 
 Trabajo por fases 01–06 (`_EBIM_PROMPTS/prompts`). Decisiones en

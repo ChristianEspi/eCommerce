@@ -22,6 +22,7 @@ export const API_SCOPES = [
   'product.read',
   'stock.read',
   'customer.read',
+  'catalog.write',
 ] as const
 export type ApiScope = (typeof API_SCOPES)[number]
 
@@ -38,6 +39,7 @@ export const API_ERROR_CODES = [
   'LIMITE_DE_TASA',
   'VERSION_NO_SOPORTADA',
   'METODO_NO_PERMITIDO',
+  'LOTE_DEMASIADO_GRANDE',
   'ERROR_INTERNO',
 ] as const
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number]
@@ -70,6 +72,7 @@ export const API_ERROR_STATUS: Record<ApiErrorCode, number> = {
   LIMITE_DE_TASA: 429,
   VERSION_NO_SOPORTADA: 400,
   METODO_NO_PERMITIDO: 405,
+  LOTE_DEMASIADO_GRANDE: 413,
   ERROR_INTERNO: 500,
 }
 
@@ -103,6 +106,8 @@ export const DB_CODE_TO_API: Record<string, ApiErrorCode> = {
   LIMITE_DE_PEDIDOS: 'LIMITE_DE_TASA',
   SIN_MODULO: 'SCOPE_INSUFICIENTE',
   SIN_PERMISO: 'SCOPE_INSUFICIENTE',
+  LOTE_INVALIDO: 'PETICION_INVALIDA',
+  LOTE_EXCESIVO: 'LOTE_DEMASIADO_GRANDE',
 }
 
 export interface ApiErrorBody {
