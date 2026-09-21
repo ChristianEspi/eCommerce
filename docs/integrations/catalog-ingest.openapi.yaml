@@ -1,0 +1,466 @@
+openapi: 3.1.0
+info:
+  title: eCommerce by EBIM · Ingesta de catálogo (PROPUESTA)
+  version: v1-draft
+  description: |
+    **Estado: PROPUESTA, sin implementar.** Este documento es el contrato que se
+    acuerda ANTES de construir. La API real publica su especificación generada en
+    `GET /v1/openapi.json`; esta ruta entrará ahí cuando exista su implementación.
+    Mientras tanto, se puede probar contra un servidor simulado (Prism) con este mismo
+    archivo. Guía completa: `docs/integrations/catalog-ingest.md`.
+
+    - **Autenticación:** OAuth 2.0 `client_credentials` (la misma de la API de socio).
+      El permiso nuevo es `catalog.write`.
+    - **Tenant:** lo define la credencial. El cuerpo nunca declara organización ni sociedad.
+    - **Identificadores:** `sku` (obligatorio, único en la sociedad) y `gtin` (GS1
+      GTIN-8/12/13/14, opcional, con dígito de control válido).
+    - **Nombres de campo:** inspirados en schema.org `Product`.
+    - **Importes:** cadena decimal (`"111.29"`), nunca número de coma flotante.
+    - **Omitido = no tocar.** `null` explícito = vaciar (solo en campos opcionales).
+servers:
+  - url: https://ehxlxbhtlmfgneiagdcj.supabase.co/functions/v1/api
+    description: QAS (cuando esté implementada)
+  - url: http://127.0.0.1:4010
+    description: Servidor simulado local (Prism)
+security:
+  - bearerAuth: [catalog.write]
+paths:
+  /v1/oauth/token:
+    post:
+      operationId: issueToken
+      summary: Emite un token de acceso (ya existe en la API de socio).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [grant_type, client_id, client_secret]
+              properties:
+                grant_type: { type: string, enum: [client_credentials] }
+                client_id: { type: string }
+                client_secret: { type: string }
+                scope:
+                  type: string
+                  description: Permisos pedidos, separados por espacios.
+            example:
+              grant_type: client_credentials
+              client_id: ec_00000000000000000000000000000000
+              client_secret: "…"
+              scope: catalog.write product.read
+      responses:
+        '200':
+          description: Token emitido
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [access_token, token_type, expires_in]
+                properties:
+                  access_token: { type: string }
+                  token_type: { type: string, enum: [Bearer] }
+                  expires_in: { type: integer }
+              example:
+                access_token: tok_simulado
+                token_type: Bearer
+                expires_in: 3600
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/catalog/products:batch:
+    post:
+      operationId: upsertCatalogProducts
+      summary: Crea o actualiza productos (maestro, variantes y publicación por tienda) en lote.
+      description: |
+        - **Upsert por `sku`** dentro de la sociedad de la credencial: si existe se
+          actualiza, si no se crea.
+        - **Todo o nada:** si una fila se rechaza, no se escribe ninguna (422 con el
+          informe fila por fila).
+        - **`dry_run=true`:** valida y devuelve el mismo informe sin escribir nada.
+        - **Idempotente:** la misma `Idempotency-Key` con el mismo cuerpo devuelve la
+          primera respuesta; con otro cuerpo, 409.
+        - **Publicación por tienda:** `publications` configura dirección, categoría,
+          estado y precio en cada tienda; una tienda que no aparece no se toca.
+      parameters:
+        - name: dry_run
+          in: query
+          required: false
+          description: Simula sin escribir. Por defecto `false`.
+          schema: { type: boolean, default: false }
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Clave de idempotencia (8–200 caracteres). Obligatoria también en `dry_run`.
+          schema: { type: string, minLength: 8, maxLength: 200 }
+        - name: x-correlation-id
+          in: header
+          required: false
+          description: Hilo del incidente; si no se envía, el servidor lo genera y lo devuelve.
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BatchRequest' }
+            examples:
+              farmacia_simple:
+                summary: MiQuímica · productos simples con GTIN
+                value:
+                  products:
+                    - sku: QS-514574
+                      gtin: "4005800077937"
+                      name: Bloqueador Solar Eucerin FPS 50 Loción Textura Ligera 150 ml
+                      description: Protección solar muy alta. Frasco de 150 ml.
+                      brand_code: eucerin
+                      kind: simple
+                      stock: 181
+                      custom_fields: { codigo_qs: "514574", linea: BEIERSDORF, pack_maestro: 24 }
+                      publications:
+                        - store: miquimica
+                          category_slug: cuidado-de-la-piel
+                          status: published
+                          price: "111.29"
+                          compare_at_price: "130.93"
+              moda_variantes:
+                summary: Biel · producto con variantes, en dos tiendas con precio distinto
+                value:
+                  products:
+                    - sku: BIE-BLU-0101
+                      name: Blusa Marea satinada
+                      brand_code: andes-outdoor
+                      kind: variant
+                      variants:
+                        - sku: BIE-BLU-0101-ROS-S
+                          gtin: "7750000000014"
+                          axes: { color: rosa-palo, talla: s }
+                          stock: 5
+                        - sku: BIE-BLU-0101-ROS-M
+                          gtin: "7750000000021"
+                          axes: { color: rosa-palo, talla: m }
+                          stock: 7
+                          prices:
+                            - { store: biel-outlet, price: "79.90" }
+                      publications:
+                        - store: biel
+                          category_slug: mujer-blusas
+                          status: published
+                          price: "101.90"
+                        - store: biel-outlet
+                          category_slug: liquidacion
+                          status: draft
+                          price: "84.90"
+      responses:
+        '200':
+          description: Lote aplicado (o simulado con `dry_run=true`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BatchReport' }
+              example:
+                dry_run: false
+                applied: true
+                summary: { received: 1, created: 1, updated: 0, unchanged: 0, rejected: 0 }
+                items:
+                  - index: 0
+                    sku: QS-514574
+                    status: created
+                    product_id: 2c428293-f73a-4354-87a7-5b997b03127c
+                    publications: [{ store: miquimica, status: created }]
+                    errors: []
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413':
+          description: Lote demasiado grande (más de 500 productos o más de 5 MB).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422':
+          description: Una o más filas no pasan la validación; no se escribió nada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BatchReport' }
+              example:
+                dry_run: false
+                applied: false
+                summary: { received: 2, created: 0, updated: 0, unchanged: 0, rejected: 1 }
+                items:
+                  - index: 0
+                    sku: QS-514574
+                    status: updated
+                    publications: [{ store: miquimica, status: updated }]
+                    errors: []
+                  - index: 1
+                    sku: QS-999999
+                    status: rejected
+                    errors:
+                      - code: CATEGORIA_NO_ENCONTRADA
+                        field: products[1].publications[0].category_slug
+                        message: La categoría 'no-existe' no existe en la tienda 'miquimica'.
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+
+  schemas:
+    Money:
+      type: string
+      pattern: '^\d{1,12}(\.\d{1,2})?$'
+      description: Importe en cadena decimal, hasta 2 decimales. En la moneda de la tienda.
+      examples: ["101.90"]
+    Gtin:
+      type: string
+      pattern: '^(\d{8}|\d{12,14})$'
+      description: GS1 GTIN-8/12/13/14. El servidor verifica el dígito de control.
+      examples: ["7750000000014"]
+    Sku:
+      type: string
+      minLength: 1
+      maxLength: 64
+      description: Identificador del artículo, único en la sociedad (productos y variantes comparten espacio).
+    Code:
+      type: string
+      pattern: '^[a-z0-9][a-z0-9-]{0,80}$'
+      description: Código del vocabulario de la sociedad (marca, familia, atributo, valor, categoría).
+
+    BatchRequest:
+      type: object
+      additionalProperties: false
+      required: [products]
+      properties:
+        products:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items: { $ref: '#/components/schemas/ProductInput' }
+
+    ProductInput:
+      type: object
+      additionalProperties: false
+      required: [sku]
+      description: |
+        Producto MAESTRO de la sociedad. En el alta son obligatorios `name` y, si se
+        publica, `price` en cada publicación. En la actualización, lo omitido no se toca.
+      properties:
+        sku: { $ref: '#/components/schemas/Sku' }
+        gtin: { oneOf: [{ $ref: '#/components/schemas/Gtin' }, { type: 'null' }] }
+        name: { type: string, minLength: 2, maxLength: 240 }
+        description: { type: [string, 'null'], maxLength: 8000 }
+        kind:
+          type: string
+          enum: [simple, variant]
+          description: Solo en el alta. `variant` exige al menos una variante. Los kits se gestionan en el backoffice.
+        brand_code: { oneOf: [{ $ref: '#/components/schemas/Code' }, { type: 'null' }] }
+        family_code: { oneOf: [{ $ref: '#/components/schemas/Code' }, { type: 'null' }] }
+        tax_category_code:
+          type: [string, 'null']
+          description: Categoría fiscal; `null` = la categoría por defecto de la sociedad.
+        stock:
+          type: integer
+          minimum: 0
+          description: Stock de catálogo (sin almacenes). Con almacenes se ignora; la existencia va por inventario.
+        attributes:
+          type: object
+          description: 'Ficha técnica, `{codigo_atributo: codigo_valor | texto | número}`. Solo atributos existentes.'
+          additionalProperties: { type: [string, number, boolean, 'null'] }
+        custom_fields:
+          type: object
+          description: Datos libres del integrador (p. ej. código del ERP). Se fusionan con los existentes.
+          additionalProperties: true
+        variants:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/VariantInput' }
+        publications:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/PublicationInput' }
+
+    VariantInput:
+      type: object
+      additionalProperties: false
+      required: [sku]
+      properties:
+        sku: { $ref: '#/components/schemas/Sku' }
+        gtin: { oneOf: [{ $ref: '#/components/schemas/Gtin' }, { type: 'null' }] }
+        name:
+          type: string
+          maxLength: 240
+          description: Si se omite en el alta, se compone con el nombre del producto y los valores de los ejes.
+        axes:
+          type: object
+          description: 'Ejes de la variante, `{codigo_atributo: codigo_valor}`. Atributos marcados como eje.'
+          additionalProperties: { type: string }
+        stock: { type: integer, minimum: 0 }
+        active: { type: boolean }
+        prices:
+          type: array
+          description: Precio propio de la variante POR TIENDA. Sin precio propio hereda el de la publicación.
+          items: { $ref: '#/components/schemas/VariantPrice' }
+
+    VariantPrice:
+      type: object
+      additionalProperties: false
+      required: [store, price]
+      properties:
+        store: { type: string, description: Slug de la tienda. }
+        price: { oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }], description: '`null` borra el precio propio.' }
+        compare_at_price: { oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }] }
+
+    PublicationInput:
+      type: object
+      additionalProperties: false
+      required: [store]
+      description: Configuración del producto EN una tienda de la sociedad. Si no existía, se crea (exige `price`).
+      properties:
+        store: { type: string, description: Slug de la tienda. }
+        slug:
+          type: string
+          pattern: '^[a-z0-9][a-z0-9-]{0,120}$'
+          description: Dirección en la vitrina. En el alta, si se omite, se deriva del nombre.
+        category_slug: { type: [string, 'null'], description: 'Categoría DE ESA tienda; `null` la quita.' }
+        status: { type: string, enum: [draft, published, archived] }
+        price: { $ref: '#/components/schemas/Money' }
+        compare_at_price: { oneOf: [{ $ref: '#/components/schemas/Money' }, { type: 'null' }] }
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          description: ISO 4217. Opcional; si viene, tiene que coincidir con la moneda de la tienda.
+
+    BatchReport:
+      type: object
+      required: [dry_run, applied, summary, items]
+      properties:
+        dry_run: { type: boolean }
+        applied: { type: boolean }
+        summary:
+          type: object
+          required: [received, created, updated, unchanged, rejected]
+          properties:
+            received: { type: integer }
+            created: { type: integer }
+            updated: { type: integer }
+            unchanged: { type: integer }
+            rejected: { type: integer }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ItemResult' }
+        error: { $ref: '#/components/schemas/ErrorDetail' }
+
+    ItemResult:
+      type: object
+      required: [index, sku, status, errors]
+      properties:
+        index: { type: integer, description: 'Posición en `products`.' }
+        sku: { type: string }
+        status: { type: string, enum: [created, updated, unchanged, rejected] }
+        product_id: { type: [string, 'null'], format: uuid, description: '`null` en simulación de un alta.' }
+        publications:
+          type: array
+          items:
+            type: object
+            properties:
+              store: { type: string }
+              status: { type: string, enum: [created, updated, unchanged] }
+        errors:
+          type: array
+          items: { $ref: '#/components/schemas/RowError' }
+
+    RowError:
+      type: object
+      required: [code, field, message]
+      properties:
+        code:
+          type: string
+          description: Código estable para ramificar.
+          examples:
+            - CAMPO_REQUERIDO
+            - VALOR_INVALIDO
+            - GTIN_INVALIDO
+            - GTIN_EN_OTRO_PRODUCTO
+            - SKU_DUPLICADO
+            - SKU_REPETIDO_EN_LOTE
+            - TIPO_DISTINTO
+            - MARCA_NO_ENCONTRADA
+            - FAMILIA_NO_ENCONTRADA
+            - ATRIBUTO_NO_ENCONTRADO
+            - VALOR_NO_ENCONTRADO
+            - NO_ES_EJE
+            - TIENDA_NO_ENCONTRADA
+            - CATEGORIA_NO_ENCONTRADA
+            - MONEDA_INCONSISTENTE
+            - SLUG_DUPLICADO
+        field: { type: string, description: 'Ruta JSON del campo, p. ej. `products[3].publications[0].price`.' }
+        message: { type: string }
+
+    ErrorDetail:
+      type: object
+      required: [code, message, status]
+      properties:
+        code:
+          type: string
+          examples:
+            - NO_AUTENTICADO
+            - TOKEN_INVALIDO
+            - TOKEN_EXPIRADO
+            - CREDENCIAL_INVALIDA
+            - SCOPE_INSUFICIENTE
+            - PETICION_INVALIDA
+            - LOTE_RECHAZADO
+            - LOTE_DEMASIADO_GRANDE
+            - IDEMPOTENCIA_CONFLICTO
+            - IDEMPOTENCIA_EN_CURSO
+            - LIMITE_DE_TASA
+            - ERROR_INTERNO
+        message: { type: string }
+        status: { type: integer }
+        correlation_id: { type: string }
+        request_id: { type: string }
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { $ref: '#/components/schemas/ErrorDetail' }
+
+  responses:
+    BadRequest:
+      description: Petición inválida (JSON mal formado, campo desconocido, tipos).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            error: { code: PETICION_INVALIDA, message: "Campo no permitido: products[0].organization_id", status: 400 }
+    Unauthorized:
+      description: Token ausente, inválido o caducado.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            error: { code: TOKEN_EXPIRADO, message: El token caducó, status: 401 }
+    Forbidden:
+      description: La credencial no tiene `catalog.write` o la sociedad no tiene el módulo.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            error: { code: SCOPE_INSUFICIENTE, message: "Falta el permiso catalog.write", status: 403 }
+    Conflict:
+      description: La clave de idempotencia ya se usó con otro cuerpo, o el mismo lote sigue en curso.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            error: { code: IDEMPOTENCIA_CONFLICTO, message: La clave ya se usó con otro contenido, status: 409 }
+    TooManyRequests:
+      description: Límite de tasa superado. Reintentar tras `Retry-After`.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            error: { code: LIMITE_DE_TASA, message: Demasiadas peticiones, status: 429 }

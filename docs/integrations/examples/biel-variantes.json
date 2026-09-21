@@ -1,0 +1,29 @@
+{
+  "products": [
+    {
+      "sku": "BIE-BLU-0101",
+      "name": "Blusa Marea satinada",
+      "brand_code": "andes-outdoor",
+      "kind": "variant",
+      "variants": [
+        {
+          "sku": "BIE-BLU-0101-ROS-S",
+          "gtin": "7750000000014",
+          "axes": { "color": "rosa-palo", "talla": "s" },
+          "stock": 5
+        },
+        {
+          "sku": "BIE-BLU-0101-ROS-M",
+          "gtin": "7750000000021",
+          "axes": { "color": "rosa-palo", "talla": "m" },
+          "stock": 7,
+          "prices": [{ "store": "biel-outlet", "price": "79.90" }]
+        }
+      ],
+      "publications": [
+        { "store": "biel", "category_slug": "mujer-blusas", "status": "published", "price": "101.90" },
+        { "store": "biel-outlet", "category_slug": "liquidacion", "status": "draft", "price": "84.90" }
+      ]
+    }
+  ]
+}

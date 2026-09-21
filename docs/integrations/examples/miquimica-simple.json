@@ -1,0 +1,31 @@
+{
+  "products": [
+    {
+      "sku": "QS-514574",
+      "gtin": "4005800077937",
+      "name": "Bloqueador Solar Eucerin FPS 50 Loción Textura Ligera 150 ml",
+      "description": "Protección solar muy alta. Frasco de 150 ml.",
+      "brand_code": "eucerin",
+      "kind": "simple",
+      "stock": 181,
+      "custom_fields": { "codigo_qs": "514574", "linea": "BEIERSDORF", "pack_maestro": 24 },
+      "publications": [
+        {
+          "store": "miquimica",
+          "category_slug": "cuidado-de-la-piel",
+          "status": "published",
+          "price": "111.29",
+          "compare_at_price": "130.93"
+        }
+      ]
+    },
+    {
+      "sku": "QS-514575",
+      "name": "Crema Hidratante Nivea Soft 200 ml",
+      "stock": 0,
+      "publications": [
+        { "store": "miquimica", "price": "32.50", "compare_at_price": null }
+      ]
+    }
+  ]
+}

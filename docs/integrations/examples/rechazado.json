@@ -1,0 +1,22 @@
+{
+  "products": [
+    {
+      "sku": "QS-ERR-001",
+      "gtin": "4005800077930",
+      "name": "GTIN con dígito de control inválido",
+      "publications": [{ "store": "miquimica", "price": "10.00" }]
+    },
+    {
+      "sku": "QS-ERR-002",
+      "name": "Categoría inexistente y moneda distinta",
+      "publications": [
+        { "store": "miquimica", "category_slug": "no-existe", "price": "10.00", "currency": "USD" }
+      ]
+    },
+    {
+      "sku": "QS-ERR-002",
+      "name": "SKU repetido en el mismo lote",
+      "publications": [{ "store": "miquimica", "price": "12.00" }]
+    }
+  ]
+}

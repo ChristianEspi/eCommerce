@@ -1,0 +1,38 @@
+meta {
+  name: 03 Productos de la tienda
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/v1/products?store={{store}}&limit=5
+  body: none
+  auth: bearer
+}
+
+params:query {
+  store: {{store}}
+  limit: 5
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  Ya existe en QAS (scope product.read). Sirve para ver el catálogo antes y
+  después de un lote.
+}
+
+script:post-response {
+  const first = res.body && Array.isArray(res.body.data) ? res.body.data[0] : null;
+  if (first && first.sku) {
+    bru.setVar("sampleSku", first.sku);
+  }
+}
+
+tests {
+  test("responde 200", function () {
+    expect(res.status).to.equal(200);
+  });
+}

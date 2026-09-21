@@ -1,0 +1,29 @@
+meta {
+  name: 04 Stock por SKU
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/v1/stock/{{sampleSku}}?store={{store}}
+  body: none
+  auth: bearer
+}
+
+params:query {
+  store: {{store}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  Ya existe en QAS (scope stock.read). Toma el SKU del paso 03.
+}
+
+tests {
+  test("responde 200", function () {
+    expect(res.status).to.equal(200);
+  });
+}

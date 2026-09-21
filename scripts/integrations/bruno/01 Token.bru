@@ -1,0 +1,34 @@
+meta {
+  name: 01 Token
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/v1/oauth/token
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "grant_type": "client_credentials",
+    "client_id": "{{clientId}}",
+    "client_secret": "{{clientSecret}}",
+    "scope": "{{scopes}}"
+  }
+}
+
+script:post-response {
+  if (res.status === 200) {
+    bru.setVar("accessToken", res.body.access_token);
+  }
+}
+
+tests {
+  test("emite un token Bearer", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.token_type).to.equal("Bearer");
+    expect(res.body.access_token).to.be.a("string");
+  });
+}

@@ -1,0 +1,56 @@
+meta {
+  name: 06 Lote - aplicar
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/v1/catalog/products:batch
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "products": [
+      {
+        "sku": "QS-514574",
+        "gtin": "4005800077937",
+        "name": "Bloqueador Solar Eucerin FPS 50 Loción Textura Ligera 150 ml",
+        "brand_code": "eucerin",
+        "kind": "simple",
+        "stock": 181,
+        "custom_fields": { "codigo_qs": "514574", "linea": "BEIERSDORF" },
+        "publications": [
+          { "store": "{{store}}", "category_slug": "cuidado-de-la-piel", "status": "published", "price": "111.29", "compare_at_price": "130.93" }
+        ]
+      }
+    ]
+  }
+}
+
+script:pre-request {
+  // Clave nueva en cada envío. Para probar la idempotencia, fijarla a mano.
+  req.setHeader("Idempotency-Key", "bruno-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10));
+}
+
+docs {
+  Upsert por SKU. Repetir con la misma Idempotency-Key devuelve la misma respuesta.
+  PROPUESTA: hoy solo responde el servidor simulado (entorno mock).
+}
+
+tests {
+  test("aplica el lote", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.applied).to.equal(true);
+    expect(["created", "updated", "unchanged"]).to.include(res.body.items[0].status);
+  });
+}
