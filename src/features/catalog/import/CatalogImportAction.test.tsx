@@ -81,14 +81,16 @@ describe('importar categorías desde Excel', () => {
         total: 2, created: 1, errors: 1,
         rows: [
           { sheet: 'categories', row: 2, key: 'mujer', status: 'created' },
-          { sheet: 'categories', row: 3, key: 'mujer-vestidos', status: 'error', reason: 'PADRE_NO_ENCONTRADO', field: 'parent_slug' },
+          { sheet: 'categories', row: 3, key: 'mujer-vestidos', status: 'error', reason: 'PADRE_NO_ENCONTRADO', field: 'parent_slug', value: 'mujr' },
         ],
       }),
     )
 
     const { dialog } = await openAndUpload()
 
-    await within(dialog).findByText('La categoría madre no existe · Slug de la madre')
+    // Regla, columna y VALOR: sin el valor hay que ir a buscar al Excel cuál
+    // de las celdas de esa fila es la que está mal.
+    await within(dialog).findByText('La categoría madre no existe · Slug de la madre · «mujr»')
     expect(api.importCategories).toHaveBeenCalledWith(
       STORE,
       [

@@ -27,6 +27,8 @@ const rowResultSchema = z.object({
   status: z.enum(['created', 'updated', 'error']),
   reason: z.string().optional(),
   field: z.string().nullable().optional(),
+  /** El valor que traía el Excel en ese campo: es lo que hay que corregir. */
+  value: z.string().nullable().optional(),
   constraint: z.string().nullable().optional(),
 })
 
@@ -48,6 +50,7 @@ export type ImportResult = z.infer<typeof importResultSchema>
 export const ROW_REASONS = [
   'CAMPO_REQUERIDO',
   'CODIGO_INVALIDO',
+  'CODIGO_INVALIDO_ATRIBUTO',
   'SLUG_INVALIDO',
   'FORMATO_INVALIDO',
   'NUMERO_INVALIDO',

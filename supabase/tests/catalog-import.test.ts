@@ -29,6 +29,8 @@ interface ImportRow {
   status: 'created' | 'updated' | 'error'
   reason?: string
   field?: string | null
+  /** El valor del Excel que incumple la regla. */
+  value?: string | null
 }
 
 interface ImportResult {
@@ -212,6 +214,30 @@ describe('import_catalog_vocabulary', () => {
       [2, 'ATRIBUTO_NO_ENCONTRADO', 'attribute_code'],
     ])
     expect(await svc(`select 1 from public.brands where company_id = $1 and code = 'urbano'`, [TENANT_A.companyId])).toEqual([])
+  })
+
+  /**
+   * Un error que dice la REGLA pero no el valor obliga a ir a buscarlo al
+   * Excel, y con veintiséis filas malas eso es contar filas a mano.
+   */
+  it('cada fila rechazada dice el valor que falla y con qué clave', async () => {
+    const result = await vocabulary(
+      {
+        attributes: [{ row: 6, code: 'tipo-calzado', name: 'Tipo de calzado' }],
+        attribute_values: [{ row: 47, attribute_code: 'tipo-calzado', code: 'botin', label: 'Botín' }],
+      },
+      true,
+    )
+
+    const filas = result.rows.filter((row) => row.status === 'error')
+    expect(filas.map((row) => [row.row, row.reason, row.value, row.key])).toEqual([
+      // El código de un atributo lleva guion BAJO: tiene razón propia, porque
+      // los demás códigos del libro sí admiten guiones.
+      [6, 'CODIGO_INVALIDO_ATRIBUTO', 'tipo-calzado', 'tipo-calzado'],
+      // Y la clave de un valor se arma antes de validar: aunque su atributo no
+      // exista, la fila se identifica sola.
+      [47, 'ATRIBUTO_NO_ENCONTRADO', 'tipo-calzado', 'tipo-calzado:botin'],
+    ])
   })
 
   it('valores solo en atributos de lista', async () => {

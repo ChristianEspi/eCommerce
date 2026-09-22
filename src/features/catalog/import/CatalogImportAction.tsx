@@ -404,8 +404,17 @@ export function CatalogImportDialog({
                             />
                           </TableCell>
                           <TableCell>
+                            {/* Regla · columna · VALOR. El valor es lo que se
+                                corrige en el Excel: sin él, «Código no válido»
+                                obliga a ir a buscar cuál de los campos falla. */}
                             {row.status === 'error'
-                              ? [t(rowReasonKey(row.reason)), headerOf(row.sheet, row.field)].filter(Boolean).join(' · ')
+                              ? [
+                                  t(rowReasonKey(row.reason)),
+                                  headerOf(row.sheet, row.field),
+                                  row.value ? `«${row.value}»` : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(' · ')
                               : ''}
                           </TableCell>
                         </TableRow>
