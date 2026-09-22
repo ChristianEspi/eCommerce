@@ -42,6 +42,7 @@ import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { useDebouncedValue } from '@/shared/lib/useDebouncedValue'
 import { FormDrawer } from '@/shared/ui/FormDrawer'
+import { ContentAiAssistant } from './ai/ContentAiAssistant'
 import { StoreAssetField } from '@/features/admin/settings/StoreAssetField'
 import { useAssetUrls } from '@/features/admin/settings/useStoreSettings'
 /**
@@ -510,6 +511,27 @@ export function BlocksSection({ pageId }: { pageId: string | null }) {
               )}
             </>
           )}
+
+          {/* Fase 09: borradores con IA sobre lo que ya está escrito. Aplicar
+              escribe en este formulario; se guarda con «Guardar». Nunca publica. */}
+          <ContentAiAssistant
+            target="block"
+            blockId={editing?.id ?? null}
+            blockType={form.block_type}
+            current={{
+              title: form.title,
+              subtitle: form.subtitle,
+              cta_label: form.cta_label,
+              media_alt: form.media_alt,
+            }}
+            applicable={[
+              'title',
+              ...(rules.subtitle !== 'unused' ? (['subtitle'] as const) : []),
+              ...(rules.cta !== 'unused' ? (['cta_label'] as const) : []),
+              ...(rules.media !== 'unused' ? (['media_alt'] as const) : []),
+            ]}
+            onApply={(field, value) => setForm((prev) => ({ ...prev, [field]: value }))}
+          />
 
           <TextField
             label={t('content.blocks.title')}

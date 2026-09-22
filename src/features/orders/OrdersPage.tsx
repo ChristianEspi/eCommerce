@@ -39,6 +39,8 @@ import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState, ErrorState } from '@/shared/ui/states'
 import { OrderDrawer } from './OrderDrawer'
+import { OrdersAiBar } from './ai/OrdersAiBar'
+import type { OrderDrawerTab } from './ai/ordersAi'
 import { fetchOrder, fetchOrdersForExport } from './api'
 import { downloadCsv, ordersToCsv } from './exportCsv'
 import {
@@ -107,7 +109,13 @@ export function OrdersPage() {
   const [status, setStatus] = useState<OrderStatusFilter>('all')
   const [range, setRange] = useState<OrderDateRange>('all')
   const [page, setPage] = useState(0)
-  const [selected, setSelected] = useState<Order | null>(null)
+  const [selected, setSelectedOrder] = useState<Order | null>(null)
+  // Pestaña con la que se abre el detalle: solo la fija la IA del listado.
+  const [drawerTab, setDrawerTab] = useState<OrderDrawerTab | undefined>(undefined)
+  const setSelected = (order: Order | null) => {
+    setDrawerTab(undefined)
+    setSelectedOrder(order)
+  }
   const [exporting, setExporting] = useState(false)
   const [params, setParams] = useSearchParams()
   const pedidoEnlazado = params.get('order')
@@ -125,13 +133,31 @@ export function OrdersPage() {
     let vigente = true
     void fetchOrder(pedidoEnlazado)
       .then((order) => {
-        if (vigente && order) setSelected(order)
+        if (!vigente || !order) return
+        setDrawerTab(undefined)
+        setSelectedOrder(order)
       })
       .catch(() => undefined)
     return () => {
       vigente = false
     }
   }, [pedidoEnlazado, selected?.id])
+
+  /**
+   * Abrir un pedido que propone la IA (búsqueda o cola de atención).
+   *
+   * Se relee por id —igual que el enlace de un aviso—: la RLS decide si se
+   * puede ver, y la pestaña es la del flujo normal donde la persona actúa.
+   */
+  function abrirDesdeIa(orderId: string, tab?: OrderDrawerTab) {
+    void fetchOrder(orderId)
+      .then((order) => {
+        if (!order) return
+        setSelectedOrder(order)
+        setDrawerTab(tab)
+      })
+      .catch(() => notify(t('orders.error.generic'), 'error'))
+  }
 
   function cerrarPedido() {
     setSelected(null)
@@ -236,6 +262,7 @@ export function OrdersPage() {
         }
       />
       <Stack spacing={2}>
+        <OrdersAiBar storeId={storeId} onOpenOrder={abrirDesdeIa} />
         <Tabs
           value={status}
           onChange={(_, next: OrderStatusFilter) => setStatus(next)}
@@ -467,6 +494,7 @@ export function OrdersPage() {
         open={selected !== null}
         canWrite={canWrite}
         onClose={cerrarPedido}
+        initialTab={drawerTab}
       />
     </>
   )

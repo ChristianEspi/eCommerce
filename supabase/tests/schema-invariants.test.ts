@@ -57,8 +57,12 @@ const REFERENCE_CATALOG = ['app_capabilities', 'currencies', 'integration_provid
  *
  * La exencion es NOMINAL a proposito, igual que la de arriba: el dia que
  * alguien meta aqui una tabla que si tiene lectores, el hueco se ve.
+ *
+ * `ai_tickets` (fase 01 de IA) es la misma clase de tabla: une un consumo con
+ * su traza y solo la tocan `ebim.ai_consume` / `ebim.ai_record`. Un lector
+ * directo permitiria ver cuando consumio cada persona sin pasar por la traza.
  */
-const BILLING_PLANE = ['ai_quotas', 'ai_usage']
+const BILLING_PLANE = ['ai_quotas', 'ai_usage', 'ai_tickets']
 
 beforeAll(async () => {
   db = await createTestDatabase()

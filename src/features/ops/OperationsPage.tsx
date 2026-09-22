@@ -2,6 +2,7 @@ import HealthAndSafetyRoundedIcon from '@mui/icons-material/HealthAndSafetyRound
 import StorefrontRoundedIcon from '@mui/icons-material/StorefrontRounded'
 import { Card } from '@mui/material'
 import { useMemo, useState } from 'react'
+import { useAiFeature } from '@/features/ai/hooks'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { PageHeader } from '@/shared/ui/PageHeader'
@@ -12,6 +13,7 @@ import { AuditSection } from './AuditSection'
 import { HealthSection } from './HealthSection'
 import { IncidentsSection } from './IncidentsSection'
 import { TraceSection } from './TraceSection'
+import { OpsAiSection } from './ai/OpsAiSection'
 
 /**
  * Operación: salud, incidentes, rastro y auditoría.
@@ -42,6 +44,9 @@ export function OperationsPage() {
   const { t } = useI18n()
   const { activeStore, activeCompanyId, tenant, status } = useTenant()
   const [correlationId, setCorrelationId] = useState('')
+  // Fase 10: pestaña de IA solo para los roles de la funcionalidad `operations`.
+  const { availability } = useAiFeature('operations')
+  const conIA = availability !== 'forbidden' && availability !== 'loading'
 
   const storeId = activeStore?.id ?? null
 
@@ -66,8 +71,9 @@ export function OperationsPage() {
         ),
       },
       { id: 'auditoria', label: t('ops.tab.audit'), content: <AuditSection /> },
+      ...(conIA ? [{ id: 'analisis-ia', label: t('aiOps.tab'), content: <OpsAiSection /> }] : []),
     ],
-    [t, storeId, correlationId],
+    [t, storeId, correlationId, conIA],
   )
 
   if (status === 'loading') {

@@ -139,7 +139,7 @@ export const ESQUEMA_SUGERENCIA = {
     },
   },
   required: ['reply', 'ids'],
-  additionalProperties: false,
+  additionalProperties: false as const,
 }
 
 /**
@@ -159,6 +159,31 @@ export interface CandidatoIA {
 }
 
 /** La lista numerada que ve el modelo. Una línea por candidato, sin adornos. */
+const CONTACTO_VITRINA = /@|https?:\/\/|www\.|\b[a-z0-9-]+\.(com|pe|net|org|io|shop|store|link|ly)\b|(?:\d[\s.-]?){7,}/i
+const DINERO_VITRINA = /S\/|\$|€|£|\b(usd|pen|eur|soles?|d[oó]lares?|euros?)\b|%|\bgratis\b|\bfree\b/i
+
+/**
+ * Candado de la respuesta PÚBLICA de la vitrina (fase 12).
+ *
+ * La lista cerrada protege los identificadores; el texto llegaba al comprador
+ * anónimo solo recortado. Un nombre de producto con una «instrucción» dentro
+ * (el catálogo también entra por la API de socio) podía hacer que el modelo
+ * escribiera un enlace, un teléfono o un precio inventado. Aquí se exige lo que
+ * dicen las reglas 1 y 2: sin contacto, sin dinero ni porcentajes, y ninguna
+ * cifra que no esté en el NOMBRE, la marca o la categoría de un candidato (el
+ * precio no cuenta: lo pinta la tarjeta, contra el catálogo).
+ */
+export function respuestaVitrinaSegura(reply: string, candidatos: readonly CandidatoIA[]): boolean {
+  if (CONTACTO_VITRINA.test(reply) || DINERO_VITRINA.test(reply)) return false
+  const nombres = candidatos
+    .map((c) => [c.name, c.brand_name ?? '', c.category_name ?? ''].join(' '))
+    .join(' ')
+  for (const cifra of reply.match(/\d+(?:[.,]\d+)?/g) ?? []) {
+    if (!nombres.includes(cifra)) return false
+  }
+  return true
+}
+
 export function listarCandidatos(candidatos: readonly CandidatoIA[]): string {
   return candidatos
     .map(

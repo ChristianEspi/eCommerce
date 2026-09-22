@@ -76,6 +76,15 @@ function orderRow(patch: Record<string, unknown> = {}) {
   }
 }
 
+/**
+ * Las RPC que ESCRIBEN. Desde la fase 04 la pantalla lee además el saldo de IA
+ * (`ai_entitlement`, solo lectura) para decidir si enseña el asistente; esa
+ * lectura no es un comando y no cuenta aquí.
+ */
+function comandos(client: FakeSupabase) {
+  return client.state.rpcCalls.filter((c) => c.name !== 'ai_entitlement')
+}
+
 function backend(role: 'admin' | 'viewer' = 'admin'): FakeSupabase {
   return createFakeSupabase({
     session: makeSession(),
@@ -596,8 +605,8 @@ describe('OrdersPage — el comando de transicion', () => {
     await user.type(within(drawer).getByLabelText(/Nota del cambio/i), 'Depósito verificado')
     await user.click(within(drawer).getByRole('button', { name: 'Actualizar estado' }))
 
-    await waitFor(() => expect(client.state.rpcCalls).toHaveLength(1))
-    const call = client.state.rpcCalls[0]
+    await waitFor(() => expect(comandos(client)).toHaveLength(1))
+    const call = comandos(client)[0]
     expect(call?.name).toBe('order_transition')
     expect(call?.args).toEqual({
       p_order_id: ORDER_1,
@@ -617,8 +626,8 @@ describe('OrdersPage — el comando de transicion', () => {
     await user.click(await screen.findByRole('option', { name: 'Cancelado' }))
     await user.click(within(drawer).getByRole('button', { name: 'Actualizar estado' }))
 
-    await waitFor(() => expect(client.state.rpcCalls).toHaveLength(1))
-    const args = client.state.rpcCalls[0]?.args ?? {}
+    await waitFor(() => expect(comandos(client)).toHaveLength(1))
+    const args = comandos(client)[0]?.args ?? {}
     for (const field of TENANT_FIELDS) expect(args).not.toHaveProperty(field)
     for (const field of ['store_id', 'p_from', 'grand_total', 'subtotal', 'currency']) {
       expect(args).not.toHaveProperty(field)
@@ -659,8 +668,8 @@ describe('OrdersPage — aprobacion B2B', () => {
     await user.type(within(drawer).getByLabelText(/^Motivo/i), 'Presupuesto disponible')
     await user.click(within(drawer).getByRole('button', { name: 'Autorizar' }))
 
-    await waitFor(() => expect(client.state.rpcCalls).toHaveLength(1))
-    expect(client.state.rpcCalls[0]).toMatchObject({
+    await waitFor(() => expect(comandos(client)).toHaveLength(1))
+    expect(comandos(client)[0]).toMatchObject({
       name: 'order_approval_decide',
       args: { p_order_id: ORDER_3, p_approve: true, p_reason: 'Presupuesto disponible' },
     })

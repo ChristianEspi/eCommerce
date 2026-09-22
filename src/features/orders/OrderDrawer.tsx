@@ -1,3 +1,4 @@
+import { useCopilotEntity } from '@/features/ai/copilot/copilot-context'
 import { StatusChip } from '@/shared/ui/StatusChip'
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded'
 import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded'
@@ -32,6 +33,9 @@ import { isSafeExternalUrl } from '@/domain/href'
 import { FormDrawer } from '@/shared/ui/FormDrawer'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
+import { useAiFeature } from '@/features/ai/hooks'
+import { OrderAiPanel } from './ai/OrderAiPanel'
+import type { OrderDrawerTab } from './ai/ordersAi'
 import { OrderError } from './errors'
 import {
   APPROVAL_COLOR,
@@ -169,15 +173,26 @@ export function OrderDrawer({
   open,
   canWrite,
   onClose,
+  initialTab,
 }: {
   order: Order | null
   open: boolean
   canWrite: boolean
   onClose: () => void
+  /**
+   * Pestaña con la que se abre. La usa la IA del listado: su acción sugerida
+   * lleva a la pestaña del flujo normal (p. ej. «Operación» para el cobro).
+   */
+  initialTab?: OrderDrawerTab
 }) {
   const { t, locale } = useI18n()
+  // La pestaña de IA solo existe para los roles de la funcionalidad `orders`.
+  const { availability: aiAvailability } = useAiFeature('orders')
+  const showAi = aiAvailability !== 'forbidden' && aiAvailability !== 'loading'
   const { notify } = useFeedback()
   const orderId = order?.id ?? null
+  // El Copilot sabe qué pedido está abierto (tipo + id; la RLS decide).
+  useCopilotEntity('order', open ? orderId : null)
 
   // El pedido se relee: la fila del listado se queda vieja en cuanto cambia un
   // eje, y al lado se estaría pintando una línea de tiempo que sí está al día.
@@ -197,7 +212,7 @@ export function OrderDrawer({
   const addRef = useAddOrderExternalRef()
   const removeRef = useDeleteOrderExternalRef()
 
-  const [tab, setTab] = useState('summary')
+  const [tab, setTab] = useState<string>(initialTab ?? 'summary')
   const [axis, setAxis] = useState<OrderAxis>('order_status')
   const [nextValue, setNextValue] = useState('')
   const [reason, setReason] = useState('')
@@ -213,7 +228,7 @@ export function OrderDrawer({
   // Al abrir otro pedido el formulario arranca limpio: arrastrar el motivo del
   // anterior lo pegaría en la línea de tiempo del nuevo.
   useEffect(() => {
-    setTab('summary')
+    setTab(initialTab ?? 'summary')
     setAxis('order_status')
     setNextValue('')
     setReason('')
@@ -223,7 +238,7 @@ export function OrderDrawer({
     setRefSystem('')
     setRefType('invoice')
     setRefValue('')
-  }, [orderId])
+  }, [orderId, initialTab])
 
   const current = detail.data ?? order
   // Al cambiar de eje el destino elegido deja de tener sentido.
@@ -1162,10 +1177,14 @@ export function OrderDrawer({
           <Tab value="summary" label={t('orders.tab.summary')} />
           <Tab value="operation" label={t('orders.tab.operation')} />
           <Tab value="history" label={t('orders.tab.history')} />
+          {showAi && <Tab value="ai" label={t('aiOrders.tab')} />}
         </Tabs>
         {tab === 'summary' && summary}
         {tab === 'operation' && operation}
         {tab === 'history' && history}
+        {/* La IA explica; la acción sugerida solo cambia de pestaña y la
+            persona actúa con los controles de siempre. */}
+        {tab === 'ai' && showAi && <OrderAiPanel orderId={orderRef} onNavigate={(next) => setTab(next)} />}
       </Stack>
 
       {/* Cancelar es terminal, y hasta ahora era un clic sin preguntar.

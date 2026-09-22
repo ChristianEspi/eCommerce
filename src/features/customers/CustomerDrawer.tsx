@@ -1,3 +1,4 @@
+import { useCopilotEntity } from '@/features/ai/copilot/copilot-context'
 import { StatusChip } from '@/shared/ui/StatusChip'
 import {
   Alert,
@@ -20,6 +21,7 @@ import {
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect, useState, type ChangeEvent } from 'react'
 import { useForm } from 'react-hook-form'
+import { useAiFeature } from '@/features/ai/hooks'
 import { useCapabilities } from '@/features/capabilities/capabilities-context'
 import { useSegments } from '@/features/pricing/hooks'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -29,6 +31,7 @@ import { FormDrawer } from '@/shared/ui/FormDrawer'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState } from '@/shared/ui/states'
 import { AddressesPanel } from './AddressesPanel'
+import { CustomerAiPanel } from './ai/CustomerAiPanel'
 import { ContactsPanel } from './ContactsPanel'
 import { ExternalIdsPanel } from './ExternalIdsPanel'
 import { CustomersError } from './errors'
@@ -72,6 +75,8 @@ export function CustomerDrawer({
   onClose: () => void
 }) {
   const { t, locale } = useI18n()
+  // El Copilot sabe qué cliente está abierto (tipo + id; la RLS decide).
+  useCopilotEntity('customer', open ? customer?.id : null)
   const { notify } = useFeedback()
   const { has } = useCapabilities()
   const [tab, setTab] = useState(0)
@@ -82,6 +87,10 @@ export function CustomerDrawer({
   const save = useSaveCustomer()
   const account = useAccountForCustomer(customer?.id ?? null, has('customers.b2b'))
   const orders = useCustomerOrders(customer?.id ?? null, tab === 4)
+  // Resumen IA (fase 06): la pestaña solo existe para los roles de la
+  // funcionalidad `customers`; la cartera y el crédito los filtra la base.
+  const { availability: aiAvailability } = useAiFeature('customers')
+  const showAi = aiAvailability !== 'forbidden' && aiAvailability !== 'loading'
 
   const {
     register,
@@ -161,6 +170,7 @@ export function CustomerDrawer({
             <Tab label={t('customers.tab.addresses')} />
             <Tab label={t('customers.tab.externalIds')} />
             <Tab label={t('customers.tab.orders')} />
+            {showAi && <Tab label={t('aiCustomers.tab')} />}
           </Tabs>
         )}
 
@@ -314,6 +324,8 @@ export function CustomerDrawer({
         {tab === 3 && customer && scope && (
           <ExternalIdsPanel customerId={customer.id} scope={scope} canWrite={canWrite} />
         )}
+
+        {tab === 5 && customer && showAi && <CustomerAiPanel customerId={customer.id} />}
 
         {tab === 4 && customer && (
           <Stack spacing={2}>

@@ -43,6 +43,9 @@ import {
   type ReviewStatus,
 } from './api'
 import { useModerateReview, useReviewQueue } from './hooks'
+import { useAiFeature } from '@/features/ai/hooks'
+import { ReviewReplyDialog } from './ai/ReviewReplyDialog'
+import { ReviewsAiPanel } from './ai/ReviewsAiPanel'
 
 const TABS: Array<{ value: ReviewStatus; label: MessageKey }> = [
   { value: 'pending', label: 'admin.reviews.tab.pending' },
@@ -70,6 +73,10 @@ export function ReviewsPage() {
   const [rejecting, setRejecting] = useState<QueueReview | null>(null)
   const [reason, setReason] = useState('')
   const [dialogError, setDialogError] = useState<MessageKey | null>(null)
+  // Fase 09: borrador de respuesta con IA (se copia; nunca se publica).
+  const [replyFor, setReplyFor] = useState<{ id: string; label: string } | null>(null)
+  const aiReviews = useAiFeature('reviews')
+  const canDraftReply = aiReviews.availability !== 'forbidden' && aiReviews.availability !== 'loading'
 
   const ready = tenantStatus !== 'loading' && Boolean(tenant && activeCompanyId)
   const queue = useReviewQueue(ready)
@@ -123,6 +130,15 @@ export function ReviewsPage() {
     )
   }
 
+  function replyLabel(review: Pick<QueueReview, 'product_name' | 'rating'>): string {
+    return `${review.product_name ?? '—'} · ${t('store.reviews.starsLabel').replace('{n}', String(review.rating))}`
+  }
+
+  function openReply(reviewId: string) {
+    const review = (queue.data ?? []).find((r) => r.id === reviewId)
+    setReplyFor({ id: reviewId, label: review ? replyLabel(review) : '' })
+  }
+
   async function publish(review: QueueReview) {
     try {
       await moderate.mutateAsync({ reviewId: review.id, decision: 'publish' })
@@ -160,6 +176,8 @@ export function ReviewsPage() {
 
       <Stack spacing={2}>
         {!canModerate && <Alert severity="info">{t('admin.reviews.readOnly')}</Alert>}
+
+        {activeStore && <ReviewsAiPanel storeId={activeStore.id} onReply={openReply} />}
 
         <Tabs
           value={status}
@@ -259,6 +277,16 @@ export function ReviewsPage() {
                               {t('admin.reviews.reject')}
                             </Button>
                           )}
+                          {canDraftReply && (
+                            <Button
+                              size="small"
+                              onClick={() => setReplyFor({ id: review.id, label: replyLabel(review) })}
+                              sx={{ ml: 1 }}
+                              aria-label={`${t('aiReviews.reply.open')} · ${review.product_name ?? ''}`}
+                            >
+                              {t('aiReviews.reply.open')}
+                            </Button>
+                          )}
                         </TableCell>
                       )}
                     </TableRow>
@@ -303,6 +331,15 @@ export function ReviewsPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {replyFor && activeStore && (
+        <ReviewReplyDialog
+          storeId={activeStore.id}
+          reviewId={replyFor.id}
+          label={replyFor.label}
+          onClose={() => setReplyFor(null)}
+        />
+      )}
     </>
   )
 }

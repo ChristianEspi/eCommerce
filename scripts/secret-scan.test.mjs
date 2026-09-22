@@ -44,6 +44,14 @@ describe('los patrones encuentran lo que dicen encontrar', () => {
     expect(hits('const PREFIX = "sb_secret_"', 'supabase-secret-key')).toBe(0)
   })
 
+  it('el literal corto de los tests de redacción NO es una clave del proveedor', () => {
+    expect(hits('provider key sk-ant-api03-AbCdEfGhIjKlMnOp was rejected', 'anthropic-api-key')).toBe(0)
+  })
+
+  it('la clave del proveedor de IA asignada con valor es un hallazgo', () => {
+    expect(hits('EBIM_AI_API_KEY=abcdefghijklmnopqrstuvwxyz', 'service-role-assignment')).toBe(1)
+  })
+
   it('una asignación de clave de servidor con valor', () => {
     const text = 'SUPABASE_SERVICE_ROLE_KEY=abcdefghijklmnopqrstuvwxyz'
     expect(hits(text, 'service-role-assignment')).toBe(1)
@@ -59,6 +67,7 @@ describe('los patrones encuentran lo que dicen encontrar', () => {
     ['aws-access-key', 'AKIAIOSFODNN7EXAMPLE'],
     ['stripe-live-key', 'sk_live_abcdefghijklmnop123'],
     ['slack-token', 'xoxb-1234567890-abcdefghij'],
+    ['anthropic-api-key', `sk-ant-api03-${'A1b2C3d4E5'.repeat(6)}`],
   ])('%s', (id, text) => {
     expect(hits(text, id)).toBe(1)
   })
@@ -103,5 +112,7 @@ describe('el repositorio, ahora mismo', () => {
     const { findings, code } = runSecretScan({ quiet: true })
     expect(findings).toEqual([])
     expect(code).toBe(0)
-  })
+    // Lee el repositorio entero (git + ~1400 archivos + `dist/`): con la suite
+    // en paralelo compite por disco y CPU con los bancos de BD.
+  }, 60_000)
 })

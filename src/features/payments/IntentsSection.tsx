@@ -21,6 +21,7 @@ import {
 } from '@mui/material'
 import { useMemo, useState } from 'react'
 import { useTenant } from '@/features/tenant/tenant-context'
+import { PaymentIntentAiToggle } from './ai/PaymentsAiSection'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { formatDateTime } from '@/shared/lib/format'
@@ -359,6 +360,14 @@ export function IntentsSection() {
                 </Typography>
               )}
             </Stack>
+
+            {/* Fase 08: explicar el cobro con IA. Solo lee; se monta al pulsar. */}
+            <PaymentIntentAiToggle
+              key={selected.intent_id}
+              storeId={activeStore?.id ?? null}
+              intentId={selected.intent_id}
+              onNavigate={() => setSelected(null)}
+            />
           </Stack>
         )}
       </FormDrawer>

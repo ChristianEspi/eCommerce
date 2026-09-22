@@ -76,6 +76,10 @@ export const SELLABLE_CAPABILITY_IDS = [
   'ai.assist',
   'ai.catalog.copy',
   'ai.insights',
+  // EBIM_AI_SEQUENCE fase 01. Redactar contenido publicable (promociones, CMS,
+  // respuestas a reseñas), siempre como borrador. Declarada: el hub tiene que
+  // dar de alta `ecommerce.ai.content` y la fase 09 implementarla.
+  'ai.content',
 ] as const
 
 export const CAPABILITY_IDS = [
@@ -440,9 +444,25 @@ export const CAPABILITIES: readonly Capability[] = [
     // Lee indicadores que YA calcula la base y dice cuáles merecen atención.
     // No inventa cifras: recibe las filas resueltas y devuelve cuáles señalar y
     // por qué, con la misma regla de lista cerrada que el asistente.
+    // Desde la fase 01 de EBIM_AI_SEQUENCE paga también las explicaciones por
+    // módulo (pedidos, inventario, clientes, cobranza, operaciones…): todas
+    // leen cifras que ya calculó la base y ninguna decide nada. Cada una exige
+    // además su módulo contratado (`ebim.ai_module_capability_for`).
     state: 'implemented',
     grants:
       'Lectura de los indicadores de la tienda para señalar qué merece atención, sobre cifras calculadas por la base y nunca por el modelo.',
+  },
+  {
+    id: 'ai.content',
+    name: 'Redacción de contenido con IA',
+    boundary: 'ai',
+    entitlement: `${ENTITLEMENT_PREFIX}ai.content`,
+    // Declarada en la fase 01 de EBIM_AI_SEQUENCE; la implementa la fase 09.
+    // Borradores de promociones, páginas y respuestas a reseñas que una
+    // persona revisa y publica por el flujo normal: la IA no publica nada.
+    state: 'declared',
+    grants:
+      'Borradores de textos de promociones, contenido de la vitrina y respuestas a reseñas, que una persona revisa antes de publicar.',
   },
   {
     id: 'content.cms',

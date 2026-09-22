@@ -11,6 +11,113 @@ el recorrido SaaS P00–P17 queda cerrado)
 > (`claude-saas-opus/config/phases.json`), que se identifica siempre como «P0x-SaaS». No son la misma
 > serie: el P12 histórico es el framework de integraciones; el P12-SaaS es fulfillment y devoluciones.
 
+## Secuencia de IA (`EBIM_AI_SEQUENCE`, desde 2026-09-21)
+
+Fase 00 (análisis y plan) cerrada sin cambios de código. Arquitectura actual/objetivo en
+[`AI_ARCHITECTURE.md`](AI_ARCHITECTURE.md); checklist 00–12 y deuda D1–D12 en
+[`AI_IMPLEMENTATION_STATE.md`](AI_IMPLEMENTATION_STATE.md). Línea base: 80 tests de IA en verde.
+
+Fase 01 (AI Core y capabilities) cerrada: núcleo común `_shared/aiCore.ts` + pipeline `_shared/aiPipeline.ts`,
+transporte con errores tipados y política de modelo por funcionalidad, frontera de datos no confiables,
+validación runtime de salida, rol + módulo antes de gastar cuota, tickets de consumo para `ai_record`,
+`interaction_id` + pulgar en contexto, 17 funcionalidades por módulo y `ai.content` declarada
+(migración `20260921120000_ai_core.sql`, **no aplicada** en QAS). `catalog-copy` y `shopping-assistant`
+migrados al pipeline sin cambiar su contrato.
+
+Fase 02 (Dashboard / Analista IA) cerrada: bloque «Resumen inteligente · Hoy deberías revisar» (3–6
+insights validados) y «Preguntar sobre estos datos» en el dashboard, bajo demanda y sin tocar KPIs ni
+avisos deterministas. Dataset reducido `public.ai_dashboard_facts` (SECURITY INVOKER, owner/admin,
+listas ≤5, secciones solo con el módulo contratado; migración `20260921130000_ai_dashboard_facts.sql`,
+**no aplicada** en QAS), Edge Function `dashboard-insights` (**sin desplegar**) y candado «ninguna cifra
+escrita por el modelo»: las cifras se citan por clave y las pinta el front desde la base.
+
+Fase 04 (Pedidos con IA) cerrada: pestaña «Asistente IA» en el detalle del pedido (cálculo del sistema
+—bloqueos, faltantes, siguiente paso— sin cuota + interpretación IA bajo demanda: resumen, estado,
+historial, pregunta) y «Asistente IA de pedidos» en el listado (búsqueda en lenguaje natural → filtros
+tipados → SQL controlado ≤25 filas; «¿Qué pedidos requieren atención?» sobre un lote ≤15). Solo lectura:
+la `suggested_action` abre la pestaña del flujo normal. Datasets `ai_order_facts` / `ai_orders_attention`
+/ `ai_orders_search` (migración `20260921140000_ai_orders_facts.sql`, **no aplicada** en QAS) y Edge
+Function `orders-assistant` (**sin desplegar**).
+
+Fase 05 (Inventario y planificación con IA) cerrada: pestaña «Análisis IA» en Inventario (cálculo del
+sistema —quiebre, riesgo de quiebre, bajo punto de pedido, exceso, inmovilizado, alta rotación,
+movimientos atípicos, ERP caducado— sin cuota + interpretación IA bajo demanda) y en Planificación
+(previsión existente frente a la venta real, tendencia, temporada, anomalías, factores observables), y
+«Explicar con IA» en el cajón del sugerido: la cantidad es SIEMPRE la de `suggest_order_v2`
+(`history_seasonal_v2`), la IA solo explica. Datasets `ai_inventory_facts` / `ai_planning_facts` /
+`ai_suggestion_facts` (migración `20260921150000_ai_inventory_planning_facts.sql`, **no aplicada** en
+QAS) y Edge Functions `inventory-assistant` / `planning-assistant` (**sin desplegar**).
+
+Fase 06 (Clientes y fuerza de ventas con IA) cerrada: pestaña «Resumen IA» en la ficha de cliente
+(cálculo del sistema —señales, pedidos enlazados por cuenta B2B y correo con el enlace declarado,
+productos frecuentes y dejados de pedir, promociones, crédito solo si el rol lo ve, visitas— sin cuota +
+resumen 360 bajo demanda) y «Asistente de visita» en Visitas (Preparar visita + Generar seguimiento como
+BORRADOR editable que se copia; no hay envío). Permisos por dato en el dataset: el vendedor solo su
+cartera, crédito solo owner/admin/orders con `credit.management`, secciones sin permiso en `null` (nunca
+ceros); candados contra cifras inventadas, inferencias sensibles y promesas comerciales. Datasets
+`ai_customer_facts` / `ai_visit_facts` (migración `20260921160000_ai_customer_facts.sql`, **no aplicada**
+en QAS) y Edge Functions `customers-assistant` / `sales-assistant` (**sin desplegar**).
+
+Fase 07 (Cotizaciones y surtidos con IA) cerrada: «Borrador con IA» en Cotizaciones. La IA solo convierte
+la instrucción en texto (cliente, productos, cantidades, vigencia, nota) y un candado exige que todo esté
+ESCRITO en la frase; el sistema resuelve contra clientes (cartera del vendedor) y productos publicados
+(surtido autorizado) y, con duda, devuelve CANDIDATOS que elige la persona. Precio, impuesto por línea,
+lista y disponibilidad los da `quote_draft_preview` (motor `price_quote`); guardar exige confirmación y
+`quote_create_from_draft` re-precia en el servidor y crea la cotización en `draft` (idempotente). Sugerencias
+de surtido (reposición, venta cruzada, complemento) calculadas en SQL sobre productos publicados,
+autorizados y sin rotura; la IA solo prioriza y explica. Migración `20260921170000_ai_quotes_assortments.sql`
+(**no aplicada** en QAS) y Edge Function `quotes-assistant` (**sin desplegar**).
+
+Fase 08 (Crédito, pagos y entregas con IA) cerrada: pestaña «Análisis IA» en Crédito, Pagos y
+Fulfillment (cálculo del sistema sin cuota + interpretación IA bajo demanda con hallazgos por señal y
+acciones de seguimiento de LISTA CERRADA que solo navegan o preparan un borrador), «Asistente de
+cobranza» por cliente con BORRADOR de recordatorio (sin amenazas ni concesiones), «Explicar con IA» en el
+detalle de un cobro (conciliación, tiempos agotados = resultado desconocido, códigos técnicos) y
+«Analizar con IA» en el detalle de una entrega con BORRADOR de mensaje al cliente (sin fechas prometidas ni
+compensaciones). Nada escribe: ni límites, ni bloqueos, ni pagos, ni conciliaciones, ni estados de entrega.
+Datasets `ai_collections_facts` / `ai_payments_facts` / `ai_fulfillment_facts` (migración
+`20260922100000_ai_credit_payments_fulfillment_facts.sql`, **no aplicada** en QAS) y Edge Functions
+`credit-assistant` / `payments-assistant` / `fulfillment-assistant` (**sin desplegar**).
+
+Fase 09 (Promociones, CMS y reseñas con IA) cerrada: «Redactar con IA» en el cajón de una promoción
+guardada (condiciones del sistema y candidatos por regla sin cuota + BORRADOR de nombre, descripción,
+titular, copy, CTA y términos resumidos que cita las reglas por marcador; nombre y descripción se
+APLICAN al formulario y se guardan con «Guardar»; ningún descuento ni regla se propone), «Borrador con
+IA» en los formularios de bloque y página del CMS (banner, landing, SEO y traducción ES↔EN sobre lo que
+la persona ya escribió; nunca publica) y «Análisis de reseñas con IA» en la cola de moderación (cifras
+y tono por estrellas del sistema + temas con evidencia y reseñas a revisar) con «Borrador de respuesta»
+que se copia. El texto de clientes viaja siempre delimitado como dato no confiable (tests de prompt
+injection). Nada publica, modera, responde, oculta ni borra. Datasets `ai_promotion_facts` /
+`ai_reviews_facts` (migración `20260922120000_ai_promotions_reviews_facts.sql`, **no aplicada** en
+QAS) y Edge Functions `promotions-assistant` / `content-assistant` / `reviews-assistant` (**sin
+desplegar**). La capacidad `ai.content` sigue **declarada**: el hub tiene que dar de alta
+`ecommerce.ai.content` para encenderla.
+
+Fase 10 (Operaciones e integraciones con IA) cerrada: pestaña «Análisis IA» en Operaciones (salud,
+colas e incidentes AGRUPADOS por tipo y código con marcas por regla —crítico, pico, recurrente, viejo,
+cola muerta, compras atascadas— sin cuota; un grupo abre su incidente más reciente con el HILO de
+`trace_by_correlation`) y en Integraciones (errores agrupados por proveedor, operación, clase —código
+HTTP + patrones— y huella del texto; disyuntores, proveedores sin éxito, webhooks, bandeja y errores de la
+API de socio; un grupo abre su mensaje con los intentos). La IA interpreta y sugiere verificaciones de lista
+cerrada; no reintenta, no reproduce, no cierra disyuntores, no resuelve incidentes ni da comandos. Deuda
+D10 resuelta: sanitizador en `_shared/observability/redact.ts` (Authorization, JWT, API keys, cookies,
+passwords, secretos, cadenas de conexión, tokens opacos, correo, teléfono, tarjeta, IP, documentos) ANTES
+de cualquier prompt, más una pasada final sobre el prompt; tests de sanitización y de prompt injection.
+Datasets `ai_ops_facts` / `ai_integrations_facts` (migración `20260922140000_ai_ops_integrations_facts.sql`,
+**no aplicada** en QAS) y Edge Functions `operations-assistant` / `integrations-assistant` (**sin
+desplegar**).
+
+Fase 11 (EBIM Copilot global) cerrada: botón ✦ en la barra del backoffice y cajón lateral (pantalla
+completa en móvil) con sugerencias según la pantalla y la entidad abierta (pedido, producto, cliente), y
+solo las que el rol y los módulos permiten. Detrás, una capa de HERRAMIENTAS de solo lectura (resumen del
+día, ventas, búsqueda/detalle/atención de pedidos, búsqueda/ficha de productos, inventario, cliente): el
+modelo elige herramienta y parámetros tipados de la lista de ESA persona (`ai_copilot_tools()`), el sistema
+revisa el plan y ejecuta cada herramienta con el JWT del usuario (SQL SECURITY INVOKER + STABLE con guard de
+rol, módulo, tienda y topes); una herramienta denegada no aporta datos. Cifras solo por marcador, enlaces
+solo a pantallas de lista cerrada, nada escribe. Funcionalidad `copilot` (`ai.insights`), una unidad de
+cuota por pregunta. Migración `20260922160000_ai_copilot.sql` (**no aplicada** en QAS) y Edge Function
+`copilot` (**sin desplegar**).
+
 ## Ingesta de catálogo por la API de socio (2026-09-21)
 
 `POST /v1/catalog/products:batch` con scope nuevo `catalog.write`:

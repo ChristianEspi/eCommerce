@@ -29,6 +29,7 @@ import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { formatDate } from '@/shared/lib/format'
 import { FormDrawer } from '@/shared/ui/FormDrawer'
+import { ContentAiAssistant } from './ai/ContentAiAssistant'
 import { SearchField } from '@/shared/ui/SearchField'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { useFeedback } from '@/shared/ui/feedback-context'
@@ -415,6 +416,15 @@ export function PagesSection({
             onChange={(event) => setForm({ ...form, seo_description: event.target.value })}
             multiline
             minRows={2}
+          />
+          {/* Fase 09: título y SEO con IA sobre lo que ya está escrito. Aplicar
+              escribe en este formulario; se guarda con «Guardar». Nunca publica. */}
+          <ContentAiAssistant
+            target="page"
+            pageId={editing?.id ?? null}
+            current={{ title: form.title, seo_title: form.seo_title, seo_description: form.seo_description }}
+            applicable={['title', 'seo_title', 'seo_description']}
+            onApply={(field, value) => setForm((prev) => ({ ...prev, [field]: value }))}
           />
           {firstIssue && (
             <Typography sx={{ color: 'var(--red)', fontWeight: 700, fontSize: 12 }}>

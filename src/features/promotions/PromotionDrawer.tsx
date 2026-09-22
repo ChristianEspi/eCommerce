@@ -36,6 +36,7 @@ import {
   useTiers,
 } from './hooks'
 import type { PromotionScopeIds } from './api'
+import { PromotionAiAssistant } from './ai/PromotionAiAssistant'
 import {
   PROMOTION_KINDS,
   PROMOTION_STATUSES,
@@ -391,6 +392,18 @@ export function PromotionDrawer({
           size="small"
           fullWidth
         />
+
+        {/* Fase 09: redactar con IA sobre la promoción GUARDADA (las reglas
+            salen de la base). Aplicar escribe en el formulario; se guarda con
+            «Guardar». Sin promoción guardada no hay reglas que citar. */}
+        {promotion && (
+          <PromotionAiAssistant
+            key={promotion.id}
+            promotionId={promotion.id}
+            current={{ name: values.name, description: values.description }}
+            onApply={(field, value) => set(field, value)}
+          />
+        )}
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
           <TextField

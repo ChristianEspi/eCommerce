@@ -2,6 +2,7 @@ import LocalShippingRoundedIcon from '@mui/icons-material/LocalShippingRounded'
 import StorefrontRoundedIcon from '@mui/icons-material/StorefrontRounded'
 import { Card } from '@mui/material'
 import { useMemo } from 'react'
+import { useAiFeature } from '@/features/ai/hooks'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { PageHeader } from '@/shared/ui/PageHeader'
@@ -13,6 +14,7 @@ import { NetworkSection } from './NetworkSection'
 import { QueueSection } from './QueueSection'
 import { ReturnsSection } from './ReturnsSection'
 import { RoutingSection } from './RoutingSection'
+import { FulfillmentAiSection } from './ai/FulfillmentAiSection'
 
 /**
  * Entregas: qué hay que despachar, qué vuelve y cómo se llega.
@@ -33,6 +35,9 @@ import { RoutingSection } from './RoutingSection'
 export function FulfillmentPage() {
   const { t } = useI18n()
   const { activeStore, activeCompanyId, tenant, status } = useTenant()
+  // Fase 08: pestaña de IA solo para los roles de la funcionalidad `fulfillment`.
+  const { availability } = useAiFeature('fulfillment')
+  const conIA = availability !== 'forbidden' && availability !== 'loading'
 
   const items = useMemo(
     () => [
@@ -51,8 +56,9 @@ export function FulfillmentPage() {
         ),
       },
       { id: 'red', label: t('fulfillment.tab.network'), content: <NetworkSection /> },
+      ...(conIA ? [{ id: 'analisis-ia', label: t('aiFulfillment.tab'), content: <FulfillmentAiSection /> }] : []),
     ],
-    [t],
+    [t, conIA],
   )
 
   // Mismo criterio que el resto del backoffice: mientras el espacio de trabajo

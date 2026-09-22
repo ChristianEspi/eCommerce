@@ -2,6 +2,7 @@ import HubRoundedIcon from '@mui/icons-material/HubRounded'
 import StorefrontRoundedIcon from '@mui/icons-material/StorefrontRounded'
 import { Card } from '@mui/material'
 import { useMemo } from 'react'
+import { useAiFeature } from '@/features/ai/hooks'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { PageHeader } from '@/shared/ui/PageHeader'
@@ -12,6 +13,7 @@ import { ApiClientsSection } from './ApiClientsSection'
 import { HealthSection } from './HealthSection'
 import { QueueSection } from './QueueSection'
 import { WebhooksSection } from './WebhooksSection'
+import { IntegrationsAiSection } from './ai/IntegrationsAiSection'
 
 /**
  * Monitor de Integraciones: salud, cola, webhooks y credenciales de la API.
@@ -40,6 +42,9 @@ import { WebhooksSection } from './WebhooksSection'
 export function IntegrationsPage() {
   const { t } = useI18n()
   const { activeStore, activeCompanyId, tenant, status } = useTenant()
+  // Fase 10: pestaña de IA solo para los roles de la funcionalidad `integrations`.
+  const { availability } = useAiFeature('integrations')
+  const conIA = availability !== 'forbidden' && availability !== 'loading'
 
   const items = useMemo(
     () => [
@@ -47,8 +52,9 @@ export function IntegrationsPage() {
       { id: 'cola', label: t('integrations.tab.queue'), content: <QueueSection /> },
       { id: 'webhooks', label: t('integrations.tab.webhooks'), content: <WebhooksSection /> },
       { id: 'api', label: t('integrations.tab.api'), content: <ApiClientsSection /> },
+      ...(conIA ? [{ id: 'analisis-ia', label: t('aiIntegrations.tab'), content: <IntegrationsAiSection /> }] : []),
     ],
-    [t],
+    [t, conIA],
   )
 
   if (status === 'loading') {

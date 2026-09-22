@@ -2,6 +2,7 @@ import WarehouseRoundedIcon from '@mui/icons-material/WarehouseRounded'
 import StorefrontRoundedIcon from '@mui/icons-material/StorefrontRounded'
 import { Card } from '@mui/material'
 import { useMemo } from 'react'
+import { useAiFeature } from '@/features/ai/hooks'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { PageHeader } from '@/shared/ui/PageHeader'
@@ -9,6 +10,7 @@ import { SectionTabs } from '@/shared/ui/SectionTabs'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { EmptyState } from '@/shared/ui/states'
 import { AlertsSection } from './AlertsSection'
+import { InventoryAiSection } from './ai/InventoryAiSection'
 import { LevelsSection } from './LevelsSection'
 import { MovementsSection } from './MovementsSection'
 import { WarehousesSection } from './WarehousesSection'
@@ -30,6 +32,11 @@ import { WarehousesSection } from './WarehousesSection'
 export function InventoryPage() {
   const { t } = useI18n()
   const { activeStore, activeCompanyId, tenant, status } = useTenant()
+  // Fase 05: la pestaña de IA solo existe para los roles de la funcionalidad
+  // `inventory`. Sin contrato o sin cuota se ve igual (el cálculo del sistema
+  // no gasta), con el aviso correspondiente.
+  const { availability } = useAiFeature('inventory')
+  const conIA = availability !== 'forbidden' && availability !== 'loading'
 
   const items = useMemo(
     () => [
@@ -37,8 +44,9 @@ export function InventoryPage() {
       { id: 'existencias', label: t('inventory.tab.levels'), content: <LevelsSection /> },
       { id: 'movimientos', label: t('inventory.tab.movements'), content: <MovementsSection /> },
       { id: 'alertas', label: t('inventory.tab.alerts'), content: <AlertsSection /> },
+      ...(conIA ? [{ id: 'analisis-ia', label: t('aiInventory.tab'), content: <InventoryAiSection key={activeStore?.id ?? 'sin-tienda'} /> }] : []),
     ],
-    [t],
+    [t, conIA, activeStore?.id],
   )
 
   // Mismo criterio que el resto del backoffice: mientras el espacio de trabajo

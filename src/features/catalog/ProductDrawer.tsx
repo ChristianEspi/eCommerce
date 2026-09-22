@@ -1,11 +1,10 @@
+import { useCopilotEntity } from '@/features/ai/copilot/copilot-context'
 import { zodResolver } from '@hookform/resolvers/zod'
-import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded'
 import {
   Alert,
   Box,
   Button,
   Checkbox,
-  CircularProgress,
   FormControlLabel,
   InputAdornment,
   MenuItem,
@@ -39,7 +38,7 @@ import { RelationsPanel } from './pim/RelationsPanel'
 import { UomsPanel } from './pim/UomsPanel'
 import { VariantsPanel } from './pim/VariantsPanel'
 import { useBrands, useFamilies } from './pim/hooks'
-import { pedirBorradorDeFicha, type MotivoSinBorrador } from './api/copy'
+import { ProductAiAssistant } from './ProductAiAssistant'
 import {
   categoryTree,
   PRODUCT_KINDS,
@@ -116,6 +115,8 @@ export function ProductDrawer({
   onClose: () => void
 }) {
   const { t } = useI18n()
+  // El Copilot sabe qué producto está abierto (tipo + id; la RLS decide).
+  useCopilotEntity('product', open ? product?.id : null)
   const { notify } = useFeedback()
   const save = useSaveProduct()
   const entrada = useAdjustInventory()
@@ -261,35 +262,11 @@ export function ProductDrawer({
   const kind = watch('kind')
   const publish = watch('publish')
 
-  /**
-   * El borrador de la ficha, que es una SUGERENCIA y no un guardado.
-   *
-   * Escribe en el formulario y ya está: no toca la base. Quien lo pidió lo lee,
-   * lo corrige y decide si guarda, igual que si lo hubiera tecleado. Un botón
-   * de IA que guarda solo convierte una ayuda en una publicación que nadie
-   * aprobó, y en el catálogo de una botica eso no es una molestia, es un riesgo.
-   */
-  const [redactando, setRedactando] = useState(false)
-  const [avisoIA, setAvisoIA] = useState<MotivoSinBorrador | 'ok' | null>(null)
-
-  async function redactarFicha() {
-    if (!product?.id) return
-    setRedactando(true)
-    setAvisoIA(null)
-    try {
-      const { draft, motivo } = await pedirBorradorDeFicha(product.id)
-      if (draft) {
-        setValue('description', draft, { shouldDirty: true, shouldValidate: true })
-        setAvisoIA('ok')
-      } else {
-        setAvisoIA(motivo ?? 'proveedor')
-      }
-    } catch (error) {
-      setServerError(error instanceof CatalogError ? error.key : 'catalog.error.generic')
-    } finally {
-      setRedactando(false)
-    }
-  }
+  // La publicación en la tienda ACTIVA: es donde el asistente puede aplicar
+  // una categoría (su comando y su validación, al pulsar).
+  const publicacionActiva =
+    (publications.data ?? []).find((row) => row.store_id === storeId && row.publication_id !== null) ??
+    null
 
   // El árbol se arma una vez por lista de categorías, no en cada tecla del
   // formulario: son decenas de filas y el cajón repinta con cada carácter.
@@ -411,43 +388,28 @@ export function ProductDrawer({
               {...register('description')}
             />
 
-            {/* Solo al EDITAR: para redactar hace falta un producto guardado del
-                que leer nombre, marca y categoría con su RLS. En el alta no hay
-                nada de eso todavía, y un botón que no puede funcionar es peor
-                que un botón que no está. */}
-            {canWrite && product?.id && (
-              <Stack direction="row" sx={{ gap: 1.25, alignItems: 'center', flexWrap: 'wrap' }}>
-                <Button
-                  size="small"
-                  startIcon={
-                    redactando ? (
-                      <CircularProgress size={14} color="inherit" />
-                    ) : (
-                      <AutoAwesomeRoundedIcon fontSize="small" />
-                    )
-                  }
-                  disabled={redactando || busy}
-                  onClick={() => void redactarFicha()}
-                  sx={{ textTransform: 'none', fontWeight: 700 }}
-                >
-                  {redactando ? t('catalog.copy.writing') : t('catalog.copy.draft')}
-                </Button>
-
-                <Typography sx={{ fontSize: 12.5, color: 'var(--muted)', flex: 1, minWidth: 220 }}>
-                  {t('catalog.copy.notice')}
-                </Typography>
-              </Stack>
-            )}
-
-            {avisoIA && (
-              <Alert
-                severity={avisoIA === 'ok' ? 'success' : 'info'}
-                onClose={() => setAvisoIA(null)}
-              >
-                {avisoIA === 'ok'
-                  ? t('catalog.copy.done')
-                  : t(`catalog.copy.motivo.${avisoIA}` as MessageKey)}
-              </Alert>
+            {/* Solo al EDITAR: para sugerir hace falta un producto guardado del
+                que leer nombre, marca, categoría y atributos con su RLS. En el
+                alta no hay nada de eso todavía, y un botón que no puede
+                funcionar es peor que un botón que no está. Las sugerencias NO
+                guardan: nombre y descripción van al formulario y se guardan
+                con «Guardar»; categoría y atributos, al pulsar «Aplicar». */}
+            {product?.id && (
+              <ProductAiAssistant
+                // Fase 12: una sugerencia de OTRO producto no puede quedar
+                // viva al cambiar de ficha y «Aplicarse» a esta.
+                key={product.id}
+                productId={product.id}
+                storeId={storeId}
+                canWrite={canWrite}
+                disabled={busy}
+                current={{ name: watch('name'), description: watch('description') }}
+                publication={publicacionActiva}
+                scope={{ organizationId, companyId, storeId }}
+                onApplyText={(field, value) =>
+                  setValue(field, value, { shouldDirty: true, shouldValidate: true })
+                }
+              />
             )}
           </Stack>
 

@@ -65,6 +65,16 @@ async function consumirDe(tenant: typeof TENANT_A, feature: string) {
 }
 
 async function consumir(tenant: typeof TENANT_A, unidades = 1) {
+  // Fase 12: por JWT solo se consume de una en una (`BAD_UNITS` si no). Las
+  // peticiones de varias unidades son del núcleo de servidor, que es donde se
+  // prueba el «no descontar a medias».
+  if (unidades !== 1) {
+    const rows = await svc<{ r: Record<string, unknown> }>(
+      `select ebim.ai_consume_for($1, $2, 'assistant', $3) as r`,
+      [tenant.organizationId, tenant.companyId, unidades],
+    )
+    return rows[0]?.r as Record<string, unknown>
+  }
   return comoAdmin(tenant, async () => {
     const rows = await svc<{ r: Record<string, unknown> }>(
       `select ebim.ai_consume('assistant', $1) as r`,
@@ -108,6 +118,9 @@ beforeEach(async () => {
   // prueba que herede el gasto de la anterior mide otra cosa.
   await svc(`delete from public.ai_usage`)
   await svc(`delete from public.ai_interactions`)
+  // Fase 01: una traza por JWT canjea el ticket de un consumo. Un ticket que
+  // sobreviva a su prueba dejaría registrar a la siguiente sin consumir.
+  await svc(`delete from public.ai_tickets`)
   await svc(`delete from public.ai_quotas`)
   await svc(`delete from public.tenant_entitlements where entitlement_code = $1`, [ENTITLEMENT])
 })
@@ -255,6 +268,46 @@ describe('la vitrina pública', () => {
     expect(fallo).toMatch(/TIENDA_NO_DISPONIBLE/i)
   })
 
+  it('fase 12 (D9): la vitrina tiene techo por tienda y hora, y al saltar no gasta', async () => {
+    await contratarIA(TENANT_A)
+    await svc(
+      `insert into public.ai_quotas (organization_id, company_id, plan, trial_quota)
+       values ($1, $2, 'trial', 100)`,
+      [TENANT_A.organizationId, TENANT_A.companyId],
+    )
+    // Techo bajo configurado por la tienda (sin migración), como el resto de
+    // límites públicos.
+    await svc(
+      `insert into public.store_settings (store_id, organization_id, company_id, config)
+       select s.id, s.organization_id, s.company_id, '{"rate_limits":{"ai.assistant":2}}'::jsonb
+         from public.stores s where s.slug = $1
+       on conflict (store_id) do update set config = excluded.config`,
+      [TENANT_A.storeSlug],
+    )
+    const pedir = async () =>
+      (
+        await svc<{ r: Record<string, unknown> }>(
+          `select public.ai_consume_for_store($1, 'assistant', 1) as r`,
+          [TENANT_A.storeSlug],
+        )
+      )[0]?.r as Record<string, unknown>
+
+    // La ventana es acumulativa: las pruebas anteriores de la vitrina ya
+    // anotaron intentos en esta tienda.
+    await svc(`delete from public.public_rate_events`)
+    try {
+      expect((await pedir()).allowed).toBe(true)
+      expect((await pedir()).allowed).toBe(true)
+      const frenada = await pedir()
+      expect(frenada.allowed).toBe(false)
+      expect(frenada.reason).toBe('RATE_LIMITED')
+      expect((await estado(TENANT_A)).used).toBe(2)
+    } finally {
+      await svc(`delete from public.public_rate_events`)
+      await svc(`update public.store_settings set config = config - 'rate_limits'`)
+    }
+  })
+
   it('la vitrina no cuela la cuota de OTRA sociedad', async () => {
     // El slug decide la sociedad. Pedir con el slug de A nunca puede descontar
     // de B, por mucho que quien llame sea `service_role`.
@@ -295,6 +348,7 @@ describe('la traza', () => {
   it('redacta lo que la persona escribió', async () => {
     // Un prompt de compra lleva dentro texto libre, y ahí puede ir un correo.
     await contratarIA(TENANT_A)
+    await consumir(TENANT_A)
     await comoAdmin(TENANT_A, () =>
       svc(
         `select ebim.ai_record('assistant', 'ai', 'm', 'escríbeme a juan.perez@correo.com', 'ok')`,
@@ -305,11 +359,13 @@ describe('la traza', () => {
       `select prompt_excerpt from public.ai_interactions`,
     )
 
+    expect(filas).toHaveLength(1)
     expect(filas[0]?.prompt_excerpt).not.toContain('juan.perez@correo.com')
   })
 
   it('la lee quien administra el espacio, y solo de su sociedad', async () => {
     await contratarIA(TENANT_A)
+    await consumir(TENANT_A)
     await comoAdmin(TENANT_A, () => svc(`select ebim.ai_record('assistant', 'ai', 'm', 'a', 'b')`))
 
     const propias = await comoAdmin(TENANT_A, () =>
@@ -323,6 +379,7 @@ describe('la traza', () => {
 
   it('el pulgar solo admite arriba o abajo', async () => {
     await contratarIA(TENANT_A)
+    await consumir(TENANT_A)
     const creada = await comoAdmin(TENANT_A, async () => {
       const rows = await svc<{ id: string }>(
         `select ebim.ai_record('assistant', 'ai', 'm', 'a', 'b') as id`,
@@ -349,6 +406,7 @@ describe('la traza', () => {
 
   it('nadie opina sobre la traza de otra sociedad', async () => {
     await contratarIA(TENANT_A)
+    await consumir(TENANT_A)
     const creada = await comoAdmin(TENANT_A, async () => {
       const rows = await svc<{ id: string }>(
         `select ebim.ai_record('assistant', 'ai', 'm', 'a', 'b') as id`,
@@ -380,15 +438,66 @@ describe('la puerta que PostgREST ve', () => {
     )
 
     expect(filas.map((f) => f.proname)).toEqual([
+      // Fase 07: candidatos de surtido (reposición, venta cruzada,
+      // complemento) calculados en SQL. INVOKER, roles de `quotes`, cartera.
+      'ai_assortment_facts',
+      // Fase 08: cobranza (cartera o cliente). INVOKER, roles de `credit` +
+      // `credit.management`; solo lectura.
+      'ai_collections_facts',
       'ai_consume',
       'ai_consume_for_store',
+      // Fase 11: herramientas del Copilot. `ai_copilot_tools` describe qué
+      // herramientas tiene quien llama (rol + módulo); productos, ficha y
+      // ventas son datasets INVOKER + STABLE con su propio guard.
+      'ai_copilot_product',
+      'ai_copilot_products',
+      'ai_copilot_sales_facts',
+      'ai_copilot_tools',
+      // Fase 06: el resumen 360 del cliente y el dataset de la visita.
+      // INVOKER, roles de su funcionalidad + cartera del vendedor + crédito
+      // solo con permiso; solo lectura.
+      'ai_customer_facts',
+      // Fase 02: el dataset reducido del analista del dashboard. SECURITY
+      // INVOKER (RLS de quien llama) y solo owner/admin; no toca cuota.
+      'ai_dashboard_facts',
       'ai_entitlement',
       'ai_feedback',
+      // Fase 08: entregas (tienda o una entrega) sin dirección, contacto ni guía.
+      'ai_fulfillment_facts',
+      // Fase 10: integraciones (proveedores, errores agrupables, disyuntores,
+      // webhooks, API) o un mensaje; sin payloads, URL ni secretos. INVOKER.
+      'ai_integrations_facts',
+      // Fase 05: los datasets de inventario y planificación (señales de
+      // existencia, previsión frente a venta y el sugerido v2 sin recalcular).
+      // INVOKER, roles de su funcionalidad + módulo; solo lectura.
+      'ai_inventory_facts',
+      // Fase 10: salud + incidentes agrupados o un incidente con su hilo.
+      // INVOKER, roles de `operations`; sin notas de resolución ni hilos.
+      'ai_ops_facts',
+      // Fase 04: los datasets de la IA de pedidos (detalle, lote de atención
+      // y búsqueda con filtros tipados). INVOKER, roles de `orders`, solo
+      // lectura; no tocan cuota.
+      'ai_order_facts',
+      'ai_orders_attention',
+      'ai_orders_search',
+      // Fase 08: pagos (tienda o un cobro); códigos de error, nunca el detalle.
+      'ai_payments_facts',
+      'ai_planning_facts',
+      // Fase 09: reglas de UNA promoción (tal cual) y candidatos por regla.
+      // INVOKER, roles de `promotions` + módulo; sin precios, stock ni cupones.
+      'ai_promotion_facts',
+      // Fase 07: texto interpretado → candidatos reales de cliente y producto.
+      'ai_quote_resolve',
       'ai_record',
       'ai_record_for_store',
+      // Fase 09: reseñas agregadas + muestra con marcas por regla, sin autor.
+      // INVOKER, roles de `reviews` + módulo `catalog`; solo lectura.
+      'ai_reviews_facts',
+      'ai_suggestion_facts',
       // El desglose por modulo: con UN presupuesto compartido, es lo que
       // responde en que se esta yendo.
       'ai_usage_by_feature',
+      'ai_visit_facts',
     ])
   })
 
@@ -527,20 +636,28 @@ describe('cada uso de IA se contrata por separado', () => {
 
     const saldo = await estado(TENANT_A)
     expect(saldo.enabled).toBe(true)
-    expect(saldo.features).toEqual({
+    // Fase 01: el mapa lista TODAS las funcionalidades declaradas; solo la
+    // contratada (con su módulo, `catalog`, baseline) está abierta.
+    const features = saldo.features as Record<string, boolean>
+    expect(features).toMatchObject({
       assistant: false,
       'catalog.copy': true,
       insights: false,
     })
+    expect(Object.entries(features).filter(([, on]) => on).map(([f]) => f)).toEqual([
+      'catalog.copy',
+    ])
   })
 
   it('sin ninguna contratada no se anuncia un saldo que no se puede gastar', async () => {
     const saldo = await estado(TENANT_B)
     expect(saldo.enabled).toBe(false)
-    expect(saldo.features).toEqual({
+    const features = saldo.features as Record<string, boolean>
+    expect(features).toMatchObject({
       assistant: false,
       'catalog.copy': false,
       insights: false,
     })
+    expect(Object.values(features).every((on) => on === false)).toBe(true)
   })
 })

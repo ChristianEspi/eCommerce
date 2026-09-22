@@ -1,3 +1,4 @@
+import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded'
 import PaymentsRoundedIcon from '@mui/icons-material/PaymentsRounded'
 import {
   Box,
@@ -12,6 +13,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useMemo, useState } from 'react'
+import { useAiFeature } from '@/features/ai/hooks'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { formatMoney } from '@/shared/lib/format'
@@ -24,6 +26,7 @@ import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { usePagedRows } from '@/shared/ui/usePagedRows'
 import { EmptyState, ErrorState } from '@/shared/ui/states'
 import { ReceiptDrawer } from './ReceiptDrawer'
+import { CreditCustomerAiDrawer } from './ai/CreditAiSection'
 import { useArDocuments } from './hooks'
 import { agingBucket, daysOverdue, type ArDocument } from './types'
 
@@ -51,6 +54,11 @@ export function CollectionsSection() {
   const [search, setSearch] = useState('')
   const [onlyOpen, setOnlyOpen] = useState(true)
   const [cobrando, setCobrando] = useState<string | null>(null)
+  // Fase 08: «Asistente de cobranza» por cliente, solo para los roles de la
+  // funcionalidad `credit`. Solo lee y prepara borradores.
+  const { availability } = useAiFeature('credit')
+  const conIA = availability !== 'forbidden' && availability !== 'loading'
+  const [asistiendo, setAsistiendo] = useState<{ id: string; name: string | null } | null>(null)
 
   const query = useArDocuments(onlyOpen)
 
@@ -173,6 +181,16 @@ export function CollectionsSection() {
                           disabled: !canWrite || Number(doc.balance) <= 0,
                           onClick: () => setCobrando(doc.customer_id),
                         },
+                        ...(conIA
+                          ? [
+                              {
+                                id: 'ai',
+                                icon: <AutoAwesomeRoundedIcon fontSize="small" />,
+                                label: `${t('aiCredit.rowAction')}: ${doc.customer_name ?? doc.document_number}`,
+                                onClick: () => setAsistiendo({ id: doc.customer_id, name: doc.customer_name }),
+                              },
+                            ]
+                          : []),
                       ]}
                     />
                   </TableCell>
@@ -202,6 +220,13 @@ export function CollectionsSection() {
             : null
         }
         onClose={() => setCobrando(null)}
+      />
+
+      <CreditCustomerAiDrawer
+        key={asistiendo?.id ?? 'none'}
+        customerId={asistiendo?.id ?? null}
+        customerName={asistiendo?.name ?? null}
+        onClose={() => setAsistiendo(null)}
       />
     </Stack>
   )

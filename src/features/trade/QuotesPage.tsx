@@ -1,4 +1,5 @@
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded'
+import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded'
 import RequestQuoteRoundedIcon from '@mui/icons-material/RequestQuoteRounded'
 import StorefrontRoundedIcon from '@mui/icons-material/StorefrontRounded'
 import {
@@ -13,7 +14,8 @@ import {
   TableRow,
   Typography,
 } from '@mui/material'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useAiFeature } from '@/features/ai/hooks'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
@@ -28,6 +30,7 @@ import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { usePagedRows } from '@/shared/ui/usePagedRows'
 import { EmptyState, ErrorState } from '@/shared/ui/states'
 import { QuoteDrawer } from './QuoteDrawer'
+import { QuoteAiDraftDrawer } from './ai/QuoteAiDraftDrawer'
 import { useQuotes } from './hooks'
 import { isExpired, type Quote, type QuoteStatus } from './types'
 
@@ -55,8 +58,24 @@ export function QuotesPage() {
   const [estado, setEstado] = useState<QuoteStatus | 'all'>('all')
   const [abierta, setAbierta] = useState<Quote | null>(null)
   const [creando, setCreando] = useState(false)
+  // Fase 07: borrador con IA. Lo ven los roles de la funcionalidad `quotes`
+  // (el vendedor incluido, para SU cartera); quien guarda y precia es la base.
+  const { availability: aiQuotes } = useAiFeature('quotes')
+  const puedeIA = aiQuotes !== 'forbidden' && aiQuotes !== 'loading'
+  const [borradorIA, setBorradorIA] = useState(false)
+  const [recienCreada, setRecienCreada] = useState<string | null>(null)
 
   const query = useQuotes()
+
+  // La cotización creada desde el borrador se abre en cuanto llega al listado.
+  useEffect(() => {
+    if (!recienCreada) return
+    const creada = (query.data ?? []).find((q) => q.id === recienCreada)
+    if (!creada) return
+    setRecienCreada(null)
+    setCreando(false)
+    setAbierta(creada)
+  }, [recienCreada, query.data])
 
   const cotizaciones = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -96,16 +115,28 @@ export function QuotesPage() {
       title={t('trade.quotes.title')}
       subtitle={activeStore?.name ?? t('trade.quotes.subtitle')}
       actions={
-        <Button
-          variant="contained"
-          disabled={!canWrite || !scope}
-          onClick={() => {
-            setAbierta(null)
-            setCreando(true)
-          }}
-        >
-          {t('trade.quotes.new')}
-        </Button>
+        <Stack direction="row" spacing={1}>
+          {puedeIA && (
+            <Button
+              variant="outlined"
+              startIcon={<AutoAwesomeRoundedIcon />}
+              disabled={!scope}
+              onClick={() => setBorradorIA(true)}
+            >
+              {t('aiQuotes.open')}
+            </Button>
+          )}
+          <Button
+            variant="contained"
+            disabled={!canWrite || !scope}
+            onClick={() => {
+              setAbierta(null)
+              setCreando(true)
+            }}
+          >
+            {t('trade.quotes.new')}
+          </Button>
+        </Stack>
       }
     />
   )
@@ -270,6 +301,16 @@ export function QuotesPage() {
           setAbierta(null)
         }}
       />
+
+      {/* Montado solo mientras está abierto: cerrar descarta el borrador. */}
+      {puedeIA && borradorIA && (
+        <QuoteAiDraftDrawer
+          open
+          storeId={scope.storeId}
+          onClose={() => setBorradorIA(false)}
+          onCreated={(id) => setRecienCreada(id)}
+        />
+      )}
     </>
   )
 }

@@ -48,3 +48,6 @@ EBIM_AI_SEQUENCE/
 _EBIM_PROMPTS/
 docs/PROMPT_CLAUDE_OPUS_5_CIERRE_ECOMMERCE.md
 catalog-ingest.html
+
+# Logs de la fase de QA de la secuencia de IA: no son producto.
+.qa12/

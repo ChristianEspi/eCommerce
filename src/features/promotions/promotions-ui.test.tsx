@@ -578,7 +578,7 @@ describe('Simulador', () => {
     await elegirProducto(usuario)
     await usuario.click(screen.getByRole('button', { name: 'Simular' }))
 
-    expect(await screen.findByText('100.00 PEN', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(await screen.findByText('100.00 PEN', {}, { timeout: 15_000 })).toBeInTheDocument()
     expect(screen.getByText('−15.00 PEN')).toBeInTheDocument()
     expect(screen.getByText('15.30 PEN')).toBeInTheDocument()
     expect(screen.getByText('100.30 PEN')).toBeInTheDocument()

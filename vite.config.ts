@@ -231,6 +231,9 @@ export default defineConfig(({ mode }) => {
       // ver `src/test/jsdom-environment.ts`.
       environment: './src/test/jsdom-environment.ts',
       setupFiles: ['./src/test/setup.ts'],
+      // Migra la base PGlite una sola vez y la comparten los ~100 bancos de BD
+      // (ver `supabase/tests/harness.ts`, `snapshotPath`).
+      globalSetup: ['./supabase/tests/global-setup.ts'],
       // Los worktrees de trabajo en paralelo viven bajo `.claude/worktrees` y
       // son copias COMPLETAS del repositorio, con sus propios tests. Sin esto la
       // suite los recoge: corre cada archivo una vez por worktree y mezcla en el

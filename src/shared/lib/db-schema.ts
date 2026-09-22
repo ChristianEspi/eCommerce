@@ -108,6 +108,13 @@ export const AI_ENTITLEMENT_RPC = 'ai_entitlement'
 export const AI_CONSUME_RPC = 'ai_consume'
 /** Deja la traza y suma los tokens, ya conocidos tras responder. */
 export const AI_RECORD_RPC = 'ai_record'
+// --- Cotizaciones con IA (migración 20260921170000, fase 07) --------------
+// Sin `satisfies`: la migración aún no está en el proyecto enlazado. Red de
+// seguridad: `supabase/tests/ai-quotes-facts.test.ts`.
+/** Borrador preciado por el motor (`price_quote`) con disponibilidad y surtido. Solo lee. */
+export const QUOTE_DRAFT_PREVIEW_RPC = 'quote_draft_preview'
+/** Guarda el borrador en `draft` tras la confirmación humana; re-precia en el servidor. */
+export const QUOTE_CREATE_FROM_DRAFT_RPC = 'quote_create_from_draft'
 /** El pulgar. Única columna de la traza que puede cambiar una persona. */
 export const AI_FEEDBACK_RPC = 'ai_feedback'
 
@@ -700,6 +707,94 @@ export const CHECKOUT_FUNCTION = 'checkout'
 export const SHOPPING_ASSISTANT_FUNCTION = 'shopping-assistant'
 /** Redacta el borrador de la ficha de un producto (addon `ai.catalog.copy`). */
 export const CATALOG_COPY_FUNCTION = 'catalog-copy'
+/** Analista IA del dashboard (addon `ai.insights`, fase 02). Solo lee; nunca ejecuta. */
+export const DASHBOARD_INSIGHTS_FUNCTION = 'dashboard-insights'
+/**
+ * Asistente IA de pedidos (funcionalidad `orders`, fase 04): resume, explica y
+ * busca con filtros tipados. Solo lee; nunca cambia un estado.
+ */
+export const ORDERS_ASSISTANT_FUNCTION = 'orders-assistant'
+/**
+ * IA de inventario (funcionalidad `inventory`, fase 05): explica riesgo de
+ * quiebre, exceso, inmovilizados, rotación y movimientos atípicos que calcula
+ * el sistema. Solo lee; nunca ajusta existencias ni propone cantidades.
+ */
+export const INVENTORY_ASSISTANT_FUNCTION = 'inventory-assistant'
+/**
+ * IA de planificación (funcionalidad `planning`, fase 05): explica la previsión
+ * existente frente a la venta y el sugerido de `suggest_order_v2`. No calcula
+ * previsiones ni cantidades.
+ */
+export const PLANNING_ASSISTANT_FUNCTION = 'planning-assistant'
+/**
+ * IA de clientes (funcionalidad `customers`, fase 06): resumen 360 con los
+ * datos que el rol puede ver (crédito solo con permiso). Solo lee.
+ */
+export const CUSTOMERS_ASSISTANT_FUNCTION = 'customers-assistant'
+/**
+ * IA de fuerza de ventas (funcionalidad `sales`, fase 06): preparar visita y
+ * BORRADOR de seguimiento. Nunca envía nada.
+ */
+export const SALES_ASSISTANT_FUNCTION = 'sales-assistant'
+/**
+ * IA de cotizaciones y surtidos (funcionalidad `quotes`, fase 07): interpreta la
+ * instrucción de un borrador y explica sugerencias de surtido del sistema. No
+ * precia ni guarda: eso son `quote_draft_preview` / `quote_create_from_draft`.
+ */
+export const QUOTES_ASSISTANT_FUNCTION = 'quotes-assistant'
+/**
+ * IA de crédito y cobranza (funcionalidad `credit`, fase 08): explica la deuda
+ * con cifras del sistema y redacta BORRADORES de recordatorio. No cambia
+ * límites ni bloquea; no envía nada.
+ */
+export const CREDIT_ASSISTANT_FUNCTION = 'credit-assistant'
+/**
+ * IA de pagos (funcionalidad `payments`, fase 08): explica conciliación, fallos
+ * y códigos técnicos. No marca como pagado ni altera transacciones.
+ */
+export const PAYMENTS_ASSISTANT_FUNCTION = 'payments-assistant'
+/**
+ * IA de entregas (funcionalidad `fulfillment`, fase 08): explica atrasos,
+ * parciales e incidencias y redacta BORRADORES para el cliente. No despacha ni
+ * cancela.
+ */
+export const FULFILLMENT_ASSISTANT_FUNCTION = 'fulfillment-assistant'
+/**
+ * IA de promociones (funcionalidad `promotions`, fase 09): BORRADORES de
+ * nombre, copy y términos resumidos citando las reglas del motor, y
+ * candidatos por regla. No propone descuentos ni guarda.
+ */
+export const PROMOTIONS_ASSISTANT_FUNCTION = 'promotions-assistant'
+/**
+ * IA del CMS (funcionalidad `content`, fase 09): BORRADORES de banner,
+ * landing, SEO y traducción para el formulario. Nunca publica.
+ */
+export const CONTENT_ASSISTANT_FUNCTION = 'content-assistant'
+/**
+ * IA de reseñas (funcionalidad `reviews`, fase 09): resumen agregado, temas,
+ * reseñas a revisar y BORRADOR de respuesta. No publica, oculta, borra ni
+ * responde.
+ */
+export const REVIEWS_ASSISTANT_FUNCTION = 'reviews-assistant'
+/**
+ * Asistente técnico de operaciones (funcionalidad `operations`, fase 10):
+ * resume y agrupa incidencias, interpreta un incidente con su hilo y sugiere
+ * verificaciones. Datos saneados; no resuelve ni ejecuta nada.
+ */
+export const OPERATIONS_ASSISTANT_FUNCTION = 'operations-assistant'
+/**
+ * Asistente técnico de integraciones (funcionalidad `integrations`, fase 10):
+ * interpreta errores de API/webhook/ERP, agrupa errores parecidos y detecta
+ * patrones. Datos saneados; no reintenta, no reproduce ni modifica nada.
+ */
+export const INTEGRATIONS_ASSISTANT_FUNCTION = 'integrations-assistant'
+/**
+ * EBIM Copilot global (funcionalidad `copilot`, fase 11): capa de
+ * herramientas de SOLO LECTURA (dashboard, ventas, pedidos, productos,
+ * inventario, clientes) con el JWT de quien pregunta; cada herramienta exige
+ * los roles y el módulo de su funcionalidad. No escribe nada.
+ */
+export const COPILOT_FUNCTION = 'copilot'
 export const UPDATE_ORDER_STATUS_FUNCTION = 'update-order-status'
 export const PLATFORM_CONTEXT_FUNCTION = 'platform-context'
 // P12: la puerta por la que un operador logístico dice dónde va el paquete. No

@@ -31,6 +31,8 @@
  * lo que aquí puede hacer daño.
  */
 
+import { delimitarDatos } from './aiCore.ts'
+
 /** Lo que se le cuenta al modelo del producto. Nada de precio ni de stock. */
 export interface ProductoParaFicha {
   readonly name: string
@@ -77,12 +79,18 @@ export const SISTEMA_FICHA = [
  * hora y no describe nada.
  */
 export function datosDeProducto(producto: ProductoParaFicha): string {
-  return [
-    `Nombre: ${producto.name}`,
-    `Marca: ${producto.brandName ?? '(sin marca)'}`,
-    `Categoria: ${producto.categoryName ?? '(sin categoria)'}`,
-    `SKU: ${producto.sku}`,
-  ].join('\n')
+  // Va DELIMITADO como dato no confiable (fase 01): el nombre de un producto lo
+  // escribe una persona o lo trae una integración y puede llevar dentro una
+  // «instrucción». El sistema lo declara dato (`sistemaConFrontera`).
+  return delimitarDatos(
+    'producto',
+    [
+      `Nombre: ${producto.name}`,
+      `Marca: ${producto.brandName ?? '(sin marca)'}`,
+      `Categoria: ${producto.categoryName ?? '(sin categoria)'}`,
+      `SKU: ${producto.sku}`,
+    ].join('\n'),
+  )
 }
 
 /**

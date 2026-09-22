@@ -79,8 +79,17 @@ const PATTERNS = [
     id: 'service-role-assignment',
     // `SUPABASE_SERVICE_ROLE_KEY=<algo>` con valor real, no el comentario del
     // `.env.example`.
-    re: /(SERVICE_ROLE_KEY|SERVICE_KEY|CLIENT_SECRET|PROVISIONING_KEY|WORKER_KEY)\s*[:=]\s*['"]?[A-Za-z0-9_\-./+]{16,}/g,
+    re: /(SERVICE_ROLE_KEY|SERVICE_KEY|CLIENT_SECRET|PROVISIONING_KEY|WORKER_KEY|AI_API_KEY)\s*[:=]\s*['"]?[A-Za-z0-9_\-./+]{16,}/g,
     why: 'asignación de una clave de servidor con valor',
+  },
+  {
+    id: 'anthropic-api-key',
+    // Clave del proveedor de IA (fase 12). Vive SOLO en los secretos de las
+    // Edge Functions (`EBIM_AI_API_KEY`). Las reales llevan ~95 caracteres de
+    // cuerpo; el umbral de 40 deja pasar los literales cortos que los tests de
+    // redacción usan para comprobar que `redact.ts` la tapa.
+    re: /sk-ant-[A-Za-z0-9_-]{40,}/g,
+    why: 'clave de API del proveedor de IA',
   },
   {
     id: 'private-key-block',
@@ -179,6 +188,20 @@ function trackedFiles() {
   return out.split('\0').filter(Boolean)
 }
 
+/**
+ * Archivos NUEVOS que todavía no están versionados pero tampoco ignorados
+ * (fase 12). Son los que entrarán en el próximo commit: esperar a que estén
+ * versionados para mirarlos es enterarse tarde. Lo ignorado (`.env`) sigue
+ * fuera, que es su sitio.
+ */
+function untrackedFiles() {
+  const out = execFileSync('git', ['ls-files', '-z', '--others', '--exclude-standard'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+  })
+  return out.split('\0').filter(Boolean)
+}
+
 function walk(dir, acc = []) {
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry)
@@ -233,6 +256,10 @@ export function runSecretScan({ quiet = false } = {}) {
   // 1 · Archivos versionados
   findings.push(...scan(trackedFiles(), PATTERNS, 'versionado'))
 
+  // 1b · Archivos nuevos aún sin versionar (no ignorados)
+  const nuevos = untrackedFiles()
+  findings.push(...scan(nuevos, PATTERNS, 'sin versionar'))
+
   // 2 · El bundle
   const dist = join(ROOT, 'dist')
   if (existsSync(dist)) {
@@ -262,6 +289,7 @@ export function runSecretScan({ quiet = false } = {}) {
   }
 
   say(`· versionado: ${tracked.size} archivos revisados`)
+  say(`· sin versionar (no ignorados): ${nuevos.length} archivos revisados`)
   say(`· excepciones nominales: ${[...ALLOWED.keys()].join(', ')}`)
 
   if (findings.length === 0) {

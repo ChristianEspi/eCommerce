@@ -2,6 +2,7 @@ import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded'
 import StorefrontRoundedIcon from '@mui/icons-material/StorefrontRounded'
 import { Card } from '@mui/material'
 import { useMemo } from 'react'
+import { useAiFeature } from '@/features/ai/hooks'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { PageHeader } from '@/shared/ui/PageHeader'
@@ -9,6 +10,7 @@ import { SectionTabs } from '@/shared/ui/SectionTabs'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { EmptyState } from '@/shared/ui/states'
 import { ForecastsSection } from './ForecastsSection'
+import { PlanningAiSection } from './ai/PlanningAiSection'
 import { SuggestionsSection } from './SuggestionsSection'
 
 /**
@@ -25,13 +27,17 @@ import { SuggestionsSection } from './SuggestionsSection'
 export function PlanningPage() {
   const { t } = useI18n()
   const { activeStore, activeCompanyId, tenant, status } = useTenant()
+  // Fase 05: la pestaña de IA solo para los roles de la funcionalidad `planning`.
+  const { availability } = useAiFeature('planning')
+  const conIA = availability !== 'forbidden' && availability !== 'loading'
 
   const items = useMemo(
     () => [
       { id: 'sugerido', label: t('planning.tab.suggestions'), content: <SuggestionsSection /> },
       { id: 'prevision', label: t('planning.tab.forecasts'), content: <ForecastsSection /> },
+      ...(conIA ? [{ id: 'analisis-ia', label: t('aiPlanning.tab'), content: <PlanningAiSection key={activeStore?.id ?? 'sin-tienda'} /> }] : []),
     ],
-    [t],
+    [t, conIA, activeStore?.id],
   )
 
   if (status === 'loading') {

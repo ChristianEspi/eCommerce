@@ -189,7 +189,10 @@ describe('Clientes — la pantalla', () => {
 
     const dialog = await screen.findByRole('dialog', { name: 'Acme' })
     // Con el cajón abierto, las pestañas de la pantalla quedan fuera del árbol
-    // de accesibilidad (el panel es modal), así que estas cinco son las suyas.
+    // de accesibilidad (el panel es modal), así que estas son las suyas. La
+    // sexta, «Resumen IA» (fase 06), existe porque el rol tiene la
+    // funcionalidad `customers`; sin contrato enseña el aviso, no gasta.
+    await screen.findByRole('tab', { name: 'Resumen IA' })
     const tabs = await screen.findAllByRole('tab')
     expect(tabs.map((tab) => tab.textContent)).toEqual([
       'General',
@@ -197,6 +200,7 @@ describe('Clientes — la pantalla', () => {
       'Direcciones',
       'Identificadores',
       'Pedidos',
+      'Resumen IA',
     ])
     expect(dialog).toBeInTheDocument()
   })

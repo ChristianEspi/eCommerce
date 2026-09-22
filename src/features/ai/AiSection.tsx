@@ -8,6 +8,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
   TableRow,
   Typography,
@@ -81,78 +82,82 @@ export function AiSection() {
 }
 
 function TablaTraza({ filas }: { filas: readonly AiInteraction[] }) {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const opinar = useAiFeedback()
 
+  // Fase 12: desplazamiento horizontal en móvil (seis columnas no caben) y la
+  // fecha en el idioma de la app, no en el del navegador.
   return (
-    <Table size="small">
-      <TableHead>
-        <TableRow>
-          <TableCell>{t('ai.trace.when')}</TableCell>
-          <TableCell>{t('ai.trace.feature')}</TableCell>
-          <TableCell>{t('ai.trace.question')}</TableCell>
-          <TableCell>{t('ai.trace.status')}</TableCell>
-          <TableCell align="right">{t('ai.trace.tokens')}</TableCell>
-          <TableCell align="right">{t('common.actions')}</TableCell>
-        </TableRow>
-      </TableHead>
-      <TableBody>
-        {filas.map((fila) => (
-          <TableRow key={fila.id} hover>
-            <TableCell sx={{ whiteSpace: 'nowrap', fontSize: 12, color: 'var(--muted)' }}>
-              {new Date(fila.created_at).toLocaleString()}
-            </TableCell>
-            <TableCell sx={{ fontWeight: 700 }}>{fila.feature}</TableCell>
-            <TableCell sx={{ maxWidth: 320 }}>
-              <Typography noWrap sx={{ fontSize: 13 }}>
-                {fila.prompt_excerpt ?? '—'}
-              </Typography>
-              {fila.reply_excerpt && (
-                <Typography noWrap sx={{ fontSize: 11.5, color: 'var(--muted)' }}>
-                  {fila.reply_excerpt}
-                </Typography>
-              )}
-            </TableCell>
-            <TableCell>
-              <StatusChip label={t(etiquetaEstado(fila.status))} tone={tonoEstado(fila.status)} />
-            </TableCell>
-            <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', fontSize: 12 }}>
-              {/* Entrada y salida por separado: la salida cuesta cinco veces
-                  más, y sumarlas esconde cuál de las dos se disparó. */}
-              {fila.input_tokens} / {fila.output_tokens}
-              {fila.cache_read_tokens > 0 && (
-                <Typography component="span" sx={{ fontSize: 11, color: 'var(--accent-deep)' }}>
-                  {' '}
-                  ·{fila.cache_read_tokens}
-                </Typography>
-              )}
-            </TableCell>
-            <TableCell align="right">
-              <RowActions
-                actions={[
-                  {
-                    id: 'up',
-                    icon: <ThumbUpRoundedIcon fontSize="small" />,
-                    label: `${t('ai.trace.useful')}: ${fila.feature}`,
-                    tone: fila.feedback === 1 ? 'accent' : 'neutral',
-                    disabled: opinar.isPending,
-                    onClick: () => opinar.mutate({ id: fila.id, value: 1 }),
-                  },
-                  {
-                    id: 'down',
-                    icon: <ThumbDownRoundedIcon fontSize="small" />,
-                    label: `${t('ai.trace.useless')}: ${fila.feature}`,
-                    tone: fila.feedback === -1 ? 'danger' : 'neutral',
-                    disabled: opinar.isPending,
-                    onClick: () => opinar.mutate({ id: fila.id, value: -1 }),
-                  },
-                ]}
-              />
-            </TableCell>
+    <TableContainer sx={{ overflowX: 'auto' }}>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell>{t('ai.trace.when')}</TableCell>
+            <TableCell>{t('ai.trace.feature')}</TableCell>
+            <TableCell>{t('ai.trace.question')}</TableCell>
+            <TableCell>{t('ai.trace.status')}</TableCell>
+            <TableCell align="right">{t('ai.trace.tokens')}</TableCell>
+            <TableCell align="right">{t('common.actions')}</TableCell>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHead>
+        <TableBody>
+          {filas.map((fila) => (
+            <TableRow key={fila.id} hover>
+              <TableCell sx={{ whiteSpace: 'nowrap', fontSize: 12, color: 'var(--muted)' }}>
+                {new Date(fila.created_at).toLocaleString(locale === 'en' ? 'en-US' : 'es-PE')}
+              </TableCell>
+              <TableCell sx={{ fontWeight: 700 }}>{fila.feature}</TableCell>
+              <TableCell sx={{ maxWidth: 320 }}>
+                <Typography noWrap sx={{ fontSize: 13 }}>
+                  {fila.prompt_excerpt ?? '—'}
+                </Typography>
+                {fila.reply_excerpt && (
+                  <Typography noWrap sx={{ fontSize: 11.5, color: 'var(--muted)' }}>
+                    {fila.reply_excerpt}
+                  </Typography>
+                )}
+              </TableCell>
+              <TableCell>
+                <StatusChip label={t(etiquetaEstado(fila.status))} tone={tonoEstado(fila.status)} />
+              </TableCell>
+              <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', fontSize: 12 }}>
+                {/* Entrada y salida por separado: la salida cuesta cinco veces
+                    más, y sumarlas esconde cuál de las dos se disparó. */}
+                {fila.input_tokens} / {fila.output_tokens}
+                {fila.cache_read_tokens > 0 && (
+                  <Typography component="span" sx={{ fontSize: 11, color: 'var(--accent-deep)' }}>
+                    {' '}
+                    ·{fila.cache_read_tokens}
+                  </Typography>
+                )}
+              </TableCell>
+              <TableCell align="right">
+                <RowActions
+                  actions={[
+                    {
+                      id: 'up',
+                      icon: <ThumbUpRoundedIcon fontSize="small" />,
+                      label: `${t('ai.trace.useful')}: ${fila.feature}`,
+                      tone: fila.feedback === 1 ? 'accent' : 'neutral',
+                      disabled: opinar.isPending,
+                      onClick: () => opinar.mutate({ id: fila.id, value: 1 }),
+                    },
+                    {
+                      id: 'down',
+                      icon: <ThumbDownRoundedIcon fontSize="small" />,
+                      label: `${t('ai.trace.useless')}: ${fila.feature}`,
+                      tone: fila.feedback === -1 ? 'danger' : 'neutral',
+                      disabled: opinar.isPending,
+                      onClick: () => opinar.mutate({ id: fila.id, value: -1 }),
+                    },
+                  ]}
+                />
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
   )
 }
 

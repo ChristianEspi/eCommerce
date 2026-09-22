@@ -24,6 +24,7 @@ import { PageHeader } from '@/shared/ui/PageHeader'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
 import { T } from '@/theme/tokens'
 import { BarList, type BarRow } from './BarList'
+import { AiAnalystPanel } from './dashboard/AiAnalystPanel'
 import { InsightBanner, type Insight } from './dashboard/InsightBanner'
 import { RecentOrders } from './dashboard/RecentOrders'
 import { SectionHeader } from './dashboard/SectionHeader'
@@ -297,6 +298,11 @@ export function DashboardPage() {
       <PageHeader icon={<SpaceDashboardRoundedIcon />} title={t('admin.dashboard.title')} subtitle={subtitle} />
       <Stack spacing={2.5}>
         <InsightBanner insights={insights} />
+
+        {/* Analista IA (fase 02): COMPLEMENTA los avisos y KPIs deterministas,
+            no los sustituye. Se oculta solo para roles sin la funcionalidad
+            `insights`; en una tienda recien creada no hay nada que analizar. */}
+        {!isFresh && <AiAnalystPanel storeId={storeId} />}
 
         <SectionHeader icon={<QueryStatsRoundedIcon fontSize="small" />} title={t('admin.dashboard.section.sales')} />
         {/* Cuatro columnas iguales: la cifra protagonista manda por el borde y

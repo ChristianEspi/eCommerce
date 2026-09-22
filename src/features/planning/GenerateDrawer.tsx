@@ -10,6 +10,7 @@ import type { PlanningScope } from './api'
 import { PlanningError } from './errors'
 import { useProductLabels, usePreviewSuggestion, useSaveSuggestion } from './hooks'
 import { SuggestedLinesTable } from './SuggestedLinesTable'
+import { SuggestionAiExplain } from './ai/SuggestionAiExplain'
 import {
   SUGGEST_MODEL_V1,
   SUGGEST_WINDOWS,
@@ -229,6 +230,14 @@ export function GenerateDrawer({
             <Box sx={{ overflowX: 'auto' }}>
               <SuggestedLinesTable lines={lineas} labels={etiquetas} />
             </Box>
+
+            {/* Fase 05: la IA explica el cálculo del motor; no lo cambia ni
+                guarda nada. Solo aparece con líneas a la vista. */}
+            {scope && elegido && (
+              <Box sx={{ mt: 2 }}>
+                <SuggestionAiExplain storeId={scope.storeId} customerId={elegido.id} days={Number(days)} />
+              </Box>
+            )}
           </Box>
         )}
       </Stack>

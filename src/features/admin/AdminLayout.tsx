@@ -32,6 +32,8 @@ import { useTenant } from '@/features/tenant/tenant-context'
 import { R, T } from '@/theme/tokens'
 import { GlobalSearch } from '@/features/search/GlobalSearch'
 import { NotificationBell } from '@/features/notifications/NotificationBell'
+import { CopilotButton, CopilotDrawer } from '@/features/ai/copilot/CopilotDrawer'
+import { CopilotProvider } from '@/features/ai/copilot/CopilotProvider'
 import { AppIcon } from '@/shared/ui/AppIcon'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { AppBreadcrumbs } from '@/shared/ui/AppBreadcrumbs'
@@ -412,6 +414,7 @@ function AdminChrome() {
             <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
               <StoreSwitcher />
             </Box>
+            <CopilotButton />
             <NotificationBell />
             <IconButton
               onClick={toggleMode}
@@ -450,7 +453,23 @@ function AdminChrome() {
           </ErrorBoundary>
         </Box>
       </Box>
+      <CopilotDrawer />
     </Box>
+  )
+}
+
+/**
+ * El Copilot envuelve el chrome entero: los cajones de detalle (dentro del
+ * `Outlet`) declaran su entidad y el panel vive fuera del contenido. La `key`
+ * de sociedad reinicia la conversación al cambiar de sociedad: lo que se
+ * habló con los datos de una no puede seguir de contexto en otra.
+ */
+function AdminChromeWithCopilot() {
+  const { activeCompanyId } = useTenant()
+  return (
+    <CopilotProvider key={activeCompanyId ?? 'sin-sociedad'}>
+      <AdminChrome />
+    </CopilotProvider>
   )
 }
 
@@ -465,7 +484,7 @@ function AdminChrome() {
 export function AdminLayout() {
   return (
     <RequireTenant>
-      <AdminChrome />
+      <AdminChromeWithCopilot />
     </RequireTenant>
   )
 }

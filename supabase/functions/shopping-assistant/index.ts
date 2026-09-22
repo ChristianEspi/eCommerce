@@ -54,12 +54,19 @@ import {
   filtrarPermitidos,
   listarCandidatos,
   recortarRespuesta,
+  respuestaVitrinaSegura,
   type AiStatus,
   type CandidatoIA,
 } from '../_shared/ai.ts'
 import { anonClient, serviceClient } from '../_runtime/clients.ts'
 import type { Trace } from '../_shared/observability/index.ts'
+import { sanitizeTextForModel } from '../_shared/observability/redact.ts'
 import { hayProveedorIA, pedirJson } from '../_runtime/anthropic.ts'
+import { medidorDeTienda } from '../_runtime/aiMeter.ts'
+import { delimitarDatos, sistemaConFrontera } from '../_shared/aiCore.ts'
+import { ejecutarIA } from '../_shared/aiPipeline.ts'
+
+const FEATURE = 'assistant'
 
 const ALLOWED_FIELDS = ['store_slug', 'message'] as const
 
@@ -154,55 +161,56 @@ async function recomendar(
   candidatos: Candidato[],
   trace: Trace,
 ): Promise<{ reply: string; ids: string[]; status: AiStatus } | null> {
-  // Ni se mira la cuota si no hay proveedor o no hay entre qué elegir: gastar
-  // una acción para no llamar a nadie es cobrar por nada.
-  if (!hayProveedorIA() || candidatos.length === 0) return null
+  // Sin entre qué elegir no se llama a nadie ni se gasta cuota.
+  if (candidatos.length === 0) return null
 
   // `serviceClient` y no `anonClient`: las funciones de medición son de
-  // servidor a propósito, porque llevan la sociedad como argumento y no
-  // comprueban pertenencia. La clave de servicio vive en los secretos de esta
-  // función y no sale de aquí.
-  const servicio = serviceClient(trace)
-
-  const { data: cuota } = await servicio.rpc('ai_consume_for_store', {
-    p_store_slug: storeSlug,
-    p_feature: 'assistant',
-    p_units: 1,
-  })
-  if (!cuota?.allowed) return null
-
-  const respuesta = await pedirJson<{ reply?: unknown; ids?: unknown }>({
-    system: SISTEMA_ASISTENTE,
-    user: `Consulta: ${mensaje}\n\nProductos:\n${listarCandidatos(candidatos)}`,
-    schema: ESQUEMA_SUGERENCIA,
-    maxTokens: 400,
-    timeoutMs: TIMEOUT_MS,
-  })
-
+  // servidor a propósito, porque llevan la sociedad (resuelta por slug en SQL)
+  // y no comprueban pertenencia. La clave de servicio no sale de aquí.
+  const medidor = medidorDeTienda(serviceClient(trace), storeSlug)
   const permitidos = new Set(candidatos.map((c) => c.product_id))
-  // La barrera se mantiene AUNQUE la respuesta venga con esquema: el esquema
-  // garantiza que `ids` son cadenas, no que nombren algo que existe.
-  const ids = filtrarPermitidos(respuesta.data?.ids, permitidos)
-  const reply = recortarRespuesta(respuesta.data?.reply)
-  const salioBien = Boolean(respuesta.data) && Boolean(reply) && ids.length > 0
 
-  // La traza se deja SIEMPRE, también cuando falló: una llamada que no
-  // respondió cuesta lo mismo y es la que más interesa mirar después.
-  await servicio.rpc('ai_record_for_store', {
-    p_store_slug: storeSlug,
-    p_feature: 'assistant',
-    p_status: salioBien ? 'ai' : respuesta.motivo === 'proveedor' ? 'error' : 'search',
-    p_model: respuesta.model,
-    p_prompt: mensaje,
-    p_reply: reply || null,
-    p_input_tokens: respuesta.usage.inputTokens,
-    p_output_tokens: respuesta.usage.outputTokens,
-    p_cache_read_tokens: respuesta.usage.cacheReadTokens,
-    p_latency_ms: respuesta.latencyMs,
-  })
+  const resultado = await ejecutarIA<{ reply?: unknown; ids?: unknown }, { reply: string; ids: string[] }>(
+    {
+      feature: FEATURE,
+      prompt: mensaje,
+      revisar: (data) => {
+        // La barrera se mantiene AUNQUE la respuesta venga con esquema: el
+        // esquema garantiza que `ids` son cadenas, no que nombren algo que existe.
+        const ids = filtrarPermitidos(data.ids, permitidos)
+        const reply = recortarRespuesta(data.reply)
+        if (!reply || ids.length === 0) return { ok: false, motivo: 'vacia' }
+        // Fase 12: el texto va a un comprador ANÓNIMO. Contacto, dinero o una
+        // cifra que no sale de los candidatos ⇒ se descarta y se degrada al
+        // buscador (la cuota ya se gastó; la traza lo dice como `bloqueada`).
+        if (!respuestaVitrinaSegura(reply, candidatos)) return { ok: false, motivo: 'bloqueada' }
+        return { ok: true, value: { reply, ids }, reply }
+      },
+    },
+    {
+      hayProveedor: hayProveedorIA,
+      consumir: medidor.consumir,
+      registrar: medidor.registrar,
+      llamar: () =>
+        pedirJson<{ reply?: unknown; ids?: unknown }>({
+          feature: FEATURE,
+          system: sistemaConFrontera(SISTEMA_ASISTENTE),
+          // La frase del comprador y el catálogo son DATOS, delimitados: una
+          // «instrucción» escrita en la caja de búsqueda no cambia las reglas.
+          user: [
+            // Fase 12: saneada antes del proveedor (correo, teléfono,
+            // tokens…). La búsqueda determinista sigue usando la frase tal cual.
+            delimitarDatos('consulta_comprador', sanitizeTextForModel(mensaje, MAX_MENSAJE) ?? ''),
+            delimitarDatos('productos_candidatos', listarCandidatos(candidatos)),
+          ].join('\n\n'),
+          schema: ESQUEMA_SUGERENCIA,
+          timeoutMs: TIMEOUT_MS,
+        }),
+    },
+  )
 
-  if (!salioBien) return null
-  return { reply, ids, status: 'ai' }
+  if (!resultado.data) return null
+  return { reply: resultado.data.reply, ids: resultado.data.ids, status: 'ai' }
 }
 
 const handler = serveJson(

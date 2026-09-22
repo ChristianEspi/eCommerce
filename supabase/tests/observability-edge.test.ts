@@ -158,6 +158,27 @@ describe('la redaccion del borde', () => {
     expect(redactText('a'.repeat(900), 100)).toHaveLength(100)
     expect(redactText('   ')).toBeNull()
   })
+
+  it('fase 12: el texto suelto tampoco lleva dentro credenciales con forma reconocible', () => {
+    const jwt = ['eyJhbGciOiJSUzI1NiJ9', 'eyJzdWIiOiJ4In0', 'ZmlybWE'].join('.')
+    const t = redactText(`401 del ERP: Authorization: Bearer ${jwt} en postgres://u:clave@db/x`)!
+    expect(t).not.toContain(jwt)
+    expect(t).not.toContain('clave@db')
+    expect(t).toContain('401 del ERP')
+  })
+
+  it('fase 12: cabeceras y credenciales como CLAVE no llegan al log, con cualquier grafía', () => {
+    const limpio = redact({ Authorization: 'Bearer x', 'X-Api-Key': 'k', cookie: 'c', jwt: 'j', status: 401 })
+    expect(limpio).toEqual({
+      Authorization: '[redactado]',
+      'X-Api-Key': '[redactado]',
+      cookie: '[redactado]',
+      jwt: '[redactado]',
+      status: 401,
+    })
+    // Contadores con «token» en el nombre NO se tapan: no son credenciales.
+    expect(redact({ input_tokens: 10 })).toEqual({ input_tokens: 10 })
+  })
 })
 
 describe('el log estructurado', () => {

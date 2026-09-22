@@ -57,6 +57,12 @@ verify_jwt = true
 [functions.shopping-assistant]
 verify_jwt = true
 
+# Redaccion de fichas con IA (backoffice). Explicito desde la fase 12: antes
+# dependia del valor por defecto de la CLI, y un cambio de defecto no puede
+# dejar abierta una funcion que gasta cuota.
+[functions.catalog-copy]
+verify_jwt = true
+
 # Crear la cuenta de acceso de una persona. Usa `service_role`, asi que ademas
 # de este flag verifica la firma del token a mano (`_runtime/verify.ts`) y
 # consulta el rol del que llama CON SU PROPIO token antes de tocar la Admin API.
@@ -78,4 +84,84 @@ verify_jwt = false
 
 # Boton «Probar» del correo en Configuracion. Owner o admin, con su sesion.
 [functions.notifications-test]
+verify_jwt = true
+
+# Analista IA del dashboard (fase 02). Owner/admin con su sesion: lee el dataset
+# reducido con el JWT del usuario (RLS) y gasta cuota de `ai.insights`.
+[functions.dashboard-insights]
+verify_jwt = true
+
+# Asistente IA de pedidos (fase 04). Roles de la funcionalidad `orders` con su
+# sesion: lee datasets reducidos con el JWT del usuario (RLS), solo lectura.
+[functions.orders-assistant]
+verify_jwt = true
+
+# IA de inventario y de planificacion (fase 05). Roles de `inventory` /
+# `planning` con su sesion: datasets reducidos con el JWT del usuario (RLS) y
+# modulo contratado; solo lectura.
+[functions.inventory-assistant]
+verify_jwt = true
+
+[functions.planning-assistant]
+verify_jwt = true
+
+# IA de clientes y fuerza de ventas (fase 06). Roles de `customers` / `sales`
+# con su sesion: datasets reducidos con el JWT del usuario (RLS), cartera del
+# vendedor y credito solo con permiso; solo lectura. El seguimiento es un
+# borrador: no hay envio.
+[functions.customers-assistant]
+verify_jwt = true
+
+[functions.sales-assistant]
+verify_jwt = true
+
+# IA de cotizaciones y surtidos (fase 07). Roles de `quotes` con su sesion: la
+# IA solo interpreta la instruccion y explica candidatos del sistema; resolver,
+# preciar y guardar son funciones SQL con el JWT del usuario. No escribe.
+[functions.quotes-assistant]
+verify_jwt = true
+
+# IA de credito, pagos y entregas (fase 08). Roles de `credit` / `payments` /
+# `fulfillment` con su sesion: datasets reducidos con el JWT del usuario (RLS),
+# codigos de error y nunca el detalle; solo lectura. Los recordatorios y
+# mensajes al cliente son borradores: no hay envio ni cambio de estado.
+[functions.credit-assistant]
+verify_jwt = true
+
+[functions.payments-assistant]
+verify_jwt = true
+
+[functions.fulfillment-assistant]
+verify_jwt = true
+
+# IA de promociones, CMS y resenas (fase 09). Roles de `promotions` /
+# `content` / `reviews` con su sesion: la IA redacta BORRADORES (nombre, copy,
+# terminos, banner, landing, SEO, traduccion, respuesta a una resena) y resume
+# resenas de forma agregada. Las reglas de descuento siguen en el motor; nada
+# se guarda, publica, oculta, borra ni responde desde aqui.
+[functions.promotions-assistant]
+verify_jwt = true
+
+[functions.content-assistant]
+verify_jwt = true
+
+[functions.reviews-assistant]
+verify_jwt = true
+
+# Asistente tecnico de operaciones e integraciones (fase 10). Roles de
+# `operations` / `integrations` (owner, admin) con su sesion: datasets
+# reducidos con el JWT del usuario (RLS), sin payloads, URL ni secretos, y todo
+# texto de error SANEADO antes de llegar al proveedor. Solo lectura: no
+# reintenta, no reproduce, no cierra disyuntores ni resuelve incidentes.
+[functions.operations-assistant]
+verify_jwt = true
+
+[functions.integrations-assistant]
+verify_jwt = true
+
+# EBIM Copilot global (fase 11). Cualquier rol del backoffice con su sesion:
+# capa de HERRAMIENTAS de solo lectura (dashboard, ventas, pedidos, productos,
+# inventario, clientes) ejecutadas con el JWT del usuario; cada una exige los
+# roles y el modulo de su funcionalidad. Sin SQL libre, sin escrituras.
+[functions.copilot]
 verify_jwt = true

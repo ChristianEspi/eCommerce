@@ -38,6 +38,7 @@ import {
   newIdempotencyKey,
   type FulfillmentRow,
 } from './types'
+import { FulfillmentAiToggle } from './ai/FulfillmentAiSection'
 
 /**
  * De la clave de un hecho a su nombre.
@@ -103,7 +104,7 @@ export function FulfillmentDrawer({
 }) {
   const { t, locale } = useI18n()
   const { notify } = useFeedback()
-  const { can } = useTenant()
+  const { can, activeStore } = useTenant()
   const canOperate = can('orders.write')
 
   const [target, setTarget] = useState('')
@@ -516,6 +517,15 @@ export function FulfillmentDrawer({
               </Stack>
             ))}
           </Stack>
+
+          {/* Fase 08: explicar la entrega con IA y preparar un mensaje al
+              cliente. Solo lee; se monta al pulsar. */}
+          <FulfillmentAiToggle
+            key={fulfillment.fulfillment_id}
+            storeId={activeStore?.id ?? null}
+            fulfillmentId={fulfillment.fulfillment_id}
+            onNavigate={onClose}
+          />
         </Stack>
       )}
     </FormDrawer>

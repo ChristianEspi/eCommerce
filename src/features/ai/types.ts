@@ -56,6 +56,12 @@ export const aiEntitlementSchema = z.object({
   used: z.number().int().nonnegative().optional(),
   quota: z.number().int().nonnegative().optional(),
   remaining: z.number().int().nonnegative().optional(),
+  /**
+   * Qué funcionalidades están USABLES en la sociedad (capacidad de IA + módulo),
+   * desde `20260910210000_ai_features.sql` y completo desde la fase 01. Antes
+   * se descartaba y la UI no sabía qué uso estaba contratado (D2).
+   */
+  features: z.record(z.string(), z.boolean()).optional(),
 })
 
 export type AiEntitlement = z.infer<typeof aiEntitlementSchema>

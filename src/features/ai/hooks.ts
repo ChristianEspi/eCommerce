@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import { fetchAiEntitlement, fetchAiInteractions, sendAiFeedback } from './api'
 import type { AiEntitlement, AiInteraction } from './types'
+import { useTenant } from '@/features/tenant/tenant-context'
+import { AI_FEATURE_ROLES, aiFeatureAvailability, type AiFeature, type AiFeatureAvailability } from './features'
 
 /**
  * El saldo de IA en el cliente.
@@ -41,4 +43,30 @@ export function useAiFeedback() {
     // No invalida el saldo: opinar no gasta cuota.
     onSuccess: () => queryClient.invalidateQueries({ queryKey: aiInteractionsKey() }),
   })
+}
+
+/**
+ * ¿Se puede ofrecer esta funcionalidad a ESTA persona en ESTA sociedad?
+ *
+ * Cruza el saldo (capacidad + módulo + cuota, del servidor) con el rol de la
+ * membresía activa. Solo decide la UX —botón activo, aviso de contratar o de
+ * permiso—; `ebim.ai_consume` vuelve a decidirlo todo al gastar.
+ */
+export function useAiFeature(feature: AiFeature): {
+  availability: AiFeatureAvailability
+  entitlement: AiEntitlement | undefined
+} {
+  const { role } = useTenant()
+  const query = useAiEntitlement(Boolean(role))
+  // Fase 12: el ROL primero. Si el saldo no se pudo leer, a quien no le toca
+  // la funcionalidad no se le enseña ni la pestaña ni el aviso de contratar.
+  const rolPermitido = Boolean(role) && (AI_FEATURE_ROLES[feature] as readonly string[]).includes(role as string)
+  return {
+    availability: !rolPermitido
+      ? 'forbidden'
+      : query.isError
+        ? 'not_entitled'
+        : aiFeatureAvailability(query.data, feature, role),
+    entitlement: query.data,
+  }
 }
