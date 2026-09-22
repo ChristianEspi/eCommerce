@@ -126,9 +126,11 @@ interface Filtros {
   categoryId: string
   brandId: string
   minStock: string
+  /** Vacío = todas las tiendas de la sociedad. */
+  storeId: string
 }
 
-const SIN_FILTROS: Filtros = { search: '', categoryId: '', brandId: '', minStock: '' }
+const SIN_FILTROS: Filtros = { search: '', categoryId: '', brandId: '', minStock: '', storeId: '' }
 
 /** El formulario de filtros, para que el botón de fuera pueda enviarlo. */
 const FORM_FILTROS = 'filtros-productos'
@@ -136,7 +138,7 @@ const FORM_FILTROS = 'filtros-productos'
 export function ProductsPage() {
   const { t } = useI18n()
   const { notify } = useFeedback()
-  const { activeStore, activeCompanyId, tenant, status: tenantStatus, can } = useTenant()
+  const { activeStore, activeCompanyId, stores, tenant, status: tenantStatus, can } = useTenant()
   const canWrite = can('catalog.write')
 
   const [status, setStatus] = useState<ProductStatusFilter>('all')
@@ -237,6 +239,7 @@ export function ProductsPage() {
     sort,
     categoryIds: familiaElegida,
     brandId: aplicados.brandId || null,
+    storeId: aplicados.storeId || null,
     // Vacío no es cero: dejar el campo en blanco significa «no me importa el
     // stock», y un cero significaría «solo los que tienen cero o más», que es
     // todo el catálogo dicho de una forma rara.
@@ -302,7 +305,10 @@ export function ProductsPage() {
       <PageHeader
         icon={<Inventory2RoundedIcon />}
         title={t('admin.products.title')}
-        subtitle={activeStore?.name}
+        // La tienda activa NO acota esta pantalla (ADR 018): enseñar su nombre
+        // aquí hacía leer la lista como «los productos de Bata Store» cuando
+        // son los de toda la sociedad. Se dice de quién es el catálogo.
+        subtitle={tenant?.name ? `${tenant.name} · ${t('catalog.products.subtitle')}` : t('catalog.products.subtitle')}
         actions={
           <>
             <Button
@@ -419,6 +425,28 @@ export function ProductsPage() {
                 </MenuItem>
               ))}
             </TextField>
+
+            {/* La lista es el maestro de la SOCIEDAD y se queda así: este
+                filtro solo responde «de todo esto, qué se vende en tal
+                tienda». Con una sola tienda no se enseña, porque entonces
+                elegir no cambia nada. */}
+            {stores.length > 1 && (
+              <TextField
+                select
+                size="small"
+                label={t('catalog.products.filter.store')}
+                value={borrador.storeId}
+                onChange={(event) => cambiar('storeId', event.target.value)}
+                sx={{ minWidth: 190 }}
+              >
+                <MenuItem value="">{t('catalog.products.filter.allStores')}</MenuItem>
+                {stores.map((store) => (
+                  <MenuItem key={store.id} value={store.id}>
+                    {store.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
 
             <TextField
               size="small"

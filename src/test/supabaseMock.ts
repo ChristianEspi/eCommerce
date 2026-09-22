@@ -359,6 +359,18 @@ class FakeQuery implements PromiseLike<QueryResult> {
     return this
   }
 
+  /**
+   * `cs` de PostgREST: la columna es un array y contiene TODOS los valores
+   * pedidos. Lo usa el listado de maestros para acotar a una tienda.
+   */
+  contains(column: string, values: unknown[]): this {
+    this.rows = this.rows.filter((row) => {
+      const cell = row[column]
+      return Array.isArray(cell) && values.every((value) => cell.includes(value))
+    })
+    return this
+  }
+
   limit(count: number): this {
     this.rows = this.rows.slice(0, count)
     return this

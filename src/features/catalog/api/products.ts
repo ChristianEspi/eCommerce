@@ -110,6 +110,15 @@ export interface ProductQuery {
   brandId?: string | null
   /** Deja solo lo que tiene AL MENOS esta cantidad. */
   minStock?: number | null
+  /**
+   * Deja solo los maestros que se venden EN esa tienda, publicados o no.
+   *
+   * Es un FILTRO, no el alcance de la pantalla: el listado sigue siendo el
+   * maestro de la sociedad (ADR 018). Existe porque con varias tiendas la
+   * pregunta «de esto, qué se vende aquí» no tenía respuesta sin abrir
+   * producto por producto.
+   */
+  storeId?: string | null
 }
 
 export interface ProductPage {
@@ -133,6 +142,7 @@ export async function fetchProducts({
   categoryIds,
   brandId,
   minStock,
+  storeId,
 }: ProductQuery): Promise<ProductPage> {
   if (!companyId) return { rows: [], total: 0 }
   const supabase = catalogClient()
@@ -147,6 +157,8 @@ export async function fetchProducts({
   // `ov` (se solapan): el maestro tiene alguna publicación en esas categorías.
   if (categoryIds && categoryIds.length > 0) query = query.overlaps('category_ids', [...categoryIds])
   if (brandId) query = query.eq('brand_id', brandId)
+  // `cs` (contiene): la vista ya trae en `store_ids` las tiendas del maestro.
+  if (storeId) query = query.contains('store_ids', [storeId])
   if (typeof minStock === 'number' && Number.isFinite(minStock)) {
     query = query.gte('stock', minStock)
   }

@@ -42,6 +42,7 @@ export const productsKey = (query: ProductQuery) =>
     query.categoryIds ?? null,
     query.brandId ?? null,
     query.minStock ?? null,
+    query.storeId ?? null,
   ] as const
 
 export const productUsageKey = (productId: string | null) =>

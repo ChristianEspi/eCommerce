@@ -160,9 +160,43 @@ function tiendasIniciales(): Publicacion[] {
   ]
 }
 
+/**
+ * Las tiendas de la SOCIEDAD, tal y como las devuelve `stores` al resolver el
+ * espacio de trabajo. Por defecto hay una; con dos aparece el filtro de tienda.
+ */
+function unaTienda(): Fila[] {
+  return [
+    {
+      id: STORE_A,
+      organization_id: ORG,
+      company_id: COMPANY_A,
+      slug: 'mi-negocio',
+      name: 'Mi Negocio',
+      status: 'active',
+      currency: 'PEN',
+    },
+  ]
+}
+
+function conDosTiendas(): Fila[] {
+  return [
+    ...unaTienda(),
+    {
+      id: STORE_B,
+      organization_id: ORG,
+      company_id: COMPANY_A,
+      slug: 'outlet',
+      name: 'Outlet',
+      status: 'active',
+      currency: 'PEN',
+    },
+  ]
+}
+
 function backend(
   role: 'admin' | 'viewer' | 'catalog' = 'admin',
   masters = defaultMasters(),
+  tiendasDeLaSociedad = unaTienda(),
   tiendas = tiendasIniciales(),
 ): FakeSupabase {
   const nombreCategoria = new Map([
@@ -187,17 +221,7 @@ function backend(
       tenant_members: [
         { organization_id: ORG, company_id: COMPANY_A, user_id: USER, role, status: 'active' },
       ],
-      stores: [
-        {
-          id: STORE_A,
-          organization_id: ORG,
-          company_id: COMPANY_A,
-          slug: 'mi-negocio',
-          name: 'Mi Negocio',
-          status: 'active',
-          currency: 'PEN',
-        },
-      ],
+      stores: tiendasDeLaSociedad,
       tax_categories: [
         { id: TAX_DEFAULT_ID, code: 'igv18', name: 'IGV general (18%)', is_default: true },
         { id: TAX_EXEMPT_ID, code: 'exonerado', name: 'Exonerado', is_default: false },
@@ -517,6 +541,54 @@ describe('ProductsPage — listado de maestros', () => {
 
     await user.click(tiendas)
     await waitFor(() => expect(tiendas.closest('th')).toHaveAttribute('aria-sort', 'descending'))
+  })
+
+  /**
+   * La pantalla es el maestro de la SOCIEDAD y no se acota por la tienda
+   * activa (ADR 018). Lo que sí hay es un filtro para preguntar «de todo esto,
+   * qué se vende aquí», y el encabezado dice de quién es el catálogo para que
+   * la lista no se lea como «los productos de la tienda en la que estoy».
+   */
+  it('el encabezado no atribuye el catalogo a la tienda activa', async () => {
+    renderPage(backend('admin', catalogoAmplio(), conDosTiendas()))
+    await screen.findByText('Silla A')
+    expect(
+      screen.getByText('Mi Negocio · Catálogo de la sociedad; cada producto se publica por tienda'),
+    ).toBeInTheDocument()
+  })
+
+  it('el filtro de tienda deja solo lo que se vende en ella, sin cambiar de sociedad', async () => {
+    const user = userEvent.setup()
+    renderPage(
+      backend(
+        'admin',
+        [
+          master({ store_ids: [STORE_A] }),
+          master({
+            id: '99999999-9999-4999-8999-999999999999',
+            sku: 'Z-9',
+            name: 'Mesa Z',
+            store_ids: [STORE_B],
+            published_store_names: ['Outlet'],
+          }),
+        ],
+        conDosTiendas(),
+      ),
+    )
+    await screen.findByText('Mesa Z')
+
+    await user.click(screen.getByRole('combobox', { name: 'Tienda' }))
+    await user.click(await screen.findByRole('option', { name: 'Outlet' }))
+    await user.click(screen.getByRole('button', { name: 'Filtrar' }))
+
+    expect(await screen.findByText('Mesa Z')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('Silla A')).not.toBeInTheDocument())
+  })
+
+  it('con una sola tienda no se ofrece el filtro de tienda', async () => {
+    renderPage(backend('admin', catalogoAmplio()))
+    await screen.findByText('Silla A')
+    expect(screen.queryByRole('combobox', { name: 'Tienda' })).not.toBeInTheDocument()
   })
 
   it('las pestanas de estado son las tres del enum mas "Todos"', async () => {
@@ -863,7 +935,7 @@ describe('ProductsPage — publicación por tienda', () => {
       status: 'published',
       price: '149.90',
     })
-    const fake = backend('admin', defaultMasters(), tiendas)
+    const fake = backend('admin', defaultMasters(), unaTienda(), tiendas)
     renderPage(fake)
     const drawer = await abrirTiendas(user)
 
