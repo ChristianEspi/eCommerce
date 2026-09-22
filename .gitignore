@@ -39,3 +39,12 @@ vite-dev.log
 # commit. Se integran por git, no copiando carpetas.
 .claude/worktrees/
 
+
+# Secuencias y prompts de agentes: herramientas del operador, no producto.
+.claude/
+.claude-ai-sequence/
+.claude-ai-sequence-backup/
+EBIM_AI_SEQUENCE/
+_EBIM_PROMPTS/
+docs/PROMPT_CLAUDE_OPUS_5_CIERRE_ECOMMERCE.md
+catalog-ingest.html
