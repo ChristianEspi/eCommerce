@@ -8,7 +8,7 @@ import { PromoCarousel } from '../components/PromoCarousel'
 import { SectionHeading } from '../components/SectionHeading'
 import { StoreFeaturedHero } from '../components/StoreFeaturedHero'
 import { StoreHero } from '../components/StoreHero'
-import { StoreServicesStrip } from '../components/StoreServicesStrip'
+import { StoreValueProps } from '../components/StoreValueProps'
 import type { HomeSectionData, HomeSectionRegistry } from './types'
 
 /**
@@ -67,11 +67,16 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
   },
 
   /**
-   * Las cuatro dudas que tiene alguien ANTES de mirar el primer precio: cuándo
-   * llega, si es seguro pagar, quién le asesora y si puede recogerlo. En el pie
-   * se leen después de decidir, o sea nunca.
+   * Las dudas que tiene alguien ANTES de mirar el primer precio. En el pie se
+   * leen después de decidir, o sea nunca.
+   *
+   * Lo que la franja DICE no lo decide este registro: lo decide
+   * `resolveValueProps` con lo que el comercio configuró o, si no configuró
+   * nada, con lo que la plataforma puede afirmar de cualquier tienda. El
+   * identificador sigue siendo `services` porque cambiarlo rompería el orden
+   * ya guardado de cada portada.
    */
-  services: () => <StoreServicesStrip />,
+  services: (data) => <StoreValueProps store={data.store} />,
 
   offers: (data, maxItems) => (
     <OffersFeaturedBand
@@ -124,8 +129,8 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
    * reales del tenant (las que no cuelgan de nadie), con el mismo tinte e icono
    * que el bloque de categorías del CMS, porque es el mismo componente.
    *
-   * Vale igual para una zapatería, una ferretería o una botica: lo que cambia es
-   * el catálogo del comercio, no el código. Sin familias, no se pinta.
+   * Vale igual para cualquier rubro: lo que cambia es el catálogo del
+   * comercio, no el código. Sin familias, no se pinta.
    */
   categories: (data, maxItems) => {
     const familias = conTope(data.categorias, maxItems)
@@ -143,8 +148,8 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
   },
 
   /**
-   * Las marcas, al lado de las categorías: en una botica se compra por marca
-   * tanto como por familia.
+   * Las marcas, al lado de las categorías: se compra por marca tanto como por
+   * familia.
    */
   brands: (data, maxItems) => (
     <BrandRow
@@ -221,8 +226,8 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
   ),
 
   /**
-   * Prueba social al cierre: quien duda de una botica en línea deja de dudar
-   * cuando reconoce los nombres que ya compra en la farmacia de la esquina.
+   * Reconocimiento al cierre: quien duda de una tienda en línea deja de dudar
+   * cuando ve nombres que ya conoce.
    */
   trust: (data) => <BrandTrustStrip brands={data.brands} storeSlug={data.storeSlug} />,
 

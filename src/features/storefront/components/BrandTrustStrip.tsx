@@ -1,23 +1,30 @@
-import VerifiedRoundedIcon from '@mui/icons-material/VerifiedRounded'
 import { Box, Stack, Typography } from '@mui/material'
 import { SectionHeading } from './SectionHeading'
 import { Link } from 'react-router-dom'
 import { useI18n } from '@/shared/i18n/i18n-context'
-import { TS } from '@/theme/tokens'
 import { initials } from '../branding'
 import { tintFor } from '../tint'
 
 /**
- * Las marcas que respaldan la tienda, al cierre de la portada.
+ * Las marcas del catálogo, al cierre de la portada.
  *
  * No es la fila de «Compra por marca» —esa es navegación, con su contador y su
- * filtro—: esto es una prueba social. Quien duda de una botica en línea deja de
- * dudar cuando reconoce los nombres que ya compra en la farmacia de la esquina,
- * y por eso va abajo, que es donde se decide comprar o cerrar.
+ * filtro—: esto es reconocimiento. Quien duda de una tienda en línea deja de
+ * dudar cuando ve nombres que ya conoce, y por eso va abajo, que es donde se
+ * decide comprar o cerrar.
  *
  * Sale de las MARCAS REALES del catálogo, en orden de tamaño: nadie mantiene
  * una lista de logos aparte, y una lista escrita a mano acabaría enseñando una
  * marca que la tienda dejó de vender.
+ *
+ * ## Lo que ya NO lleva, y por qué
+ *
+ * Tenía una pastilla fija con «Productos originales». Es una afirmación sobre
+ * la cadena de suministro de OTRO, escrita por la plataforma y puesta en todas
+ * las tiendas por igual — incluidas las que revenden, las que fabrican y las
+ * que no pueden sostenerla. Un comercio que quiera decirlo lo dice desde sus
+ * propuestas de valor (`store_settings.value_props`), donde el texto es suyo y
+ * solo sale en su tienda.
  */
 export function BrandTrustStrip({
   brands,
@@ -45,30 +52,7 @@ export function BrandTrustStrip({
           'linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, var(--card)) 0%, color-mix(in srgb, var(--accent2) 8%, var(--card)) 100%)',
       }}
     >
-      <SectionHeading
-        title={t('store.trust.title')}
-        subtitle={t('store.trust.subtitle')}
-        action={
-          <Stack
-            direction="row"
-            sx={{
-              gap: 0.75,
-              alignItems: 'center',
-              px: 1.5,
-              py: 0.75,
-              borderRadius: 'var(--sf-pill)',
-              bgcolor: 'var(--card)',
-              border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
-              color: 'var(--accent-deep)',
-            }}
-          >
-            <VerifiedRoundedIcon sx={{ fontSize: 18 }} />
-            <Typography sx={{ fontSize: TS.label, fontWeight: 800, whiteSpace: 'nowrap' }}>
-              {t('store.trust.original')}
-            </Typography>
-          </Stack>
-        }
-      />
+      <SectionHeading title={t('store.trust.title')} subtitle={t('store.trust.subtitle')} />
 
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: { xs: 1, md: 1.25 } }}>
       {brands.slice(0, 8).map((brand) => {

@@ -351,3 +351,129 @@ describe.each(RUBROS)('portada de $rubro con la sección de familias ($tema)', (
     }
   })
 })
+
+/**
+ * Storefront V2 · P01 · La franja de la portada no habla de un rubro.
+ *
+ * ## Qué defiende este bloque
+ *
+ * Antes de P01 la franja bajo la portada anunciaba «Atención farmacéutica» y
+ * «Retiro en tienda» en TODAS las tiendas. Eran dos afirmaciones que el código
+ * no puede sostener: una sobre la plantilla del comercio y otra sobre su local.
+ * Una zapatería abría su tienda ofreciendo asesoría farmacéutica.
+ *
+ * La prueba no comprueba que el texto sea bonito: comprueba la LÍNEA. Lo que la
+ * plataforma afirma sola es lo que hace el código; todo lo demás lo escribe el
+ * comercio y sale solo en su tienda.
+ */
+const VOCABULARIO_DE_RUBRO = [
+  /farmac/i,
+  /laboratorio/i,
+  /registro sanitario/i,
+  /pharmacist/i,
+  /health registry/i,
+  /catalogue labs/i,
+]
+
+describe('la franja de propuestas de valor', () => {
+  it('sin nada configurado enseña SOLO lo que hace el código', async () => {
+    // La zapatería, que es la tienda que el fallo original contaminaba.
+    await abrir(ESCENARIOS[1] as Escenario)
+
+    const franja = await screen.findByRole('region', { name: 'Cómo compras aquí' })
+    expect(within(franja).getByText('Envío a domicilio')).toBeInTheDocument()
+    expect(within(franja).getByText('Compra segura')).toBeInTheDocument()
+    // Hay correo de contacto en el escenario, así que la atención sí se anuncia.
+    expect(within(franja).getByText('Atención al cliente')).toBeInTheDocument()
+    // Y lo que el código no sabe, no se anuncia: el local y la plantilla.
+    expect(within(franja).queryByText('Retiro en tienda')).not.toBeInTheDocument()
+    expect(within(franja).queryByText('Asesoría especializada')).not.toBeInTheDocument()
+  })
+
+  it('la atención solo se ofrece si hay a dónde escribir', async () => {
+    await abrir(ESCENARIOS[1] as Escenario, '/s/tienda', {
+      store: { support_email: null, contact_phone: null },
+    })
+
+    const franja = await screen.findByRole('region', { name: 'Cómo compras aquí' })
+    expect(within(franja).queryByText('Atención al cliente')).not.toBeInTheDocument()
+    expect(within(franja).getByText('Compra segura')).toBeInTheDocument()
+  })
+
+  it.each(ESCENARIOS)('en $rubro no aparece vocabulario de otro rubro', async (e) => {
+    cleanup()
+    await abrir(e)
+
+    const franja = await screen.findByRole('region', { name: 'Cómo compras aquí' })
+    const texto = franja.textContent ?? ''
+    for (const patron of VOCABULARIO_DE_RUBRO) expect(texto).not.toMatch(patron)
+  })
+
+  it('el claim especializado sale SOLO en la tienda que lo escribió', async () => {
+    // La botica configura lo suyo. Es contenido de su fila, no una rama del
+    // código: no hay ningún sitio donde el programa sepa que es una botica.
+    await abrir(ESCENARIOS[2] as Escenario, '/s/tienda', {
+      store: {
+        value_props: [
+          { iconKey: 'expertise', title: 'Atención farmacéutica', body: 'Pregunta al químico', enabled: true },
+          { iconKey: 'certification', title: 'Registro sanitario', enabled: true },
+        ],
+      },
+    })
+
+    const suya = await screen.findByRole('region', { name: 'Cómo compras aquí' })
+    expect(within(suya).getByText('Atención farmacéutica')).toBeInTheDocument()
+    expect(within(suya).getByText('Pregunta al químico')).toBeInTheDocument()
+    expect(within(suya).getByText('Registro sanitario')).toBeInTheDocument()
+    // Configurar SUSTITUYE: no se completa con las de plataforma.
+    expect(within(suya).queryByText('Compra segura')).not.toBeInTheDocument()
+
+    cleanup()
+
+    // La zapatería, MISMA versión del código y sin configurar nada.
+    await abrir(ESCENARIOS[1] as Escenario)
+    const ajena = await screen.findByRole('region', { name: 'Cómo compras aquí' })
+    expect(within(ajena).queryByText('Atención farmacéutica')).not.toBeInTheDocument()
+    expect(within(ajena).queryByText('Registro sanitario')).not.toBeInTheDocument()
+  })
+
+  it('una entrada mal formada no tumba la portada', async () => {
+    await abrir(ESCENARIOS[1] as Escenario, '/s/tienda', {
+      store: { value_props: 'esto no es una lista' },
+    })
+
+    // La tienda sigue en pie y la franja cae a las de plataforma.
+    const franja = await screen.findByRole('region', { name: 'Cómo compras aquí' })
+    expect(within(franja).getByText('Compra segura')).toBeInTheDocument()
+  })
+
+  it('la tienda que apagó sus propuestas no deja una caja vacía', async () => {
+    await abrir(ESCENARIOS[1] as Escenario, '/s/tienda', {
+      store: {
+        value_props: [{ iconKey: 'delivery', title: 'Envíos 24 h', enabled: false }],
+      },
+    })
+
+    await screen.findByRole('banner')
+    expect(screen.queryByRole('region', { name: 'Cómo compras aquí' })).not.toBeInTheDocument()
+  })
+})
+
+describe('el cierre de la portada tampoco afirma nada que no sepa', () => {
+  /**
+   * La banda de marcas tenía una pastilla fija con «Productos originales» y un
+   * subtítulo que hablaba de distribución autorizada, registro sanitario y
+   * trazabilidad. Tres afirmaciones sobre la cadena de suministro de otro,
+   * escritas por la plataforma y puestas en todas las tiendas por igual.
+   */
+  it('las marcas se presentan por lo que son: las del catálogo', async () => {
+    await abrir(ESCENARIOS[1] as Escenario, '/s/tienda', {
+      store: { home_layout: { version: 1, sections: [{ id: 'trust', enabled: true }] } },
+    })
+
+    await screen.findByRole('banner')
+    expect(screen.queryByText('Productos originales')).not.toBeInTheDocument()
+    expect(screen.queryByText(/registro sanitario/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Distribuidor autorizado/i)).not.toBeInTheDocument()
+  })
+})

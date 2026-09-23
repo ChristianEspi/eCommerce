@@ -224,3 +224,140 @@ Fotografía completa y verificable del punto de partida; ningún cambio de UI, c
 en esta fase; ningún cambio ajeno perdido.
 
 `PHASE_RESULT: PASS`
+
+---
+
+# P01 — Contenido multi-industria y propuestas de valor
+
+**HEAD inicial:** `397e638` · **Commit de la fase:** ver tabla final · **Migración nueva:**
+`supabase/migrations/20260923100000_storefront_value_props.sql`
+
+## El problema, dicho exacto
+
+La franja bajo la portada tenía sus cuatro servicios **cableados** en
+`StoreServicesStrip.tsx`, y dos de ellos eran afirmaciones que el código no puede sostener:
+
+- «Atención farmacéutica» — un hecho de la **plantilla** del comercio;
+- «Retiro en tienda» — un hecho de su **local**.
+
+Cualquier tienda las anunciaba. Además `store.brands.eyebrow` decía «Laboratorios del catalogo»,
+`store.trust.subtitle` afirmaba distribución autorizada con registro sanitario y trazabilidad, y
+`store.trust.original` colgaba una pastilla fija con «Productos originales» en todas las tiendas.
+
+## La solución: tres capas, y la tercera no existe
+
+1. **PLATAFORMA** — lo que el código puede afirmar de cualquier tienda porque lo hace él: el
+   checkout tiene un paso de entrega donde se elige el método, y el cobro se procesa en el servidor.
+   Son dos, más «atención al cliente» **solo si la tienda dio correo o teléfono** (anunciar
+   «escríbenos» sin canal es mandar a alguien a una puerta cerrada). Viven en i18n; no ocupan fila.
+2. **COMERCIO** — `store_settings.value_props`: hasta cuatro entradas con icono de lista cerrada,
+   título (1–40) y apoyo opcional (1–90). Una botica escribe «Atención farmacéutica» y sale **solo
+   en su tienda**; una zapatería escribe «Cambio de talla» y también.
+3. **RUBRO** — no existe. No hay campo «a qué te dedicas» y no se añade: en cuanto existiera,
+   alguien ramificaría por él.
+
+Configurar **sustituye**, no completa: si se rellenara la lista del comercio con las de plataforma
+hasta llegar a cuatro, quien quiso enseñar una cosa vería tres que no escribió.
+
+Y «no configuró nada» (lista vacía) es distinto de «lo configuró y lo apagó»: en el segundo caso la
+franja desaparece, porque apagar es una decisión suya y devolverle las de plataforma encima sería
+ignorarla.
+
+## Base de datos
+
+Migración **nueva** `20260923100000_storefront_value_props.sql`:
+
+- `ebim.value_prop_is_valid(jsonb)` — una entrada: claves ⊆ {`iconKey`,`title`,`body`,`enabled`},
+  icono de los doce nombrados, título 1–40 con contenido tras recortar, apoyo opcional 1–90,
+  `enabled` booleano, y **sin caracteres de control** (`!~ '[[:cntrl:]]'`: un salto de línea en un
+  título parte la franja y vacía de sentido el tope de 40).
+- `ebim.value_props_are_valid(jsonb)` — la lista: array de 0 a 4, todas válidas, **sin icono
+  repetido**. Las dos con `coalesce(..., false)` envolviendo, porque un CHECK que se evalúa a NULL
+  **pasa**.
+- `store_settings.value_props jsonb not null default '[]'` + CHECK.
+- `grant select (value_props) to anon, authenticated` y `grant update (value_props) to
+  authenticated`. Nombrar la columna es obligatorio: el GRANT de tabla se retiró en la migración de
+  white-label y una columna nueva no lo hereda.
+- `public_stores` recreada (DROP + CREATE en migración nueva, nunca editando la aplicada) con
+  `value_props` y `coalesce(..., '[]')` por el LEFT JOIN. `security_invoker = on` y filtro de tienda
+  activa intactos. No entra ni una columna interna.
+
+**No es premium.** No lo gatea `content.white_label` y hay dos pruebas que lo fijan: la tienda de
+prueba no tiene el addon y aun así escribe su franja, y retirar entitlements no borra lo escrito.
+
+## Texto libre: por qué no es un agujero
+
+Lo único libre es el TEXTO, y el texto se pinta como texto (React escapa). Lo que decide
+presentación —el icono— es lista cerrada. No hay ni un `like '%<script%'` en la migración: un filtro
+solo detiene lo que alguien previó, y aquí no hay sitio donde ese marcado pudiera ejecutarse. La
+prueba de base intenta meter `html`, `onClick`, `imageUrl`, `href` y `css` como claves: las cinco se
+rechazan por no estar nombradas.
+
+## Frontend
+
+| Archivo | Qué cambia |
+|---|---|
+| `src/features/storefront/valueProps.ts` | **Nuevo.** Contrato: doce iconos, topes, `sanitizeValueProps` (lo que se guarda), `normalizeValueProps` (lo que se pinta), `PLATFORM_VALUE_PROPS` y `resolveValueProps`. Sin JSX y sin i18n cargado: recibe `t` como argumento, así que es puro y se prueba sin proveedor. |
+| `src/features/storefront/components/StoreValueProps.tsx` | **Nuevo**, sustituye a `StoreServicesStrip.tsx` (borrado). Rejilla de 1–4 columnas según las entradas reales: con dos, cuatro columnas dejaban media franja vacía. |
+| `home/SectionRegistry.tsx` | `services` pasa el `store`. El **identificador de sección se conserva**: cambiarlo rompería el `home_layout` ya guardado de cada tienda. |
+| `components/BrandTrustStrip.tsx` | Fuera la pastilla «Productos originales» (afirmación sobre la cadena de suministro de otro). Copy neutral. |
+| `components/BrandRow.tsx` | Copy y comentarios neutrales. |
+| `admin/settings/ValuePropsSection.tsx` | **Nuevo.** Editor de hasta cuatro filas: icono, título, apoyo, visible, subir/bajar/quitar, «volver a las de la plataforma». Va en la pestaña **General** junto al contacto, no en Diseño: es contenido, no disposición. |
+| `admin/SettingsPage.tsx` | Monta la sección nueva. |
+| `admin/settings/types.ts` | `value_props` en `storeSettingsSchema` (cruda), `valuePropsField` (zod `strict`, ≤4, sin icono repetido) en `storeFormSchema`, y `sanitizeValueProps` en `toForm`. |
+| `admin/settings/api.ts` | `value_props` entra en el grupo de columnas opcionales del sondeo de esquema y en el patch de guardado. |
+| `storefront/types.ts` | `value_props: z.unknown()` — misma frontera que las tres del tema. |
+| i18n ES/EN | 25 claves nuevas `store.valueProps.*` (título + 12 pares de sugerencia), 14 `settings.valueProps.*`. Retiradas las 9 `store.services.*` y `store.trust.original`. |
+
+### Detalle que merece registro: el sondeo de esquema
+
+`store_settings` se lee con lista explícita de columnas y PostgREST responde **400/42703** si una no
+existe, tirando la pantalla de Configuración entera. Ya había un grupo de columnas opcionales para
+las tres del tema; `value_props` entra en **ese mismo grupo** en vez de tener el suyo, y la razón
+está escrita en el código: el 42703 dice que falta *una* columna, no cuál, y leerlo del texto del
+error está prohibido en este repositorio (`architecture.test.ts`: ramificar por el mensaje del
+servidor se rompe en cuanto cambia una palabra). Un grupo = una relectura. La consecuencia asumida:
+mientras falte cualquiera de las cuatro columnas, Diseño y el editor de propuestas quedan apagados.
+Es transitorio y apagar una pantalla que no puede guardar es mejor que perder lo que alguien escriba.
+
+## Tests
+
+| Archivo | Qué fija | Casos |
+|---|---|---|
+| `src/features/storefront/valueProps.test.ts` | **Nuevo.** El contrato. Incluye la prueba que da nombre a la fase: `PLATFORM_VALUE_PROPS` no contiene `pickup`, `expertise`, `certification`, `warranty`, `returns` ni `installments`. | 21 |
+| `src/features/storefront/theme/multi-industry.test.tsx` | **Ampliado.** Franja sin vocabulario de rubro en los 4 escenarios; atención solo con contacto; claim especializado solo en la tienda que lo escribió; JSON basura no tumba la portada; franja apagada no deja caja vacía; el cierre ya no dice «Productos originales» ni «registro sanitario». | 47 (antes 33) |
+| `src/features/admin/settings/value-props.test.tsx` | **Nuevo.** Editor con teclado: añadir, reordenar con botones, tope de 4, título vacío señalado en su fila, apoyo vacío se omite, el selector no ofrece iconos ya usados. | 16 |
+| `supabase/tests/storefront-value-props.test.ts` | **Nuevo.** CHECK, GRANT por columna, aislamiento entre sociedades, lector sin escritura, `public_stores`, tienda sin fila de ajustes, `anon` sin UPDATE, no-premium. | 56 |
+| `supabase/tests/storefront-theme.test.ts` | `value_props` entra en la lista «lo que el formulario envía se puede escribir» — la guarda del GRANT olvidado, que ya falló dos veces. | +1 |
+| `supabase/tests/store-default-country.test.ts` | Inventario de columnas de `public_stores` actualizado con `value_props`. El test es una **puerta**: añadir una línea es la decisión explícita de publicar esa columna. | 9 |
+
+### Búsqueda obligatoria de la fase
+
+```
+rg -n "Atención farmacéutica|Pharmacist support|Laboratorios del catálogo|Catalogue labs|registro sanitario|health registry|botica" src
+```
+
+Resultados: **ningún default global**. Lo que queda son (a) fixtures y nombres de tienda de prueba
+(`botica-sur`, `hola@botica.pe`), (b) los tests que comprueban precisamente que ese texto NO aparece
+salvo configurado, y (c) comentarios de `valueProps.ts` que explican la decisión. Se limpió además
+vocabulario de rubro en comentarios de producción de `ProductCard`, `StoreCategoryNav`,
+`StoreFeaturedHero`, `SectionRegistry`, `CheckoutSummary` y `portal.ts`.
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** (1 ciclo correctivo: `no-unused-vars` en un destructuring de descarte, resuelto reconstruyendo el objeto en vez de silenciarlo) |
+| `npm run test` | **PASS** — 284 ficheros, 5599 tests |
+| `npm run build` | **PASS** |
+| DB (PGlite, migraciones reales) | **PASS** — 56 casos nuevos |
+
+Ciclos correctivos usados: **2 de 3**.
+
+1. `resolveValueProps` caía a las propuestas de plataforma cuando el comercio había apagado todas
+   las suyas. Lo cazó una prueba propia. Causa raíz: se miraba la lista **normalizada** (solo
+   encendidas) para decidir si la tienda tenía franja propia. Arreglado mirando la **saneada**.
+2. Lint: destructuring con variable de descarte.
+
+`PHASE_RESULT: PASS`

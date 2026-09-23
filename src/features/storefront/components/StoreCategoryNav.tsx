@@ -52,7 +52,7 @@ function arbol(categories: readonly PublicCategory[]): Nodo[] {
  * Las categorías eran una fila de azulejos a media página: para cambiar de
  * familia había que volver arriba, y desde una ficha de producto no había forma
  * de llegar. En la cabecera están en TODAS las pantallas de la tienda, que es
- * lo que hace una botica de verdad.
+ * lo que hace cualquier comercio con un catalogo grande.
  *
  * ## Por qué un panel y no un enlace directo
  *

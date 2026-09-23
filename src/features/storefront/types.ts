@@ -110,6 +110,17 @@ export const publicStoreSchema = z.object({
   storefront_style: z.unknown(),
   home_layout: z.unknown(),
   /**
+   * Storefront V2 · P01 · Las propuestas de valor de la tienda, CRUDAS.
+   *
+   * `z.unknown()` por el mismo motivo que las tres de arriba: es una respuesta
+   * que puede venir de una base anterior a la migración `20260923100000` —y
+   * entonces no trae la columna— o traer una entrada escrita a mano. Validarlo
+   * aquí haría fallar el `parse` de TODA la tienda por una franja de cuatro
+   * frases. Quien decide qué se pinta es `resolveValueProps`, y ahí lo
+   * desconocido se descarta entrada a entrada.
+   */
+  value_props: z.unknown(),
+  /**
    * H08 · País por defecto del checkout, derivado de las zonas de entrega de la
    * tienda (migración `20260913120000`). `null` si vende a varios países o no
    * configuró cobertura. `catch(null)` y `default(null)`: una base anterior a la

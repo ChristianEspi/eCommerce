@@ -16,10 +16,10 @@ export interface BrandOption {
 /**
  * Las marcas de la tienda, como puerta de entrada.
  *
- * En una botica se compra por marca tanto como por categoría: quien busca
- * «Eucerin» no busca «dermocosmética», busca Eucerin. Estaban solo dentro del
- * panel lateral de filtros, que es donde va quien YA está filtrando — y en
- * móvil queda debajo del catálogo, o sea, después de haber recorrido todo.
+ * Se compra por marca tanto como por categoría: quien busca una marca concreta
+ * no busca su familia, busca esa marca. Estaban solo dentro del panel lateral
+ * de filtros, que es donde va quien YA está filtrando — y en móvil queda debajo
+ * del catálogo, o sea, después de haber recorrido todo.
  *
  * Sale de las FACETAS de la búsqueda, no de una lista aparte: así solo aparecen
  * las marcas que de verdad tienen producto publicado ahora, con cuántos, y
@@ -52,8 +52,8 @@ export function BrandRow({
         // La mitad de abajo de la portada se habia quedado en «listas sueltas
         // sobre blanco» mientras la de arriba ya tenia bandas con fondo. Un
         // panel tenido —el mismo tinte flojo que usan las secciones del CMS—
-        // le da a las marcas el peso que de verdad tienen: en una botica se
-        // entra por marca tanto como por familia.
+        // le da a las marcas el peso que de verdad tienen: se entra por marca
+        // tanto como por familia.
         p: { xs: 1.75, md: 2.5 },
         borderRadius: 'var(--sf-radius)',
         border: '1px solid var(--sf-line)',
@@ -88,8 +88,8 @@ export function BrandRow({
       />
 
       {/* Gira sola, como las puertas de categoria. Un catalogo con cuarenta
-          laboratorios enseñaba seis y las otras treinta y cuatro solo existian
-          para quien se molestara en empujar la fila. */}
+          marcas enseñaba seis y las otras treinta y cuatro solo existian para
+          quien se molestara en empujar la fila. */}
       <LoopingRow
         items={brands}
         keyOf={(brand) => brand.code}

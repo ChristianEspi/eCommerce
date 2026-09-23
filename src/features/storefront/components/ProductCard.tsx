@@ -162,7 +162,7 @@ export function ProductCard({
     >
       {/* La foto flota sobre la tarjeta, sin caja propia.
           Con fondo y relleno propios, un frasco fotografiado sobre blanco
-          —casi todo el catalogo de una botica— quedaba como un rectangulo
+          —buena parte de cualquier catalogo— quedaba como un rectangulo
           blanco dentro de otro gris dentro de la tarjeta: tres bordes para
           ensenar un producto. */}
       <Box

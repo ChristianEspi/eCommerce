@@ -92,16 +92,31 @@ const SETTINGS_COLUMNS = [
 ]
 
 /**
- * Las tres columnas del Theme Engine, aparte.
+ * Las columnas de CONFIGURACIÓN DE VITRINA, aparte.
  *
  * ## Por qué no van en la lista de arriba sin más
  *
  * Porque PostgREST no ignora una columna que no existe: responde 400 con
- * `42703` y **la consulta entera se cae**. Con las tres dentro de la lista, una
+ * `42703` y **la consulta entera se cae**. Con estas dentro de la lista, una
  * base a la que todavía no se le ha aplicado la migración no deja abrir
  * Configuración: ni General, ni Marca, ni Impuestos. Una pantalla de ajustes
  * que muere porque una migración va por detrás es exactamente el fallo que un
  * despliegue en dos pasos produce, y no puede costar el backoffice entero.
+ *
+ * ## Por qué son UN grupo y no uno por migración
+ *
+ * Porque el error 42703 dice que FALTA UNA columna, no cuál — y leerlo del
+ * texto está prohibido en este repositorio con razón (`architecture.test.ts`:
+ * ramificar por el mensaje del servidor se rompe en cuanto cambia una palabra).
+ * Con un grupo hay UNA relectura y el resto de Configuración sigue sirviendo;
+ * con un grupo por migración habría que adivinar cuál falló o pagar una
+ * consulta de sondeo por grupo en cada apertura de la pantalla.
+ *
+ * La consecuencia se asume y se documenta: mientras falte CUALQUIERA de estas
+ * columnas, la pantalla de Diseño y el editor de propuestas de valor quedan
+ * apagados, aunque alguna de las otras sí exista. Es un estado transitorio de
+ * despliegue, y apagar una pantalla que no puede guardar es mejor que ofrecerla
+ * y perder lo que la persona escriba.
  *
  * ## Por qué aquí no vale el `*` que usa la vitrina
  *
@@ -111,7 +126,13 @@ const SETTINGS_COLUMNS = [
  * de verificación del dominio. La lista explícita es lo que mantiene esos tres
  * fuera del navegador, así que se queda.
  */
-const THEME_COLUMNS = ['theme_preset', 'storefront_style', 'home_layout'] as const
+const THEME_COLUMNS = [
+  'theme_preset',
+  'storefront_style',
+  'home_layout',
+  // Storefront V2 · P01. Contenido de portada, no marca blanca.
+  'value_props',
+] as const
 
 const SETTINGS_SELECT = [...SETTINGS_COLUMNS, ...THEME_COLUMNS].join(', ')
 const SETTINGS_SELECT_SIN_TEMA = SETTINGS_COLUMNS.join(', ')
@@ -239,7 +260,7 @@ export async function saveStoreSettings(input: SaveSettingsInput): Promise<void>
     // vez de una capacidad. La policy no lo gatea; esto no lo gatea tampoco.
     //
     // La condición NO es de permisos: es de esquema. Si la base todavía no
-    // tiene las tres columnas, enviarlas devuelve 400 y se pierde también el
+    // tiene estas columnas, enviarlas devuelve 400 y se pierde también el
     // teléfono que la persona acababa de escribir. La pantalla de diseño está
     // apagada en ese caso, así que aquí no hay nada que guardar.
     ...(temaEnLaBase === false
@@ -248,6 +269,11 @@ export async function saveStoreSettings(input: SaveSettingsInput): Promise<void>
           theme_preset: values.theme_preset,
           storefront_style: values.storefront_style,
           home_layout: values.home_layout,
+          // Storefront V2 · P01 · CONTENIDO del comercio, no marca blanca: se
+          // envía siempre que la columna exista. Lo que la tienda no configura
+          // no se rellena aquí — la vitrina cae a lo que la plataforma puede
+          // afirmar de cualquier tienda. Ver `storefront/valueProps.ts`.
+          value_props: values.value_props,
         }),
     // PREMIUM. Igual que `white_label` desde P02: sin la capacidad el campo NO
     // se envía, en vez de enviarse vacío. Guardar el teléfono de contacto no
