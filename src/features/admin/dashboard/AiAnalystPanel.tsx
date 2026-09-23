@@ -3,7 +3,6 @@ import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded'
 import ErrorOutlineRoundedIcon from '@mui/icons-material/ErrorOutlineRounded'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined'
-import SendRoundedIcon from '@mui/icons-material/SendRounded'
 import {
   Alert,
   Box,
@@ -15,10 +14,9 @@ import {
   Grid,
   Skeleton,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material'
-import { useState, type FormEvent, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
 import { useCapabilities } from '@/features/capabilities/capabilities-context'
 import { AiFeedbackButtons } from '@/features/ai/AiFeedbackButtons'
@@ -31,22 +29,19 @@ import { C, T } from '@/theme/tokens'
 import {
   ANALYST_ROUTE_CAPABILITY,
   ANALYST_ROUTES,
-  MAX_QUESTION,
-  SUGGESTED_QUESTIONS,
+  DASHBOARD_SIGNALS,
   canRetryMotivo,
-  citedEntityRefs,
   evidenceMetricKeys,
   metricLabelKey,
   orderHref,
   renderAnalystText,
-  type AnalystAnswer,
   type AnalystContext,
   type AnalystInsight,
   type AnalystModule,
   type Severity,
 } from './aiAnalyst'
-import { AnswerHeader, CardGrid, EntityCard, MetricTile, SectionLabel } from './AnalystCards'
-import { useAnalystSummary, useAskAnalyst } from './useAiAnalyst'
+import { CardGrid, MetricTile, SectionLabel } from './AnalystCards'
+import { useAnalystSummary, useDashboardSignals } from './useAiAnalyst'
 
 const SEVERITY_TONE: Record<Severity, AppIconTone> = { high: 'danger', medium: 'warning', low: 'info' }
 const SEVERITY_ICON: Record<Severity, ReactNode> = {
@@ -273,169 +268,52 @@ function SummarySection({ storeId }: { storeId: string | null }) {
 }
 
 /**
- * Respuesta como ficha: el texto breve arriba y, debajo, lo que cita —cifras
- * generales como indicadores y entidades (pedidos, stock, clientes…) como
- * tarjetas—. Todo sale de `metrics`/`entities`; el modelo solo eligió qué citar.
+ * «Hoy en tu tienda»: lo que el SISTEMA ya calculó, en tarjetas que llevan a
+ * su módulo. Sin modelo y sin cuota —por eso se ve aunque la IA no esté
+ * contratada o no quede saldo—. Solo aparecen las de módulos con datos.
  */
-function AnswerView({
-  answer,
-  question,
-  interactionId,
-}: {
-  answer: AnalystAnswer
-  question: string | null
-  interactionId: string | null
-}) {
+function SignalsSection({ storeId }: { storeId: string | null }) {
   const { t } = useI18n()
-  const refs = citedEntityRefs(answer.answer, answer.evidence, answer)
-  const keys = evidenceMetricKeys(answer.evidence, answer).filter((k) => metricLabelKey(k) !== null)
+  const signals = useDashboardSignals(storeId, true)
+  const metrics = signals.data ?? {}
+  const visibles = DASHBOARD_SIGNALS.filter((s) => Object.hasOwn(metrics, s.key))
+
   return (
-    <Box
-      component="article"
-      sx={{
-        p: { xs: 1.75, sm: 2.25 },
-        borderRadius: 3,
-        border: `1px solid ${C.line}`,
-        bgcolor: C.card,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 2,
-      }}
-    >
-      <AnswerHeader answerable={answer.answerable} question={question} />
-      <Typography sx={{ fontSize: 14.5, lineHeight: 1.6, whiteSpace: 'pre-line' }}>
-        <AnalystText text={answer.answer} context={answer} />
-      </Typography>
-
-      {keys.length > 0 && (
-        <Stack spacing={1}>
-          <SectionLabel>{t('aiAnalyst.answer.keyData')}</SectionLabel>
-          <CardGrid min={170}>
-            {keys.map((key) => (
-              <MetricTile key={key} metricKey={key} context={answer} />
-            ))}
-          </CardGrid>
-        </Stack>
-      )}
-
-      {refs.length > 0 && (
-        <Stack spacing={1}>
-          <SectionLabel>{t('aiAnalyst.answer.cited')}</SectionLabel>
-          <CardGrid>
-            {refs.map((ref) => (
-              <EntityCard key={ref} entityRef={ref} context={answer} />
-            ))}
-          </CardGrid>
-        </Stack>
-      )}
-
+    <Stack spacing={1}>
       <Stack
-        direction={{ xs: 'column', sm: 'row' }}
+        direction="row"
+        useFlexGap
         spacing={1}
-        sx={{ alignItems: { xs: 'flex-start', sm: 'center' }, justifyContent: 'space-between' }}
+        sx={{ alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap' }}
       >
-        {answer.module ? <ModuleLink module={answer.module} /> : <span />}
-        <AiFeedbackButtons interactionId={interactionId} />
+        <SectionLabel>{t('aiAnalyst.signals.title')}</SectionLabel>
+        <Typography sx={{ fontSize: 11.5, color: C.muted }}>{t('aiAnalyst.signals.free')}</Typography>
       </Stack>
-    </Box>
-  )
-}
-
-function AskSection({ storeId }: { storeId: string | null }) {
-  const { t, locale } = useI18n()
-  const ask = useAskAnalyst(storeId, locale)
-  const [question, setQuestion] = useState('')
-  const [asked, setAsked] = useState<string | null>(null)
-  const result = ask.data
-  const tooLong = question.trim().length > MAX_QUESTION
-
-  const send = (text: string) => {
-    const q = text.trim()
-    if (!q || q.length > MAX_QUESTION || ask.isPending) return
-    setAsked(q)
-    ask.mutate(q)
-  }
-  const onSubmit = (event: FormEvent) => {
-    event.preventDefault()
-    send(question)
-  }
-
-  return (
-    <Stack spacing={1.25}>
-      <Typography component="h3" sx={{ fontSize: T.body, fontWeight: 800 }}>
-        {t('aiAnalyst.ask.title')}
-      </Typography>
-      <Stack direction="row" useFlexGap spacing={1} sx={{ flexWrap: 'wrap' }} role="group" aria-label={t('aiAnalyst.ask.suggested')}>
-        {SUGGESTED_QUESTIONS.map((id) => {
-          const label = t(`aiAnalyst.ask.q.${id}` as MessageKey)
-          return (
-            <Chip
-              key={id}
-              label={label}
-              variant="outlined"
-              clickable
-              disabled={ask.isPending}
-              onClick={() => {
-                setQuestion(label)
-                send(label)
-              }}
-            />
-          )
-        })}
-      </Stack>
-      <Box component="form" onSubmit={onSubmit} noValidate>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'flex-start' } }}>
-          <TextField
-            fullWidth
-            size="small"
-            label={t('aiAnalyst.ask.label')}
-            placeholder={t('aiAnalyst.ask.placeholder')}
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            error={tooLong}
-            helperText={tooLong ? t('aiAnalyst.ask.tooLong') : undefined}
-            inputProps={{ maxLength: MAX_QUESTION + 50 }}
-          />
-          <Button
-            type="submit"
-            variant="contained"
-            endIcon={<SendRoundedIcon />}
-            disabled={ask.isPending || !question.trim() || tooLong}
-            sx={{ flexShrink: 0 }}
-          >
-            {t('aiAnalyst.ask.send')}
-          </Button>
-        </Stack>
-      </Box>
-
-      <Box aria-live="polite" aria-busy={ask.isPending}>
-        {ask.isPending && (
-          <Stack spacing={0.75}>
-            <Typography sx={{ fontSize: 12.5, color: 'var(--muted)' }}>{t('aiAnalyst.ask.thinking')}</Typography>
-            <Skeleton variant="rounded" height={64} />
-          </Stack>
-        )}
-        {!ask.isPending && ask.isError && (
-          <Alert
-            severity="error"
-            action={
-              asked ? (
-                <Button color="inherit" size="small" onClick={() => send(asked)}>
-                  {t('common.retry')}
-                </Button>
-              ) : undefined
-            }
-          >
-            {t('aiAnalyst.networkError')}
-          </Alert>
-        )}
-        {!ask.isPending && !ask.isError && result?.motivo && (
-          <MotivoNotice motivo={result.motivo} onRetry={asked ? () => send(asked) : undefined} />
-        )}
-        {!ask.isPending && !ask.isError && result?.data && (
-          <AnswerView answer={result.data} question={asked} interactionId={result.interactionId} />
-        )}
-      </Box>
+      {signals.isPending && (
+        <CardGrid min={170}>
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} variant="rounded" height={112} sx={{ borderRadius: 3 }} />
+          ))}
+        </CardGrid>
+      )}
+      {signals.isError && (
+        <Typography sx={{ fontSize: 12.5, color: C.muted }}>{t('aiAnalyst.signals.error')}</Typography>
+      )}
+      {signals.data && visibles.length > 0 && (
+        <Box role="group" aria-label={t('aiAnalyst.signals.title')}>
+          <CardGrid min={170}>
+            {visibles.map((s) => (
+              <MetricTile
+                key={s.key}
+                metricKey={s.key}
+                context={{ metrics }}
+                module={s.module}
+                {...(s.sub ? { subKey: s.sub } : {})}
+              />
+            ))}
+          </CardGrid>
+        </Box>
+      )}
     </Stack>
   )
 }
@@ -475,14 +353,15 @@ export function AiAnalystPanel({ storeId }: { storeId: string | null }) {
           </Stack>
         </Stack>
 
+        <SignalsSection storeId={storeId} />
+        <Divider />
+
         {availability === 'not_entitled' && <MotivoNotice motivo="sin_contratar" />}
         {availability === 'quota_exhausted' && <MotivoNotice motivo="sin_cuota" />}
 
         {availability === 'available' && (
           <>
             <SummarySection storeId={storeId} />
-            <Divider />
-            <AskSection storeId={storeId} />
             <Typography sx={{ fontSize: 11.5, color: 'var(--muted)' }}>{t('aiAnalyst.disclaimer')}</Typography>
           </>
         )}

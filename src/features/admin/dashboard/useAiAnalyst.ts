@@ -1,7 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AI_KEY, aiEntitlementKey } from '@/features/ai/hooks'
 import type { Locale } from '@/shared/i18n/messages'
-import { askAnalyst, requestAnalystSummary } from './aiAnalyst'
+import { fetchDashboardSignals, requestAnalystSummary } from './aiAnalyst'
 
 export const analystSummaryKey = (storeId: string | null, locale: Locale) =>
   [...AI_KEY, 'dashboard-summary', storeId, locale] as const
@@ -34,10 +34,16 @@ export function useAnalystSummary(storeId: string | null, locale: Locale) {
   return query
 }
 
-export function useAskAnalyst(storeId: string | null, locale: Locale) {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (question: string) => askAnalyst({ storeId, locale, question }),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: aiEntitlementKey() }),
+/**
+ * «Hoy en tu tienda»: cifras del SISTEMA (sin modelo ni cuota), así que sí se
+ * piden al abrir el dashboard. Las preguntas libres son del Copilot.
+ */
+export function useDashboardSignals(storeId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: [...AI_KEY, 'dashboard-signals', storeId],
+    queryFn: () => fetchDashboardSignals(storeId),
+    enabled,
+    retry: false,
+    staleTime: 60_000,
   })
 }

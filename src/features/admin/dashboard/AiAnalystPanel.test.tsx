@@ -17,12 +17,12 @@ import {
   ANALYST_ROUTES,
   SUGGESTED_ACTIONS,
   SUGGESTED_QUESTIONS,
-  citedEntityRefs,
   evidenceMetricKeys,
   formatMetric,
   metricSchema,
   orderHref,
   plainAnalystText,
+  signalsFromFacts,
   summarySchema,
   type AnalystContext,
 } from './aiAnalyst'
@@ -133,10 +133,26 @@ function entitlement(overrides: Record<string, unknown> = {}) {
   }
 }
 
+/**
+ * `ai_dashboard_facts` tal como la devuelve el SQL: lo que pinta «Hoy en tu
+ * tienda». Sin sección de inventario (módulo no contratado): no hay tarjeta.
+ */
+const FACTS = {
+  generated_at: '2026-09-23T12:00:00Z',
+  period_days: 7,
+  currency: 'PEN',
+  sales: { currency: 'PEN', gross_current: '999.00', gross_delta_pct: '-12.5' },
+  orders: { pending: 9, awaiting_approval: 1, unpaid_over_3d: 4, paid_unshipped_over_2d: 0, attention: [], recent: [] },
+  inventory: null,
+  fulfillment: { open: 3, overdue: 2, failed: 0, late: [] },
+  credit: { overdue_documents: 3, overdue_currency: 'PEN', overdue_balance: '4340.00', customers: [] },
+}
+
 function backend(options: {
   role?: string
   entitlement?: Record<string, unknown>
   insights?: (body: Record<string, unknown>) => unknown
+  facts?: () => unknown
 }): FakeSupabase {
   return createFakeSupabase({
     session: makeSession(),
@@ -144,6 +160,7 @@ function backend(options: {
       dashboard_kpis: () => kpis(),
       dashboard_recent_orders: () => [],
       ai_entitlement: () => entitlement(options.entitlement),
+      ai_dashboard_facts: options.facts ?? (() => FACTS),
     },
     functions: options.insights ? { 'dashboard-insights': options.insights } : {},
     tables: {
@@ -230,7 +247,7 @@ describe('las cifras salen de la base', () => {
     expect(formatMetric(fecha, 'es', labels)).toMatch(/2026/)
   })
 
-  it('las tarjetas salen de lo que la respuesta cita, en orden y sin repetir', () => {
+  it('los indicadores de un insight son cifras generales existentes, sin repetir', () => {
     const ctx: AnalystContext = {
       ...CONTEXT,
       metrics: { ...CONTEXT.metrics, 'R1.total': { kind: 'money', value: '1.00', currency: 'PEN' } },
@@ -239,11 +256,20 @@ describe('las cifras salen de la base', () => {
         R1: { kind: 'order', label: 'EC-1', detail: 'pending', module: 'orders', route: '/app/orders' },
       },
     }
-    expect(citedEntityRefs('{{R1.total}} y {{O1}} y {{R1}} y {{X9}}', ['O1.age_days'], ctx)).toEqual(['R1', 'O1'])
-    // Indicadores: solo cifras generales existentes; las de entidad van en su tarjeta.
     expect(evidenceMetricKeys(['R1.total', 'sales.gross_delta_pct', 'sales.inventada', 'sales.gross_delta_pct'], ctx)).toEqual([
       'sales.gross_delta_pct',
     ])
+  })
+
+  it('del dataset a señales: lo ausente no es cero, lo raro se omite', () => {
+    const s = signalsFromFacts(FACTS)
+    expect(s['sales.gross_current']).toEqual({ kind: 'money', value: '999.00', currency: 'PEN' })
+    expect(s['orders.unpaid_over_3d']).toEqual({ kind: 'count', value: 4 })
+    expect(s['credit.overdue_balance']).toEqual({ kind: 'money', value: '4340.00', currency: 'PEN' })
+    // Inventario no contratado: sin tarjeta, no un cero.
+    expect(s['inventory.below_reorder']).toBeUndefined()
+    expect(signalsFromFacts({ orders: { unpaid_over_3d: '4' }, sales: { currency: null, gross_current: '1.00' } })).toEqual({})
+    expect(signalsFromFacts(null)).toEqual({})
   })
 
   it('el enlace a un pedido solo existe con su id', () => {
@@ -275,11 +301,13 @@ describe('Resumen inteligente', () => {
     expect(insights.mock.calls[0]).toEqual([{ mode: 'summary', store_id: STORE_A, locale: 'es' }])
 
     // Cifras de la base (en el texto y como indicador con su nombre), entidad,
-    // severidad descrita con texto y pulgar.
-    expect(screen.getAllByText('7').length).toBeGreaterThanOrEqual(2)
-    expect(screen.getByText('Sin pagar (+3 días)')).toBeInTheDocument()
-    expect(screen.getAllByText('+55 %').length).toBeGreaterThanOrEqual(2)
-    expect(screen.getByText('Variación de ventas')).toBeInTheDocument()
+    // severidad descrita con texto y pulgar — dentro de SU tarjeta.
+    const card = within(screen.getByText('Pedidos sin pagar acumulados').closest('article') as HTMLElement)
+    expect(card.getAllByText('7').length).toBeGreaterThanOrEqual(2)
+    expect(card.getByText('Sin pagar (+3 días)')).toBeInTheDocument()
+    const ventas = within(screen.getByText('Ventas en alza').closest('article') as HTMLElement)
+    expect(ventas.getAllByText('+55 %').length).toBeGreaterThanOrEqual(2)
+    expect(ventas.getByText('Variación de ventas')).toBeInTheDocument()
     expect(screen.getByText('Pedido: A-OLD-5')).toBeInTheDocument()
     expect(screen.getByText('Prioridad alta')).toBeInTheDocument()
     expect(screen.getByRole('group', { name: '¿Te sirvió?' })).toBeInTheDocument()
@@ -354,104 +382,49 @@ describe('Resumen inteligente', () => {
   })
 })
 
-describe('Preguntar sobre estos datos', () => {
-  it('una pregunta sugerida se envía y la respuesta pinta cifras de la base', async () => {
-    const insights = vi.fn((body: Record<string, unknown>) =>
-      body.mode === 'ask'
-        ? {
-            data: {
-              ...CONTEXT,
-              answerable: true,
-              answer: 'Las ventas variaron {{sales.gross_delta_pct}}.',
-              module: 'sales',
-              route: '/app/analytics',
-              evidence: ['sales.gross_delta_pct'],
-            },
-            motivo: null,
-            interaction_id: INTERACTION,
-          }
-        : summaryBody(),
-    )
-    render({ insights })
-    await userEvent.click(await screen.findByRole('button', { name: '¿Por qué cambiaron las ventas?' }))
-    // En el texto y en el indicador «Datos clave».
-    expect((await screen.findAllByText('+55 %')).length).toBeGreaterThanOrEqual(2)
-    expect(screen.getByText('Datos clave')).toBeInTheDocument()
-    expect(insights).toHaveBeenCalledWith({
-      mode: 'ask',
-      store_id: STORE_A,
-      locale: 'es',
-      question: '¿Por qué cambiaron las ventas?',
-    })
-  })
-
-  it('«¿cuál fue mi último pedido?»: tarjeta del pedido con total, estados y enlace a ESE pedido', async () => {
-    const ORDER_ID = '33333333-3333-4333-8333-333333333333'
-    const insights = vi.fn((body: Record<string, unknown>) =>
-      body.mode === 'ask'
-        ? {
-            data: {
-              generated_at: '2026-09-23T18:00:00Z',
-              metrics: {
-                'R1.total': { kind: 'money', value: '39.86', currency: 'PEN' },
-                'R1.placed_at': { kind: 'datetime', value: '2026-09-23T17:53:00+00:00' },
-                'R1.age_days': { kind: 'days', value: 0 },
-              },
-              entities: {
-                R1: {
-                  kind: 'order',
-                  label: 'EC-20260923-00043',
-                  detail: 'pending',
-                  module: 'orders',
-                  route: '/app/orders',
-                  id: ORDER_ID,
-                  facets: { payment: 'pending', fulfillment: 'unfulfilled' },
-                },
-              },
-              answerable: true,
-              answer: 'Tu último pedido es {{R1}}, por {{R1.total}}.',
-              module: 'orders',
-              route: '/app/orders',
-              evidence: ['R1.total', 'R1.placed_at'],
-            },
-            motivo: null,
-            interaction_id: INTERACTION,
-          }
-        : summaryBody(),
-    )
-    render({ insights })
-    await userEvent.click(await screen.findByRole('button', { name: '¿Cuál fue mi último pedido?' }))
-
-    const card = await screen.findByRole('article', { name: 'Pedido EC-20260923-00043' })
-    const inCard = within(card)
-    expect(inCard.getByText(/39[.,]86/)).toBeInTheDocument()
-    expect(inCard.getByText('Último')).toBeInTheDocument()
-    // Los tres ejes con las mismas etiquetas que el listado de Pedidos.
-    expect(inCard.getByText('Pendiente')).toBeInTheDocument()
-    expect(inCard.getByText('Sin cobrar')).toBeInTheDocument()
-    expect(inCard.getByText('Sin despachar')).toBeInTheDocument()
-    // Abre ESE pedido (el listado lo relee por id, con RLS).
-    expect(inCard.getByRole('link', { name: 'Abrir pedido' })).toHaveAttribute('href', `/app/orders?order=${ORDER_ID}`)
-    expect(screen.getByText('Lo que menciona la respuesta')).toBeInTheDocument()
-  })
-
-  it('una pregunta escrita demasiado larga no se envía', async () => {
+describe('Hoy en tu tienda', () => {
+  it('tarjetas del sistema al abrir, sin llamar a la IA; cada una lleva a su módulo', async () => {
     const insights = vi.fn(() => summaryBody())
-    render({ insights })
-    const campo = await screen.findByLabelText('Tu pregunta')
-    await userEvent.click(campo)
-    await userEvent.paste('x'.repeat(301))
-    expect(screen.getByText('Máximo 300 caracteres.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Preguntar' })).toBeDisabled()
+    const client = render({ insights })
+
+    const grupo = await screen.findByRole('group', { name: 'Hoy en tu tienda' })
+    const tarjetas = within(grupo)
+    expect(await tarjetas.findByText(/999[.,]00/)).toBeInTheDocument()
+    // La variación va como apoyo de ventas, con su signo.
+    expect(tarjetas.getByText('−12.5 %')).toBeInTheDocument()
+    expect(tarjetas.getByText('Sin pagar (+3 días)')).toBeInTheDocument()
+    expect(tarjetas.getByText('Entregas vencidas')).toBeInTheDocument()
+    expect(tarjetas.getByText(/4[.,]340[.,]00/)).toBeInTheDocument()
+    // Módulo no contratado (inventario): no hay tarjeta.
+    expect(tarjetas.queryByText('Bajo punto de pedido')).not.toBeInTheDocument()
+    // Enlaza al módulo (orders es baseline en la demo).
+    expect(tarjetas.getByRole('link', { name: 'Sin pagar (+3 días): 4' })).toHaveAttribute('href', '/app/orders')
+    // Nada de IA: ni el asistente, ni cuota.
     expect(insights).not.toHaveBeenCalled()
+    expect(client.state.rpcCalls.find((c) => c.name === 'ai_dashboard_facts')?.args).toEqual({ p_store_id: STORE_A })
   })
 
-  it('respuesta bloqueada por cifras sin respaldo: motivo y reintento', async () => {
-    render({ insights: () => ({ data: null, motivo: 'bloqueada', interaction_id: null }) })
-    await userEvent.click(await screen.findByRole('button', { name: '¿Qué debería revisar hoy?' }))
-    expect(
-      await screen.findByText('La respuesta no pasó las reglas de seguridad y se descartó.'),
-    ).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument()
+  it('ya no hay «Preguntar sobre estos datos»: las preguntas son del Copilot', async () => {
+    render({ insights: () => summaryBody() })
+    await screen.findByRole('group', { name: 'Hoy en tu tienda' })
+    expect(screen.queryByText('Preguntar sobre estos datos')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Tu pregunta')).not.toBeInTheDocument()
+  })
+
+  it('se ven aunque la IA no esté contratada: no la usan', async () => {
+    render({ entitlement: { features: { insights: false } }, insights: () => summaryBody() })
+    expect(await screen.findByText('Tu empresa no tiene contratado este uso de IA.')).toBeInTheDocument()
+    expect(await screen.findByRole('group', { name: 'Hoy en tu tienda' })).toBeInTheDocument()
+  })
+
+  it('si el cálculo falla, lo dice sin romper el resumen', async () => {
+    render({
+      insights: () => summaryBody(),
+      facts: () => {
+        throw new Error('caída')
+      },
+    })
+    expect(await screen.findByText('No se pudieron calcular los indicadores.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Generar resumen' })).toBeInTheDocument()
   })
 })

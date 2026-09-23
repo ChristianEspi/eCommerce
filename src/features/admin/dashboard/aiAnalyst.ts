@@ -264,34 +264,11 @@ export function plainAnalystText(
 }
 
 // ---------------------------------------------------------------------------
-// Tarjetas: qué entidades y cifras cita una respuesta
+// Indicadores de un insight
 // ---------------------------------------------------------------------------
 
-/** Tope de tarjetas por respuesta: lo demás sigue en el texto. */
-export const MAX_ANSWER_CARDS = 6
-
 /**
- * Referencias de entidad que una respuesta cita, en orden de aparición: el
- * marcador directo (`{{R1}}`) o el prefijo de una cifra (`{{R1.total}}` → R1),
- * en el texto y en la evidencia. Solo las que existen en `entities`.
- */
-export function citedEntityRefs(
-  text: string,
-  evidence: readonly string[],
-  context: Pick<AnalystContext, 'entities'>,
-): string[] {
-  const refs: string[] = []
-  const add = (key: string) => {
-    const ref = key.split('.')[0] ?? ''
-    if (Object.hasOwn(context.entities, ref) && !refs.includes(ref)) refs.push(ref)
-  }
-  for (const match of text.matchAll(PLACEHOLDER)) add(match[1] ?? '')
-  for (const key of evidence) add(key)
-  return refs.slice(0, MAX_ANSWER_CARDS)
-}
-
-/**
- * Cifras generales (no de una entidad) que sostienen la respuesta, sin repetir
+ * Cifras generales (no de una entidad) que sostienen un insight, sin repetir
  * y solo si existen: se pintan como indicadores.
  */
 export function evidenceMetricKeys(
@@ -305,34 +282,6 @@ export function evidenceMetricKeys(
     if (Object.hasOwn(context.metrics, key) && !keys.includes(key)) keys.push(key)
   }
   return keys.slice(0, 4)
-}
-
-/** Cifras de una entidad (`R1.total` → `total`), en un orden estable. */
-export const ENTITY_FIELDS = [
-  'total',
-  'placed_at',
-  'age_days',
-  'available',
-  'reorder_point',
-  'days_late',
-  'documents',
-  'max_days_overdue',
-  'units',
-  'revenue',
-] as const
-export type EntityField = (typeof ENTITY_FIELDS)[number]
-
-export function entityMetrics(
-  ref: string,
-  context: Pick<AnalystContext, 'metrics'>,
-): Array<{ field: EntityField; metric: Metric }> {
-  const out: Array<{ field: EntityField; metric: Metric }> = []
-  for (const field of ENTITY_FIELDS) {
-    const key = `${ref}.${field}`
-    const metric = Object.hasOwn(context.metrics, key) ? context.metrics[key] : undefined
-    if (metric) out.push({ field, metric })
-  }
-  return out
 }
 
 /** Etiqueta de cada cifra general. Lo que no está aquí no se pinta como indicador. */
@@ -372,6 +321,85 @@ const METRIC_LABEL: Readonly<Record<string, MessageKey>> = {
 
 export function metricLabelKey(key: string): MessageKey | null {
   return Object.hasOwn(METRIC_LABEL, key) ? (METRIC_LABEL[key] ?? null) : null
+}
+
+// ---------------------------------------------------------------------------
+// «Hoy en tu tienda»: señales del SISTEMA, sin modelo y sin cuota
+// ---------------------------------------------------------------------------
+
+/**
+ * El mismo dataset que lee el Analista (`ai_dashboard_facts`: SQL determinista,
+ * `security invoker`, owner/admin, sociedad activa), leído DIRECTAMENTE. Las
+ * cifras no necesitan un modelo: se enseñan tal cual y la IA queda para
+ * interpretar, bajo demanda.
+ */
+export const DASHBOARD_FACTS_RPC = 'ai_dashboard_facts'
+
+/** Tarjetas en su orden, con el módulo al que llevan y una cifra de apoyo. */
+export const DASHBOARD_SIGNALS: ReadonlyArray<{
+  readonly key: string
+  readonly module: AnalystModule
+  readonly sub?: string
+}> = [
+  { key: 'sales.gross_current', module: 'sales', sub: 'sales.gross_delta_pct' },
+  { key: 'orders.unpaid_over_3d', module: 'orders' },
+  { key: 'orders.paid_unshipped_over_2d', module: 'orders' },
+  { key: 'orders.awaiting_approval', module: 'orders' },
+  { key: 'inventory.below_reorder', module: 'inventory' },
+  { key: 'fulfillment.overdue', module: 'fulfillment' },
+  { key: 'credit.overdue_balance', module: 'credit', sub: 'credit.overdue_documents' },
+]
+
+type RawFacts = Record<string, unknown>
+const obj = (v: unknown): RawFacts | null => (v && typeof v === 'object' && !Array.isArray(v) ? (v as RawFacts) : null)
+
+/**
+ * Del dataset a métricas con clave. Una sección ausente (módulo no contratado)
+ * o un valor sin forma no se convierte en cero: simplemente no hay tarjeta.
+ */
+export function signalsFromFacts(raw: unknown): Record<string, Metric> {
+  const r = obj(raw) ?? {}
+  const out: Record<string, Metric> = {}
+  const put = (key: string, metric: unknown) => {
+    const parsed = metricSchema.safeParse(metric)
+    if (parsed.success) out[key] = parsed.data
+  }
+  const count = (key: string, v: unknown) => {
+    if (typeof v === 'number' && Number.isInteger(v)) put(key, { kind: 'count', value: v })
+  }
+  const sales = obj(r.sales)
+  if (sales) {
+    if (typeof sales.currency === 'string') put('sales.gross_current', { kind: 'money', value: sales.gross_current, currency: sales.currency })
+    if (sales.gross_delta_pct !== null && sales.gross_delta_pct !== undefined) {
+      put('sales.gross_delta_pct', { kind: 'percent', value: sales.gross_delta_pct })
+    }
+  }
+  const orders = obj(r.orders)
+  if (orders) {
+    count('orders.unpaid_over_3d', orders.unpaid_over_3d)
+    count('orders.paid_unshipped_over_2d', orders.paid_unshipped_over_2d)
+    count('orders.awaiting_approval', orders.awaiting_approval)
+  }
+  const inventory = obj(r.inventory)
+  if (inventory) count('inventory.below_reorder', inventory.below_reorder)
+  const fulfillment = obj(r.fulfillment)
+  if (fulfillment) count('fulfillment.overdue', fulfillment.overdue)
+  const credit = obj(r.credit)
+  if (credit) {
+    count('credit.overdue_documents', credit.overdue_documents)
+    if (typeof credit.overdue_currency === 'string') {
+      put('credit.overdue_balance', { kind: 'money', value: credit.overdue_balance, currency: credit.overdue_currency })
+    }
+  }
+  return out
+}
+
+export async function fetchDashboardSignals(storeId: string | null): Promise<Record<string, Metric>> {
+  const supabase = tryGetSupabaseClient()
+  if (!supabase) throw new AppError({ boundary: 'ai', code: 'CONFIG_INCOMPLETA' })
+  const { data, error } = await supabase.rpc(DASHBOARD_FACTS_RPC, { p_store_id: storeId })
+  if (error) throw new AppError({ boundary: 'ai', code: 'CONSULTA_FALLIDA' })
+  return signalsFromFacts(data)
 }
 
 /** Enlace que abre ESE pedido en el listado (el drawer lo relee por id, con RLS). */
