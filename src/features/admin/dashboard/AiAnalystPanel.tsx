@@ -160,9 +160,9 @@ function InsightCard({
           />
         )}
         {evidence.length > 0 && (
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 0.75 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 1 }}>
             {evidence.map((key) => (
-              <MetricTile key={key} metricKey={key} context={context} />
+              <MetricTile key={key} metricKey={key} context={context} compact />
             ))}
           </Box>
         )}
@@ -310,7 +310,7 @@ function AnswerView({
       {keys.length > 0 && (
         <Stack spacing={1}>
           <SectionLabel>{t('aiAnalyst.answer.keyData')}</SectionLabel>
-          <CardGrid min={150}>
+          <CardGrid min={170}>
             {keys.map((key) => (
               <MetricTile key={key} metricKey={key} context={answer} />
             ))}
