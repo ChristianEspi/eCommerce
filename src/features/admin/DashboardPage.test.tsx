@@ -114,6 +114,25 @@ describe('cifras del resumen', () => {
     expect(screen.getByText(/9 publicados/)).toBeInTheDocument()
   })
 
+  it('pedidos llevan su reparto por estado; productos, el progreso de publicados', async () => {
+    render(() => kpis())
+
+    // Barra segmentada con nombre accesible (el color acompaña, no informa solo)
+    // y leyenda con cada conteo.
+    const reparto = await screen.findByRole('img', { name: 'Pendiente: 5, Pagado: 2, Cancelado: 1' })
+    const tarjeta = reparto.closest('.MuiCard-root') as HTMLElement
+    expect(within(tarjeta).getByText('Pedidos')).toBeInTheDocument()
+    // 9 de 11 publicados = 82 %, con su progressbar declarado.
+    const progreso = screen.getByRole('progressbar', { name: /^9 publicados/ })
+    expect(progreso).toHaveAttribute('aria-valuenow', '82')
+  })
+
+  it('sin pedidos no pinta una barra de estados vacía', async () => {
+    render(() => kpis({ orders: 0, by_status: [] }))
+    await screen.findByText('Pedidos')
+    expect(screen.queryByRole('img', { name: /Pendiente/ })).not.toBeInTheDocument()
+  })
+
   it('sin moneda única no inventa cifra: ni ventas ni ticket medio', async () => {
     // Es la regla que más importa de esta pantalla: un cero inventado en un
     // panel se lee como un dato, y aquí hay dos cifras de dinero.

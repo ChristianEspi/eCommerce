@@ -11,18 +11,19 @@ import PaidRoundedIcon from '@mui/icons-material/PaidRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import TrendingUpRoundedIcon from '@mui/icons-material/TrendingUpRounded'
 import StorefrontRoundedIcon from '@mui/icons-material/StorefrontRounded'
-import { Card, CardContent, Grid, Stack, Typography } from '@mui/material'
+import { Box, Card, CardContent, Grid, Stack, Typography } from '@mui/material'
 import type { ReactNode } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
 import { Button } from '@mui/material'
+import { STATUS_COLOR, type StatusColor } from '@/features/orders/status'
+import { ORDER_STATUSES, type OrderStatus } from '@/features/orders/types'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { formatMoney } from '@/shared/lib/format'
-import { AppIcon } from '@/shared/ui/AppIcon'
 import { PageHeader } from '@/shared/ui/PageHeader'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
-import { T } from '@/theme/tokens'
+import { C, SH, T } from '@/theme/tokens'
 import { BarList, type BarRow } from './BarList'
 import { AiAnalystPanel } from './dashboard/AiAnalystPanel'
 import { InsightBanner, type Insight } from './dashboard/InsightBanner'
@@ -31,21 +32,29 @@ import { SectionHeader } from './dashboard/SectionHeader'
 import { Meter } from './Meter'
 import { useDashboardKpis, useRecentOrders, type DashboardKpis } from './useDashboardKpis'
 
+type KpiTone = 'accent' | 'info' | 'warning'
+
+const KPI_TONE: Record<KpiTone, { fg: string; soft: string }> = {
+  accent: { fg: C.accentDeep, soft: C.accentSoft },
+  info: { fg: C.blue, soft: C.blueSoft },
+  warning: { fg: C.amber, soft: C.amberSoft },
+}
+
 /**
  * Tarjeta de cifra del resumen.
  *
  * Una sola forma para las cuatro. La protagonista (`emphasis`) se distingue por
- * el borde de acento y por el cuerpo de la cifra, NO por ocupar media pantalla:
- * antes ventas se llevaba la mitad del ancho para un numero de doce caracteres
- * y el resto de la tarjeta era aire. Con cuatro columnas iguales la fila se lee
- * como una fila y la jerarquia sigue estando donde tiene que estar.
+ * el degradado de marca y el cuerpo de la cifra, NO por ocupar media pantalla:
+ * con cuatro columnas iguales la fila se lee como una fila y la jerarquia sigue
+ * donde tiene que estar. Las demas llevan franja e icono del tono de lo que
+ * miden, y un detalle (`extra`) que responde la pregunta siguiente: de cuantos
+ * pedidos, en que estado; cuanto catalogo esta vivo.
  *
- * El icono es DECORATIVO (`aria-hidden`, lo pone `AppIcon`): la etiqueta ya
- * nombra la cifra, y anunciarlo seria ruido repetido.
+ * El icono es DECORATIVO (`aria-hidden`): la etiqueta ya nombra la cifra, y
+ * anunciarlo seria ruido repetido.
  *
- * El enlace va anclado abajo (`mt: 'auto'`): asi las dos tarjetas que lo llevan
- * lo tienen a la misma altura, y el hueco que deja el texto desigual queda en
- * un solo sitio en vez de repartido por toda la tarjeta.
+ * El enlace va anclado abajo (`mt: 'auto'`): asi las tarjetas que lo llevan lo
+ * tienen a la misma altura.
  */
 function KpiTile({
   label,
@@ -55,6 +64,8 @@ function KpiTile({
   to,
   actionLabel,
   emphasis = false,
+  tone = 'accent',
+  extra,
 }: {
   label: string
   value: string
@@ -63,33 +74,100 @@ function KpiTile({
   /** Adonde lleva la cifra: una cifra sin salida obliga a buscarla en el menu. */
   to?: string
   actionLabel?: string
+  /**
+   * La protagonista: degradado de marca (`--hero-grad`, conmuta con la paleta
+   * del tenant) y texto blanco. El resto, superficie de tarjeta con franja.
+   */
   emphasis?: boolean
+  tone?: KpiTone
+  /** Detalle bajo la cifra (barra de estados, progreso…). Todo de la base. */
+  extra?: ReactNode
 }) {
+  const colors = KPI_TONE[tone]
+  const ink = emphasis ? C.white : C.ink
+  const soft = emphasis ? `color-mix(in srgb, ${C.white} 82%, transparent)` : C.muted
   return (
-    <Card sx={{ height: '100%', ...(emphasis ? { borderColor: 'var(--accent)' } : {}) }}>
+    <Card
+      sx={{
+        position: 'relative',
+        overflow: 'hidden',
+        height: '100%',
+        borderRadius: 3,
+        transition: 'box-shadow 160ms ease, transform 160ms ease',
+        '&:hover': { boxShadow: SH.lg, transform: 'translateY(-1px)' },
+        '@media (prefers-reduced-motion: reduce)': { transition: 'none', '&:hover': { transform: 'none' } },
+        ...(emphasis
+          ? {
+              background: C.heroGrad,
+              border: 'none',
+              color: C.white,
+              // Detalle decorativo: dos círculos translúcidos en la esquina.
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                right: -40,
+                top: -40,
+                width: 150,
+                height: 150,
+                borderRadius: '50%',
+                background: `color-mix(in srgb, ${C.white} 8%, transparent)`,
+                boxShadow: `0 0 0 22px color-mix(in srgb, ${C.white} 5%, transparent)`,
+                pointerEvents: 'none',
+              },
+            }
+          : {
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: 4,
+                bgcolor: colors.fg,
+                opacity: 0.85,
+              },
+            }),
+      }}
+    >
       <CardContent
         sx={{
           // `CardContent` reserva 24 px de fondo para el ultimo hijo: en una
           // tarjeta de una cifra eso es una franja vacia bajo el numero.
-          p: 2,
+          position: 'relative',
+          zIndex: 1,
+          p: 2.25,
+          pl: emphasis ? 2.25 : 2.5,
           '&:last-child': { pb: 2 },
           height: '100%',
           display: 'flex',
           flexDirection: 'column',
-          gap: 0.25,
+          gap: 1,
         }}
       >
-        <Stack direction="row" sx={{ alignItems: 'center', gap: 0.75, minWidth: 0 }}>
-          <AppIcon tone={emphasis ? 'accent' : 'neutral'} size="sm">
+        <Stack direction="row" sx={{ alignItems: 'center', gap: 1, minWidth: 0 }}>
+          <Box
+            aria-hidden
+            sx={{
+              width: 34,
+              height: 34,
+              borderRadius: '50%',
+              display: 'grid',
+              placeItems: 'center',
+              flexShrink: 0,
+              bgcolor: emphasis ? `color-mix(in srgb, ${C.white} 18%, transparent)` : colors.soft,
+              color: emphasis ? C.white : colors.fg,
+              '& .MuiSvgIcon-root': { fontSize: 18 },
+            }}
+          >
             {icon}
-          </AppIcon>
+          </Box>
           <Typography
             sx={{
               fontSize: T.label,
               fontWeight: 800,
               letterSpacing: '0.1em',
               textTransform: 'uppercase',
-              color: 'var(--muted)',
+              color: soft,
               lineHeight: 1.3,
             }}
           >
@@ -99,10 +177,11 @@ function KpiTile({
         <Typography
           className="tnum"
           sx={{
-            fontSize: emphasis ? T.kpiBig : T.kpiCard,
+            fontSize: emphasis ? T.kpiBig + 4 : T.kpiBig,
             fontWeight: 800,
             letterSpacing: '-0.02em',
-            lineHeight: 1.15,
+            lineHeight: 1.1,
+            color: ink,
             // Una cifra partida en dos lineas dentro de una tarjeta estrecha se
             // lee como dos numeros.
             whiteSpace: 'nowrap',
@@ -112,24 +191,98 @@ function KpiTile({
         >
           {value}
         </Typography>
-        {hint && (
-          <Typography sx={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.35 }}>
-            {hint}
-          </Typography>
-        )}
+        {hint && <Typography sx={{ fontSize: 12, color: soft, lineHeight: 1.4 }}>{hint}</Typography>}
+        {extra}
         {to && actionLabel && (
           <Button
             component={RouterLink}
             to={to}
             size="small"
             endIcon={<ArrowForwardRoundedIcon />}
-            sx={{ mt: 'auto', ml: -1, alignSelf: 'flex-start' }}
+            sx={{ mt: 'auto', ml: -1, alignSelf: 'flex-start', ...(emphasis ? { color: C.white } : {}) }}
           >
             {actionLabel}
           </Button>
         )}
       </CardContent>
     </Card>
+  )
+}
+
+const STATUS_VAR: Record<StatusColor, string> = {
+  default: C.muted,
+  info: C.blue,
+  success: C.accent,
+  warning: C.amber,
+  error: C.red,
+}
+
+const isOrderStatus = (v: string): v is OrderStatus => (ORDER_STATUSES as readonly string[]).includes(v)
+
+/**
+ * Barra segmentada de pedidos por estado, con los colores del listado de
+ * Pedidos, y su leyenda. El color acompaña: la leyenda dice qué es cada tramo.
+ */
+function StatusStrip({ rows, total }: { rows: DashboardKpis['by_status']; total: number }) {
+  const { t } = useI18n()
+  const visibles = rows.filter((r) => r.count > 0 && isOrderStatus(r.status))
+  if (total <= 0 || visibles.length === 0) return null
+  return (
+    <Stack spacing={0.75}>
+      <Box
+        role="img"
+        aria-label={visibles.map((r) => `${t(`orders.status.${r.status}` as MessageKey)}: ${r.count}`).join(', ')}
+        sx={{ display: 'flex', height: 8, borderRadius: 999, overflow: 'hidden', bgcolor: C.neutralSoft, gap: '2px' }}
+      >
+        {visibles.map((r) => (
+          <Box
+            key={r.status}
+            sx={{ flexGrow: r.count, flexBasis: 0, bgcolor: STATUS_VAR[STATUS_COLOR[r.status as OrderStatus]] }}
+          />
+        ))}
+      </Box>
+      <Stack direction="row" useFlexGap sx={{ flexWrap: 'wrap', columnGap: 1.25, rowGap: 0.25 }}>
+        {visibles.map((r) => (
+          <Stack key={r.status} direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+            <Box
+              aria-hidden
+              sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: STATUS_VAR[STATUS_COLOR[r.status as OrderStatus]] }}
+            />
+            <Typography sx={{ fontSize: 11.5, color: C.muted }}>
+              <Box component="span" className="tnum" sx={{ fontWeight: 800, color: C.ink }}>
+                {r.count}
+              </Box>{' '}
+              {t(`orders.status.${r.status}` as MessageKey)}
+            </Typography>
+          </Stack>
+        ))}
+      </Stack>
+    </Stack>
+  )
+}
+
+/** Progreso fino (publicados / total). */
+function ProgressLine({ value, total, caption }: { value: number; total: number; caption: string }) {
+  const pct = total > 0 ? Math.min(100, Math.round((value / total) * 100)) : 0
+  return (
+    <Stack spacing={0.5}>
+      <Box
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={pct}
+        aria-label={caption}
+        sx={{ height: 8, borderRadius: 999, bgcolor: C.neutralSoft, overflow: 'hidden' }}
+      >
+        <Box sx={{ width: `${pct}%`, height: '100%', borderRadius: 999, bgcolor: C.blue }} />
+      </Box>
+      <Typography sx={{ fontSize: 11.5, color: C.muted }}>
+        <Box component="span" className="tnum" sx={{ fontWeight: 800, color: C.ink }}>
+          {pct} %
+        </Box>{' '}
+        · {caption}
+      </Typography>
+    </Stack>
   )
 }
 
@@ -204,6 +357,8 @@ export function DashboardPage() {
     /** Adonde lleva la cifra. Una cifra sin salida obliga a buscarla en el menu. */
     to?: string
     actionLabel?: MessageKey
+    tone?: KpiTone
+    extra?: ReactNode
   }
 
   const hero: Tile = {
@@ -221,6 +376,7 @@ export function DashboardPage() {
       value: money(kpis.avg_ticket),
       icon: <TrendingUpRoundedIcon fontSize="small" />,
       hint: t('admin.kpi.avgTicket.hint'),
+      tone: 'accent',
     },
     {
       key: 'orders',
@@ -229,6 +385,8 @@ export function DashboardPage() {
       icon: <ReceiptLongRoundedIcon fontSize="small" />,
       to: '/app/orders',
       actionLabel: 'admin.dashboard.seeOrders',
+      tone: 'warning',
+      extra: <StatusStrip rows={kpis.by_status} total={kpis.orders} />,
     },
     {
       key: 'products',
@@ -237,9 +395,16 @@ export function DashboardPage() {
       icon: <LocalMallRoundedIcon fontSize="small" />,
       to: '/app/products',
       actionLabel: 'admin.dashboard.seeProducts',
+      tone: 'info',
       // Publicados deja de ser una tarjeta propia: como cifra suelta no dice
       // nada, y junto a total responde «cuanto catalogo esta vivo».
-      hint: `${kpis.published} ${t('admin.kpi.publishedTotal')}`,
+      extra: (
+        <ProgressLine
+          value={kpis.published}
+          total={kpis.products}
+          caption={`${kpis.published} ${t('admin.kpi.publishedTotal')}`}
+        />
+      ),
     },
   ]
 
@@ -325,6 +490,8 @@ export function DashboardPage() {
                 icon={card.icon}
                 {...(card.hint ? { hint: card.hint } : {})}
                 {...(card.to ? { to: card.to, actionLabel: t(card.actionLabel as MessageKey) } : {})}
+                {...(card.tone ? { tone: card.tone } : {})}
+                {...(card.extra ? { extra: card.extra } : {})}
               />
             </Grid>
           ))}
