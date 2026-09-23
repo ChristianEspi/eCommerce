@@ -386,6 +386,13 @@ export const PUBLIC_PRODUCTS_VIEW = 'public_products' satisfies ViewName
 export const PUBLIC_PRODUCT_IMAGES_VIEW = 'public_product_images' satisfies ViewName
 // Ídem que las tablas del PIM: sin `satisfies` hasta que se regeneren los tipos.
 export const PUBLIC_PRODUCT_VARIANTS_VIEW = 'public_product_variants'
+/**
+ * Storefront V2 · P02 · Las marcas con producto publicado por tienda, con su
+ * logo. Existe porque las FACETAS de la búsqueda dan código, nombre y cuenta —
+ * lo que necesita un filtro— y nunca el logo; pedirlo marca a marca sería el
+ * N+1 que el rediseño prohíbe. Sin `satisfies` hasta regenerar los tipos.
+ */
+export const PUBLIC_BRANDS_VIEW = 'public_brands'
 
 // --- Buckets de Storage ----------------------------------------------------
 // Los dos son PRIVADOS: no hay URL pública ni para el dueño. Cada lado firma

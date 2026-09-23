@@ -27,6 +27,7 @@ import {
   useContentAssets,
   useSignedStoreAssets,
   usePrefetchProduct,
+  usePublicBrands,
   usePublicCategories,
   useSignedThumbnails,
   useStoreContent,
@@ -354,11 +355,48 @@ export function StoreHomePage() {
     () => categoryTrail(categories.data ?? [], categorySlug),
     [categories.data, categorySlug],
   )
-  const brandOptions = brandFacets.map((facet) => ({
-    code: facet.code,
-    name: facet.name,
-    count: brand ? null : facet.count,
-  }))
+  /**
+   * Storefront V2 · P02 · Las marcas de la portada, con su logo.
+   *
+   * ## De dónde sale cada mitad, y por qué hacen falta las dos
+   *
+   * Las FACETAS de la búsqueda dicen qué marcas tienen producto AHORA y cuántos
+   * — se calculan sobre el resultado ya filtrado, que es lo que hace que el
+   * contador sea cierto. Lo que no traen es el logo, y no puede traerlo: al
+   * elegir una marca las facetas devuelven una sola.
+   *
+   * `public_brands` trae las marcas de la tienda con su logo, en UNA consulta y
+   * compartida por las dos secciones que las pintan. Cruzarlas por `code` es lo
+   * que evita el N+1 —una petición por marca— que el rediseño prohíbe.
+   *
+   * El ORDEN manda el de las facetas (por tamaño): es el que ya tenía la fila,
+   * y reordenar por nombre habría enterrado las marcas que de verdad se compran.
+   */
+  const brandsConLogo = usePublicBrands(catalogo ? null : store.store_id)
+  const logosPorMarca = useMemo(() => {
+    const mapa = new Map<string, string | null>()
+    for (const marca of brandsConLogo.data ?? []) mapa.set(marca.code, marca.logo_url)
+    return mapa
+  }, [brandsConLogo.data])
+
+  // Las firmas, en un lote para todas. Una por marca serían cuarenta viajes en
+  // un catálogo real, y el bucket es privado: no hay URL pública que valga.
+  const logosFirmados = useSignedStoreAssets(
+    useMemo(() => [...logosPorMarca.values()], [logosPorMarca]),
+  )
+
+  const brandOptions = brandFacets.map((facet) => {
+    const ref = logosPorMarca.get(facet.code) ?? null
+    return {
+      code: facet.code,
+      name: facet.name,
+      count: brand ? null : facet.count,
+      // Una `https://` externa se pinta tal cual; una ruta, ya firmada. Si la
+      // firma no ha llegado todavía, `null` y monograma: mejor el respaldo que
+      // un hueco que se rellena a medio segundo.
+      logoUrl: ref === null ? null : (logosFirmados[ref] ?? (/^https:\/\//i.test(ref) ? ref : null)),
+    }
+  })
 
   // Los favoritos se cargan UNA vez por tienda y se reparten a las tarjetas.
   const favorites = useFavorites(store.store_id)

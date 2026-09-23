@@ -361,3 +361,156 @@ Ciclos correctivos usados: **2 de 3**.
 2. Lint: destructuring con variable de descarte.
 
 `PHASE_RESULT: PASS`
+
+---
+
+# P02 — Logos de marca de punta a punta
+
+**HEAD inicial:** `d5f437e` · **Migración nueva:**
+`supabase/migrations/20260923110000_brand_logos.sql`
+
+## Verificación del supuesto (obligatoria antes de tocar)
+
+`public.brands.logo_url` existe desde `20260827170000` **y** `anon` ya tenía
+`grant select (id, code, name, logo_url, is_active)`. Lo que faltaba no era la columna: era todo lo
+demás. Confirmado línea por línea:
+
+| Eslabón | Estado antes de P02 |
+|---|---|
+| `pim/types.ts` → `brandSchema` | sin `logo_url` |
+| `pim/api.ts` → `CATALOG_ENTRY_SELECT` | `'id, code, name, description, is_active'` |
+| `pim/api.ts` → `saveCatalogEntry` | escribía `code`, `name`, `is_active` |
+| `CatalogEntrySection.tsx` | formulario de tres campos, sin subida |
+| vitrina | marcas desde las **facetas** de la búsqueda: `code`, `name`, `count` |
+| `grep logo_url src/` | ni un consumidor de marca |
+
+## La decisión que gobierna esta fase: una marca NO es un asset de tienda
+
+`store-assets` autoriza por ruta `{organization_id}/{store_id}/…`: `ebim.storage_store` saca el
+segundo segmento y lo contrasta contra `public.stores`. Funciona para el logo de la tienda porque
+el logo de una tienda es de esa tienda.
+
+`public.brands` **no tiene `store_id`**, y es deliberado desde el PIM: «la misma marca se vende en
+la tienda mayorista y en la minorista de la misma sociedad, y tenerla dos veces significa que un día
+el logo se cambia en una y no en la otra».
+
+Reutilizar la ruta de tienda habría exigido elegir UNA tienda como dueña del archivo: o el logo se
+duplica —el problema que el PIM evitó— o cuelga de una tienda que mañana se cierra llevándose un
+logo que la otra seguía usando. Así que la ruta es de la **sociedad**:
+
+```
+{organization_id}/company/{company_id}/brands/{uuid}.{ext}
+```
+
+El literal `company` del segundo segmento es lo que separa las dos familias de rutas en el mismo
+bucket: con él, `ebim.storage_store` devuelve NULL y las policies de tienda no autorizan nada. Hay
+dos pruebas de base que fijan exactamente eso en las dos direcciones.
+
+## Base de datos (migración nueva)
+
+1. **`ebim.is_brand_logo_ref(text, uuid, uuid)`** + constraint `brands_logo_ref`. Dos formas y
+   ninguna más: `https://` externa (contrato §4.3) o ruta bajo el prefijo de la **propia** sociedad.
+   Valida contra `organization_id`/`company_id` **de la fila**, nunca contra un argumento del
+   cliente — hay una prueba que lo demuestra llamando a la función con el tenant equivocado.
+   Rechaza además `http://`, `javascript:`, `data:`, travesía de directorios y —el caso más
+   probable— una ruta con forma de asset de tienda.
+2. **Storage company-scoped**: `storage_is_company_path`, `storage_company`,
+   `can_write_company_object` y `company_object_visible`, más cinco policies nuevas sobre
+   `storage.objects` (select/insert/update/delete de miembro con rol de catálogo, y select anónimo).
+   Se **añaden** a las de tienda, no las sustituyen.
+3. **`public.public_brands`** (`security_invoker = on`): marcas con producto publicado por tienda,
+   con su logo, en una consulta. Sin `organization_id`, sin `company_id`, sin `description` y sin
+   contadores —los contadores los dan las facetas, y dos fuentes para el mismo número discrepan—.
+
+### El fallo que apareció al probar, y su precedente exacto
+
+`company_object_visible` se escribió primero SIN `security definer`, y la prueba de lectura anónima
+falló con `permission denied for table stores`. La causa: `anon` solo tiene
+`grant select (id, slug, name, status, currency, domain)` sobre `public.stores`, y el cuerpo de una
+función normal se ejecuta con los permisos de quien llama. Sin `definer`, la policy de Storage no
+puede ni evaluarse y **el logo no se ve nunca**.
+
+Es letra por letra el fallo que arregló `20260901100000_fix_public_store_asset_read.sql` para el
+logo de la TIENDA —mismo síntoma («enseñaba las iniciales»), misma causa—. Se repitió la misma
+solución en vez de inventar otra, con su obligación incluida: como la RLS de `stores` deja de
+filtrar, **la condición de visibilidad va escrita en el cuerpo** (`status = 'active'`). Sin esa
+línea, el logo de una marca de una sociedad con todas sus tiendas en borrador sería público; hay una
+prueba que suspende la tienda y comprueba que el objeto desaparece para `anon`.
+
+Lo que la función revela sigue siendo un booleano sobre una organización y una sociedad que quien
+pregunta ya lleva escritas en la ruta.
+
+## Separación marca / familia (requisito explícito de la fase)
+
+`productFamilySchema` era `brandSchema`: el mismo tipo por comodidad, correcto mientras fueran
+iguales. Con `logo_url`, esa comodidad ofrecía subir un logo a una clasificación interna y producía
+un `insert` contra una columna que no existe. Ahora:
+
+- **`productFamilySchema`** es la base (código, nombre, activo);
+- **`brandSchema`** la extiende con `logo_url` (`catch(null)`: una fila con un valor que esta versión
+  no sabe leer se lee como marca sin logo, no deja la tabla sin cargar);
+- **`brandFormSchema`** extiende a `catalogEntryFormSchema`;
+- **`saveBrand`** es su propia función y no `saveCatalogEntry` con un campo extra;
+- **una sola pantalla** con la diferencia declarada en un sitio (`kind`), porque dos copias se
+  separarían el día que una arregle un detalle de accesibilidad.
+
+Hay pruebas de las dos mitades: la familia no ofrece el campo y al crearla el `insert` **no lleva**
+`logo_url`; y `product_families` sigue sin columna de logo en la base.
+
+## Frontend
+
+| Archivo | Qué cambia |
+|---|---|
+| `catalog/api/brandLogos.ts` | **Nuevo.** `MAX_BRAND_LOGO_BYTES` (2 MB), `validateBrandLogo`, `buildBrandLogoPath`, `uploadBrandLogo`, `signedBrandLogoUrls`. Sin SVG: es un documento que puede llevar `<script>` y no hay sanitizador aprobado. La extensión sale del MIME, no del nombre. |
+| `catalog/pim/BrandLogoField.tsx` | **Nuevo.** El hueco ES el botón (misma anatomía que el branding de tienda). `contain` y hueco cuadrado: un logo no se recorta. Mientras no hay logo se ve el monograma, no un rectángulo gris. |
+| `catalog/pim/BrandMonogram.tsx` | **Nuevo.** Iniciales sobre el acento de suite. |
+| `catalog/pim/CatalogEntrySection.tsx` | Reescrito: columna de logo en la tabla (una sola petición de firmas para la página visible), cajón propio de marca, cajón de familia sin logo, y `sugerirCodigo` extraído —la misma regla que los dos CHECK, escrita una vez—. |
+| `catalog/pim/hooks.ts` | `useBrandLogoUrls` (un lote, no una firma por fila) y `useUploadBrandLogo` (no invalida: lo que cambia el estado es guardar). |
+| `shared/lib/initials.ts` | **Nuevo.** `initials` sale de la vitrina a `shared`: el backoffice enseña las mismas marcas, y dos cálculos harían que «Laboratorios San Miguel» fuera «LS» arriba y «LM» abajo. `storefront/branding.ts` la reexporta. |
+| `storefront/components/BrandLogo.tsx` | **Nuevo.** Logo real o monograma, `contain`, tamaño fijo, `onError` al monograma. `<img>` nativo y no `Box component="img"`: MUI se queda `width`/`height` como atajos de estilo y no llegan al DOM — y son justo los que evitan que la fila se mueva al cargar. |
+| `BrandRow` / `BrandTrustStrip` | Usan `BrandLogo`. `BrandOption` gana `logoUrl` (ya firmado: firmar por tarjeta serían tantas peticiones como marcas). |
+| `storefront/api.ts` + `hooks.ts` + `types.ts` | `fetchPublicBrands` / `usePublicBrands` / `publicBrandSchema`. `logo_url` pasa por `assetRef`, el mismo filtro que el logo de la tienda. |
+| `StoreHomePage.tsx` | Cruza facetas (nombre, cuenta, orden por tamaño) con `public_brands` (logo) por `code`. Firma el lote entero con `useSignedStoreAssets`. |
+| `db-schema.ts` | `PUBLIC_BRANDS_VIEW`, sin `satisfies` hasta regenerar tipos. |
+| i18n ES/EN | 7 claves `pim.brands.logo.*`. |
+
+### Degradación si la migración va por detrás
+
+`fetchPublicBrands` devuelve `[]` ante cualquier error en vez de propagar: una base sin la vista deja
+la portada **con las marcas de siempre, sin logos**, no sin marcas. Es el mismo criterio que
+`fetchPublicVariants` con la migración de ejes.
+
+## Tests
+
+| Archivo | Casos |
+|---|---|
+| `supabase/tests/brand-logos.test.ts` | **Nuevo**, 38. Referencia del logo (12 rechazos nombrados), Storage de sociedad en las dos direcciones, lector sin escritura, `anon` sin insert, visibilidad por tienda activa, `public_brands` (borrador, programado, marca apagada, tienda suspendida, columnas exactas, `security_invoker`), aislamiento cruzado en ambos sentidos y `product_families` sin columna de logo. |
+| `src/features/catalog/pim/brand-logos.test.tsx` | **Nuevo**, 18. Monograma sin logo, imagen firmada con `contain` + `lazy`, **una sola firma para tres logos** (la guarda del N+1), ruta de sociedad sin `store_id`, dos subidas nunca al mismo objeto, validador (SVG, HTML, 4 formatos, 0 bytes, límite exacto), subida antes de guardar, quitar sin borrar el objeto, y la familia sin campo ni `logo_url` en el `insert`. |
+| `src/features/storefront/components/brand-logo.test.tsx` | **Nuevo**, 9. Logo real, monograma, `onError` → monograma, `alt=""` (el nombre lo lleva el enlace), `width`/`height` en el DOM, eyebrow sin vocabulario de rubro, enlaces al catálogo filtrado y el cierre sin claims. |
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 287 ficheros, 5664 tests |
+| `npm run build` | **PASS** |
+| DB (PGlite, migraciones reales) | **PASS** — 38 casos nuevos |
+
+Ciclos correctivos usados: **3 de 3**, y los tres por causa raíz, no por síntoma.
+
+1. **`company_object_visible` sin `security definer`.** Diagnóstico completo arriba. Lo delató una
+   prueba de lectura anónima, y buscar el precedente (`20260901100000`) dio la solución exacta.
+2. **Sesión de prueba sin claims de tenant.** El test del PIM usaba un objeto de sesión a mano, así
+   que `can('catalog.write')` era falso y la pantalla se pintaba en modo lectura: siete casos
+   fallaban por la misma causa. Se cambió a `makeSession()` + `effective_capabilities`, que es lo
+   que ya hacía `pim-ui.test.tsx`.
+3. **Dos fallos del utillaje, no del código.** (a) `width`/`height` sobre `Box component="img"` no
+   llegan al DOM porque MUI los interpreta como atajos de estilo — se cambió a `<img>` nativo, que
+   además es lo que de verdad evita el salto de layout; (b) el script de parcheo usaba
+   `String.replace` con reemplazo de tipo cadena, y un `$` seguido de comilla en el texto activó la
+   referencia `$'` de JavaScript duplicando medio fichero de prueba. El script ahora pasa el
+   reemplazo como función; el fichero se reescribió.
+
+`PHASE_RESULT: PASS`

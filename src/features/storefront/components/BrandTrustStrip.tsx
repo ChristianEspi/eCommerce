@@ -2,8 +2,8 @@ import { Box, Stack, Typography } from '@mui/material'
 import { SectionHeading } from './SectionHeading'
 import { Link } from 'react-router-dom'
 import { useI18n } from '@/shared/i18n/i18n-context'
-import { initials } from '../branding'
 import { tintFor } from '../tint'
+import { BrandLogo } from './BrandLogo'
 
 /**
  * Las marcas del catálogo, al cierre de la portada.
@@ -30,7 +30,7 @@ export function BrandTrustStrip({
   brands,
   storeSlug,
 }: {
-  brands: readonly { code: string; name: string }[]
+  brands: readonly { code: string; name: string; logoUrl?: string | null }[]
   storeSlug: string
 }) {
   const { t } = useI18n()
@@ -87,26 +87,10 @@ export function BrandTrustStrip({
               },
             }}
           >
-            {/* Mientras la marca no traiga logo, sus iniciales sobre su tinte:
+            {/* El logo real si lo hay; si no, las iniciales sobre su tinte:
                 una fila de nombres en gris no se distingue de un pie de página,
                 y lo que aquí hace falta es RECONOCER de un vistazo. */}
-            <Box
-              aria-hidden
-              sx={{
-                width: 30,
-                height: 30,
-                display: 'grid',
-                placeItems: 'center',
-                borderRadius: '50%',
-                bgcolor: tinte.fg,
-                color: tinte.bg,
-                fontSize: 11,
-                fontWeight: 800,
-                boxShadow: `0 6px 14px -8px ${tinte.fg}`,
-              }}
-            >
-              {initials(brand.name)}
-            </Box>
+            <BrandLogo name={brand.name} url={brand.logoUrl ?? null} size={30} />
             <Typography sx={{ fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>
               {brand.name}
             </Typography>

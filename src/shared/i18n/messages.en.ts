@@ -996,6 +996,14 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'pim.brands.new': 'New brand',
     'pim.brands.empty': 'You have not created any brand yet',
     'pim.brands.help': 'A brand belongs to the company: every store shares it.',
+    'pim.brands.logo': 'Logo',
+    'pim.brands.logo.help':
+      'It shows on the shop front of your stores. JPG, PNG, WebP or AVIF, up to 2 MB. With no logo the brand initials are shown.',
+    'pim.brands.logo.upload': 'Upload logo',
+    'pim.brands.logo.replace': 'Replace logo',
+    'pim.brands.logo.remove': 'Remove logo',
+    'pim.brands.logo.errorType': 'That format is not accepted. Use JPG, PNG, WebP or AVIF.',
+    'pim.brands.logo.errorSize': 'The logo is over 2 MB. Save it optimised and upload it again.',
     'pim.families.new': 'New family',
     'pim.families.empty': 'You have not created any family yet',
     'pim.families.help':

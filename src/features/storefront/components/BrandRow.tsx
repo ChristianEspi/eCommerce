@@ -2,8 +2,8 @@ import { Box, Button, Stack, Typography } from '@mui/material'
 import { Link } from 'react-router-dom'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { TS } from '@/theme/tokens'
-import { initials } from '../branding'
 import { tintFor } from '../tint'
+import { BrandLogo } from './BrandLogo'
 import { LoopingRow } from './LoopingRow'
 import { SectionHeading } from './SectionHeading'
 
@@ -11,6 +11,14 @@ export interface BrandOption {
   readonly code: string
   readonly name: string
   readonly count: number | null
+  /**
+   * Logo YA firmado, o `null` si la marca no tiene (Storefront V2 · P02).
+   *
+   * Llega firmado y no como ruta a propósito: firmar aquí serían tantas
+   * peticiones como marcas. La portada firma el lote entero de una vez y
+   * reparte — ver `usePublicBrands` y `useSignedStoreAssets`.
+   */
+  readonly logoUrl?: string | null
 }
 
 /**
@@ -139,31 +147,11 @@ export function BrandRow({
                 },
               }}
             >
-              {/* El monograma hace de logo mientras no haya logo.
-                  Un catálogo de marcas sin imagen es una lista de texto gris
-                  donde ninguna se distingue de la de al lado; con dos letras
-                  sobre el acento del comercio, cada una tiene forma propia y la
-                  fila se lee de lado. El día que la marca traiga logo, va en su
-                  sitio sin mover nada más. */}
-              <Box
-                aria-hidden
-                sx={{
-                  width: 40,
-                  height: 40,
-                  flexShrink: 0,
-                  display: 'grid',
-                  placeItems: 'center',
-                  borderRadius: '50%',
-                  bgcolor: tinte.fg,
-                  color: tinte.bg,
-                  fontSize: 14,
-                  fontWeight: 800,
-                  letterSpacing: '0.02em',
-                  boxShadow: `0 6px 16px -8px ${tinte.fg}`,
-                }}
-              >
-                {initials(brand.name)}
-              </Box>
+              {/* El logo REAL de la marca si lo tiene, y su monograma si no.
+                  El día que la marca trae logo entra aquí sin mover nada: el
+                  hueco es del mismo tamaño en los dos casos, así que la fila no
+                  cambia de alto al cargar las imágenes. Ver `BrandLogo`. */}
+              <BrandLogo name={brand.name} url={brand.logoUrl ?? null} size={40} />
 
               <Box sx={{ minWidth: 0 }}>
                 <Typography

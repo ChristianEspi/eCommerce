@@ -189,6 +189,15 @@ export const esBackoffice = {
   'pim.brands.new': 'Nueva marca',
   'pim.brands.empty': 'Todavía no diste de alta ninguna marca',
   'pim.brands.help': 'La marca es de la sociedad: la comparten todas sus tiendas.',
+  // --- Logo de marca (Storefront V2 · P02) ---------------------------------
+  'pim.brands.logo': 'Logo',
+  'pim.brands.logo.help':
+    'Se ve en la portada de tus tiendas. JPG, PNG, WebP o AVIF, hasta 2 MB. Sin logo se enseñan las iniciales de la marca.',
+  'pim.brands.logo.upload': 'Subir logo',
+  'pim.brands.logo.replace': 'Cambiar logo',
+  'pim.brands.logo.remove': 'Quitar logo',
+  'pim.brands.logo.errorType': 'Ese formato no se admite. Usa JPG, PNG, WebP o AVIF.',
+  'pim.brands.logo.errorSize': 'El logo pesa más de 2 MB. Guárdalo optimizado y vuelve a subirlo.',
   'pim.families.new': 'Nueva familia',
   'pim.families.empty': 'Todavía no diste de alta ninguna familia',
   'pim.families.help':

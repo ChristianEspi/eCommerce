@@ -26,6 +26,7 @@ import {
   saveVariant,
   setVariantAxes,
 } from './api'
+import { signedBrandLogoUrls, uploadBrandLogo } from '../api/brandLogos'
 import { CATALOG_KEY } from '../useProducts'
 import type {
   Attribute,
@@ -54,6 +55,8 @@ import type {
 export const PIM_KEY = [...CATALOG_KEY, 'pim'] as const
 
 export const brandsKey = () => [...PIM_KEY, 'brands'] as const
+export const brandLogosKey = (refs: readonly string[]) =>
+  [...PIM_KEY, 'brand-logos', refs] as const
 export const familiesKey = () => [...PIM_KEY, 'families'] as const
 export const unitsKey = () => [...PIM_KEY, 'units'] as const
 export const attributesKey = () => [...PIM_KEY, 'attributes'] as const
@@ -81,6 +84,42 @@ function useInvalidatePim() {
 
 export function useBrands(enabled = true) {
   return useQuery<Brand[]>({ queryKey: brandsKey(), queryFn: fetchBrands, enabled })
+}
+
+/**
+ * Las URL para VER los logos de las marcas en el backoffice.
+ *
+ * UNA petición para todo el lote, nunca una por fila: la tabla de marcas de un
+ * catálogo real tiene cuarenta, y cuarenta firmas son cuarenta viajes. Las
+ * rutas se deduplican y se ordenan para que la clave de caché no cambie por el
+ * orden en que llegaron.
+ *
+ * Media hora de `staleTime` contra una firma de una hora: así nunca se sirve
+ * una URL a punto de caducar desde la caché.
+ */
+export function useBrandLogoUrls(refs: readonly (string | null)[]): Record<string, string> {
+  const lote = [...new Set(refs.filter((ref): ref is string => Boolean(ref)))].sort()
+
+  const { data } = useQuery({
+    queryKey: brandLogosKey(lote),
+    queryFn: () => signedBrandLogoUrls(lote),
+    enabled: lote.length > 0,
+    staleTime: 30 * 60 * 1000,
+    retry: false,
+  })
+
+  return data ?? {}
+}
+
+/**
+ * Sube el logo y devuelve su ruta.
+ *
+ * No invalida nada: lo que cambia el estado de la pantalla es GUARDAR la marca,
+ * y hasta entonces la ruta solo vive en el formulario. Invalidar aquí haría
+ * recargar la tabla para enseñar lo de antes.
+ */
+export function useUploadBrandLogo() {
+  return useMutation({ mutationFn: uploadBrandLogo })
 }
 
 export function useFamilies(enabled = true) {

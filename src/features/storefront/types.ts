@@ -23,6 +23,7 @@ export {
   PUBLIC_PRODUCTS_VIEW,
   PUBLIC_PRODUCT_IMAGES_VIEW,
   PUBLIC_PRODUCT_VARIANTS_VIEW,
+  PUBLIC_BRANDS_VIEW,
   PRODUCT_IMAGES_BUCKET,
   STORE_ASSETS_BUCKET,
 } from '@/shared/lib/db-schema'
@@ -134,6 +135,24 @@ export const publicStoreSchema = z.object({
     .default(null),
 })
 export type PublicStore = z.infer<typeof publicStoreSchema>
+
+/**
+ * Una marca con producto publicado en esta tienda (Storefront V2 · P02).
+ *
+ * `logo_url` pasa por `assetRef`, el MISMO filtro que el logo de la tienda: una
+ * URL `https://` externa o una ruta del bucket privado, y nada más. El filtro
+ * no es cosmético — sin él, un `javascript:` guardado en la columna acabaría en
+ * el `src` de un `<img>` del dominio de la vitrina—. Lo que no pasa el filtro
+ * cae a `null` y la marca se pinta con su monograma.
+ */
+export const publicBrandSchema = z.object({
+  brand_id: z.string().uuid(),
+  store_id: z.string().uuid(),
+  code: z.string().min(1),
+  name: z.string().min(1),
+  logo_url: assetRef,
+})
+export type PublicBrand = z.infer<typeof publicBrandSchema>
 
 export const publicCategorySchema = z.object({
   category_id: z.string().uuid(),

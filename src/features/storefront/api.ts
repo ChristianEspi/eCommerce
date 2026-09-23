@@ -12,6 +12,8 @@ import {
   PUBLIC_PRODUCT_IMAGES_VIEW,
   PUBLIC_PRODUCT_VARIANTS_VIEW,
   PUBLIC_STORES_VIEW,
+  PUBLIC_BRANDS_VIEW,
+  publicBrandSchema,
   publicCategorySchema,
   publicProductImageSchema,
   publicProductSchema,
@@ -19,6 +21,7 @@ import {
   publicVariantSchema,
   type CatalogQuery,
   type GalleryImage,
+  type PublicBrand,
   type PublicCategory,
   type PublicProduct,
   type PublicStore,
@@ -127,6 +130,8 @@ export function storefrontClient(): SupabaseClient {
 const STORE_SELECT = '*'
 
 const CATEGORY_SELECT = 'category_id, store_id, parent_id, slug, name, position'
+
+const BRAND_SELECT = 'brand_id, store_id, code, name, logo_url'
 
 /** `::text` en los importes: el céntimo no pasa por el float del navegador. */
 const PRODUCT_SELECT = [
@@ -247,6 +252,40 @@ export async function fetchPublicStore(slug: string): Promise<PublicStore> {
   if (error) throw new StorefrontError(error)
   if (!data) throw new StorefrontNotFoundError(slug)
   return resolveStoreAssets(publicStoreSchema.parse(data))
+}
+
+/**
+ * Las marcas de la tienda, con su logo, en UNA consulta.
+ *
+ * ## Por qué existe si las marcas ya llegaban
+ *
+ * Llegaban por las FACETAS de la búsqueda, que devuelven código, nombre y
+ * cuenta. Es lo correcto para un filtro y es inservible para un logo: las
+ * facetas se calculan sobre el resultado YA filtrado, así que al elegir una
+ * marca vuelve una sola.
+ *
+ * La alternativa —pedir el logo marca a marca— es exactamente el N+1 que el
+ * rediseño prohíbe: una portada con cuarenta marcas serían cuarenta
+ * peticiones. Esto trae las marcas de la tienda de una vez y la portada las
+ * cruza con las facetas por `code`.
+ *
+ * No devuelve contadores a propósito: los dan las facetas, y dos fuentes para
+ * el mismo número acaban discrepando delante del comprador.
+ */
+export async function fetchPublicBrands(storeId: string | null): Promise<PublicBrand[]> {
+  if (!storeId) return []
+
+  const { data, error } = await storefront()
+    .from(PUBLIC_BRANDS_VIEW)
+    .select(BRAND_SELECT)
+    .eq('store_id', storeId)
+    .order('name')
+
+  // Una base sin la migración de P02 no tiene la vista, y eso NO puede dejar la
+  // portada sin marcas: se cae a la lista sin logos, que es lo que había antes.
+  // Mismo criterio que `fetchPublicVariants` con la migración de ejes.
+  if (error) return []
+  return publicBrandSchema.array().parse(data ?? [])
 }
 
 /** Solo categorías activas: la vista `public_categories` ya filtra `is_active`. */
