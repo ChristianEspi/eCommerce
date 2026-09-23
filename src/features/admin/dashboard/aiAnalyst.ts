@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { AppError } from '@/domain/errors'
 import type { CapabilityId } from '@/domain'
 import { AI_ERROR_KINDS, parseAiResult, type AiResult } from '@/features/ai/result'
-import type { Locale } from '@/shared/i18n/messages'
+import type { Locale, MessageKey } from '@/shared/i18n/messages'
 import { DASHBOARD_INSIGHTS_FUNCTION } from '@/shared/lib/db-schema'
 import { codeFromInvokeError } from '@/shared/lib/edgeError'
 import { formatMoney } from '@/shared/lib/format'
@@ -333,6 +333,45 @@ export function entityMetrics(
     if (metric) out.push({ field, metric })
   }
   return out
+}
+
+/** Etiqueta de cada cifra general. Lo que no está aquí no se pinta como indicador. */
+const METRIC_LABEL: Readonly<Record<string, MessageKey>> = {
+  'period.days': 'aiAnalyst.metric.period.days',
+  'sales.gross_current': 'aiAnalyst.metric.sales.gross_current',
+  'sales.gross_previous': 'aiAnalyst.metric.sales.gross_previous',
+  'sales.gross_delta_pct': 'aiAnalyst.metric.sales.gross_delta_pct',
+  'sales.orders_current': 'aiAnalyst.metric.sales.orders_current',
+  'sales.orders_previous': 'aiAnalyst.metric.sales.orders_previous',
+  'sales.orders_delta_pct': 'aiAnalyst.metric.sales.orders_delta_pct',
+  'sales.avg_ticket_current': 'aiAnalyst.metric.sales.avg_ticket_current',
+  'sales.avg_ticket_previous': 'aiAnalyst.metric.sales.avg_ticket_previous',
+  'sales.conversion_rate': 'aiAnalyst.metric.sales.conversion_rate',
+  'sales.abandonment_rate': 'aiAnalyst.metric.sales.abandonment_rate',
+  'sales.orders_total': 'aiAnalyst.metric.sales.orders_total',
+  'sales.sales_total': 'aiAnalyst.metric.sales.sales_total',
+  'catalog.products': 'aiAnalyst.metric.catalog.products',
+  'catalog.published': 'aiAnalyst.metric.catalog.published',
+  'catalog.unpublished': 'aiAnalyst.metric.catalog.unpublished',
+  'orders.pending': 'aiAnalyst.metric.orders.pending',
+  'orders.awaiting_approval': 'aiAnalyst.metric.orders.awaiting_approval',
+  'orders.unpaid_over_3d': 'aiAnalyst.metric.orders.unpaid_over_3d',
+  'orders.paid_unshipped_over_2d': 'aiAnalyst.metric.orders.paid_unshipped_over_2d',
+  'inventory.below_reorder': 'aiAnalyst.metric.inventory.below_reorder',
+  'inventory.negative': 'aiAnalyst.metric.inventory.negative',
+  'inventory.stale': 'aiAnalyst.metric.inventory.stale',
+  'inventory.idle': 'aiAnalyst.metric.inventory.idle',
+  'fulfillment.open': 'aiAnalyst.metric.fulfillment.open',
+  'fulfillment.overdue': 'aiAnalyst.metric.fulfillment.overdue',
+  'fulfillment.failed': 'aiAnalyst.metric.fulfillment.failed',
+  'credit.overdue_documents': 'aiAnalyst.metric.credit.overdue_documents',
+  'credit.overdue_balance': 'aiAnalyst.metric.credit.overdue_balance',
+  'credit.accounts_blocked': 'aiAnalyst.metric.credit.accounts_blocked',
+  'credit.accounts_watch': 'aiAnalyst.metric.credit.accounts_watch',
+}
+
+export function metricLabelKey(key: string): MessageKey | null {
+  return Object.hasOwn(METRIC_LABEL, key) ? (METRIC_LABEL[key] ?? null) : null
 }
 
 /** Enlace que abre ESE pedido en el listado (el drawer lo relee por id, con RLS). */

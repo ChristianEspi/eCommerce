@@ -219,6 +219,29 @@ describe('ai_dashboard_facts — cifras deterministas y aisladas', () => {
     expect(f.orders.attention[0]!.order_number).toBe('A-OLD-5')
     expect(JSON.stringify(f)).not.toContain('@')
   })
+
+  it('pedidos recientes: los 5 últimos, el más nuevo primero, con id y estados y sin correos', async () => {
+    const f = await hechos(claimsFor(TENANT_A), storeOf[TENANT_A.slug]!)
+    const recent = f.orders.recent as Array<Record<string, unknown>>
+    expect(recent).toHaveLength(5)
+    // Hoy: A-APR (0 días) y luego A-1 (1 día), A-2 (3), A-3 (5), A-4 (9).
+    expect(recent.map((r) => r.order_number)).toEqual(['A-APR', 'A-1', 'A-2', 'A-3', 'A-4'])
+    const ultimo = recent[0]!
+    expect(ultimo).toMatchObject({ status: 'pending', grand_total: '10.00', currency: 'PEN', age_days: 0 })
+    expect(ultimo.id).toMatch(/^[0-9a-f-]{36}$/)
+    expect(typeof ultimo.placed_at).toBe('string')
+    expect(Object.keys(ultimo)).not.toContain('customer_email')
+    // La cola de atención también trae el id para abrir el pedido.
+    expect(f.orders.attention[0]!.id).toMatch(/^[0-9a-f-]{36}$/)
+  })
+
+  it('los recientes de A nunca incluyen pedidos de B', async () => {
+    const f = await hechos(claimsFor(TENANT_A), null)
+    const numeros = (f.orders.recent as Array<Record<string, unknown>>).map((r) => r.order_number)
+    expect(numeros).not.toContain('B-1')
+    const b = await hechos(claimsFor(TENANT_B), null)
+    expect((b.orders.recent as Array<Record<string, unknown>>).map((r) => r.order_number)).toEqual(['B-1'])
+  })
 })
 
 describe('ai_dashboard_facts — secciones por módulo contratado', () => {

@@ -17,7 +17,11 @@ import {
   ANALYST_ROUTES,
   SUGGESTED_ACTIONS,
   SUGGESTED_QUESTIONS,
+  citedEntityRefs,
+  evidenceMetricKeys,
   formatMetric,
+  metricSchema,
+  orderHref,
   plainAnalystText,
   summarySchema,
   type AnalystContext,
@@ -217,6 +221,38 @@ describe('las cifras salen de la base', () => {
     expect(formatMetric({ kind: 'money', value: '10.00' }, 'es', labels)).toBe('—')
   })
 
+  it('fecha y hora solo con el tipo `datetime`, formateada en el idioma', () => {
+    const fecha = { kind: 'datetime', value: '2026-09-23T17:53:00+00:00' } as const
+    expect(metricSchema.safeParse(fecha).success).toBe(true)
+    // Un número disfrazado de fecha, o una fecha con otro tipo, no pasa.
+    expect(metricSchema.safeParse({ kind: 'datetime', value: 5 }).success).toBe(false)
+    expect(metricSchema.safeParse({ kind: 'count', value: '2026-09-23T17:53:00+00:00' }).success).toBe(false)
+    expect(formatMetric(fecha, 'es', labels)).toMatch(/2026/)
+  })
+
+  it('las tarjetas salen de lo que la respuesta cita, en orden y sin repetir', () => {
+    const ctx: AnalystContext = {
+      ...CONTEXT,
+      metrics: { ...CONTEXT.metrics, 'R1.total': { kind: 'money', value: '1.00', currency: 'PEN' } },
+      entities: {
+        ...CONTEXT.entities,
+        R1: { kind: 'order', label: 'EC-1', detail: 'pending', module: 'orders', route: '/app/orders' },
+      },
+    }
+    expect(citedEntityRefs('{{R1.total}} y {{O1}} y {{R1}} y {{X9}}', ['O1.age_days'], ctx)).toEqual(['R1', 'O1'])
+    // Indicadores: solo cifras generales existentes; las de entidad van en su tarjeta.
+    expect(evidenceMetricKeys(['R1.total', 'sales.gross_delta_pct', 'sales.inventada', 'sales.gross_delta_pct'], ctx)).toEqual([
+      'sales.gross_delta_pct',
+    ])
+  })
+
+  it('el enlace a un pedido solo existe con su id', () => {
+    const id = '33333333-3333-4333-8333-333333333333'
+    expect(orderHref({ kind: 'order', id })).toBe(`/app/orders?order=${id}`)
+    expect(orderHref({ kind: 'order' })).toBeNull()
+    expect(orderHref({ kind: 'customer', id })).toBeNull()
+  })
+
   it('una respuesta con ruta fuera de la lista cerrada no se pinta', () => {
     const body = summaryBody()
     const insights = body.data.insights as Array<Record<string, unknown>>
@@ -238,9 +274,12 @@ describe('Resumen inteligente', () => {
     expect(insights).toHaveBeenCalledTimes(1)
     expect(insights.mock.calls[0]).toEqual([{ mode: 'summary', store_id: STORE_A, locale: 'es' }])
 
-    // Cifras de la base, entidad, severidad descrita con texto y pulgar.
-    expect(screen.getByText('7')).toBeInTheDocument()
-    expect(screen.getByText('+55 %')).toBeInTheDocument()
+    // Cifras de la base (en el texto y como indicador con su nombre), entidad,
+    // severidad descrita con texto y pulgar.
+    expect(screen.getAllByText('7').length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByText('Sin pagar (+3 días)')).toBeInTheDocument()
+    expect(screen.getAllByText('+55 %').length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByText('Variación de ventas')).toBeInTheDocument()
     expect(screen.getByText('Pedido: A-OLD-5')).toBeInTheDocument()
     expect(screen.getByText('Prioridad alta')).toBeInTheDocument()
     expect(screen.getByRole('group', { name: '¿Te sirvió?' })).toBeInTheDocument()
@@ -335,13 +374,65 @@ describe('Preguntar sobre estos datos', () => {
     )
     render({ insights })
     await userEvent.click(await screen.findByRole('button', { name: '¿Por qué cambiaron las ventas?' }))
-    expect(await screen.findByText('+55 %')).toBeInTheDocument()
+    // En el texto y en el indicador «Datos clave».
+    expect((await screen.findAllByText('+55 %')).length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByText('Datos clave')).toBeInTheDocument()
     expect(insights).toHaveBeenCalledWith({
       mode: 'ask',
       store_id: STORE_A,
       locale: 'es',
       question: '¿Por qué cambiaron las ventas?',
     })
+  })
+
+  it('«¿cuál fue mi último pedido?»: tarjeta del pedido con total, estados y enlace a ESE pedido', async () => {
+    const ORDER_ID = '33333333-3333-4333-8333-333333333333'
+    const insights = vi.fn((body: Record<string, unknown>) =>
+      body.mode === 'ask'
+        ? {
+            data: {
+              generated_at: '2026-09-23T18:00:00Z',
+              metrics: {
+                'R1.total': { kind: 'money', value: '39.86', currency: 'PEN' },
+                'R1.placed_at': { kind: 'datetime', value: '2026-09-23T17:53:00+00:00' },
+                'R1.age_days': { kind: 'days', value: 0 },
+              },
+              entities: {
+                R1: {
+                  kind: 'order',
+                  label: 'EC-20260923-00043',
+                  detail: 'pending',
+                  module: 'orders',
+                  route: '/app/orders',
+                  id: ORDER_ID,
+                  facets: { payment: 'pending', fulfillment: 'unfulfilled' },
+                },
+              },
+              answerable: true,
+              answer: 'Tu último pedido es {{R1}}, por {{R1.total}}.',
+              module: 'orders',
+              route: '/app/orders',
+              evidence: ['R1.total', 'R1.placed_at'],
+            },
+            motivo: null,
+            interaction_id: INTERACTION,
+          }
+        : summaryBody(),
+    )
+    render({ insights })
+    await userEvent.click(await screen.findByRole('button', { name: '¿Cuál fue mi último pedido?' }))
+
+    const card = await screen.findByRole('article', { name: 'Pedido EC-20260923-00043' })
+    const inCard = within(card)
+    expect(inCard.getByText(/39[.,]86/)).toBeInTheDocument()
+    expect(inCard.getByText('Último')).toBeInTheDocument()
+    // Los tres ejes con las mismas etiquetas que el listado de Pedidos.
+    expect(inCard.getByText('Pendiente')).toBeInTheDocument()
+    expect(inCard.getByText('Sin cobrar')).toBeInTheDocument()
+    expect(inCard.getByText('Sin despachar')).toBeInTheDocument()
+    // Abre ESE pedido (el listado lo relee por id, con RLS).
+    expect(inCard.getByRole('link', { name: 'Abrir pedido' })).toHaveAttribute('href', `/app/orders?order=${ORDER_ID}`)
+    expect(screen.getByText('Lo que menciona la respuesta')).toBeInTheDocument()
   })
 
   it('una pregunta escrita demasiado larga no se envía', async () => {

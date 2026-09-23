@@ -27,19 +27,25 @@ import type { AiErrorKind } from '@/features/ai/result'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { AppIcon, type AppIconTone } from '@/shared/ui/AppIcon'
-import { T } from '@/theme/tokens'
+import { C, T } from '@/theme/tokens'
 import {
   ANALYST_ROUTE_CAPABILITY,
   ANALYST_ROUTES,
   MAX_QUESTION,
   SUGGESTED_QUESTIONS,
   canRetryMotivo,
+  citedEntityRefs,
+  evidenceMetricKeys,
+  metricLabelKey,
+  orderHref,
   renderAnalystText,
+  type AnalystAnswer,
   type AnalystContext,
   type AnalystInsight,
   type AnalystModule,
   type Severity,
 } from './aiAnalyst'
+import { AnswerHeader, CardGrid, EntityCard, MetricTile, SectionLabel } from './AnalystCards'
 import { useAnalystSummary, useAskAnalyst } from './useAiAnalyst'
 
 const SEVERITY_TONE: Record<Severity, AppIconTone> = { high: 'danger', medium: 'warning', low: 'info' }
@@ -120,7 +126,12 @@ function InsightCard({
   context: AnalystContext
 }) {
   const { t } = useI18n()
+  const { has } = useCapabilities()
   const entity = insight.entity_ref ? context.entities[insight.entity_ref] : undefined
+  const evidence = evidenceMetricKeys(insight.evidence, context)
+    .filter((k) => metricLabelKey(k) !== null)
+    .slice(0, 2)
+  const orderLink = entity && has('orders') ? orderHref(entity) : null
   return (
     <Card variant="outlined" sx={{ height: '100%' }} component="article">
       <CardContent sx={{ p: 2, '&:last-child': { pb: 2 }, height: '100%', display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -148,6 +159,13 @@ function InsightCard({
             sx={{ alignSelf: 'flex-start', maxWidth: '100%' }}
           />
         )}
+        {evidence.length > 0 && (
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 0.75 }}>
+            {evidence.map((key) => (
+              <MetricTile key={key} metricKey={key} context={context} />
+            ))}
+          </Box>
+        )}
         {insight.action_label && (
           <Typography sx={{ fontSize: 12.5, color: 'var(--muted)' }}>
             <Box component="span" sx={{ fontWeight: 700 }}>
@@ -156,9 +174,14 @@ function InsightCard({
             <AnalystText text={insight.action_label} context={context} />
           </Typography>
         )}
-        <Box sx={{ mt: 'auto', pt: 0.5 }}>
+        <Stack direction="row" useFlexGap spacing={1} sx={{ mt: 'auto', pt: 0.5, flexWrap: 'wrap' }}>
+          {orderLink && (
+            <Button component={RouterLink} to={orderLink} size="small" variant="contained" endIcon={<ArrowForwardRoundedIcon />}>
+              {t('aiAnalyst.card.openOrder')}
+            </Button>
+          )}
           <ModuleLink module={insight.module} />
-        </Box>
+        </Stack>
       </CardContent>
     </Card>
   )
@@ -246,6 +269,75 @@ function SummarySection({ storeId }: { storeId: string | null }) {
         )}
       </Box>
     </Stack>
+  )
+}
+
+/**
+ * Respuesta como ficha: el texto breve arriba y, debajo, lo que cita —cifras
+ * generales como indicadores y entidades (pedidos, stock, clientes…) como
+ * tarjetas—. Todo sale de `metrics`/`entities`; el modelo solo eligió qué citar.
+ */
+function AnswerView({
+  answer,
+  question,
+  interactionId,
+}: {
+  answer: AnalystAnswer
+  question: string | null
+  interactionId: string | null
+}) {
+  const { t } = useI18n()
+  const refs = citedEntityRefs(answer.answer, answer.evidence, answer)
+  const keys = evidenceMetricKeys(answer.evidence, answer).filter((k) => metricLabelKey(k) !== null)
+  return (
+    <Box
+      component="article"
+      sx={{
+        p: { xs: 1.75, sm: 2.25 },
+        borderRadius: 3,
+        border: `1px solid ${C.line}`,
+        bgcolor: C.card,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 2,
+      }}
+    >
+      <AnswerHeader answerable={answer.answerable} question={question} />
+      <Typography sx={{ fontSize: 14.5, lineHeight: 1.6, whiteSpace: 'pre-line' }}>
+        <AnalystText text={answer.answer} context={answer} />
+      </Typography>
+
+      {keys.length > 0 && (
+        <Stack spacing={1}>
+          <SectionLabel>{t('aiAnalyst.answer.keyData')}</SectionLabel>
+          <CardGrid min={150}>
+            {keys.map((key) => (
+              <MetricTile key={key} metricKey={key} context={answer} />
+            ))}
+          </CardGrid>
+        </Stack>
+      )}
+
+      {refs.length > 0 && (
+        <Stack spacing={1}>
+          <SectionLabel>{t('aiAnalyst.answer.cited')}</SectionLabel>
+          <CardGrid>
+            {refs.map((ref) => (
+              <EntityCard key={ref} entityRef={ref} context={answer} />
+            ))}
+          </CardGrid>
+        </Stack>
+      )}
+
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={1}
+        sx={{ alignItems: { xs: 'flex-start', sm: 'center' }, justifyContent: 'space-between' }}
+      >
+        {answer.module ? <ModuleLink module={answer.module} /> : <span />}
+        <AiFeedbackButtons interactionId={interactionId} />
+      </Stack>
+    </Box>
   )
 }
 
@@ -341,21 +433,7 @@ function AskSection({ storeId }: { storeId: string | null }) {
           <MotivoNotice motivo={result.motivo} onRetry={asked ? () => send(asked) : undefined} />
         )}
         {!ask.isPending && !ask.isError && result?.data && (
-          <Card variant="outlined">
-            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 }, display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {asked && (
-                <Typography sx={{ fontSize: 12.5, color: 'var(--muted)', fontStyle: 'italic' }}>{asked}</Typography>
-              )}
-              {!result.data.answerable && (
-                <Typography sx={{ fontSize: 12.5, fontWeight: 700 }}>{t('aiAnalyst.ask.notAnswerable')}</Typography>
-              )}
-              <Typography sx={{ fontSize: 13.5, lineHeight: 1.55, whiteSpace: 'pre-line' }}>
-                <AnalystText text={result.data.answer} context={result.data} />
-              </Typography>
-              {result.data.module && <ModuleLink module={result.data.module} />}
-              <AiFeedbackButtons interactionId={result.interactionId} />
-            </CardContent>
-          </Card>
+          <AnswerView answer={result.data} question={asked} interactionId={result.interactionId} />
         )}
       </Box>
     </Stack>

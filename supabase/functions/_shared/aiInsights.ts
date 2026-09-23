@@ -119,7 +119,7 @@ const DECIMAL = /^-?\d{1,15}(\.\d{1,6})?$/
 const MONEDA = /^[A-Z]{3}$/
 const CODIGO = /^[a-z_]{1,40}$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const FECHA_HORA = /^d{4}-d{2}-d{2}Td{2}:d{2}(:d{2}(.d{1,6})?)?(Z|[+-]d{2}:d{2})$/
+const FECHA_HORA = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+-]\d{2}:\d{2})$/
 
 function objeto(v: unknown): Objeto | null {
   return v && typeof v === 'object' && !Array.isArray(v) ? (v as Objeto) : null
