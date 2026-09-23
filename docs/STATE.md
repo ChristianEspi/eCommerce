@@ -25,6 +25,12 @@ cambian (siguen siendo el guard de las funciones). Ensayo en QAS con rollback: `
 26 s → 0,38 s, `inventory_alerts` 9,8 s → 0,23 s. **Regla nueva:** una policy nueva se escribe con esa
 forma; `supabase/tests/rls-initplan.test.ts` pone rojo cualquier `can_access`/`has_role` por fila.
 
+**Despliegue en QAS (2026-09-23, a pedido del operador):** migración
+`20260923110000_ai_dashboard_recent_orders.sql` aplicada con registro (`db push`; el resto ya estaba);
+18 Edge Functions de IA redesplegadas (`dashboard-insights`, los 14 asistentes, `copilot`,
+`shopping-assistant`, `catalog-copy`) con `aiCore`/`aiInsights` al día; frontend por fast-forward de
+`dev` a `upstream/qas` (`a6c800c..8171b68`). Smoke de QAS `NOT_RUN` (sin `QAS_BASE_URL`).
+
 ## Secuencia de IA (`EBIM_AI_SEQUENCE`, desde 2026-09-21)
 
 Fase 00 (análisis y plan) cerrada sin cambios de código. Arquitectura actual/objetivo en
