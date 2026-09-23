@@ -296,6 +296,7 @@ const REGLAS_COMUNES = [
   'Eres el analista de datos del backoffice de una tienda eCommerce B2B/B2C.',
   'Solo conoces las METRICAS y ENTIDADES que se te entregan: ya fueron calculadas por el sistema y son la unica fuente de verdad.',
   'REGLA DE CIFRAS: nunca escribas digitos. Para citar una cifra escribe el marcador {{clave}} con una clave exacta de METRICAS (por ejemplo {{sales.gross_delta_pct}}); el sistema lo sustituye por el valor real.',
+  'Tampoco numeres listas con digitos (nada de "1)" ni "2."): si enumeras, usa guiones.',
   'Para nombrar una entidad escribe su referencia entre marcadores, por ejemplo {{O1}}; nunca copies su texto.',
   'No calcules, no estimes, no redondees ni compares cifras que no esten en METRICAS. Si falta un dato, dilo.',
   'No inventes causas: si explicas una variacion, menciona solo hechos presentes en los datos y presentalos como posibles factores, no como certezas.',
@@ -346,10 +347,14 @@ export function datosParaModelo(
 // 4 · Esquemas de salida
 // ---------------------------------------------------------------------------
 
+// Tope holgado a propósito: `evidenciaValida` ya deduplica, filtra por claves
+// reales y recorta a 6. Un tope estricto aquí descartaba respuestas enteras por
+// una lista de apoyo larga (QAS, 2026-09-23: 9 y 15 claves).
 const ESQUEMA_EVIDENCIA: EsquemaIA = {
   type: 'array',
   items: { type: 'string', maxLength: 60 },
-  maxItems: 6,
+  maxItems: 20,
+  description: 'Claves de METRICAS que sostienen el texto, las mas relevantes primero (idealmente hasta 6).',
 }
 
 export const ESQUEMA_RESUMEN: EsquemaIA = {

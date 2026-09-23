@@ -245,9 +245,21 @@ describe('validación runtime de la salida', () => {
       additionalProperties: boolean
     }
     expect(api.additionalProperties).toBe(false)
-    expect(api.properties.titulo).toEqual({ type: 'string' })
+    expect(JSON.stringify(api)).not.toMatch(/maxLength|minLength|maxItems|minItems|"minimum"|"maximum"/)
     expect(api.properties.nivel).toEqual({ type: 'string', enum: ['alto', 'bajo'] })
-    expect(api.properties.claves).toEqual({ type: 'array', items: { type: 'string' } })
+  })
+
+  it('los límites retirados viajan como texto en la descripción, para que el modelo los lea', () => {
+    const api = esquemaParaProveedor(esquema) as { properties: Record<string, Record<string, unknown>> }
+    expect(api.properties.titulo).toEqual({ type: 'string', description: 'Maximo 10 caracteres.' })
+    expect(api.properties.claves).toEqual({
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Maximo 2 elementos.',
+    })
+    expect(api.properties.puntos).toEqual({ type: 'integer', description: 'Valor minimo 0.' })
+    const conBase = esquemaParaProveedor({ type: 'string', maxLength: 5, description: 'Codigo.' })
+    expect(conBase).toEqual({ type: 'string', description: 'Codigo. Maximo 5 caracteres.' })
   })
 })
 
