@@ -9,10 +9,11 @@
  *    como marcador `{{clave}}`; el front las pinta desde el dato de origen con
  *    el formato de su idioma. Un dígito escrito por el modelo es una cifra que
  *    nadie calculó → el insight se descarta (`bloqueada`).
- *  - **Entidades** con referencia corta (`O1` pedido, `S1` stock bajo, `I1`
- *    stock sin movimiento, `D1` entrega vencida, `C1` cliente con deuda, `P1`
- *    producto más vendido). El modelo las cita por su referencia; un id que no
- *    estaba en el dataset se descarta.
+ *  - **Entidades** con referencia corta (`O1` pedido que pide atención, `R1`
+ *    pedido reciente —R1 es el último—, `S1` stock bajo, `I1` stock sin
+ *    movimiento, `D1` entrega vencida, `C1` cliente con deuda, `P1` producto
+ *    más vendido). El modelo las cita por su referencia; un id que no estaba en
+ *    el dataset se descarta.
  *
  * Rutas destino y acciones sugeridas son enums cerrados: la IA sugiere ir a
  * revisar, nunca ejecuta nada (patrón proponer → confirmar → validar → ejecutar).
@@ -63,6 +64,7 @@ export type AccionSugerida = (typeof ACCIONES_SUGERIDAS)[number]
 /** Preguntas sugeridas (el front las traduce; la persona también puede escribir). */
 export const PREGUNTAS_SUGERIDAS = [
   'review_today',
+  'last_order',
   'sales_change',
   'orders_attention',
   'products_review',
@@ -76,11 +78,11 @@ export const MAX_PREGUNTA = 300
 // 2 · Del dataset SQL a métricas y entidades
 // ---------------------------------------------------------------------------
 
-export type TipoMetrica = 'count' | 'money' | 'percent' | 'days' | 'quantity'
+export type TipoMetrica = 'count' | 'money' | 'percent' | 'days' | 'quantity' | 'datetime'
 
 export interface Metrica {
   readonly kind: TipoMetrica
-  /** Decimal en texto para dinero/porcentaje/cantidad; entero para el resto. */
+  /** Decimal en texto para dinero/porcentaje/cantidad; ISO 8601 para `datetime`; entero para el resto. */
   readonly value: string | number
   readonly currency?: string
 }
@@ -94,6 +96,13 @@ export interface Entidad {
   /** Código cerrado (motivo, estado) sin cifras. */
   readonly detail: string | null
   readonly module: ModuloAnalista
+  /**
+   * Id de la fila (uuid). Lo usa el FRONT para abrir esa ficha; el modelo no lo
+   * ve (`datosParaModelo` no lo manda) y la RLS vuelve a decidir al leerla.
+   */
+  readonly id?: string
+  /** Estados por eje (`payment`, `fulfillment`…) como códigos cerrados. */
+  readonly facets?: Readonly<Record<string, string>>
 }
 
 export interface HechosDashboard {
@@ -109,6 +118,8 @@ type Objeto = Record<string, unknown>
 const DECIMAL = /^-?\d{1,15}(\.\d{1,6})?$/
 const MONEDA = /^[A-Z]{3}$/
 const CODIGO = /^[a-z_]{1,40}$/
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const FECHA_HORA = /^d{4}-d{2}-d{2}Td{2}:d{2}(:d{2}(.d{1,6})?)?(Z|[+-]d{2}:d{2})$/
 
 function objeto(v: unknown): Objeto | null {
   return v && typeof v === 'object' && !Array.isArray(v) ? (v as Objeto) : null
@@ -141,6 +152,15 @@ function codigo(v: unknown): string | null {
   return typeof v === 'string' && CODIGO.test(v) ? v : null
 }
 
+function uuid(v: unknown): string | undefined {
+  return typeof v === 'string' && UUID.test(v) ? v.toLowerCase() : undefined
+}
+
+/** Timestamp de Postgres serializado por `jsonb` (`2026-09-23T17:53:01.12+00:00`). */
+function fechaHora(v: unknown): string | null {
+  return typeof v === 'string' && FECHA_HORA.test(v) ? v : null
+}
+
 /**
  * Convierte la respuesta de `ai_dashboard_facts` en listas cerradas.
  *
@@ -169,6 +189,10 @@ export function hechosDelDashboard(raw: unknown): HechosDashboard {
   const cantidad = (clave: string, v: unknown) => {
     const d = decimal(v)
     if (d !== null) metrics[clave] = { kind: 'quantity', value: d }
+  }
+  const momento = (clave: string, v: unknown) => {
+    const f = fechaHora(v)
+    if (f !== null) metrics[clave] = { kind: 'datetime', value: f }
   }
 
   contar('period.days', r.period_days, 'days')
@@ -219,7 +243,30 @@ export function hechosDelDashboard(raw: unknown): HechosDashboard {
       const ref = `O${i + 1}`
       const label = texto(o.order_number, 40)
       if (!label) return
-      entities[ref] = { kind: 'order', label, detail: codigo(o.reason), module: 'orders' }
+      entities[ref] = { kind: 'order', label, detail: codigo(o.reason), module: 'orders', id: uuid(o.id) }
+      contar(`${ref}.age_days`, o.age_days, 'days')
+    })
+    // Recientes: R1 es el último pedido. `detail` = estado comercial; los
+    // otros dos ejes van en `facets` para que la tarjeta los enseñe.
+    lista(orders.recent).forEach((o, i) => {
+      const ref = `R${i + 1}`
+      const label = texto(o.order_number, 40)
+      if (!label) return
+      const facets: Record<string, string> = {}
+      const pago = codigo(o.payment_status)
+      const envio = codigo(o.fulfillment_status)
+      if (pago) facets.payment = pago
+      if (envio) facets.fulfillment = envio
+      entities[ref] = {
+        kind: 'order',
+        label,
+        detail: codigo(o.status),
+        module: 'orders',
+        id: uuid(o.id),
+        facets,
+      }
+      dinero(`${ref}.total`, o.grand_total, moneda(o.currency))
+      momento(`${ref}.placed_at`, o.placed_at)
       contar(`${ref}.age_days`, o.age_days, 'days')
     })
   }
@@ -298,6 +345,8 @@ const REGLAS_COMUNES = [
   'REGLA DE CIFRAS: nunca escribas digitos. Para citar una cifra escribe el marcador {{clave}} con una clave exacta de METRICAS (por ejemplo {{sales.gross_delta_pct}}); el sistema lo sustituye por el valor real.',
   'Tampoco numeres listas con digitos (nada de "1)" ni "2."): si enumeras, usa guiones.',
   'Para nombrar una entidad escribe su referencia entre marcadores, por ejemplo {{O1}}; nunca copies su texto.',
+  'Referencias: O = pedidos que piden atencion (O1 el mas antiguo); R = pedidos mas recientes (R1 es el ultimo pedido, con {{R1.total}} y {{R1.placed_at}}); S = stock bajo; I = stock sin movimiento; D = entregas vencidas; C = clientes con deuda; P = productos mas vendidos.',
+  'Cuando la respuesta trate de entidades concretas, citalas con su marcador: la pantalla las muestra como tarjetas con su detalle, asi que el texto puede ser breve.',
   'No calcules, no estimes, no redondees ni compares cifras que no esten en METRICAS. Si falta un dato, dilo.',
   'No inventes causas: si explicas una variacion, menciona solo hechos presentes en los datos y presentalos como posibles factores, no como certezas.',
   'Nunca propongas ejecutar acciones (aprobar, cancelar, cobrar, cambiar precios o stock): solo sugiere que la persona revise el modulo correspondiente.',
@@ -331,7 +380,13 @@ export function datosParaModelo(
   }
   const entidades: Record<string, unknown> = {}
   for (const [ref, e] of Object.entries(hechos.entities)) {
-    entidades[ref] = { kind: e.kind, module: e.module, label: e.label, ...(e.detail ? { detail: e.detail } : {}) }
+    entidades[ref] = {
+      kind: e.kind,
+      module: e.module,
+      label: e.label,
+      ...(e.detail ? { detail: e.detail } : {}),
+      ...(e.facets && Object.keys(e.facets).length > 0 ? { facets: e.facets } : {}),
+    }
   }
   const partes = [
     `IDIOMA: ${locale === 'en' ? 'English' : 'Español'}`,
@@ -590,7 +645,15 @@ export function contextoParaFront(hechos: HechosDashboard) {
     entities: Object.fromEntries(
       Object.entries(hechos.entities).map(([ref, e]) => [
         ref,
-        { kind: e.kind, label: e.label, detail: e.detail, module: e.module, route: RUTA_DE_MODULO[e.module] },
+        {
+          kind: e.kind,
+          label: e.label,
+          detail: e.detail,
+          module: e.module,
+          route: RUTA_DE_MODULO[e.module],
+          ...(e.id ? { id: e.id } : {}),
+          ...(e.facets && Object.keys(e.facets).length > 0 ? { facets: e.facets } : {}),
+        },
       ]),
     ),
   }
