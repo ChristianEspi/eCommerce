@@ -78,11 +78,12 @@ function orderRow(patch: Record<string, unknown> = {}) {
 
 /**
  * Las RPC que ESCRIBEN. Desde la fase 04 la pantalla lee además el saldo de IA
- * (`ai_entitlement`, solo lectura) para decidir si enseña el asistente; esa
- * lectura no es un comando y no cuenta aquí.
+ * (`ai_entitlement`) y los conteos de los indicadores (`ai_orders_search`), las
+ * dos de solo lectura; esas lecturas no son comandos y no cuentan aquí.
  */
+const LECTURAS = new Set(['ai_entitlement', 'ai_orders_search'])
 function comandos(client: FakeSupabase) {
-  return client.state.rpcCalls.filter((c) => c.name !== 'ai_entitlement')
+  return client.state.rpcCalls.filter((c) => !LECTURAS.has(c.name))
 }
 
 function backend(role: 'admin' | 'viewer' = 'admin'): FakeSupabase {

@@ -1,10 +1,15 @@
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
+import HowToRegOutlinedIcon from '@mui/icons-material/HowToRegOutlined'
+import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined'
+import PriorityHighRoundedIcon from '@mui/icons-material/PriorityHighRounded'
+import ScheduleRoundedIcon from '@mui/icons-material/ScheduleRounded'
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded'
 import {
   Alert,
   Box,
   Button,
+  ButtonBase,
   Card,
   CardContent,
   Chip,
@@ -13,7 +18,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import { AiFeedbackButtons } from '@/features/ai/AiFeedbackButtons'
 import { useAiFeature } from '@/features/ai/hooks'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -21,7 +26,7 @@ import type { MessageKey } from '@/shared/i18n/messages'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import { AppIcon } from '@/shared/ui/AppIcon'
 import { StatusChip } from '@/shared/ui/StatusChip'
-import { T } from '@/theme/tokens'
+import { C, SH, T } from '@/theme/tokens'
 import {
   APPROVAL_LABEL,
   FULFILLMENT_COLOR,
@@ -34,8 +39,10 @@ import {
 } from '../status'
 import {
   MAX_ORDER_QUESTION,
+  ORDER_INDICATORS,
   describeFilters,
   suggestedActionFor,
+  type OrderIndicator,
   type AttentionSystem,
   type OrderAiFilters,
   type OrderDrawerTab,
@@ -44,14 +51,120 @@ import {
 } from './ordersAi'
 import { SuggestedActionButton } from './OrderAiPanel'
 import { MarkerText, MotivoNotice, SeverityIcon } from './parts'
-import { useOrdersAttention, useOrdersNaturalSearch } from './useOrdersAi'
-
-/** Ejemplos de búsqueda en lenguaje natural (se envían tal cual). */
-export const SEARCH_EXAMPLES = ['paid_unshipped', 'unpaid_week', 'awaiting'] as const
+import { useIndicatorOrders, useOrderIndicators, useOrdersAttention, useOrdersNaturalSearch } from './useOrdersAi'
 
 type Resultado =
   | { readonly kind: 'search'; readonly question: string }
   | { readonly kind: 'attention' }
+  | { readonly kind: 'indicator'; readonly indicator: OrderIndicator }
+
+type IndicatorTone = 'danger' | 'warning' | 'info' | 'neutral'
+
+const INDICATOR_TONE: Record<OrderIndicator, Exclude<IndicatorTone, 'neutral'>> = {
+  attention: 'danger',
+  paid_unshipped: 'warning',
+  unpaid_week: 'warning',
+  awaiting: 'info',
+}
+
+const TONE_COLORS: Record<IndicatorTone, { fg: string; soft: string }> = {
+  danger: { fg: C.red, soft: C.redSoft },
+  warning: { fg: C.amber, soft: C.amberSoft },
+  info: { fg: C.blue, soft: C.blueSoft },
+  neutral: { fg: C.muted, soft: C.neutralSoft },
+}
+
+const INDICATOR_ICON: Record<OrderIndicator, ReactNode> = {
+  attention: <PriorityHighRoundedIcon />,
+  paid_unshipped: <LocalShippingOutlinedIcon />,
+  unpaid_week: <ScheduleRoundedIcon />,
+  awaiting: <HowToRegOutlinedIcon />,
+}
+
+/**
+ * Indicador del listado: conteo del SISTEMA (sin modelo), clicable para ver
+ * esos pedidos. En cero pasa a neutro: no hay nada que mirar.
+ */
+function IndicatorCard({
+  indicator,
+  count,
+  loading,
+  selected,
+  onClick,
+}: {
+  indicator: OrderIndicator
+  count: number | null | undefined
+  loading: boolean
+  selected: boolean
+  onClick: () => void
+}) {
+  const { t } = useI18n()
+  const tone = TONE_COLORS[count === 0 ? 'neutral' : INDICATOR_TONE[indicator]]
+  const label = t(`aiOrders.indicator.${indicator}` as MessageKey)
+  return (
+    <ButtonBase
+      onClick={onClick}
+      aria-pressed={selected}
+      aria-label={`${label}: ${count ?? '—'}`}
+      sx={{
+        position: 'relative',
+        overflow: 'hidden',
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'stretch',
+        textAlign: 'left',
+        gap: 1.25,
+        p: 1.75,
+        pl: 2,
+        borderRadius: 3,
+        bgcolor: selected ? tone.soft : C.card,
+        border: `1px solid ${selected ? tone.fg : C.line}`,
+        transition: 'border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: 4,
+          bgcolor: tone.fg,
+          opacity: 0.85,
+        },
+        '&:hover': { borderColor: tone.fg, boxShadow: SH.lg, transform: 'translateY(-1px)' },
+        '&.Mui-focusVisible': { outline: `2px solid ${C.accent}`, outlineOffset: 2 },
+        '@media (prefers-reduced-motion: reduce)': { transition: 'none', '&:hover': { transform: 'none' } },
+      }}
+    >
+      <Box
+        aria-hidden
+        sx={{
+          width: 32,
+          height: 32,
+          borderRadius: '50%',
+          display: 'grid',
+          placeItems: 'center',
+          bgcolor: selected ? C.card : tone.soft,
+          color: tone.fg,
+          '& .MuiSvgIcon-root': { fontSize: 18 },
+        }}
+      >
+        {INDICATOR_ICON[indicator]}
+      </Box>
+      <Box sx={{ minWidth: 0 }}>
+        {loading ? (
+          <Skeleton variant="text" width={40} sx={{ fontSize: T.kpiCard }} />
+        ) : (
+          <Typography className="tnum" sx={{ fontSize: T.kpiCard, fontWeight: 800, lineHeight: 1.1, letterSpacing: -0.3 }}>
+            {count ?? '—'}
+          </Typography>
+        )}
+        <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: C.muted, lineHeight: 1.3, mt: 0.5 }}>{label}</Typography>
+      </Box>
+    </ButtonBase>
+  )
+}
 
 function filterValueLabel(
   key: keyof OrderAiFilters,
@@ -302,8 +415,11 @@ export function OrdersAiBar({
   const attention = useOrdersAttention(locale)
   const [question, setQuestion] = useState('')
   const [shown, setShown] = useState<Resultado | null>(null)
+  const visible = availability !== 'forbidden' && availability !== 'loading'
+  const indicators = useOrderIndicators(storeId, visible)
+  const indicatorRows = useIndicatorOrders(storeId, shown?.kind === 'indicator' ? shown.indicator : null)
 
-  if (availability === 'forbidden' || availability === 'loading') return null
+  if (!visible) return null
 
   const canAsk = availability === 'available'
   const busy = search.isPending || attention.isPending
@@ -321,6 +437,12 @@ export function OrdersAiBar({
     setShown({ kind: 'attention' })
     search.reset()
     attention.mutate({ storeId })
+  }
+  const toggleIndicator = (indicator: OrderIndicator) => {
+    if (busy) return
+    search.reset()
+    attention.reset()
+    setShown((prev) => (prev?.kind === 'indicator' && prev.indicator === indicator ? null : { kind: 'indicator', indicator }))
   }
   const clear = () => {
     setShown(null)
@@ -359,6 +481,37 @@ export function OrdersAiBar({
           )}
         </Stack>
 
+        {/* Indicadores del SISTEMA: se ven aunque la IA no esté contratada o
+            no quede cuota, porque no la usan. */}
+        <Stack spacing={1}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap' }} useFlexGap>
+            <Typography component="h3" sx={{ fontSize: T.label, fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+              {t('aiOrders.indicators.title')}
+            </Typography>
+            <Typography sx={{ fontSize: 11.5, color: C.muted }}>{t('aiOrders.indicators.free')}</Typography>
+          </Stack>
+          {indicators.isError ? (
+            <Typography sx={{ fontSize: 12.5, color: C.muted }}>{t('aiOrders.indicators.error')}</Typography>
+          ) : (
+            <Box
+              role="group"
+              aria-label={t('aiOrders.indicators.title')}
+              sx={{ display: 'grid', gap: 1.25, gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' } }}
+            >
+              {ORDER_INDICATORS.map((key) => (
+                <IndicatorCard
+                  key={key}
+                  indicator={key}
+                  count={indicators.data?.[key]}
+                  loading={indicators.isPending}
+                  selected={shown?.kind === 'indicator' && shown.indicator === key}
+                  onClick={() => toggleIndicator(key)}
+                />
+              ))}
+            </Box>
+          )}
+        </Stack>
+
         {availability === 'not_entitled' && <MotivoNotice motivo="sin_contratar" />}
         {availability === 'quota_exhausted' && <MotivoNotice motivo="sin_cuota" />}
 
@@ -388,37 +541,41 @@ export function OrdersAiBar({
                 </Button>
               </Stack>
             </Box>
-            <Stack direction="row" useFlexGap spacing={1} sx={{ flexWrap: 'wrap' }} role="group" aria-label={t('aiOrders.suggested')}>
-              <Chip
-                label={t('aiOrders.attention.run')}
-                color="primary"
-                variant="outlined"
-                clickable
-                icon={<AutoAwesomeRoundedIcon fontSize="small" />}
-                disabled={busy}
-                onClick={runAttention}
-              />
-              {SEARCH_EXAMPLES.map((id) => {
-                const label = t(`aiOrders.example.${id}` as MessageKey)
-                return (
-                  <Chip
-                    key={id}
-                    label={label}
-                    variant="outlined"
-                    clickable
-                    disabled={busy}
-                    onClick={() => {
-                      setQuestion(label)
-                      runSearch(label)
-                    }}
-                  />
-                )
-              })}
-            </Stack>
           </>
         )}
 
-        {shown && active && (
+        {shown?.kind === 'indicator' && (
+          <Box aria-live="polite" aria-busy={indicatorRows.isFetching}>
+            {indicatorRows.isPending && <Skeleton variant="rounded" height={96} />}
+            {indicatorRows.isError && (
+              <Alert
+                severity="error"
+                action={
+                  <Button color="inherit" size="small" onClick={() => void indicatorRows.refetch()}>
+                    {t('common.retry')}
+                  </Button>
+                }
+              >
+                {t('aiOrders.indicators.error')}
+              </Alert>
+            )}
+            {indicatorRows.data && (
+              <Stack spacing={1.25}>
+                {shown.indicator === 'attention' && canAsk && indicatorRows.data.total > 0 && (
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' } }}>
+                    <Button variant="contained" startIcon={<AutoAwesomeRoundedIcon />} onClick={runAttention} disabled={busy}>
+                      {t('aiOrders.indicator.analyze')}
+                    </Button>
+                    <Typography sx={{ fontSize: 12, color: C.muted }}>{t('aiOrders.indicator.analyzeHint')}</Typography>
+                  </Stack>
+                )}
+                <SearchResults data={indicatorRows.data} onOpenOrder={onOpenOrder} />
+              </Stack>
+            )}
+          </Box>
+        )}
+
+        {shown && shown.kind !== 'indicator' && active && (
           <Box aria-live="polite" aria-busy={active.isPending}>
             {active.isPending && (
               <Stack spacing={0.75}>

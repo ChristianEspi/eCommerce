@@ -121,6 +121,28 @@ function entitlement(over: Record<string, unknown> = {}) {
   }
 }
 
+/** Fila de `ai_orders_search` (la búsqueda determinista de los indicadores). */
+const SEARCH_ROW = {
+  id: OTHER_ID, order_number: 'A-APR', customer_label: 'Cliente', status: 'pending', payment_status: 'pending',
+  fulfillment_status: 'unfulfilled', approval_status: 'pending', currency: 'PEN', grand_total: '10.00',
+  placed_at: '2026-09-18T10:00:00Z',
+}
+
+/** Conteos por indicador, deducidos de los argumentos (como haría el SQL). */
+function fakeSearch(args: Record<string, unknown>) {
+  const total = args.p_attention_only
+    ? 20
+    : args.p_approval_status === 'pending'
+      ? 1
+      : args.p_fulfillment_status === 'unfulfilled'
+        ? 10
+        : args.p_older_than_days === 7
+          ? 0
+          : 0
+  const limit = Number(args.p_limit ?? 25)
+  return { generated_at: '2026-09-23T12:00:00Z', total, limit, rows: total > 0 ? [SEARCH_ROW].slice(0, limit) : [] }
+}
+
 function backend(options: {
   role?: string
   entitlement?: Record<string, unknown>
@@ -128,7 +150,7 @@ function backend(options: {
 }): FakeSupabase {
   return createFakeSupabase({
     session: makeSession(),
-    rpc: { ai_entitlement: () => entitlement(options.entitlement) },
+    rpc: { ai_entitlement: () => entitlement(options.entitlement), ai_orders_search: fakeSearch },
     functions: {
       'orders-assistant':
         options.assistant ??
@@ -328,11 +350,46 @@ const ATTENTION_SYSTEM = {
   ],
 }
 
+/** Abre «Requieren atención» y pulsa «Analizar con IA» (lo único que gasta cuota). */
+async function analyzeAttention() {
+  await userEvent.click(await screen.findByRole('button', { name: 'Requieren atención: 20' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Analizar con IA' }))
+}
+
 describe('Asistente IA del listado', () => {
-  it('no pide nada al cargar', async () => {
+  it('no gasta IA al cargar: los indicadores salen del SQL, sin modelo', async () => {
     const { client } = renderBar({})
     expect(await screen.findByText('Asistente IA de pedidos')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Requieren atención: 20' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Pagados sin despachar: 10' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sin pagar (+7 días): 0' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Esperando aprobación: 1' })).toBeInTheDocument()
     expect(assistantCalls(client)).toEqual([])
+    // Los cuatro con el filtro de su regla, en la tienda activa y sin pedir filas.
+    const busquedas = client.state.rpcCalls.filter((c) => c.name === 'ai_orders_search')
+    expect(busquedas).toHaveLength(4)
+    for (const b of busquedas) expect(b.args).toMatchObject({ p_store_id: STORE_A, p_limit: 1 })
+  })
+
+  it('pulsar un indicador lista esos pedidos sin llamar a la IA; abrir usa el id', async () => {
+    const { client, onOpenOrder } = renderBar({})
+    const card = await screen.findByRole('button', { name: 'Esperando aprobación: 1' })
+    await userEvent.click(card)
+    expect(card).toHaveAttribute('aria-pressed', 'true')
+    expect(await screen.findByText('1 de 1 pedidos')).toBeInTheDocument()
+    expect(assistantCalls(client)).toEqual([])
+    const lista = client.state.rpcCalls.filter((c) => c.name === 'ai_orders_search' && c.args.p_limit === 25)
+    expect(lista[0]?.args).toMatchObject({ p_approval_status: 'pending', p_attention_only: false })
+    await userEvent.click(screen.getByRole('button', { name: /A-APR/ }))
+    expect(onOpenOrder).toHaveBeenCalledWith(OTHER_ID)
+  })
+
+  it('los indicadores siguen aunque no quede cuota (no la usan); sin botón que gaste', async () => {
+    renderBar({ entitlement: { status: 'quota_exceeded', remaining: 0, used: 500 } })
+    expect(await screen.findByRole('button', { name: 'Requieren atención: 20' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Requieren atención: 20' }))
+    expect(await screen.findByText('1 de 20 pedidos')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Analizar con IA' })).not.toBeInTheDocument()
   })
 
   it('«¿Qué pedidos requieren atención?»: lote del servidor; la acción abre el pedido en su pestaña', async () => {
@@ -349,7 +406,7 @@ describe('Asistente IA del listado', () => {
         system: ATTENTION_SYSTEM,
       }),
     })
-    await userEvent.click(await screen.findByRole('button', { name: '¿Qué pedidos requieren atención?' }))
+    await analyzeAttention()
     expect(await screen.findByText('Espera la firma del comprador.')).toBeInTheDocument()
     expect(assistantCalls(client)).toEqual([{ mode: 'attention', store_id: STORE_A, locale: 'es' }])
     expect(screen.getByText('Se analizaron 1 de 20 pedidos abiertos.')).toBeInTheDocument()
@@ -359,7 +416,7 @@ describe('Asistente IA del listado', () => {
 
   it('sin interpretación (proveedor caído): la cola del SISTEMA sigue ahí', async () => {
     renderBar({ assistant: () => ({ data: null, motivo: 'proveedor', interaction_id: null, system: ATTENTION_SYSTEM }) })
-    await userEvent.click(await screen.findByRole('button', { name: '¿Qué pedidos requieren atención?' }))
+    await analyzeAttention()
     expect(await screen.findByText('Cola del sistema')).toBeInTheDocument()
     expect(screen.getByText('A-APR')).toBeInTheDocument()
     expect(screen.getByText('La IA no respondió. Vuelve a intentarlo.')).toBeInTheDocument()
@@ -367,7 +424,7 @@ describe('Asistente IA del listado', () => {
 
   it('cola vacía: lo dice la base, sin aviso de error', async () => {
     renderBar({ assistant: () => ({ data: null, motivo: 'vacia', interaction_id: null, system: { ...ATTENTION_SYSTEM, total_open: 0, items: [] } }) })
-    await userEvent.click(await screen.findByRole('button', { name: '¿Qué pedidos requieren atención?' }))
+    await analyzeAttention()
     expect(await screen.findByText('No hay pedidos abiertos que requieran atención.')).toBeInTheDocument()
   })
 

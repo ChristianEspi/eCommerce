@@ -333,6 +333,87 @@ export async function searchOrdersNatural(input: {
   return parseAiResult(searchSchema, envelope(raw))
 }
 
+// ---------------------------------------------------------------------------
+// Indicadores del listado: SIN modelo y SIN cuota
+// ---------------------------------------------------------------------------
+
+/**
+ * La búsqueda controlada que usa la IA, llamada DIRECTAMENTE con filtros fijos.
+ * Es SQL determinista (`security invoker`, roles de la funcionalidad `orders`,
+ * tienda de la sociedad activa): contar «pagados sin despachar» no necesita que
+ * un modelo traduzca la frase, ni gastar una consulta en hacerlo.
+ */
+export const ORDERS_SEARCH_RPC = 'ai_orders_search'
+
+export const ORDER_INDICATORS = ['attention', 'paid_unshipped', 'unpaid_week', 'awaiting'] as const
+export type OrderIndicator = (typeof ORDER_INDICATORS)[number]
+
+const NO_FILTERS: OrderAiFilters = {
+  status: null,
+  payment_status: null,
+  fulfillment_status: null,
+  approval_status: null,
+  source_channel: null,
+  placed_within_days: null,
+  older_than_days: null,
+  text: null,
+  attention_only: false,
+}
+
+/** Filtros de cada indicador. «Atención» = la misma regla que `ai_orders_attention`. */
+export const INDICATOR_FILTERS: Readonly<Record<OrderIndicator, OrderAiFilters>> = {
+  attention: { ...NO_FILTERS, attention_only: true },
+  paid_unshipped: { ...NO_FILTERS, payment_status: 'paid', fulfillment_status: 'unfulfilled' },
+  unpaid_week: { ...NO_FILTERS, status: 'pending', payment_status: 'pending', older_than_days: 7 },
+  awaiting: { ...NO_FILTERS, approval_status: 'pending' },
+}
+
+function searchArgs(storeId: string, f: OrderAiFilters, limit: number) {
+  return {
+    p_store_id: storeId,
+    p_status: f.status,
+    p_payment_status: f.payment_status,
+    p_fulfillment_status: f.fulfillment_status,
+    p_approval_status: f.approval_status,
+    p_source_channel: f.source_channel,
+    p_placed_within_days: f.placed_within_days,
+    p_older_than_days: f.older_than_days,
+    p_text: f.text,
+    p_attention_only: f.attention_only,
+    p_limit: limit,
+  }
+}
+
+/** Pedidos de un indicador (≤25, del más nuevo al más antiguo), con el total. */
+export async function fetchIndicatorOrders(
+  storeId: string,
+  indicator: OrderIndicator,
+  limit = 25,
+): Promise<OrdersSearch> {
+  const supabase = tryGetSupabaseClient()
+  if (!supabase) throw new AppError({ boundary: 'ai', code: 'CONFIG_INCOMPLETA' })
+  const filters = INDICATOR_FILTERS[indicator]
+  const { data, error } = await supabase.rpc(ORDERS_SEARCH_RPC, searchArgs(storeId, filters, limit))
+  if (error) throw new AppError({ boundary: 'ai', code: 'CONSULTA_FALLIDA' })
+  const raw = data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
+  return searchSchema.parse({ ...raw, filters, discarded: 0, total: Number(raw.total ?? 0) })
+}
+
+/** Conteo de cada indicador. Uno que falla queda en `null` (no en cero). */
+export async function fetchOrderIndicators(storeId: string): Promise<Record<OrderIndicator, number | null>> {
+  const counts = await Promise.all(
+    ORDER_INDICATORS.map((key) =>
+      fetchIndicatorOrders(storeId, key, 1)
+        .then((r) => r.total)
+        .catch(() => null),
+    ),
+  )
+  return Object.fromEntries(ORDER_INDICATORS.map((key, i) => [key, counts[i] ?? null])) as Record<
+    OrderIndicator,
+    number | null
+  >
+}
+
 /** Filtros aplicados como pares (clave, valor) para pintar chips traducidos. */
 export function describeFilters(f: OrderAiFilters): Array<{ key: keyof OrderAiFilters; value: string | number | true }> {
   const out: Array<{ key: keyof OrderAiFilters; value: string | number | true }> = []
