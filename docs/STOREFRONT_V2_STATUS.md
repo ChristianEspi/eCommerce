@@ -1085,3 +1085,113 @@ server-side del catálogo: intactos. El precio comercial B2B de la tarjeta, inta
 Ciclos correctivos usados: **0 de 3**.
 
 `PHASE_RESULT: PASS`
+
+---
+
+# P08 · Rankings y copy alineados con los datos
+
+**Commit:** `<pendiente>` · **Ciclos correctivos:** 2 de 3
+
+## El problema
+
+La portada tenía una sección titulada **«Lo más vendido»**, con el antetítulo «Lo
+que más sale» y la bajada «Los productos que más repiten nuestros clientes». Se
+llenaba con `tomar(products, 12)`: la **primera página del catálogo ordenada por
+relevancia de búsqueda**. Tres afirmaciones sobre el comportamiento de los
+compradores sostenidas por un índice de texto.
+
+No era un defecto de redacción. Una tienda recién abierta, sin un solo pedido,
+enseñaba a sus primeros visitantes «los productos que más repiten nuestros
+clientes».
+
+Y la misma sección compartía las tres claves de i18n con «Destacados», así que
+una tienda que encendiera las dos filas veía **dos veces el mismo título** sobre
+dos listas distintas.
+
+## Lo que se hizo
+
+### El ranking sale de los pedidos
+
+Migración `20260923130000_store_best_sellers.sql` →
+`public.store_best_sellers_for_slug(p_slug, p_limit)`: agrega unidades de pedidos
+`paid`/`fulfilled` de los **últimos 90 días** de esa tienda y devuelve **solo**
+`product_id` y `sort_order`, de productos que **siguen publicados**.
+
+- `security definer` porque tiene que mirar pedidos que la vitrina no puede ver,
+  con tienda activa y filtro de publicación **escritos en el cuerpo** y
+  `search_path` vacío.
+- Ni unidades, ni importes, ni compradores, ni fechas salen de la función.
+  `anon` sigue **sin GRANT** sobre `orders` ni `order_items`.
+- `sort_order` y no `position`: `position` es palabra reservada en Postgres.
+- Sin ventas devuelve **cero filas**.
+
+### El título lo decide el dato
+
+`masVendidoEsReal` viaja hasta el registro de secciones. Con ranking real la fila
+dice «Lo más vendido» y explica de dónde sale; sin ventas dice **«Recomendados»**,
+que es exactamente lo que está enseñando.
+
+**No se cambia la lista para salvar el título: se cambia el título para que diga
+la verdad sobre la lista.** Si al no haber ventas se vaciara la fila, la portada
+perdería una sección por decir la verdad.
+
+El identificador de la sección sigue siendo `best-sellers`: cambiarlo rompería el
+orden ya guardado de cada portada, y lo que tenía que cambiar era el texto
+visible, no el contrato.
+
+### El resto del copy
+
+| Antes | Ahora | Por qué |
+|---|---|---|
+| `store.row.featured` compartida por dos filas | `bestSellers*` y `highlighted*` separadas | dos listas distintas no pueden llevar el mismo título |
+| «Lo último que ha entrado al almacén esta semana» | «Lo último que se ha publicado en esta tienda» | la fuente es `published_at`; la tienda no sabe nada de almacenes |
+| «Ofertas de la semana» | «Ofertas vigentes» | nadie garantiza una vigencia semanal |
+| «Ofertas de la semana» (mural CMS) | «Campañas vigentes» | cada campaña trae su propia fecha de fin |
+
+### El reparto de productos
+
+El ranking se reparte **antes** que lo destacado. Con `destacados` delante, un
+superventas que también estaba en la primera página del catálogo se lo quedaba la
+banda de ofertas y desaparecía de su propia sección: la fila que dice «lo más
+vendido» enseñaba el cuarto, el quinto y el sexto. Lo destacado es una muestra y
+da igual cuál sea; el ranking es una afirmación concreta sobre productos
+concretos.
+
+## Ciclos correctivos
+
+1. **`position` es palabra reservada** → `syntax error at or near "position"` al
+   aplicar la migración. Renombrada la columna de salida a `sort_order`.
+2. **`orders.channel_id` es NOT NULL** desde la migración de canales → el fixture
+   del test de base selecciona el canal por defecto de la tienda, como el resto
+   de fixtures del repo.
+
+Dos gates rojos más, ninguno un fallo de implementación sino **contratos que
+había que actualizar a conciencia** —que es justo para lo que existen—:
+
+- `security-baseline.test.ts` exige que la superficie anónima sea una **lista
+  cerrada** y fija el reparto por clase **por número**. La nueva función se
+  registra con su clase (`publicado`) y su justificación, el recuento pasa a 13
+  publicado, y `docs/SECURITY_BASELINE.md` §1.6 se actualiza con ella: el test
+  existe precisamente para que documento y código no se separen.
+- `storefront-content.test.tsx` fijaba el literal «Ofertas de la semana» del mural
+  de campañas. Lo que comprueba —que las campañas van agrupadas bajo una sección—
+  se conserva intacto; solo cambia el nombre que se busca.
+
+## Tests
+
+| Archivo | Casos |
+|---|---|
+| `supabase/tests/store-best-sellers.test.ts` | **Nuevo**, 20 sobre la base real. Sin ventas, cero filas; ordena por unidades; suma varios pedidos; cancelado/reembolsado/pendiente no cuentan; más de 90 días no cuenta; despublicado se cae; desempate estable; no cruza tiendas; tienda suspendida, slug vacío/nulo/inexistente; devuelve **solo** `product_id` y `sort_order`; `anon` sigue sin poder leer `orders` ni `order_items`; el límite se acota entre 1 y 24. |
+| `home/HomeComposer.test.tsx` | +5. Sin ventas «Recomendados» y sin afirmar nada; con ventas «Lo más vendido» y de dónde sale; **la lista es la misma en los dos casos**; «Destacados» ya no comparte título; novedades habla de publicación. |
+| `security-baseline.test.ts` | La nueva función entra en la lista cerrada con su clase y su porqué. |
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 294 ficheros, 5807 tests |
+| `npm run build` | **PASS** |
+
+`PHASE_RESULT: PASS`

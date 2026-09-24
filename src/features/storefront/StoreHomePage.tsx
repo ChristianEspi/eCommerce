@@ -27,6 +27,7 @@ import {
   useCatalogPages,
   useContentAssets,
   useSignedStoreAssets,
+  useBestSellers,
   usePrefetchProduct,
   usePublicBrands,
   usePublicCategories,
@@ -258,6 +259,28 @@ export function StoreHomePage() {
   const rebajadosThumbs = useSignedThumbnails(ofertas.map((p) => p.primary_image_path))
   const prefetchProduct = usePrefetchProduct(store.store_id)
 
+  /**
+   * Storefront V2 · P08 · Los más vendidos, de los PEDIDOS.
+   *
+   * Hasta P08 la sección «Lo más vendido» se llenaba con `tomar(products, 12)`,
+   * o sea con la primera página del catálogo ordenada por RELEVANCIA de
+   * búsqueda. Tres afirmaciones sobre el comportamiento de los compradores
+   * —«lo más vendido», «lo que más sale», «los que más repiten nuestros
+   * clientes»— sostenidas por el orden de un índice de texto.
+   *
+   * Ahora sale de `store_best_sellers_for_slug`, que agrega unidades de pedidos
+   * pagados o entregados de los últimos noventa días. Y cuando no hay ventas
+   * devuelve la lista vacía: la sección NO cae a relevancia con el mismo
+   * título, cambia de título. Ver `masVendidoEsReal` y el registro de secciones.
+   *
+   * Apagada en el catálogo, como el resto de consultas de portada: pedir un
+   * agregado de pedidos para una fila que no se pinta es pagar por nada.
+   */
+  const masVendidos = useBestSellers(catalogo ? undefined : storeSlug, store.store_id)
+  const masVendidoThumbs = useSignedThumbnails(
+    (masVendidos.data ?? []).map((producto) => producto.primary_image_path),
+  )
+
   const blocks = content.data?.cms ? (content.data.blocks ?? []) : []
   const hasCmsHero = blocks.some((block) => block.type === 'hero')
   /**
@@ -326,14 +349,29 @@ export function StoreHomePage() {
     }
 
     const rebajados = ofertasPorMedia
+    const ranking = masVendidos.data ?? []
+
+    /**
+     * El ranking se reparte ANTES que lo destacado (P08).
+     *
+     * El reparto va por orden de prioridad y cada lista se queda con lo que
+     * nadie usó. Con `destacados` delante, un superventas que también estaba en
+     * la primera página del catálogo se lo quedaba la banda de ofertas y
+     * desaparecía de su propia sección — la fila que dice «lo más vendido»
+     * enseñaba entonces el cuarto, el quinto y el sexto.
+     *
+     * Lo destacado es una muestra del catálogo y da igual cuál sea; el ranking
+     * es una afirmación concreta sobre unos productos concretos. Manda el que
+     * no se puede sustituir.
+     */
     return {
       hero: tomar(rebajados, heroReserva),
       ofertas: tomar(rebajados, 3),
+      masVendido: tomar(ranking.length > 0 ? ranking : products, 12),
       destacados: tomar(products, 12),
       novedades: tomar(novedades, 12),
-      masVendido: tomar(products, 12),
     }
-  }, [ofertasPorMedia, products, novedades, heroReserva])
+  }, [ofertasPorMedia, products, novedades, heroReserva, masVendidos.data])
 
 
   /**
@@ -647,9 +685,21 @@ export function StoreHomePage() {
     destacados: secciones.destacados,
     novedades: secciones.novedades,
     masVendido: secciones.masVendido,
+    /**
+     * ¿La fila de más vendidos está SOSTENIDA por ventas?
+     *
+     * Es lo que decide el título. Con ranking real dice «Lo más vendido» y
+     * explica de dónde sale; sin él dice «Recomendados», que es exactamente lo
+     * que está enseñando — una muestra del catálogo.
+     */
+    masVendidoEsReal: (masVendidos.data?.length ?? 0) > 0,
     thumbsOfertas: rebajadosThumbs,
     thumbsCatalogo: thumbnails,
     thumbsNovedades: novedadesThumbs,
+    // Los más vendidos vienen del MISMO modelo de lectura que el catálogo, así
+    // que sus miniaturas ya están en el lote del catálogo cuando coinciden; las
+    // que no, se firman aquí.
+    thumbsMasVendido: masVendidoThumbs,
     blocks,
     assets,
     images,
@@ -666,7 +716,10 @@ export function StoreHomePage() {
     hayOfertas: ofertas.length > 0,
     favorites: favorites.ids,
     cargandoNovedades: novedadesPages.isPending,
-    cargandoCatalogo: results.isPending,
+    // El ranking cuenta como carga de esta fila: sin esto, la portada enseñaría
+    // «Recomendados» medio segundo y lo cambiaría por «Lo más vendido» al
+    // llegar el agregado, que se lee como un fallo.
+    cargandoCatalogo: results.isPending || masVendidos.isPending,
     onToggleFavorite: (productId) => void favorites.toggle(productId),
     onQuickView: (slug) => update('p', slug),
     onPrefetch: prefetchProduct,

@@ -2299,7 +2299,9 @@ export const es = {
     'store.content.campaignEyebrow': 'Promoción vigente',
     'store.content.campaignLive': 'Activa',
     'store.content.campaignEnds': 'Hasta el',
-    'store.content.campaignWall': 'Ofertas de la semana',
+    // P08 · Lo que se pinta son las campañas VIGENTES; su duración la decide
+    // cada campaña y no tiene por qué ser semanal.
+    'store.content.campaignWall': 'Campañas vigentes',
     'store.hero.featured': 'Ofertas destacadas',
     'store.hero.buyNow': 'Comprar ahora',
     // Las dos puertas de la portada editorial (Storefront V2 · P04).
@@ -2360,14 +2362,24 @@ export const es = {
     'store.catalog.all': 'Todo el catálogo',
     'store.catalog.resultsFor': 'Resultados para',
     'store.row.new': 'Novedades',
-    'store.row.newEyebrow': 'Recien llegado',
-    'store.row.newSubtitle': 'Lo ultimo que ha entrado al almacen esta semana.',
-    'store.row.weekDeals': 'Ofertas de la semana',
+    // P08 · La fuente es la fecha de PUBLICACIÓN en la tienda, no una entrada de
+    // almacén: el copy dice lo que el dato sabe.
+    'store.row.newEyebrow': 'Recién publicado',
+    'store.row.newSubtitle': 'Lo último que se ha publicado en esta tienda.',
+    // P08 · «De la semana» afirmaba una vigencia semanal que nadie garantiza.
+    'store.row.weekDeals': 'Ofertas vigentes',
     'store.row.highlighted': 'Productos destacados',
+    'store.row.highlightedEyebrow': 'Del catálogo',
+    'store.row.highlightedSubtitle': 'Una muestra de lo que esta tienda tiene publicado.',
     'store.row.page': 'Ver el grupo {n}',
-    'store.row.featured': 'Lo más vendido',
-    'store.row.featuredEyebrow': 'Lo que mas sale',
-    'store.row.featuredSubtitle': 'Los productos que mas repiten nuestros clientes.',
+    // P08 · Dos títulos para la misma sección, y el dato decide cuál.
+    'store.row.bestSellers': 'Lo más vendido',
+    'store.row.bestSellersEyebrow': 'Según los pedidos',
+    'store.row.bestSellersSubtitle':
+      'Los que más unidades han salido en los últimos 90 días.',
+    'store.row.recommended': 'Recomendados',
+    'store.row.recommendedEyebrow': 'Para empezar',
+    'store.row.recommendedSubtitle': 'Una selección del catálogo de esta tienda.',
     'store.brands.count': '{count} productos',
     'store.content.offer.save': 'Ahorro',
     'store.content.offer.tiers': 'Por volumen',

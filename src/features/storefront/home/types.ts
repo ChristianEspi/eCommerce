@@ -74,10 +74,25 @@ export interface HomeSectionData {
   readonly novedades: readonly PublicProduct[]
   readonly masVendido: readonly PublicProduct[]
 
+  /**
+   * ¿La fila de más vendidos está SOSTENIDA por ventas? (Storefront V2 · P08)
+   *
+   * Es lo que decide el TÍTULO, y por eso viaja como bandera y no se deduce
+   * aquí: con ranking real la sección dice «Lo más vendido» y explica que sale
+   * de los pedidos de los últimos noventa días; sin él dice «Recomendados», que
+   * es exactamente lo que está enseñando — una muestra del catálogo.
+   *
+   * Hasta P08 decía «Lo más vendido» en los dos casos, y en el segundo era
+   * falso: los productos salían del orden por relevancia del buscador.
+   */
+  readonly masVendidoEsReal: boolean
+
   /** Miniaturas ya firmadas. Firmarlas por sección multiplicaría las llamadas. */
   readonly thumbsOfertas: Record<string, string>
   readonly thumbsCatalogo: Record<string, string>
   readonly thumbsNovedades: Record<string, string>
+  /** Los del ranking, que puede traer productos fuera de la primera página. */
+  readonly thumbsMasVendido: Record<string, string>
 
   readonly blocks: ComponentProps<typeof ContentBlocks>['blocks']
   readonly assets: ComponentProps<typeof ContentBlocks>['assets']

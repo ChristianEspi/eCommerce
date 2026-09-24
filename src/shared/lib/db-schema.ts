@@ -635,6 +635,16 @@ export const STORE_NAVIGATION_PUBLIC_RPC = 'store_navigation_for_slug'
 // la portada tiene que aplicarse solo.
 export const STORE_PROMOTIONS_PUBLIC_RPC = 'store_promotions_for_slug'
 export const CATALOG_SEARCH_PUBLIC_RPC = 'catalog_search_for_slug'
+/**
+ * Storefront V2 · P08 · El ranking REAL de una tienda por unidades vendidas.
+ *
+ * Existe porque la portada titulaba «Lo más vendido» una lista que salía del
+ * orden por relevancia del buscador. Devuelve solo `product_id` y su orden: ni
+ * importes, ni unidades, ni un dato de nadie, y `anon` sigue sin GRANT sobre
+ * `orders`. Sin ventas devuelve cero filas, y entonces la vitrina deja de decir
+ * «lo más vendido».
+ */
+export const STORE_BEST_SELLERS_PUBLIC_RPC = 'store_best_sellers_for_slug'
 export const CATALOG_SUGGEST_PUBLIC_RPC = 'catalog_suggest_for_slug'
 export const CONTENT_PREVIEW_RPC = 'content_preview'
 export const CATALOG_SEARCH_RPC = 'catalog_search'

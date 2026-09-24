@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { cleanup, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '@/test/render'
 import { CartProvider } from '../cart/CartProvider'
@@ -78,6 +78,10 @@ function datos(overrides: Partial<HomeSectionData> = {}): HomeSectionData {
     destacados: [producto('Vitamina Destacada', 'p-destacada')],
     novedades: [producto('Gel Nuevo', 'p-nuevo')],
     masVendido: [producto('Alcohol Vendido', 'p-vendido')],
+    // P08 · Por defecto NO hay ranking de ventas: es el estado de una tienda
+    // que todavía no ha vendido, y el que hacía que la portada mintiera.
+    masVendidoEsReal: false,
+    thumbsMasVendido: {},
     thumbsOfertas: {},
     thumbsCatalogo: {},
     thumbsNovedades: {},
@@ -323,5 +327,69 @@ describe('la cubierta del comercio manda sobre la de reserva', () => {
 
     expect(screen.getByText('Jarabe Hero')).toBeInTheDocument()
     expect(screen.queryByText('Salud cerca de casa')).not.toBeInTheDocument()
+  })
+})
+
+/**
+ * Storefront V2 · P08 · El título de la fila lo decide el DATO.
+ *
+ * La sección se llamaba «Lo más vendido» con el antetítulo «Lo que más sale» y
+ * la bajada «Los productos que más repiten nuestros clientes», sobre una lista
+ * que salía del orden por RELEVANCIA del buscador. Tres afirmaciones sobre el
+ * comportamiento de los compradores sostenidas por un índice de texto.
+ *
+ * Lo que se fija aquí es la regla: **no se cambia la lista para salvar el
+ * título; se cambia el título para que diga la verdad sobre la lista.**
+ */
+describe('la fila de más vendidos dice lo que los datos sostienen', () => {
+  const SOLO_VENDIDOS = layout([{ id: 'best-sellers', enabled: true }])
+
+  it('sin ventas se llama «Recomendados» y no afirma nada', () => {
+    pintar(SOLO_VENDIDOS, datos({ masVendidoEsReal: false }))
+
+    expect(screen.getByText('store.row.recommended')).toBeInTheDocument()
+    expect(screen.queryByText('store.row.bestSellers')).not.toBeInTheDocument()
+  })
+
+  it('con ventas se llama «Lo más vendido» y explica de dónde sale', () => {
+    pintar(SOLO_VENDIDOS, datos({ masVendidoEsReal: true }))
+
+    expect(screen.getByText('store.row.bestSellers')).toBeInTheDocument()
+    expect(screen.getByText('store.row.bestSellersSubtitle')).toBeInTheDocument()
+    expect(screen.queryByText('store.row.recommended')).not.toBeInTheDocument()
+  })
+
+  it('la lista es la MISMA: lo que cambia es lo que se afirma sobre ella', () => {
+    // Si al no haber ventas se vaciara la fila, la portada perdería una sección
+    // por decir la verdad. Lo que se corrige es la afirmación, no el contenido.
+    pintar(SOLO_VENDIDOS, datos({ masVendidoEsReal: false }))
+    expect(screen.getByText('Alcohol Vendido')).toBeInTheDocument()
+
+    cleanup()
+    pintar(SOLO_VENDIDOS, datos({ masVendidoEsReal: true }))
+    expect(screen.getByText('Alcohol Vendido')).toBeInTheDocument()
+  })
+
+  it('«Destacados» ya no comparte título con «Lo más vendido»', () => {
+    // Compartían las tres claves, así que una tienda que encendiera las dos
+    // secciones veía dos veces el mismo título sobre dos listas distintas.
+    pintar(layout([
+      { id: 'best-sellers', enabled: true },
+      { id: 'featured', enabled: true },
+    ]), datos({ masVendidoEsReal: true }))
+
+    expect(screen.getByText('store.row.bestSellers')).toBeInTheDocument()
+    expect(screen.getByText('store.row.highlighted')).toBeInTheDocument()
+  })
+})
+
+describe('el copy de las demás filas dice lo que el dato sabe', () => {
+  it('novedades habla de PUBLICACIÓN, no de entrada al almacén', () => {
+    // La fuente es `published_at` del catálogo publicado: la tienda no sabe
+    // cuándo entró algo a un almacén, y desde luego no sabe si fue esta semana.
+    pintar(layout([{ id: 'new-arrivals', enabled: true }]))
+
+    expect(screen.getByText('store.row.newSubtitle')).toBeInTheDocument()
+    expect(screen.getByText('store.row.newEyebrow')).toBeInTheDocument()
   })
 })

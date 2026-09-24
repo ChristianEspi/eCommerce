@@ -1,7 +1,8 @@
+import { z } from 'zod'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { AppError } from '@/domain/errors'
 import { codeFromDbError, type PostgrestLike } from '@/shared/lib/appError'
-import { ORDER_BY_TOKEN_RPC } from '@/shared/lib/db-schema'
+import { ORDER_BY_TOKEN_RPC, STORE_BEST_SELLERS_PUBLIC_RPC } from '@/shared/lib/db-schema'
 import { buildTextSearchFilter } from '@/shared/lib/search'
 import { tryGetStorefrontClient } from '@/shared/lib/supabase'
 import {
@@ -141,6 +142,12 @@ const CATEGORY_SELECT = 'category_id, store_id, parent_id, slug, name, position'
 const CATEGORY_SELECT_CON_FOTO = `${CATEGORY_SELECT}, image_url, image_alt`
 
 const BRAND_SELECT = 'brand_id, store_id, code, name, logo_url'
+
+/** Lo que devuelve el ranking: un id y su puesto. Ni unidades, ni importes. */
+const bestSellerRankSchema = z.object({
+  product_id: z.string().uuid(),
+  sort_order: z.number().int(),
+})
 
 /** `::text` en los importes: el céntimo no pasa por el float del navegador. */
 const PRODUCT_SELECT = [
@@ -295,6 +302,59 @@ export async function fetchPublicBrands(storeId: string | null): Promise<PublicB
   // Mismo criterio que `fetchPublicVariants` con la migración de ejes.
   if (error) return []
   return publicBrandSchema.array().parse(data ?? [])
+}
+
+/**
+ * Los más vendidos de verdad de una tienda (Storefront V2 · P08).
+ *
+ * Dos consultas y no una, y a propósito: la primera pregunta al ranking QUÉ
+ * productos son —una función que lee pedidos, que la vitrina no puede leer— y
+ * la segunda los trae del MISMO modelo de lectura que el resto del catálogo.
+ *
+ * Reunirlas en una sola función de base habría obligado a duplicar ahí dentro
+ * la resolución de precio de vitrina, disponibilidad y foto principal, que es
+ * justo lo que `public_products` ya hace y lo que hay que tener escrito una
+ * sola vez. Dos consultas por portada, con media hora de caché, es más barato
+ * que dos resolvedores de precio.
+ *
+ * El ORDEN del ranking manda: `public_products` devuelve lo que le dé la gana y
+ * aquí se recoloca por la posición que dio la función. Sin esto, «lo más
+ * vendido» saldría ordenado por lo que decidiera el planificador.
+ *
+ * Sin ventas devuelve la lista vacía, y la portada deja de afirmar que las hay.
+ * Un error tampoco es una excepción: la sección cae a «Recomendados», que es
+ * peor que el ranking y mejor que una portada rota.
+ */
+export async function fetchBestSellers(
+  storeSlug: string | undefined,
+  storeId: string | null,
+  limit = 12,
+): Promise<PublicProduct[]> {
+  if (!storeSlug || !storeId) return []
+
+  const ranking = await storefront().rpc(STORE_BEST_SELLERS_PUBLIC_RPC, {
+    p_slug: storeSlug,
+    p_limit: limit,
+  })
+  if (ranking.error) return []
+
+  const orden = bestSellerRankSchema.array().safeParse(ranking.data ?? [])
+  if (!orden.success || orden.data.length === 0) return []
+
+  const ids = orden.data.map((fila) => fila.product_id)
+  const { data, error } = await storefront()
+    .from(PUBLIC_PRODUCTS_VIEW)
+    .select(PRODUCT_SELECT)
+    .eq('store_id', storeId)
+    .in('product_id', ids)
+
+  if (error) return []
+  const productos = publicProductSchema.array().parse(data ?? [])
+  const porId = new Map(productos.map((producto) => [producto.product_id, producto]))
+
+  return ids
+    .map((id) => porId.get(id))
+    .filter((producto): producto is PublicProduct => producto !== undefined)
 }
 
 /** Solo categorías activas: la vista `public_categories` ya filtra `is_active`. */

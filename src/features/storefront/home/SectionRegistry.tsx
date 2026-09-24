@@ -239,27 +239,51 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
   ),
 
   /**
-   * Solo si el comercio no compuso ya sus propias filas: repetir «Lo más
-   * vendido» dos veces con productos distintos no es más tienda, es una portada
+   * Los más vendidos — o «Recomendados», según lo que los datos sostengan.
+   *
+   * ## La decisión que da nombre a P08
+   *
+   * Esta sección decía «Lo más vendido», con el antetítulo «Lo que más sale» y
+   * la bajada «Los productos que más repiten nuestros clientes», sobre una lista
+   * que salía del orden por RELEVANCIA del buscador. Tres afirmaciones sobre el
+   * comportamiento de los compradores sostenidas por un índice de texto.
+   *
+   * Ahora el título depende del dato: con ranking real de pedidos dice lo que es
+   * y de dónde sale; sin ventas dice «Recomendados», que es exactamente lo que
+   * está enseñando. **No se cambia la lista para salvar el título: se cambia el
+   * título para que diga la verdad sobre la lista.**
+   *
+   * El IDENTIFICADOR de la sección sigue siendo `best-sellers`. Cambiarlo
+   * rompería el orden ya guardado de cada portada, y lo que tenía que cambiar
+   * era el texto visible, no el contrato.
+   *
+   * Y sigue sin pintarse si el comercio ya compuso sus propias filas: la misma
+   * sección dos veces con productos distintos no es más tienda, es una portada
    * que se contradice.
    */
-  'best-sellers': (data, maxItems) =>
-    data.cmsTraeProductos ? null : (
+  'best-sellers': (data, maxItems) => {
+    if (data.cmsTraeProductos) return null
+    const real = data.masVendidoEsReal
+
+    return (
       <ProductRow
-        title={data.t('store.row.featured')}
-        eyebrow={data.t('store.row.featuredEyebrow')}
-        subtitle={data.t('store.row.featuredSubtitle')}
+        title={data.t(real ? 'store.row.bestSellers' : 'store.row.recommended')}
+        eyebrow={data.t(real ? 'store.row.bestSellersEyebrow' : 'store.row.recommendedEyebrow')}
+        subtitle={data.t(real ? 'store.row.bestSellersSubtitle' : 'store.row.recommendedSubtitle')}
         products={conTope(data.masVendido, maxItems)}
         loading={data.cargandoCatalogo}
         storeSlug={data.storeSlug}
-        thumbnails={data.thumbsCatalogo}
+        // El ranking puede traer productos que no están en la primera página del
+        // catálogo, así que sus miniaturas van en su propio lote.
+        thumbnails={real ? data.thumbsMasVendido : data.thumbsCatalogo}
         seeAllHref={`/s/${data.storeSlug}?ver=todo`}
         onPrefetch={data.onPrefetch}
         onQuickView={data.onQuickView}
         favorites={data.favorites}
         onToggleFavorite={data.onToggleFavorite}
       />
-    ),
+    )
+  },
 
   /**
    * Lo destacado, SEPARADO de las ofertas.
@@ -271,9 +295,13 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
    */
   featured: (data, maxItems) => (
     <ProductRow
-      title={data.t('store.row.featured')}
-      eyebrow={data.t('store.row.featuredEyebrow')}
-      subtitle={data.t('store.row.featuredSubtitle')}
+      // «Productos destacados» y no «Lo más vendido»: esta fila es una muestra
+      // del catálogo publicado y nunca fue otra cosa. Compartía los textos con
+      // la de más vendidos, así que una tienda que encendiera las dos veía dos
+      // veces el mismo título sobre dos listas distintas.
+      title={data.t('store.row.highlighted')}
+      eyebrow={data.t('store.row.highlightedEyebrow')}
+      subtitle={data.t('store.row.highlightedSubtitle')}
       products={conTope(data.destacados, maxItems)}
       loading={data.cargandoCatalogo}
       storeSlug={data.storeSlug}
