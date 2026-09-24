@@ -12,7 +12,9 @@ import {
 import { useOutletContext } from 'react-router-dom'
 import type { SearchQuery, SearchResult, Suggestion } from '@/domain'
 import {
+  fetchBestSellers,
   fetchGallery,
+  fetchPublicBrands,
   fetchPublicCategories,
   fetchPublicProduct,
   fetchPublicProducts,
@@ -34,6 +36,7 @@ import { createStorefrontSearch } from './search'
 import type {
   CatalogQuery,
   GalleryImage,
+  PublicBrand,
   PublicCategory,
   PublicProduct,
   PublicStore,
@@ -47,6 +50,8 @@ import type {
 
 export const storeKey = (slug: string) => ['storefront', 'store', slug] as const
 export const categoriesKey = (storeId: string) => ['storefront', 'categories', storeId] as const
+export const brandsKey = (storeId: string) => ['storefront', 'brands', storeId] as const
+export const bestSellersKey = (slug: string) => ['storefront', 'best-sellers', slug] as const
 export const productsKey = (query: CatalogQuery) => ['storefront', 'products', query] as const
 export const productKey = (storeId: string, slug: string) =>
   ['storefront', 'product', storeId, slug] as const
@@ -74,6 +79,48 @@ export function usePublicCategories(storeId: string | null): UseQueryResult<Publ
     queryFn: () => fetchPublicCategories(storeId),
     enabled: Boolean(storeId),
     staleTime: CATALOG_STALE,
+    retry: false,
+  })
+}
+
+/**
+ * Las marcas de la tienda con su logo (Storefront V2 · P02).
+ *
+ * `BRAND_STALE` y no `CATALOG_STALE`: un logo de marca cambia como cambia una
+ * marca —casi nunca—, y esta consulta la piden dos secciones de la portada. La
+ * clave cuelga de `store_id`, así que las dos comparten la MISMA respuesta y
+ * cuesta una petición, no dos.
+ */
+export function usePublicBrands(storeId: string | null): UseQueryResult<PublicBrand[]> {
+  return useQuery({
+    queryKey: brandsKey(storeId ?? ''),
+    queryFn: () => fetchPublicBrands(storeId),
+    enabled: Boolean(storeId),
+    staleTime: BRAND_STALE,
+    retry: false,
+  })
+}
+
+/**
+ * Los más vendidos REALES de la tienda (Storefront V2 · P08).
+ *
+ * `BRAND_STALE` —cinco minutos— y no el del catálogo: un ranking de noventa días
+ * no cambia entre dos cargas de la portada, y recalcularlo cada minuto sería
+ * pagar un agregado de pedidos por visita.
+ *
+ * `retry: false` como el resto de la vitrina: si el ranking falla, la portada
+ * cae a «Recomendados» en vez de reintentar tres veces antes de enseñar lo
+ * mismo.
+ */
+export function useBestSellers(
+  storeSlug: string | undefined,
+  storeId: string | null,
+): UseQueryResult<PublicProduct[]> {
+  return useQuery({
+    queryKey: bestSellersKey(storeSlug ?? ''),
+    queryFn: () => fetchBestSellers(storeSlug, storeId),
+    enabled: Boolean(storeSlug && storeId),
+    staleTime: BRAND_STALE,
     retry: false,
   })
 }

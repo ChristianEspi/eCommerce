@@ -11,6 +11,12 @@ import {
   sanitizeHomeLayout,
   sanitizeStorefrontStyle,
 } from '@/features/storefront/theme/presets'
+import {
+  VALUE_PROPS_LIMITS,
+  VALUE_PROP_ICON_KEYS,
+  sanitizeValueProps,
+  type StoreValueProp,
+} from '@/features/storefront/valueProps'
 
 /**
  * Personalización de la tienda (`/app/settings`).
@@ -109,8 +115,54 @@ export const storeSettingsSchema = z.object({
   theme_preset: z.unknown(),
   storefront_style: z.unknown(),
   home_layout: z.unknown(),
+  /**
+   * Propuestas de valor (Storefront V2 · P01). Crudas, por el mismo motivo que
+   * las tres de arriba: una fila anterior al despliegue de la migración no
+   * puede dejar la pantalla de Configuración sin cargar. `sanitizeValueProps`
+   * las resuelve en `toForm`.
+   */
+  value_props: z.unknown(),
 })
 export type StoreSettings = z.infer<typeof storeSettingsSchema>
+
+/**
+ * Las propuestas de valor tal y como las declara el FORMULARIO.
+ *
+ * Replica el CHECK de la migración `20260923100000` clave por clave —incluido
+ * el `strict`, que es la mitad del contrato: una clave que no está en la lista
+ * pasaría la validación del formulario y moriría en la base con un error
+ * genérico—. Y el título es obligatorio aquí aunque el saneador lo tolere
+ * vacío: el saneador sirve a una fila que se está EDITANDO, esto decide si lo
+ * escrito puede escribirse.
+ *
+ * `z.custom` por la misma razón de tipos que los campos del tema: el contrato
+ * es de solo lectura (`readonly`) y lo que infiere Zod no lo es, así que el
+ * formulario habla el mismo tipo que la vitrina y la comprobación sigue siendo
+ * la de este esquema.
+ */
+const valuePropEntrySchema = z
+  .object({
+    iconKey: z.enum(VALUE_PROP_ICON_KEYS),
+    title: z.string().trim().min(1).max(VALUE_PROPS_LIMITS.titleMax),
+    body: z.string().trim().max(VALUE_PROPS_LIMITS.bodyMax).optional(),
+    enabled: z.boolean(),
+  })
+  .strict()
+
+const valuePropsListSchema = z
+  .array(valuePropEntrySchema)
+  .max(VALUE_PROPS_LIMITS.max)
+  // Sin icono repetido, igual que el CHECK: dos entradas con el mismo glifo no
+  // son una preferencia, son un guardado accidentado.
+  .refine(
+    (lista) => new Set(lista.map((prop) => prop.iconKey)).size === lista.length,
+    { message: 'settings.error.invalid' },
+  )
+
+export const valuePropsField = z.custom<readonly StoreValueProp[]>(
+  (valor) => valuePropsListSchema.safeParse(valor).success,
+  { message: 'settings.error.invalid' },
+)
 
 const optionalText = (max: number, error: string) =>
   z
@@ -205,6 +257,13 @@ export const storeFormSchema = z.object({
   theme_preset: themePresetSchema,
   storefront_style: storefrontStyleField,
   home_layout: homeLayoutField,
+  /**
+   * Propuestas de valor. CONTENIDO del comercio, no tematización y no marca
+   * blanca: se guardan siempre para owner/admin, igual que el teléfono de
+   * contacto. La raya la pone la migración `20260923100000` y la impone la
+   * policy, no esta pantalla.
+   */
+  value_props: valuePropsField,
 })
 export type StoreFormValues = z.infer<typeof storeFormSchema>
 
@@ -243,6 +302,13 @@ export function toForm(name: string, settings: StoreSettings | null): StoreFormV
     theme_preset: normalizeThemePreset(settings?.theme_preset ?? DEFAULT_THEME_PRESET),
     storefront_style: sanitizeStorefrontStyle(settings?.storefront_style),
     home_layout: sanitizeHomeLayout(settings?.home_layout),
+    /**
+     * `sanitize` y no `resolve`: aquí se prepara lo que se va a GUARDAR. Las
+     * propuestas de la plataforma no se copian a la fila —si se copiaran, el
+     * día que la suite mejorara ese texto esta tienda se quedaría con el viejo
+     * escrito a su nombre—. La lista vacía significa «usa las de plataforma».
+     */
+    value_props: sanitizeValueProps(settings?.value_props),
   }
 }
 

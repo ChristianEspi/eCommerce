@@ -130,12 +130,12 @@ La cifra de existencias nunca sale: `anon` lee `products.in_stock` —columna ge
 
 ### 1.6 La superficie anónima es una lista cerrada — PASS *(nuevo en P16)*
 
-`anon` puede ejecutar exactamente **23** funciones de `public`, cada una clasificada y justificada
-en el propio test. Una vigesimocuarta pone la suite roja.
+`anon` puede ejecutar exactamente **24** funciones de `public`, cada una clasificada y justificada
+en el propio test. Una vigesimoquinta pone la suite roja.
 
 | Clase | Cuántas | Qué las protege |
 |---|---|---|
-| `publicado` | 12 | solo leen lo que la tienda ya publica (incluidas relaciones de producto y reseñas moderadas); la autoridad es la RLS |
+| `publicado` | 13 | solo leen lo que la tienda ya publica (incluidas relaciones de producto y reseñas moderadas); la autoridad es la RLS |
 | `secreto` | 8 | exigen un token de 256 bits (pedido, carrito, devolución), un código de 96 (tarjeta regalo) o el secreto de baja de 244 bits de un recordatorio de carrito |
 | `techo` | 2 | escriben o revelan, y llevan límite de tasa desde P16 (§3.6) |
 | `recogido` | 1 | escribe sin poder llevar techo —sería negar la venta— y por eso lo que escribe se recoge (§3.7) |
@@ -169,6 +169,20 @@ en el propio test. Una vigesimocuarta pone la suite roja.
 > por estrellas), de un producto publicado. Ninguna enseña precio, usuario,
 > correo ni tenant. Escribir una reseña exige sesión (`submit_product_review`,
 > fuera de esta lista) y moderarla, rol de catálogo (`moderate_product_review`).
+
+> **Añadida en Storefront V2 · P08.** `store_best_sellers_for_slug` — el ranking
+> real de una tienda. Existe porque la portada titulaba «Lo más vendido» una
+> lista que salía del orden por **relevancia del buscador**: una afirmación
+> sobre el comportamiento de los compradores sostenida por un índice de texto.
+> Agrega unidades de pedidos pagados o entregados de los últimos noventa días y
+> devuelve **solo** `product_id` y su puesto, de productos que siguen
+> publicados: ni unidades, ni importes, ni compradores, ni fechas. `anon` sigue
+> sin GRANT sobre `orders` ni `order_items`, y el test lo comprueba leyendo las
+> dos tablas con la clave anónima. Es `security definer` por eso mismo —tiene
+> que mirar pedidos que quien pregunta no puede ver— con la tienda activa y el
+> filtro de publicación escritos en el cuerpo, y `search_path` vacío.
+> Sin ventas devuelve cero filas, y entonces la vitrina **deja de afirmar** que
+> las hay: la sección pasa a llamarse «Recomendados».
 
 Además: ninguna función de `ebim` **alcanzable** por `anon` es volátil —es decir, ninguna escribe—.
 Las funciones de disparador quedan fuera del recuento y el test **demuestra por qué**: Postgres se

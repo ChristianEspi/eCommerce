@@ -1,7 +1,8 @@
-import { screen } from '@testing-library/react'
+import { cleanup, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '@/test/render'
 import { CartProvider } from '../cart/CartProvider'
+import { DEFAULT_STORE_THEME } from '../theme/resolve'
 import { DEFAULT_HOME_LAYOUT } from '../theme/presets'
 import type { HomeLayout } from '../theme/types'
 import type { PublicProduct, PublicStore } from '../types'
@@ -64,12 +65,23 @@ function datos(overrides: Partial<HomeSectionData> = {}): HomeSectionData {
   return {
     store: STORE,
     storeSlug: 'botica',
+    /**
+     * El tema por defecto (`universal`), que es el que ve una tienda que nunca
+     * eligió nada. Desde P04 el registro lo necesita: `heroVariant` y
+     * `categoryVariant` eligen entre composiciones distintas, y sin tema no hay
+     * de dónde leerlas. Cada prueba que quiera otra composición lo pisa.
+     */
+    theme: DEFAULT_STORE_THEME,
     t: ((key: string) => key) as HomeSectionData['t'],
     hero: [producto('Jarabe Hero', 'p-hero')],
     ofertas: [producto('Crema Oferta', 'p-oferta')],
     destacados: [producto('Vitamina Destacada', 'p-destacada')],
     novedades: [producto('Gel Nuevo', 'p-nuevo')],
     masVendido: [producto('Alcohol Vendido', 'p-vendido')],
+    // P08 · Por defecto NO hay ranking de ventas: es el estado de una tienda
+    // que todavía no ha vendido, y el que hacía que la portada mintiera.
+    masVendidoEsReal: false,
+    thumbsMasVendido: {},
     thumbsOfertas: {},
     thumbsCatalogo: {},
     thumbsNovedades: {},
@@ -82,8 +94,11 @@ function datos(overrides: Partial<HomeSectionData> = {}): HomeSectionData {
     promociones: [],
     promoAssets: {},
     categorias: [],
+    // P09 · Las páginas publicadas, que pinta `business-info`.
+    paginas: [],
     brands: [{ code: 'genfar', name: 'Genfar', count: 4 }],
     brandSelected: null,
+    hayOfertas: true,
     favorites: new Set<string>(),
     cargandoNovedades: false,
     cargandoCatalogo: false,
@@ -202,15 +217,45 @@ describe('una sección sin datos se omite sola', () => {
     expect(container.textContent).toBe('')
   })
 
-  it('las secciones declaradas sin componente devuelven nada, no un error', () => {
-    const { container } = pintar(
-      layout([
-        { id: 'business-info', enabled: true },
-        { id: 'newsletter', enabled: true },
-      ]),
-    )
+  it('newsletter sigue declarada sin componente y no rompe la portada', () => {
+    // Y seguirá así mientras no exista dónde guardar la suscripción y el
+    // consentimiento: un formulario que pide un correo y lo tira es peor que
+    // no ofrecerlo.
+    const { container } = pintar(layout([{ id: 'newsletter', enabled: true }]))
 
     expect(container.textContent).toBe('')
+  })
+
+  /**
+   * `business-info` — la sección que se calla (Storefront V2 · P09).
+   *
+   * Hasta P09 devolvía `null` SIEMPRE: estaba en el contrato, salía en el
+   * editor del backoffice y un comercio podía encenderla y arrastrarla de
+   * sitio sin que pasara nada. Ahora pinta, pero solo cuando hay algo cierto
+   * que decir — y eso, desde fuera, se ve igual que no estar implementada.
+   * Estas dos pruebas son las que distinguen una cosa de la otra.
+   */
+  it('business-info encendida sin contacto sigue sin pintar: sería la cabecera repetida', () => {
+    const { container } = pintar(layout([{ id: 'business-info', enabled: true }]))
+
+    expect(container.textContent).toBe('')
+  })
+
+  it('business-info con contacto pinta la sección y sus páginas publicadas', () => {
+    pintar(
+      layout([{ id: 'business-info', enabled: true }]),
+      datos({
+        store: { ...STORE, support_email: 'hola@botica.pe' } as typeof STORE,
+        paginas: [{ slug: 'terminos', title: 'Términos' }],
+      }),
+    )
+
+    expect(screen.getByRole('region', { name: 'Sobre la tienda' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'hola@botica.pe' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Términos/ })).toHaveAttribute(
+      'href',
+      '/s/botica/p/terminos',
+    )
   })
 
   it('categories sin familias no pinta nada: no inventa categorías', () => {
@@ -219,7 +264,7 @@ describe('una sección sin datos se omite sola', () => {
     expect(container.textContent).toBe('')
   })
 
-  it('categories pinta las familias del catálogo como puertas, en su orden y con su tope', () => {
+  it('categories pinta las familias del catálogo como puertas, en su orden y con su tope', async () => {
     const familias = [
       { category_id: 'c1', name: 'Zapatillas', slug: 'zapatillas' },
       { category_id: 'c2', name: 'Botas', slug: 'botas' },
@@ -227,7 +272,11 @@ describe('una sección sin datos se omite sola', () => {
     ]
     pintar(layout([{ id: 'categories', enabled: true, maxItems: 2 }]), datos({ categorias: familias }))
 
-    const seccion = screen.getByRole('region', { name: 'store.categories.shopBy' })
+    // Las puertas llegan por `lazy` desde P14 —la sección viene apagada en los
+    // cuatro temas y su módulo no tiene por qué pesar en la portada de quien no
+    // la enciende—, así que se espera al módulo. Lo que se comprueba no cambia:
+    // cuáles se pintan, en qué orden y cuántas.
+    const seccion = await screen.findByRole('region', { name: 'store.categories.shopBy' })
     const puertas = seccion.querySelectorAll('a')
     expect([...puertas].map((a) => a.getAttribute('href'))).toEqual([
       '/s/botica?c=zapatillas',
@@ -314,5 +363,69 @@ describe('la cubierta del comercio manda sobre la de reserva', () => {
 
     expect(screen.getByText('Jarabe Hero')).toBeInTheDocument()
     expect(screen.queryByText('Salud cerca de casa')).not.toBeInTheDocument()
+  })
+})
+
+/**
+ * Storefront V2 · P08 · El título de la fila lo decide el DATO.
+ *
+ * La sección se llamaba «Lo más vendido» con el antetítulo «Lo que más sale» y
+ * la bajada «Los productos que más repiten nuestros clientes», sobre una lista
+ * que salía del orden por RELEVANCIA del buscador. Tres afirmaciones sobre el
+ * comportamiento de los compradores sostenidas por un índice de texto.
+ *
+ * Lo que se fija aquí es la regla: **no se cambia la lista para salvar el
+ * título; se cambia el título para que diga la verdad sobre la lista.**
+ */
+describe('la fila de más vendidos dice lo que los datos sostienen', () => {
+  const SOLO_VENDIDOS = layout([{ id: 'best-sellers', enabled: true }])
+
+  it('sin ventas se llama «Recomendados» y no afirma nada', () => {
+    pintar(SOLO_VENDIDOS, datos({ masVendidoEsReal: false }))
+
+    expect(screen.getByText('store.row.recommended')).toBeInTheDocument()
+    expect(screen.queryByText('store.row.bestSellers')).not.toBeInTheDocument()
+  })
+
+  it('con ventas se llama «Lo más vendido» y explica de dónde sale', () => {
+    pintar(SOLO_VENDIDOS, datos({ masVendidoEsReal: true }))
+
+    expect(screen.getByText('store.row.bestSellers')).toBeInTheDocument()
+    expect(screen.getByText('store.row.bestSellersSubtitle')).toBeInTheDocument()
+    expect(screen.queryByText('store.row.recommended')).not.toBeInTheDocument()
+  })
+
+  it('la lista es la MISMA: lo que cambia es lo que se afirma sobre ella', () => {
+    // Si al no haber ventas se vaciara la fila, la portada perdería una sección
+    // por decir la verdad. Lo que se corrige es la afirmación, no el contenido.
+    pintar(SOLO_VENDIDOS, datos({ masVendidoEsReal: false }))
+    expect(screen.getByText('Alcohol Vendido')).toBeInTheDocument()
+
+    cleanup()
+    pintar(SOLO_VENDIDOS, datos({ masVendidoEsReal: true }))
+    expect(screen.getByText('Alcohol Vendido')).toBeInTheDocument()
+  })
+
+  it('«Destacados» ya no comparte título con «Lo más vendido»', () => {
+    // Compartían las tres claves, así que una tienda que encendiera las dos
+    // secciones veía dos veces el mismo título sobre dos listas distintas.
+    pintar(layout([
+      { id: 'best-sellers', enabled: true },
+      { id: 'featured', enabled: true },
+    ]), datos({ masVendidoEsReal: true }))
+
+    expect(screen.getByText('store.row.bestSellers')).toBeInTheDocument()
+    expect(screen.getByText('store.row.highlighted')).toBeInTheDocument()
+  })
+})
+
+describe('el copy de las demás filas dice lo que el dato sabe', () => {
+  it('novedades habla de PUBLICACIÓN, no de entrada al almacén', () => {
+    // La fuente es `published_at` del catálogo publicado: la tienda no sabe
+    // cuándo entró algo a un almacén, y desde luego no sabe si fue esta semana.
+    pintar(layout([{ id: 'new-arrivals', enabled: true }]))
+
+    expect(screen.getByText('store.row.newSubtitle')).toBeInTheDocument()
+    expect(screen.getByText('store.row.newEyebrow')).toBeInTheDocument()
   })
 })

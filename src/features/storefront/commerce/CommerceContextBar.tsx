@@ -54,12 +54,18 @@ export function CommerceContextBar({ storeSlug }: { storeSlug: string }) {
       aria-label={t('store.commerce.region')}
       data-commerce-audience={audience}
       sx={{
-        mb: { xs: 2, md: 2.5 },
+        mb: { xs: 1.5, md: 2 },
         px: { xs: 1.5, md: 2 },
-        py: 1,
+        py: 0.75,
         borderRadius: 'var(--sf-radius-sm)',
-        border: '1px solid var(--sf-line)',
-        bgcolor: 'var(--card)',
+        // Una banda TEÑIDA, no una tarjeta (Storefront V2 · P05).
+        //
+        // Con fondo de tarjeta y borde competía con las tarjetas de producto que
+        // van justo debajo: lo primero que se veía de la portada era una caja
+        // blanca con texto administrativo, que es exactamente el aspecto de
+        // aplicación de gestión que la vitrina no debe tener. Sigue siendo
+        // visible y sigue diciendo para quién se compra; deja de gritar.
+        bgcolor: 'color-mix(in srgb, var(--accent) 7%, transparent)',
       }}
     >
       <Stack direction="row" sx={{ alignItems: 'center', gap: 1.25, flexWrap: 'wrap', minWidth: 0 }}>

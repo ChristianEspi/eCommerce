@@ -8,6 +8,7 @@ import type { MessageKey } from '@/shared/i18n/messages'
 import { FormDrawer } from '@/shared/ui/FormDrawer'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { CatalogError } from './api/errors'
+import { CategoryImageField } from './CategoryImageField'
 import { CategoryPicker } from './CategoryPicker'
 import {
   categoryDescendants,
@@ -159,6 +160,20 @@ export function CategoryDrawer({
             helperText={fieldError('slug') ?? t('catalog.field.slug.help')}
             inputProps={{ spellCheck: false }}
             {...register('slug', { onChange: () => setSlugEdited(true) })}
+          />
+
+          {/* La foto va DESPUÉS del nombre a propósito: el icono de respaldo se
+              deriva del nombre, así que enseñarlo antes de tenerlo sería enseñar
+              el genérico y cambiarlo delante de quien escribe. */}
+          <CategoryImageField
+            name={watch('name')}
+            imageUrl={watch('image_url')}
+            imageAlt={watch('image_alt')}
+            organizationId={organizationId}
+            storeId={storeId}
+            disabled={!canWrite}
+            onChangeImage={(next) => setValue('image_url', next, { shouldDirty: true })}
+            onChangeAlt={(next) => setValue('image_alt', next, { shouldDirty: true })}
           />
 
           <CategoryPicker

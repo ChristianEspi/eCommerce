@@ -63,7 +63,19 @@ export function StoreSearchField({
           </Typography>
         </li>
       )}
-      sx={{ width: '100%', maxWidth: { sm: 420 } }}
+      sx={{
+        width: '100%',
+        // Más ancha que antes (420) en escritorio: la caja de búsqueda es la
+        // primera herramienta de una tienda con catálogo, y con 420 px no
+        // cabían ni cinco palabras. El tope evita que en un monitor ancho se
+        // estire hasta ocupar media cabecera.
+        maxWidth: { sm: 520 },
+        // El alto lo pone la VARIANTE de cabecera (`--sf-search-h`): `compact`
+        // la recorta, y esa es la mitad de la densidad que el tema promete.
+        // Con reserva, porque fuera de la vitrina la variable no existe.
+        '& .MuiOutlinedInput-root': { minHeight: 'var(--sf-search-h, 42px)' },
+        '& .MuiInputBase-input': { py: 0 },
+      }}
       renderInput={(params) => (
         <TextField
           {...params}

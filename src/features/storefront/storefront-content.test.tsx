@@ -520,7 +520,9 @@ describe('el mural de campañas', () => {
     expect(screen.getByText(/Desde .*150.* de compra/)).toBeInTheDocument()
 
     // Van agrupadas bajo una sección, no sueltas una debajo de otra.
-    expect(screen.getByRole('region', { name: 'Ofertas de la semana' })).toBeInTheDocument()
+    // P08 · «Ofertas de la semana» afirmaba una vigencia semanal que ninguna
+    // campaña garantiza: cada una trae su propia fecha de fin.
+    expect(screen.getByRole('region', { name: 'Campañas vigentes' })).toBeInTheDocument()
   })
 
   it('una campaña con cupón lo advierte sin cantar el código', async () => {

@@ -15,6 +15,7 @@ import {
   attributeSchema,
   attributeValueSchema,
   brandSchema,
+  productFamilySchema,
   bundleItemSchema,
   productAttributeValueSchema,
   productRelationSchema,
@@ -27,6 +28,7 @@ import {
   type AttributeValue,
   type AttributeValueFormValues,
   type Brand,
+  type BrandFormValues,
   type BundleItem,
   type BundleItemFormValues,
   type CatalogEntryFormValues,
@@ -76,12 +78,14 @@ export interface StoreScope extends TenantScope {
 // ---------------------------------------------------------------------------
 
 const CATALOG_ENTRY_SELECT = 'id, code, name, description, is_active'
+/** La marca pide una columna más: su logo es publicable y la familia no tiene. */
+const BRAND_SELECT = `${CATALOG_ENTRY_SELECT}, logo_url`
 const UNIT_SELECT = 'id, code, name, symbol, is_active'
 
 export async function fetchBrands(): Promise<Brand[]> {
   const { data, error } = await catalogClient()
     .from(BRANDS_TABLE)
-    .select(CATALOG_ENTRY_SELECT)
+    .select(BRAND_SELECT)
     .order('name')
   if (error) throw catalogErrorFromDb(error)
   return brandSchema.array().parse(data ?? [])
@@ -93,7 +97,10 @@ export async function fetchFamilies(): Promise<ProductFamily[]> {
     .select(CATALOG_ENTRY_SELECT)
     .order('name')
   if (error) throw catalogErrorFromDb(error)
-  return brandSchema.array().parse(data ?? [])
+  // `productFamilySchema` y no `brandSchema`: una familia no tiene logo, y
+  // parsearla con el esquema de la marca le añadiría un `logo_url: null` que
+  // nadie puede guardar.
+  return productFamilySchema.array().parse(data ?? [])
 }
 
 export async function fetchUnits(): Promise<UnitOfMeasure[]> {
@@ -127,11 +134,37 @@ async function saveCatalogEntry(
   if (error) throw catalogErrorFromDb(error)
 }
 
-export const saveBrand = (input: {
+/**
+ * Guardar una marca. Escribe su logo ADEMÁS de lo del vocabulario.
+ *
+ * No reutiliza `saveCatalogEntry` con un campo extra porque eso obligaría a que
+ * la función genérica conociera un campo que solo tiene una de las dos tablas —
+ * y el día que se le pasara por error a una familia, el `insert` moriría con
+ * «column logo_url does not exist». Son dos escrituras parecidas, no la misma.
+ */
+export async function saveBrand(input: {
   id?: string | null
   scope: TenantScope
-  values: CatalogEntryFormValues
-}) => saveCatalogEntry(BRANDS_TABLE, input)
+  values: BrandFormValues
+}): Promise<void> {
+  const supabase = catalogClient()
+  const fields = {
+    code: input.values.code,
+    name: input.values.name,
+    is_active: input.values.is_active,
+    logo_url: input.values.logo_url,
+  }
+
+  const { error } = input.id
+    ? await supabase.from(BRANDS_TABLE).update(fields).eq('id', input.id)
+    : await supabase.from(BRANDS_TABLE).insert({
+        organization_id: input.scope.organizationId,
+        company_id: input.scope.companyId,
+        ...fields,
+      })
+
+  if (error) throw catalogErrorFromDb(error)
+}
 
 export const saveFamily = (input: {
   id?: string | null

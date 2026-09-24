@@ -9,6 +9,7 @@ import PhotoLibraryRoundedIcon from '@mui/icons-material/PhotoLibraryRounded'
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded'
 import StorefrontRoundedIcon from '@mui/icons-material/StorefrontRounded'
 import TuneRoundedIcon from '@mui/icons-material/TuneRounded'
+import VerifiedUserRoundedIcon from '@mui/icons-material/VerifiedUserRounded'
 import WorkspacePremiumRoundedIcon from '@mui/icons-material/WorkspacePremiumRounded'
 import {
   Alert,
@@ -48,6 +49,7 @@ import { CartRecoverySection } from '@/features/notifications/CartRecoverySectio
 import RemoveShoppingCartRoundedIcon from '@mui/icons-material/RemoveShoppingCartRounded'
 import { StorefrontDesignSection } from './settings/StorefrontDesignSection'
 import { TaxesSection } from './settings/TaxesSection'
+import { ValuePropsSection } from './settings/ValuePropsSection'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState, ErrorState, LoadingState, UnauthorizedState } from '@/shared/ui/states'
 import { useAppearance } from '@/theme/appearance-context'
@@ -411,6 +413,23 @@ export function SettingsPage() {
                           />
                         </Grid>
                       </Grid>
+                    </SectionCard>
+
+                    {/* Storefront V2 · P01 · Las promesas de la franja de
+                        portada.
+                        Va en General, junto al contacto y la descripción,
+                        porque es CONTENIDO del comercio y no disposición: en
+                        Diseño se elige cómo se presenta lo que se vende, aquí
+                        se escribe una afirmación sobre el negocio. Mezclarlas
+                        obligaría a bajar por un selector de proporción de
+                        imagen para llegar a escribir «Garantía de 12 meses». */}
+                    <SectionCard
+                      icon={<VerifiedUserRoundedIcon />}
+                      title={t('settings.valueProps.title')}
+                      subtitle={t('settings.valueProps.help')}
+                      padded
+                    >
+                      <ValuePropsSection form={form} busy={busy} />
                     </SectionCard>
 
                     {/* P18 · Quién puede comprar.
@@ -884,7 +903,12 @@ export function SettingsPage() {
                           color, nombre—; el diseño es cómo se presenta lo que
                           vendes. Mezclarlas obliga a bajar por un color para
                           llegar al orden de la portada. */}
-                      <StorefrontDesignSection form={form} busy={busy} />
+                      <StorefrontDesignSection
+                        form={form}
+                        busy={busy}
+                        storeId={storeId}
+                        storeSlug={activeStore?.slug ?? null}
+                      />
                     </CardContent>
                   </Card>
                 )}

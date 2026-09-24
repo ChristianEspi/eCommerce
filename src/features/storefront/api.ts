@@ -1,7 +1,8 @@
+import { z } from 'zod'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { AppError } from '@/domain/errors'
 import { codeFromDbError, type PostgrestLike } from '@/shared/lib/appError'
-import { ORDER_BY_TOKEN_RPC } from '@/shared/lib/db-schema'
+import { ORDER_BY_TOKEN_RPC, STORE_BEST_SELLERS_PUBLIC_RPC } from '@/shared/lib/db-schema'
 import { buildTextSearchFilter } from '@/shared/lib/search'
 import { tryGetStorefrontClient } from '@/shared/lib/supabase'
 import {
@@ -12,6 +13,8 @@ import {
   PUBLIC_PRODUCT_IMAGES_VIEW,
   PUBLIC_PRODUCT_VARIANTS_VIEW,
   PUBLIC_STORES_VIEW,
+  PUBLIC_BRANDS_VIEW,
+  publicBrandSchema,
   publicCategorySchema,
   publicProductImageSchema,
   publicProductSchema,
@@ -19,6 +22,7 @@ import {
   publicVariantSchema,
   type CatalogQuery,
   type GalleryImage,
+  type PublicBrand,
   type PublicCategory,
   type PublicProduct,
   type PublicStore,
@@ -127,6 +131,23 @@ export function storefrontClient(): SupabaseClient {
 const STORE_SELECT = '*'
 
 const CATEGORY_SELECT = 'category_id, store_id, parent_id, slug, name, position'
+/**
+ * Storefront V2 · P03 · La foto, pedida aparte para poder caer a la lista base.
+ *
+ * PostgREST responde 400/`42703` cuando una columna no existe y la consulta
+ * ENTERA se cae: una vitrina contra una base sin la migración se quedaría sin
+ * categorías —ni barra de familias, ni puertas, ni filtro— por una foto
+ * opcional. Mismo criterio que `fetchPublicVariants` con la migración de ejes.
+ */
+const CATEGORY_SELECT_CON_FOTO = `${CATEGORY_SELECT}, image_url, image_alt`
+
+const BRAND_SELECT = 'brand_id, store_id, code, name, logo_url'
+
+/** Lo que devuelve el ranking: un id y su puesto. Ni unidades, ni importes. */
+const bestSellerRankSchema = z.object({
+  product_id: z.string().uuid(),
+  sort_order: z.number().int(),
+})
 
 /** `::text` en los importes: el céntimo no pasa por el float del navegador. */
 const PRODUCT_SELECT = [
@@ -249,19 +270,111 @@ export async function fetchPublicStore(slug: string): Promise<PublicStore> {
   return resolveStoreAssets(publicStoreSchema.parse(data))
 }
 
+/**
+ * Las marcas de la tienda, con su logo, en UNA consulta.
+ *
+ * ## Por qué existe si las marcas ya llegaban
+ *
+ * Llegaban por las FACETAS de la búsqueda, que devuelven código, nombre y
+ * cuenta. Es lo correcto para un filtro y es inservible para un logo: las
+ * facetas se calculan sobre el resultado YA filtrado, así que al elegir una
+ * marca vuelve una sola.
+ *
+ * La alternativa —pedir el logo marca a marca— es exactamente el N+1 que el
+ * rediseño prohíbe: una portada con cuarenta marcas serían cuarenta
+ * peticiones. Esto trae las marcas de la tienda de una vez y la portada las
+ * cruza con las facetas por `code`.
+ *
+ * No devuelve contadores a propósito: los dan las facetas, y dos fuentes para
+ * el mismo número acaban discrepando delante del comprador.
+ */
+export async function fetchPublicBrands(storeId: string | null): Promise<PublicBrand[]> {
+  if (!storeId) return []
+
+  const { data, error } = await storefront()
+    .from(PUBLIC_BRANDS_VIEW)
+    .select(BRAND_SELECT)
+    .eq('store_id', storeId)
+    .order('name')
+
+  // Una base sin la migración de P02 no tiene la vista, y eso NO puede dejar la
+  // portada sin marcas: se cae a la lista sin logos, que es lo que había antes.
+  // Mismo criterio que `fetchPublicVariants` con la migración de ejes.
+  if (error) return []
+  return publicBrandSchema.array().parse(data ?? [])
+}
+
+/**
+ * Los más vendidos de verdad de una tienda (Storefront V2 · P08).
+ *
+ * Dos consultas y no una, y a propósito: la primera pregunta al ranking QUÉ
+ * productos son —una función que lee pedidos, que la vitrina no puede leer— y
+ * la segunda los trae del MISMO modelo de lectura que el resto del catálogo.
+ *
+ * Reunirlas en una sola función de base habría obligado a duplicar ahí dentro
+ * la resolución de precio de vitrina, disponibilidad y foto principal, que es
+ * justo lo que `public_products` ya hace y lo que hay que tener escrito una
+ * sola vez. Dos consultas por portada, con media hora de caché, es más barato
+ * que dos resolvedores de precio.
+ *
+ * El ORDEN del ranking manda: `public_products` devuelve lo que le dé la gana y
+ * aquí se recoloca por la posición que dio la función. Sin esto, «lo más
+ * vendido» saldría ordenado por lo que decidiera el planificador.
+ *
+ * Sin ventas devuelve la lista vacía, y la portada deja de afirmar que las hay.
+ * Un error tampoco es una excepción: la sección cae a «Recomendados», que es
+ * peor que el ranking y mejor que una portada rota.
+ */
+export async function fetchBestSellers(
+  storeSlug: string | undefined,
+  storeId: string | null,
+  limit = 12,
+): Promise<PublicProduct[]> {
+  if (!storeSlug || !storeId) return []
+
+  const ranking = await storefront().rpc(STORE_BEST_SELLERS_PUBLIC_RPC, {
+    p_slug: storeSlug,
+    p_limit: limit,
+  })
+  if (ranking.error) return []
+
+  const orden = bestSellerRankSchema.array().safeParse(ranking.data ?? [])
+  if (!orden.success || orden.data.length === 0) return []
+
+  const ids = orden.data.map((fila) => fila.product_id)
+  const { data, error } = await storefront()
+    .from(PUBLIC_PRODUCTS_VIEW)
+    .select(PRODUCT_SELECT)
+    .eq('store_id', storeId)
+    .in('product_id', ids)
+
+  if (error) return []
+  const productos = publicProductSchema.array().parse(data ?? [])
+  const porId = new Map(productos.map((producto) => [producto.product_id, producto]))
+
+  return ids
+    .map((id) => porId.get(id))
+    .filter((producto): producto is PublicProduct => producto !== undefined)
+}
+
 /** Solo categorías activas: la vista `public_categories` ya filtra `is_active`. */
 export async function fetchPublicCategories(storeId: string | null): Promise<PublicCategory[]> {
   if (!storeId) return []
 
-  const { data, error } = await storefront()
-    .from(PUBLIC_CATEGORIES_VIEW)
-    .select(CATEGORY_SELECT)
-    .eq('store_id', storeId)
-    .order('position')
-    .order('name')
+  const leer = (select: string) =>
+    storefront()
+      .from(PUBLIC_CATEGORIES_VIEW)
+      .select(select)
+      .eq('store_id', storeId)
+      .order('position')
+      .order('name')
 
-  if (error) throw new StorefrontError(error)
-  return publicCategorySchema.array().parse(data ?? [])
+  const conFoto = await leer(CATEGORY_SELECT_CON_FOTO)
+  if (!conFoto.error) return publicCategorySchema.array().parse(conFoto.data ?? [])
+
+  const base = await leer(CATEGORY_SELECT)
+  if (base.error) throw new StorefrontError(base.error)
+  return publicCategorySchema.array().parse(base.data ?? [])
 }
 
 /**

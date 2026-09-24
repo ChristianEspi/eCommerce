@@ -9,7 +9,6 @@ import {
   CircularProgress,
   IconButton,
   Stack,
-  Tooltip,
   Typography,
 } from '@mui/material'
 import { Link } from 'react-router-dom'
@@ -128,6 +127,7 @@ export function ProductCard({
 
   return (
     <Card
+      className="eb-card"
       onMouseEnter={() => onPrefetch?.(product.slug)}
       sx={{
         position: 'relative',
@@ -162,7 +162,7 @@ export function ProductCard({
     >
       {/* La foto flota sobre la tarjeta, sin caja propia.
           Con fondo y relleno propios, un frasco fotografiado sobre blanco
-          —casi todo el catalogo de una botica— quedaba como un rectangulo
+          —buena parte de cualquier catalogo— quedaba como un rectangulo
           blanco dentro de otro gris dentro de la tarjeta: tres bordes para
           ensenar un producto. */}
       <Box
@@ -200,46 +200,54 @@ export function ProductCard({
           // su nombre accesible cambiando según el estado: «guardar» y «quitar»
           // son dos acciones distintas y el lector de pantalla tiene que poder
           // distinguirlas sin ver el relleno del icono.
-          <Tooltip title={favorite ? t('store.favorite.remove') : t('store.favorite.add')}>
-            <IconButton
-              size="small"
-              aria-pressed={Boolean(favorite)}
-              aria-label={favorite ? t('store.favorite.remove') : t('store.favorite.add')}
-              onClick={() => onToggleFavorite(product.product_id)}
-              sx={{
-                position: 'absolute',
-                top: 8,
-                right: 8,
-                zIndex: 1,
-                width: 30,
-                height: 30,
-                // Un disco limpio, sin aro: el borde dibujaba una moneda sobre
-                // la foto y era lo primero que se veia de la tarjeta. La sombra
-                // basta para despegarlo del fondo, y guardado se reconoce por
-                // el relleno del corazon, no por el marco.
-                bgcolor: 'color-mix(in srgb, var(--card) 88%, transparent)',
-                backdropFilter: 'blur(6px)',
-                boxShadow: '0 2px 8px -2px rgba(16, 24, 32, 0.22)',
-                color: favorite ? 'var(--sf-heart)' : 'var(--muted)',
-                transition: 'transform .15s ease, background-color .15s ease, color .15s ease',
-                '&:hover': {
-                  bgcolor: 'var(--card)',
-                  color: 'var(--sf-heart)',
-                  transform: 'scale(1.08)',
-                },
-                '@media (prefers-reduced-motion: reduce)': {
-                  transition: 'none',
-                  '&:hover': { transform: 'none' },
-                },
-              }}
-            >
-              {favorite ? (
-                <FavoriteRoundedIcon sx={{ fontSize: 18 }} />
-              ) : (
-                <FavoriteBorderRoundedIcon sx={{ fontSize: 18 }} />
-              )}
-            </IconButton>
-          </Tooltip>
+          //
+          // El aviso al pasar el ratón va en `title` y no en un `Tooltip` de MUI
+          // (Storefront V2 · P14): dice exactamente lo mismo que el `aria-label`
+          // que el botón ya lleva —y que es lo que anuncia un lector de
+          // pantalla—, pero el `Tooltip` arrastra Popper y sus transiciones al
+          // PRIMER PINTADO de la vitrina: once kilobytes gzip en toda la portada
+          // por un texto que el navegador sabe enseñar solo. Y en un teléfono no
+          // aporta nada: no hay ratón que pasar por encima, y de ahí llega la
+          // mitad de las visitas a una tienda.
+          <IconButton
+            size="small"
+            aria-pressed={Boolean(favorite)}
+            aria-label={favorite ? t('store.favorite.remove') : t('store.favorite.add')}
+            title={favorite ? t('store.favorite.remove') : t('store.favorite.add')}
+            onClick={() => onToggleFavorite(product.product_id)}
+            sx={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              zIndex: 1,
+              width: 30,
+              height: 30,
+              // Un disco limpio, sin aro: el borde dibujaba una moneda sobre
+              // la foto y era lo primero que se veia de la tarjeta. La sombra
+              // basta para despegarlo del fondo, y guardado se reconoce por
+              // el relleno del corazon, no por el marco.
+              bgcolor: 'color-mix(in srgb, var(--card) 88%, transparent)',
+              backdropFilter: 'blur(6px)',
+              boxShadow: '0 2px 8px -2px rgba(16, 24, 32, 0.22)',
+              color: favorite ? 'var(--sf-heart)' : 'var(--muted)',
+              transition: 'transform .15s ease, background-color .15s ease, color .15s ease',
+              '&:hover': {
+                bgcolor: 'var(--card)',
+                color: 'var(--sf-heart)',
+                transform: 'scale(1.08)',
+              },
+              '@media (prefers-reduced-motion: reduce)': {
+                transition: 'none',
+                '&:hover': { transform: 'none' },
+              },
+            }}
+          >
+            {favorite ? (
+              <FavoriteRoundedIcon sx={{ fontSize: 18 }} />
+            ) : (
+              <FavoriteBorderRoundedIcon sx={{ fontSize: 18 }} />
+            )}
+          </IconButton>
         )}
 
         {discount !== null && (
@@ -272,6 +280,13 @@ export function ProductCard({
       <Stack sx={{ gap: 0.5, flex: 1 }}>
         {product.category_name && (
           <Typography
+            // La categoría es CONTEXTO, y cuánto contexto cabe depende del tema:
+            // `compact` reparte cinco o seis columnas y ahí el nombre truncado
+            // de la familia roba la línea que necesita el del producto;
+            // `premium` la esconde porque su argumento es la foto, no la
+            // taxonomía. Lo decide la hoja de estilos desde la frontera, no un
+            // `if` aquí dentro — ver `storefront.css`.
+            className="eb-card-eyebrow"
             sx={{
               fontSize: 10.5,
               fontWeight: 800,
@@ -378,6 +393,12 @@ export function ProductCard({
             fila no se pinta: allí no hay botón al que condicionar. */}
         {compact ? null : (
         <Box
+          className="eb-card-state"
+          // `in` es el estado ESPERADO de un producto publicado, y por eso hay
+          // temas que no lo pintan: una pastilla verde repetida en cada tarjeta
+          // de la rejilla no informa, decora. `out` se pinta SIEMPRE, en los
+          // cuatro: eso sí es información, y es la que decide si el botón sirve.
+          data-stock={available ? 'in' : 'out'}
           sx={{
             alignSelf: 'flex-start',
             px: 0.875,

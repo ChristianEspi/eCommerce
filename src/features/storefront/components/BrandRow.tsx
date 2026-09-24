@@ -2,8 +2,8 @@ import { Box, Button, Stack, Typography } from '@mui/material'
 import { Link } from 'react-router-dom'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { TS } from '@/theme/tokens'
-import { initials } from '../branding'
 import { tintFor } from '../tint'
+import { BrandLogo } from './BrandLogo'
 import { LoopingRow } from './LoopingRow'
 import { SectionHeading } from './SectionHeading'
 
@@ -11,15 +11,23 @@ export interface BrandOption {
   readonly code: string
   readonly name: string
   readonly count: number | null
+  /**
+   * Logo YA firmado, o `null` si la marca no tiene (Storefront V2 · P02).
+   *
+   * Llega firmado y no como ruta a propósito: firmar aquí serían tantas
+   * peticiones como marcas. La portada firma el lote entero de una vez y
+   * reparte — ver `usePublicBrands` y `useSignedStoreAssets`.
+   */
+  readonly logoUrl?: string | null
 }
 
 /**
  * Las marcas de la tienda, como puerta de entrada.
  *
- * En una botica se compra por marca tanto como por categoría: quien busca
- * «Eucerin» no busca «dermocosmética», busca Eucerin. Estaban solo dentro del
- * panel lateral de filtros, que es donde va quien YA está filtrando — y en
- * móvil queda debajo del catálogo, o sea, después de haber recorrido todo.
+ * Se compra por marca tanto como por categoría: quien busca una marca concreta
+ * no busca su familia, busca esa marca. Estaban solo dentro del panel lateral
+ * de filtros, que es donde va quien YA está filtrando — y en móvil queda debajo
+ * del catálogo, o sea, después de haber recorrido todo.
  *
  * Sale de las FACETAS de la búsqueda, no de una lista aparte: así solo aparecen
  * las marcas que de verdad tienen producto publicado ahora, con cuántos, y
@@ -48,12 +56,15 @@ export function BrandRow({
       aria-label={t('store.brands.title')}
       sx={{
         gap: 1.25,
-        scrollMarginTop: 96,
+        // El alto real de la cabecera pegajosa, del tema. Estaba escrito a mano
+        // como `96` y dejó de ser cierto en cuanto la barra cambió de alto por
+        // variante: el enlace «Marcas» saltaba aquí y dejaba el título tapado.
+        scrollMarginTop: 'var(--sf-anchor-offset, 96px)',
         // La mitad de abajo de la portada se habia quedado en «listas sueltas
         // sobre blanco» mientras la de arriba ya tenia bandas con fondo. Un
         // panel tenido —el mismo tinte flojo que usan las secciones del CMS—
-        // le da a las marcas el peso que de verdad tienen: en una botica se
-        // entra por marca tanto como por familia.
+        // le da a las marcas el peso que de verdad tienen: se entra por marca
+        // tanto como por familia.
         p: { xs: 1.75, md: 2.5 },
         borderRadius: 'var(--sf-radius)',
         border: '1px solid var(--sf-line)',
@@ -88,8 +99,8 @@ export function BrandRow({
       />
 
       {/* Gira sola, como las puertas de categoria. Un catalogo con cuarenta
-          laboratorios enseñaba seis y las otras treinta y cuatro solo existian
-          para quien se molestara en empujar la fila. */}
+          marcas enseñaba seis y las otras treinta y cuatro solo existian para
+          quien se molestara en empujar la fila. */}
       <LoopingRow
         items={brands}
         keyOf={(brand) => brand.code}
@@ -139,31 +150,11 @@ export function BrandRow({
                 },
               }}
             >
-              {/* El monograma hace de logo mientras no haya logo.
-                  Un catálogo de marcas sin imagen es una lista de texto gris
-                  donde ninguna se distingue de la de al lado; con dos letras
-                  sobre el acento del comercio, cada una tiene forma propia y la
-                  fila se lee de lado. El día que la marca traiga logo, va en su
-                  sitio sin mover nada más. */}
-              <Box
-                aria-hidden
-                sx={{
-                  width: 40,
-                  height: 40,
-                  flexShrink: 0,
-                  display: 'grid',
-                  placeItems: 'center',
-                  borderRadius: '50%',
-                  bgcolor: tinte.fg,
-                  color: tinte.bg,
-                  fontSize: 14,
-                  fontWeight: 800,
-                  letterSpacing: '0.02em',
-                  boxShadow: `0 6px 16px -8px ${tinte.fg}`,
-                }}
-              >
-                {initials(brand.name)}
-              </Box>
+              {/* El logo REAL de la marca si lo tiene, y su monograma si no.
+                  El día que la marca trae logo entra aquí sin mover nada: el
+                  hueco es del mismo tamaño en los dos casos, así que la fila no
+                  cambia de alto al cargar las imágenes. Ver `BrandLogo`. */}
+              <BrandLogo name={brand.name} url={brand.logoUrl ?? null} size={40} />
 
               <Box sx={{ minWidth: 0 }}>
                 <Typography
