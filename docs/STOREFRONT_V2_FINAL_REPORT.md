@@ -65,10 +65,10 @@ diccionarios completos y falla si un texto de vitrina nombra un rubro.
 
 | Migración | Qué añade |
 |---|---|
-| `20260923100000_storefront_value_props.sql` | `store_settings.value_props` con validación en la base (máximo 4, sin iconos repetidos, textos acotados), grants por columna y `public_stores` recreada |
-| `20260923110000_brand_logos.sql` | ruta de Storage por **sociedad** (`{org}/company/{company}/brands/…`), 5 policies nuevas, `public.public_brands` |
-| `20260923120000_category_media.sql` | `categories.image_url`/`image_alt` con validación de ruta, grants a `anon` y `public_categories` **conservando el filtro recursivo de ancestros** |
-| `20260923130000_store_best_sellers.sql` | `store_best_sellers_for_slug`: agrega pedidos pagados o entregados de 90 días y devuelve **solo** ids y puestos |
+| `20260923140000_storefront_value_props.sql` | `store_settings.value_props` con validación en la base (máximo 4, sin iconos repetidos, textos acotados), grants por columna y `public_stores` recreada |
+| `20260923150000_brand_logos.sql` | ruta de Storage por **sociedad** (`{org}/company/{company}/brands/…`), 5 policies nuevas, `public.public_brands` |
+| `20260923160000_category_media.sql` | `categories.image_url`/`image_alt` con validación de ruta, grants a `anon` y `public_categories` **conservando el filtro recursivo de ancestros** |
+| `20260923170000_store_best_sellers.sql` | `store_best_sellers_for_slug`: agrega pedidos pagados o entregados de 90 días y devuelve **solo** ids y puestos |
 
 Ninguna modifica una migración previa. Todas nacen con su RLS, sus grants por columna y su
 comentario. Las cuatro se aplican y se prueban contra Postgres real (PGlite) en la suite de base.

@@ -161,7 +161,7 @@ export const categorySchema = z.object({
    * Storefront V2 · P03 · Foto opcional de la categoría y su texto alternativo.
    *
    * `catch(null).default(null)`: una base anterior a la migración
-   * `20260923120000` no trae estas columnas, y una respuesta sin ellas se lee
+   * `20260923160000` no trae estas columnas, y una respuesta sin ellas se lee
    * como la categoría sin foto que era. La ausencia de imagen NO invalida la
    * categoría — es el caso normal y la vitrina cae a tinte + icono.
    */

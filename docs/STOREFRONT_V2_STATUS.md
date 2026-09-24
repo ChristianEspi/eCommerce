@@ -231,7 +231,7 @@ en esta fase; ningún cambio ajeno perdido.
 # P01 — Contenido multi-industria y propuestas de valor
 
 **HEAD inicial:** `397e638` · **Commit de la fase:** ver tabla final · **Migración nueva:**
-`supabase/migrations/20260923100000_storefront_value_props.sql`
+`supabase/migrations/20260923140000_storefront_value_props.sql`
 
 ## El problema, dicho exacto
 
@@ -266,7 +266,7 @@ ignorarla.
 
 ## Base de datos
 
-Migración **nueva** `20260923100000_storefront_value_props.sql`:
+Migración **nueva** `20260923140000_storefront_value_props.sql`:
 
 - `ebim.value_prop_is_valid(jsonb)` — una entrada: claves ⊆ {`iconKey`,`title`,`body`,`enabled`},
   icono de los doce nombrados, título 1–40 con contenido tras recortar, apoyo opcional 1–90,
@@ -368,7 +368,7 @@ Ciclos correctivos usados: **2 de 3**.
 # P02 — Logos de marca de punta a punta
 
 **HEAD inicial:** `d5f437e` · **Migración nueva:**
-`supabase/migrations/20260923110000_brand_logos.sql`
+`supabase/migrations/20260923150000_brand_logos.sql`
 
 ## Verificación del supuesto (obligatoria antes de tocar)
 
@@ -521,7 +521,7 @@ Ciclos correctivos usados: **3 de 3**, y los tres por causa raíz, no por sínto
 # P03 — Fotografía opcional en las categorías
 
 **HEAD inicial:** `77cf3cd` · **Migración nueva:**
-`supabase/migrations/20260923120000_category_media.sql`
+`supabase/migrations/20260923160000_category_media.sql`
 
 ## Verificación del supuesto
 
@@ -1113,7 +1113,7 @@ dos listas distintas.
 
 ### El ranking sale de los pedidos
 
-Migración `20260923130000_store_best_sellers.sql` →
+Migración `20260923170000_store_best_sellers.sql` →
 `public.store_best_sellers_for_slug(p_slug, p_limit)`: agrega unidades de pedidos
 `paid`/`fulfilled` de los **últimos 90 días** de esa tienda y devuelve **solo**
 `product_id` y `sort_order`, de productos que **siguen publicados**.
@@ -1798,3 +1798,77 @@ al día que sale de las siete señales, que había contado mal las páginas.
 limitaciones y pendientes reales.
 
 `PHASE_RESULT: PASS`
+
+---
+
+# Cierre · Colisión de versiones de migración (validación contra QAS)
+
+Al desplegar la rama en QAS, «Diseño de tienda» seguía enseñando el aviso de base pendiente. La
+validación contra el proyecto Supabase `eCommerce` (`ehxlxbhtlmfgneiagdcj`) encontró dos cosas
+distintas, y la segunda es la que importa.
+
+## 1 · Ninguna de las cuatro migraciones está aplicada
+
+El aviso lo dispara `themeColumnsReady()`, que existe para no ofrecer una pantalla que no va a
+guardar. La sonda pide cuatro columnas de `store_settings` y PostgREST responde `42703` para una:
+
+| columna | en QAS |
+|---|---|
+| `theme_preset` · `storefront_style` · `home_layout` | **sí** (Theme Engine, ya desplegado) |
+| `value_props` | **no** |
+
+Y con ella faltan los demás objetos de estas fases: la vista `public_brands`, las columnas
+`categories.image_url`/`image_alt`, la función `store_best_sellers_for_slug`, las funciones
+`ebim.value_props_are_valid` y `ebim.company_object_visible`, y las cinco policies de Storage por
+sociedad.
+
+**Todo lo que estas migraciones necesitan ya está en QAS**: `brands.logo_url`, el bucket
+`store-assets`, `order_items.store_id`, `orders.placed_at`, `store_products.published_at`,
+`public_categories` y `ebim.company_is_entitled`. No hay dependencias que resolver antes.
+
+## 2 · Dos de las cuatro se habrían saltado en silencio
+
+El historial remoto (`supabase_migrations.schema_migrations`) ya tenía ocupadas dos versiones que
+**no existen en ninguna rama de este repositorio**:
+
+| versión | nombre aplicado en remoto |
+|---|---|
+| `20260923100000` | `rls_membership_initplan` |
+| `20260923110000` | `ai_dashboard_recent_orders` |
+
+Son exactamente las dos primeras de estas fases. Y una versión que ya figura en el historial **no se
+vuelve a ejecutar**: `value_props` y los logotipos de marca no se habrían aplicado nunca, el aviso
+de la pantalla habría seguido ahí después de «aplicar las migraciones», y el fallo habría parecido
+del código.
+
+Corregido renumerando las cuatro por encima de la última aplicada en remoto, conservando su orden
+relativo:
+
+| antes | ahora |
+|---|---|
+| `20260923100000_storefront_value_props.sql` | `20260923140000_storefront_value_props.sql` |
+| `20260923110000_brand_logos.sql` | `20260923150000_brand_logos.sql` |
+| `20260923120000_category_media.sql` | `20260923160000_category_media.sql` |
+| `20260923130000_store_best_sellers.sql` | `20260923170000_store_best_sellers.sql` |
+
+No se modifica ninguna migración previamente existente: las cuatro son de estas fases y **no estaban
+aplicadas en ninguna base**, así que renumerarlas no deja historial inconsistente en ningún sitio.
+Se actualizaron también las nueve referencias por nombre en código, pruebas y documentación.
+
+Renumerar las cuatro —y no solo las dos que chocaban— mantiene el orden en el que se escribieron y
+evita que `value_props` acabe ejecutándose después de las fases que vinieron detrás.
+
+## Gates tras el renumerado
+
+| Gate | Resultado |
+|---|---|
+| `npm run test:db` | **PASS** — 136 ficheros, 3595 tests contra Postgres real |
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 300 ficheros, 5925 tests |
+
+## Pendiente para el operador
+
+Las cuatro migraciones **siguen sin aplicarse a QAS**, y no se aplican sin orden explícita. Hasta
+entonces la pantalla de diseño seguirá avisando, que es lo que tiene que hacer: la alternativa era
+ofrecer controles que no guardan.
