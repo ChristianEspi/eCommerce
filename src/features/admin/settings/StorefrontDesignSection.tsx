@@ -96,6 +96,12 @@ const ETIQUETA_VALOR: Record<string, MessageKey> = {
   portrait: 'settings.design.value.portrait',
   landscape: 'settings.design.value.landscape',
   spacious: 'settings.design.value.spacious',
+  // Storefront V3 · P02
+  brand: 'settings.design.value.brand',
+  editorial: 'settings.design.value.editorial',
+  mosaic: 'settings.design.value.mosaic',
+  cover: 'settings.design.value.cover',
+  contain: 'settings.design.value.contain',
   lg: 'settings.design.value.lg',
   xl: 'settings.design.value.xl',
 }
@@ -125,6 +131,16 @@ export function StorefrontDesignSection({
   const { t } = useI18n()
   const preset = form.watch('theme_preset')
   const estilo = form.watch('storefront_style')
+
+  /**
+   * El estilo EFECTIVO: lo que el tema dice, con lo pisado encima (V3 · P12).
+   *
+   * El formulario guarda solo lo que el comercio apartó del tema —eso es lo que
+   * permite que mejorar un tema llegue a quien no lo tocó—, así que para
+   * resolver lo que `auto` significa hoy hace falta la mezcla. Es la misma que
+   * hace el motor al leer la fila.
+   */
+  const estiloEfectivo = { ...THEME_PRESETS[preset], ...estilo }
 
   /**
    * La base puede ir por detrás del código.
@@ -278,7 +294,10 @@ export function StorefrontDesignSection({
           onReset={() => form.setValue('storefront_style', {}, { shouldDirty: true })}
         />
 
-        <HomeLayoutEditor form={form} busy={busy} />
+        {/* El tema efectivo baja al editor: el panel de presentación por
+            sección necesita saber qué significa `auto` hoy para poder
+            escribirlo en el desplegable (V3 · P12). */}
+        <HomeLayoutEditor form={form} busy={busy} preset={preset} style={estiloEfectivo} />
 
         {storeId && storeSlug && (
           <StoreReadiness
@@ -290,6 +309,18 @@ export function StorefrontDesignSection({
               support_email: form.watch('support_email'),
               contact_phone: form.watch('contact_phone'),
               contact_address: form.watch('contact_address'),
+              /**
+               * Identidad V3 (P11): sin estos tres, dos señales preguntarían
+               * mal.
+               *
+               * Con `brand_lockup` en `name`, el logotipo no es un hueco — el
+               * comercio eligió su nombre escrito como marca. Y la descripción
+               * es una señal nueva, con la bajada del hero como respaldo de
+               * compatibilidad para las tiendas anteriores a V3.
+               */
+              brand_lockup: form.watch('brand_lockup'),
+              store_description: form.watch('store_description'),
+              hero_subtitle: form.watch('hero_subtitle'),
             }}
           />
         )}
@@ -329,6 +360,19 @@ export function StorefrontDesignSection({
           themePreset={preset}
           style={estilo}
           layout={form.watch('home_layout')}
+          /**
+           * La identidad del comercio, sin guardar (V3 · P13).
+           *
+           * Es lo que le da paridad a la cabecera: el lockup elegido, el
+           * logotipo —o su ausencia, que cambia lo que se pinta— y los avisos
+           * escritos. Los tres se editan en Marca y se MIRAN aquí, que es la
+           * división que P12 dejó escrita.
+           */
+          identity={{
+            logoUrl: form.watch('logo_url'),
+            brandLockup: form.watch('brand_lockup'),
+            announcements: form.watch('announcement_messages'),
+          }}
         />
       </Box>
     </Box>

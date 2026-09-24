@@ -620,3 +620,61 @@ describe('los sinónimos', () => {
     expect(screen.getByText('Escribe al menos una equivalencia.')).toBeInTheDocument()
   })
 })
+
+/**
+ * Storefront V3 · P08 · El desplegable de composición.
+ *
+ * Lo que se defiende aquí no es el widget: es que el comercio pueda elegir la
+ * composición **de su tipo de bloque** y que lea nombres, no valores técnicos.
+ * `photo-grid` en un desplegable es una fuga de la implementación.
+ */
+describe('cómo se enseña un bloque', () => {
+  async function abrirNuevoBloque(user: ReturnType<typeof userEvent.setup>) {
+    renderContent(backend())
+    await user.click(await screen.findByText('Portada de verano'))
+    await user.click(screen.getByRole('tab', { name: 'Bloques' }))
+    await screen.findByText('Rebajas de verano')
+    await user.click(screen.getByRole('button', { name: 'Nuevo bloque' }))
+  }
+
+  it('un hero no lo pregunta: no elige composición', async () => {
+    const user = userEvent.setup()
+    await abrirNuevoBloque(user)
+
+    // El formulario se abre en «Portada», que no tiene disposición que elegir.
+    expect(screen.queryByLabelText('Disposición')).toBeNull()
+  })
+
+  it('una colección de productos ofrece las cinco, con nombres y no con valores', async () => {
+    const user = userEvent.setup()
+    await abrirNuevoBloque(user)
+
+    await user.click(screen.getByLabelText('Tipo'))
+    await user.click(await screen.findByRole('option', { name: 'Colección de productos' }))
+
+    await user.click(screen.getByLabelText('Disposición'))
+    const opciones = (await screen.findAllByRole('option')).map((opcion) => opcion.textContent)
+    expect(opciones).toEqual([
+      'Rejilla — todos del mismo tamaño',
+      'Fila — se desplaza de lado',
+      'Editorial — foto grande, sin caja',
+      'Destacado — el primero manda',
+      'Mensaje al lado — texto y productos',
+    ])
+  })
+
+  it('una colección de familias ofrece las suyas, no las de los productos', async () => {
+    const user = userEvent.setup()
+    await abrirNuevoBloque(user)
+
+    await user.click(screen.getByLabelText('Tipo'))
+    await user.click(await screen.findByRole('option', { name: 'Colección de categorías' }))
+
+    await user.click(screen.getByLabelText('Disposición'))
+    const opciones = (await screen.findAllByRole('option')).map((opcion) => opcion.textContent)
+    // Y «Rejilla de fotos», que es lo que el comercio entiende de `photo-grid`.
+    expect(opciones).toContain('Rejilla de fotos — todas a la vez')
+    expect(opciones).not.toContain('Fila — se desplaza de lado')
+    expect(opciones.join(' ')).not.toMatch(/photo-grid/)
+  })
+})

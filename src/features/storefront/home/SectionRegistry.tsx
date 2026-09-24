@@ -1,4 +1,16 @@
 import { Suspense, lazy } from 'react'
+/**
+ * El muro de logotipos viene ESTÁTICO, y es a propósito (V3 · P07).
+ *
+ * Sacarlo a su propio trozo parecía gratis —lo ve una minoría de las tiendas—
+ * y sale al revés: comparte `BrandRow`, `BrandLogo` y `SectionHeading` con la
+ * fila de marcas, que sí es el defecto de tres temas y ya viaja en la portada.
+ * El empaquetador acaba con un trozo aparte que depende ESTÁTICAMENTE del de la
+ * portada: mismos bytes en el primer pintado, una petición más, y la portada
+ * deja de ser un punto de entrada con nombre propio —con lo que el informe de
+ * bundle ya no la encuentra—. Medido en P07: 403.0 kB en los dos casos.
+ */
+import { BrandLogoWall } from '../components/BrandLogoWall'
 import { BrandRow } from '../components/BrandRow'
 import { BrandTrustStrip } from '../components/BrandTrustStrip'
 import { Stack } from '@mui/material'
@@ -10,6 +22,7 @@ import { StoreFeaturedHero } from '../components/StoreFeaturedHero'
 import { StoreHero } from '../components/StoreHero'
 import { StoreBusinessInfo } from '../components/StoreBusinessInfo'
 import { StoreValueProps } from '../components/StoreValueProps'
+import type { ResolvedPresentation } from '../theme/presentation'
 import type { HomeSectionData, HomeSectionRegistry } from './types'
 
 /**
@@ -44,6 +57,14 @@ const CategoryDoorGrid = lazy(() =>
 )
 const CategoryPills = lazy(() =>
   import('../components/CategoryDoors').then((modulo) => ({ default: modulo.CategoryPills })),
+)
+/**
+ * El mosaico también por `lazy` (Storefront V3 · P07), por lo mismo que las
+ * otras dos: la sección viene apagada en los cuatro temas, y su módulo no tiene
+ * por qué pesar en la portada de quien no la enciende.
+ */
+const CategoryMosaic = lazy(() =>
+  import('../components/CategoryMosaic').then((modulo) => ({ default: modulo.CategoryMosaic })),
 )
 
 const ContentBlocks = lazy(() =>
@@ -83,6 +104,73 @@ const ContentBlocks = lazy(() =>
  * una sección que se calla porque no tiene nada cierto que decir.
  */
 
+/**
+ * Las fotos del collage del hero (Storefront V3 · P04).
+ *
+ * ## De dónde salen, y por qué de ahí
+ *
+ * De los productos que la portada YA tiene cargados y de las miniaturas que YA
+ * firmó para sus filas. Cero consultas nuevas: decorar una portada no puede
+ * costar una petición por visita, y menos una por foto — con tres fotos serían
+ * tres firmas de URL antes del primer pintado.
+ *
+ * El orden importa: primero lo rebajado —que es lo que la tienda quiere enseñar
+ * y ya viene ordenado por descuento— y después el catálogo. Si lo rebajado no
+ * tiene fotos, el catálogo completa; si nadie tiene fotos, el hero cae a su
+ * siguiente respaldo, que es lo correcto.
+ */
+function fotosParaElCollage(data: HomeSectionData): string[] {
+  const candidatos = [...data.ofertas, ...data.destacados, ...data.novedades]
+  const firmadas = { ...data.thumbsOfertas, ...data.thumbsCatalogo, ...data.thumbsNovedades }
+
+  const urls: string[] = []
+  for (const producto of candidatos) {
+    if (urls.length >= 3) break
+    const ruta = producto.primary_image_path
+    if (!ruta) continue
+    const url = firmadas[ruta]
+    // Sin firmar todavía no vale: un `src` con la ruta cruda del bucket da 403
+    // y el hero se quedaría con un hueco en vez de caer a su respaldo.
+    if (!url || urls.includes(url)) continue
+    urls.push(url)
+  }
+  return urls
+}
+
+/**
+ * La foto de una familia, para el respaldo siguiente al collage.
+ *
+ * Misma regla: sale de las familias que la portada ya cargó, y solo si alguna
+ * tiene foto de verdad. La plataforma no pone una imagen de archivo en la
+ * portada de nadie.
+ */
+function primeraFotoDeFamilia(data: HomeSectionData): string | null {
+  for (const familia of data.categorias) {
+    const url = familia.imageUrl
+    if (url && url.trim() !== '') return url
+  }
+  return null
+}
+
+/**
+ * El reparto que pide la portada, en el vocabulario de la fila (V3 · P06).
+ *
+ * La presentación llega ya resuelta, así que aquí no hay `auto`: lo único que se
+ * comprueba es que el valor sea uno de los tres que la fila entiende. Si llegara
+ * otro —una fila configurada con la variante de otra familia de sección—, la
+ * fila decide por cantidad, que es su comportamiento de siempre.
+ *
+ * Está en una función y no repetido tres veces porque es el único punto donde se
+ * cruzan los dos vocabularios, y tres copias del mismo cruce es tres sitios
+ * donde se puede olvidar uno.
+ */
+function repartoDeFila(
+  presentation: ResolvedPresentation | undefined,
+): 'rail' | 'grid' | 'spotlight' | undefined {
+  const valor = presentation?.variant
+  return valor === 'rail' || valor === 'grid' || valor === 'spotlight' ? valor : undefined
+}
+
 /** Aplica el tope de la tienda, si lo hay. Sin tope, la lista entera. */
 function conTope<T>(lista: readonly T[], maxItems: number | undefined): readonly T[] {
   return typeof maxItems === 'number' ? lista.slice(0, maxItems) : lista
@@ -120,7 +208,14 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
    */
   hero: (data: HomeSectionData, maxItems) => {
     const editorial = data.cmsTraePortada ? null : (
-      <StoreHero store={data.store} storeSlug={data.storeSlug} hasOffers={data.hayOfertas} />
+      <StoreHero
+        store={data.store}
+        storeSlug={data.storeSlug}
+        hasOffers={data.hayOfertas}
+        // Storefront V3 · P04 · Las fotos del collage, de datos YA cargados.
+        media={fotosParaElCollage(data)}
+        categoryImage={primeraFotoDeFamilia(data)}
+      />
     )
 
     if (data.theme.style.heroVariant === 'statement') return editorial
@@ -149,8 +244,17 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
    */
   services: (data) => <StoreValueProps store={data.store} />,
 
-  offers: (data, maxItems) => (
+  offers: (data, maxItems, presentation) => (
     <OffersFeaturedBand
+      /**
+       * `band` o `split` (V3 · P08).
+       *
+       * La banda es el defecto de los cuatro temas —cabe todo en una franja— y
+       * `split` es una elección del comercio: le da a lo rebajado el ancho
+       * entero con su mensaje al lado. Es lo que quiere quien vive de la
+       * promoción, y cuesta alto de página, así que no lo resuelve ningún tema.
+       */
+      presentacion={presentation?.variant === 'split' ? 'split' : 'band'}
       offers={conTope(data.ofertas, maxItems)}
       // Si lo destacado se pintó como sección propia, la banda se queda solo
       // con las ofertas. Ver `destacadosAparte`.
@@ -215,7 +319,7 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
    * Vale igual para cualquier rubro: lo que cambia es el catálogo del
    * comercio, no el código. Sin familias, no se pinta.
    */
-  categories: (data, maxItems) => {
+  categories: (data, maxItems, presentation) => {
     const familias = conTope(data.categorias, maxItems)
     if (familias.length === 0) return null
 
@@ -229,7 +333,17 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
      *    sin empujar el catálogo fuera de la primera pantalla. Es lo que pide
      *    `catalog`, que hasta P04 lo declaraba y no lo conseguía.
      */
-    const pills = data.theme.style.categoryVariant === 'pills'
+    /**
+     * Cómo se enseñan las familias: lo que pida la SECCIÓN, y si no dice nada,
+     * lo que declare el tema (Storefront V3 · P06).
+     *
+     * La presentación llega ya resuelta, así que aquí no hay `auto` que decidir:
+     * `resolveSectionPresentation` puso el valor del tema donde la sección no
+     * dijo nada.
+     */
+    const comoSeEnsenan = presentation?.variant ?? data.theme.style.categoryVariant
+    const pills = comoSeEnsenan === 'pills'
+    const mosaico = comoSeEnsenan === 'mosaic'
 
     // Las puertas llegan por `lazy`, sin fallback: lo que hay debajo no se
     // mueve de sitio —la sección ya tiene su título— y un esqueleto de cuatro
@@ -238,7 +352,24 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
       <Suspense fallback={null}>
         <Stack component="section" aria-label={data.t('store.categories.shopBy')} sx={{ gap: 1.5 }}>
           <SectionHeading title={data.t('store.categories.shopBy')} />
-          {pills ? (
+          {mosaico ? (
+            /**
+             * El MOSAICO (Storefront V3 · P07): la primera familia ocupa el doble.
+             *
+             * Los azulejos dicen que ninguna familia manda —y eso es correcto en
+             * Universal—; el mosaico dice cuál manda, que es lo que convierte
+             * una fila de puertas en una portada editorial.
+             *
+             * Las puertas son las MISMAS: misma foto, mismo tinte de reserva,
+             * mismo icono y mismo enlace con su filtro. Un mosaico con otro tipo
+             * de puerta serían dos componentes que hay que arreglar dos veces.
+             */
+            <CategoryMosaic
+              categories={familias}
+              storeSlug={data.storeSlug}
+              ariaLabel={data.t('store.categories.shopBy')}
+            />
+          ) : pills ? (
             <CategoryPills
               categories={familias}
               storeSlug={data.storeSlug}
@@ -260,14 +391,40 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
    * Las marcas, al lado de las categorías: se compra por marca tanto como por
    * familia.
    */
-  brands: (data, maxItems) => (
-    <BrandRow
-      brands={conTope(data.brands, maxItems)}
-      selected={data.brandSelected}
-      onSelect={data.onSelectBrand}
-      seeAllHref={`/s/${data.storeSlug}?ver=todo`}
-    />
-  ),
+  brands: (data, maxItems, presentation) => {
+    const marcas = conTope(data.brands, maxItems)
+
+    /**
+     * Tarjetas o muro de logotipos (Storefront V3 · P07).
+     *
+     * Son dos preguntas distintas. Las tarjetas dan a cada marca su caja, su
+     * nombre y su CUENTA de productos: es lo correcto cuando la marca es un
+     * FILTRO y quien busca quiere saber cuántas referencias hay detrás.
+     *
+     * El muro no informa, RECONOCE — y para eso el logotipo tiene que estar
+     * limpio: sin caja, sin tinte y sin la cuenta al lado. Quien duda de una
+     * tienda en línea deja de dudar cuando ve nombres que ya conoce.
+     */
+    if (presentation?.variant === 'logos') {
+      return (
+        <BrandLogoWall
+          brands={marcas}
+          selected={data.brandSelected}
+          onSelect={data.onSelectBrand}
+          seeAllHref={`/s/${data.storeSlug}?ver=todo`}
+        />
+      )
+    }
+
+    return (
+      <BrandRow
+        brands={marcas}
+        selected={data.brandSelected}
+        onSelect={data.onSelectBrand}
+        seeAllHref={`/s/${data.storeSlug}?ver=todo`}
+      />
+    )
+  },
 
   /**
    * Novedades, sobre un tinte (P06).
@@ -278,7 +435,7 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
    * deja ver dónde acaba una sección y empieza la siguiente, sin meter una
    * línea divisoria en cada hueco.
    */
-  'new-arrivals': (data, maxItems) => (
+  'new-arrivals': (data, maxItems, presentation) => (
     <ProductRow
       tone="tinted"
       title={data.t('store.row.new')}
@@ -293,6 +450,7 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
       onQuickView={data.onQuickView}
       favorites={data.favorites}
       onToggleFavorite={data.onToggleFavorite}
+      presentation={repartoDeFila(presentation)}
     />
   ),
 
@@ -319,7 +477,7 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
    * sección dos veces con productos distintos no es más tienda, es una portada
    * que se contradice.
    */
-  'best-sellers': (data, maxItems) => {
+  'best-sellers': (data, maxItems, presentation) => {
     if (data.cmsTraeProductos) return null
     const real = data.masVendidoEsReal
 
@@ -339,6 +497,7 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
         onQuickView={data.onQuickView}
         favorites={data.favorites}
         onToggleFavorite={data.onToggleFavorite}
+        presentation={repartoDeFila(presentation)}
       />
     )
   },
@@ -351,7 +510,7 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
    * son dos argumentos distintos —«está de oferta» y «esto es lo nuestro»— y
    * hay comercios que quieren contarlos por separado.
    */
-  featured: (data, maxItems) => (
+  featured: (data, maxItems, presentation) => (
     <ProductRow
       // «Productos destacados» y no «Lo más vendido»: esta fila es una muestra
       // del catálogo publicado y nunca fue otra cosa. Compartía los textos con
@@ -369,6 +528,7 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
       onQuickView={data.onQuickView}
       favorites={data.favorites}
       onToggleFavorite={data.onToggleFavorite}
+      presentation={repartoDeFila(presentation)}
     />
   ),
 
@@ -376,7 +536,21 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
    * Reconocimiento al cierre: quien duda de una tienda en línea deja de dudar
    * cuando ve nombres que ya conoce.
    */
-  trust: (data) => <BrandTrustStrip brands={data.brands} storeSlug={data.storeSlug} />,
+  /**
+   * Reconocimiento al cierre — y sin repetir la sección de marcas (V3 · P07).
+   *
+   * `brands` y `trust` salen de la misma lista, así que una portada con las dos
+   * encendidas enseñaba dos veces lo mismo con dos maquetaciones distintas. Eso
+   * se lee como un fallo de la tienda, no como una decisión.
+   *
+   * `trust` sigue en el contrato porque su trabajo es otro —cerrar la página con
+   * nombres conocidos, no ofrecer un filtro— y sigue siendo la franja compacta
+   * de siempre. Lo que se añade es que **se calla si `brands` ya lo dijo**.
+   */
+  trust: (data) =>
+    data.marcasAparte ? null : (
+      <BrandTrustStrip brands={data.brands} storeSlug={data.storeSlug} />
+    ),
 
   /**
    * Quién es este comercio y cómo se le encuentra (Storefront V2 · P09).

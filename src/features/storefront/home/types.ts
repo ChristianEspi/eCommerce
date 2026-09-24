@@ -3,6 +3,7 @@ import type { MessageKey } from '@/shared/i18n/messages'
 import type { BrandRow } from '../components/BrandRow'
 import type { CategoryDoorGrid, ContentBlocks } from '../components/ContentBlocks'
 import type { PromoCarousel } from '../components/PromoCarousel'
+import type { ResolvedPresentation } from '../theme/presentation'
 import type { ResolvedStoreTheme } from '../theme/resolve'
 import type { HomeSectionId } from '../theme/types'
 import type { PublicProduct, PublicStore } from '../types'
@@ -166,6 +167,16 @@ export interface HomeSectionData {
    * por su cuenta es una dependencia que no se ve al leer el registro.
    */
   readonly destacadosAparte: boolean
+
+  /**
+   * ¿Está `brands` encendida como sección propia? (Storefront V3 · P07)
+   *
+   * La misma coordinación que `destacadosAparte`, y por el mismo motivo: las dos
+   * secciones de marcas salen de la misma lista, y con las dos encendidas la
+   * portada enseñaba dos veces lo mismo. `trust` se calla cuando `brands` ya lo
+   * dijo.
+   */
+  readonly marcasAparte: boolean
 }
 
 /**
@@ -179,6 +190,14 @@ export type HomeSectionRenderer = (
   data: HomeSectionData,
   /** El tope que la tienda configuró, si esta sección admite uno. */
   maxItems?: number,
+  /**
+   * Cómo se enseña esta sección (Storefront V3 · P06).
+   *
+   * Llega RESUELTA —sin `auto` y sin huecos— desde el compositor, que la calcula
+   * una vez con lo guardado y el tema. Una sección que no la use la ignora; el
+   * marco (superficie y ancho) lo pone el compositor de todas formas.
+   */
+  presentation?: ResolvedPresentation,
 ) => ReactNode
 
 export type HomeSectionRegistry = Readonly<Record<HomeSectionId, HomeSectionRenderer>>

@@ -50,8 +50,19 @@ export type ThemePreset = (typeof THEME_PRESET_IDS)[number]
 // hacen nada es un contrato que miente.
 // ---------------------------------------------------------------------------
 
-/** `StorefrontLayout`: cabecera completa o reducida. */
-export const HEADER_VARIANTS = ['standard', 'compact'] as const
+/**
+ * La cabecera: completa, reducida o de marca.
+ *
+ * `brand` llega en V3 y es una COMPOSICIÓN distinta, no una medida: la marca
+ * pasa al centro y la navegación baja a su propia fila. Existe porque una
+ * tienda de marca no compite por el clic en la primera pantalla —compite por
+ * ser reconocida— y una cabecera con buscador, carrito y cuenta apretados
+ * contra el logotipo dice lo contrario.
+ *
+ * Las dos de V2 se conservan tal cual: `standard` sigue siendo el defecto y
+ * ninguna tienda cambia de cabecera por aplicar V3.
+ */
+export const HEADER_VARIANTS = ['standard', 'compact', 'brand'] as const
 export type HeaderVariant = (typeof HEADER_VARIANTS)[number]
 
 /**
@@ -64,12 +75,28 @@ export type HeaderVariant = (typeof HEADER_VARIANTS)[number]
 export const HERO_VARIANTS = ['product', 'statement'] as const
 export type HeroVariant = (typeof HERO_VARIANTS)[number]
 
-/** `ProductCard` ya distingue las dos con su prop `compact`. */
-export const PRODUCT_CARD_VARIANTS = ['comfortable', 'compact'] as const
+/**
+ * La tarjeta de producto: cómoda, compacta o editorial.
+ *
+ * `editorial` llega en V3 para lo que `comfortable` no puede dar: una tarjeta
+ * que deja mandar a la fotografía, sin recuadro y con el texto debajo en vez de
+ * dentro. No es «cómoda con más aire»; es otra jerarquía —primero la imagen,
+ * después el nombre, el precio al final—, que es lo que pide una tienda que
+ * vende por contemplación.
+ */
+export const PRODUCT_CARD_VARIANTS = ['comfortable', 'compact', 'editorial'] as const
 export type ProductCardVariant = (typeof PRODUCT_CARD_VARIANTS)[number]
 
-/** Azulejos con icono (`CategoryDoor`) o píldoras (`CategoryBar`). Los dos existen. */
-export const CATEGORY_VARIANTS = ['tiles', 'pills'] as const
+/**
+ * Las familias: azulejos, píldoras o mosaico.
+ *
+ * `mosaic` llega en V3 y es la tercera composición: azulejos de tamaños
+ * DISTINTOS, donde la primera familia ocupa el doble. Los azulejos iguales
+ * reparten la atención a partes iguales, y eso es correcto cuando ninguna
+ * familia manda; un mosaico dice cuál manda, que es lo que hace una portada
+ * editorial.
+ */
+export const CATEGORY_VARIANTS = ['tiles', 'pills', 'mosaic'] as const
 export type CategoryVariant = (typeof CATEGORY_VARIANTS)[number]
 
 /** Los valores de `Container` que la vitrina usa hoy. */
@@ -79,6 +106,29 @@ export type ContentWidth = (typeof CONTENT_WIDTHS)[number]
 /** Se traduce a la prop `ratio` de `ProductMedia`, que hoy viene con `1 / 1`. */
 export const IMAGE_RATIOS = ['square', 'portrait', 'landscape'] as const
 export type ImageRatio = (typeof IMAGE_RATIOS)[number]
+
+/**
+ * Cómo encaja la foto en su marco (Storefront V3 · P02).
+ *
+ * ## Por qué esto tenía que salir del componente
+ *
+ * `ProductCard` traía `fit="contain"` CABLEADO. Es la decisión correcta para un
+ * catálogo de referencias fotografiadas sobre fondo blanco —recortar un tornillo
+ * o una caja de medicamento pierde justo lo que identifica el producto— y la
+ * equivocada para una tienda de moda, donde el encuadre completo deja franjas
+ * vacías arriba y abajo de cada prenda y la rejilla se ve descosida.
+ *
+ * Con la decisión dentro del componente no había forma de tener las dos cosas
+ * sin un `if` por tema dentro de la tarjeta, que es exactamente lo que este
+ * contrato existe para evitar.
+ *
+ *  · `cover` — la foto llena el marco y se recorta. Encuadre limpio, rejilla
+ *    perfecta; pierde los bordes de la imagen.
+ *  · `contain` — la foto cabe entera, con aire alrededor. No pierde nada;
+ *    admite fotos de proporciones distintas sin deformarlas.
+ */
+export const PRODUCT_MEDIA_FITS = ['cover', 'contain'] as const
+export type ProductMediaFit = (typeof PRODUCT_MEDIA_FITS)[number]
 
 /** El `gap` entre secciones de la Home, hoy fijo en `{ xs: 2, md: 3 }`. */
 export const SECTION_SPACINGS = ['compact', 'comfortable', 'spacious'] as const
@@ -107,6 +157,8 @@ export interface ThemeDefinition {
   readonly contentWidth: ContentWidth
   readonly imageRatio: ImageRatio
   readonly sectionSpacing: SectionSpacing
+  /** Storefront V3 · P02. Sale de la tarjeta, donde estaba cableado. */
+  readonly productMediaFit: ProductMediaFit
   readonly gridColumns: GridColumns
 }
 
@@ -127,6 +179,7 @@ export interface StorefrontStyle {
   readonly contentWidth: ContentWidth
   readonly imageRatio: ImageRatio
   readonly sectionSpacing: SectionSpacing
+  readonly productMediaFit: ProductMediaFit
 }
 
 // ---------------------------------------------------------------------------
@@ -165,15 +218,53 @@ export const HOME_SECTION_IDS = [
 ] as const
 export type HomeSectionId = (typeof HOME_SECTION_IDS)[number]
 
+/**
+ * Lo que una sección guarda sobre su presentación (Storefront V3 · P06).
+ *
+ * Se declara aquí —y no en `presentation.ts`— porque `HomeSectionConfig` lo
+ * necesita y `presentation.ts` importa de este archivo: al revés serían dos
+ * módulos importándose entre sí.
+ *
+ * Los tres campos son opcionales y cada uno tiene su lista cerrada POR SECCIÓN,
+ * que es lo que `presentation.ts` resuelve. `variant` es `string` aquí porque
+ * su lista depende del `id`; el tipado fino lo da el saneador.
+ */
+export interface SectionPresentation {
+  readonly variant?: string
+  readonly surface?: 'plain' | 'soft' | 'contrast'
+  readonly width?: 'contained' | 'bleed'
+}
+
 export interface HomeSectionConfig {
   readonly id: HomeSectionId
   readonly enabled: boolean
   /** Solo en las secciones que pintan una colección. Ver `SECTIONS_WITH_MAX_ITEMS`. */
   readonly maxItems?: number
+  /**
+   * Cómo se enseña esta sección (Storefront V3 · P06).
+   *
+   * Opcional, y su ausencia significa `auto`: «lo que mi tema considere correcto
+   * aquí». Por eso ninguna tienda existente cambia de portada al aplicar V3 —
+   * todas tienen exactamente esto: nada.
+   *
+   * Las opciones válidas dependen de la SECCIÓN, no son un juego común: una
+   * presentación de producto en el hero no se rechaza porque sea peligrosa, se
+   * rechaza porque no significa nada. Ver `theme/presentation.ts`.
+   */
+  readonly presentation?: SectionPresentation
 }
 
 export interface HomeLayout {
-  /** Una sola versión por ahora. Existe para poder migrar sin adivinar. */
-  readonly version: 1
+  /**
+   * La versión del contrato de composición.
+   *
+   * `1` es orden y encendido; `2` añade la presentación por sección. Las dos se
+   * leen —una fila guardada en V1 sigue siendo válida y se resuelve igual que
+   * antes— y el editor guarda `2` en cuanto alguien toca una presentación.
+   *
+   * Existe justamente para esto: poder crecer sin adivinar qué significa una
+   * fila antigua.
+   */
+  readonly version: 1 | 2
   readonly sections: readonly HomeSectionConfig[]
 }

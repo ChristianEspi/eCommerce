@@ -57,7 +57,7 @@ describe('comprar desde la rejilla', () => {
     const user = userEvent.setup()
     render(product())
 
-    await user.click(await screen.findByRole('button', { name: 'Agregar al carrito' }))
+    await user.click(await screen.findByRole('button', { name: /^Agregar al carrito/ }))
 
     expect(localStorage.getItem(`ebim.ecommerce.cart.v1:${STORE}`)).toContain('silla-roble')
   })
@@ -69,7 +69,7 @@ describe('comprar desde la rejilla', () => {
     const user = userEvent.setup()
     const { onQuickView } = render(product({ kind: 'variant', variant_count: 3 }))
 
-    await user.click(await screen.findByRole('button', { name: 'Elegir opciones' }))
+    await user.click(await screen.findByRole('button', { name: /^Elegir opciones/ }))
 
     expect(onQuickView).toHaveBeenCalledWith('silla-roble')
     expect(localStorage.getItem(`ebim.ecommerce.cart.v1:${STORE}`)).toBeNull()
@@ -78,7 +78,7 @@ describe('comprar desde la rejilla', () => {
   it('sin stock el botón no se puede pulsar', async () => {
     render(product({ in_stock: false }))
 
-    expect(await screen.findByRole('button', { name: 'Agregar al carrito' })).toBeDisabled()
+    expect(await screen.findByRole('button', { name: /^Agregar al carrito/ })).toBeDisabled()
   })
 })
 

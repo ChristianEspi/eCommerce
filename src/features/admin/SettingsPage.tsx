@@ -4,6 +4,7 @@ import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded'
 import DensityMediumRoundedIcon from '@mui/icons-material/DensityMediumRounded'
 import LaunchRoundedIcon from '@mui/icons-material/LaunchRounded'
 import MailOutlineRoundedIcon from '@mui/icons-material/MailOutlineRounded'
+import CampaignRoundedIcon from '@mui/icons-material/CampaignRounded'
 import PaletteRoundedIcon from '@mui/icons-material/PaletteRounded'
 import PhotoLibraryRoundedIcon from '@mui/icons-material/PhotoLibraryRounded'
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded'
@@ -49,6 +50,7 @@ import { CartRecoverySection } from '@/features/notifications/CartRecoverySectio
 import RemoveShoppingCartRoundedIcon from '@mui/icons-material/RemoveShoppingCartRounded'
 import { StorefrontDesignSection } from './settings/StorefrontDesignSection'
 import { TaxesSection } from './settings/TaxesSection'
+import { StoreIdentitySection } from './settings/StoreIdentitySection'
 import { ValuePropsSection } from './settings/ValuePropsSection'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState, ErrorState, LoadingState, UnauthorizedState } from '@/shared/ui/states'
@@ -345,14 +347,58 @@ export function SettingsPage() {
                             {...form.register('name')}
                           />
                         </Grid>
+                        {/* Storefront V3 · P01 · Tres campos donde antes había
+                            uno, porque eran tres cosas.
+
+                            `hero_subtitle` hacía de bajada del hero Y de
+                            descripción del comercio en el pie. Estrenar campaña
+                            cambiaba de paso lo que la tienda decía de sí misma
+                            en todas sus páginas; y querer un resumen serio abajo
+                            dejaba el hero sin poder hablar de la campaña.
+
+                            Ahora la descripción es estable, la bajada es de
+                            campaña, y el kicker es la línea que permite que el
+                            hero deje de repetir el nombre de la tienda. */}
                         <Grid item xs={12} md={7}>
                           <TextField
                             fullWidth
                             slotProps={SHRINK}
-                            label={t('settings.description')}
+                            label={t('settings.storeDescription')}
+                            helperText={
+                              fieldError(form.formState.errors.store_description?.message, t) ??
+                              t('settings.storeDescriptionHelp')
+                            }
+                            error={Boolean(form.formState.errors.store_description)}
+                            disabled={busy}
+                            multiline
+                            minRows={2}
+                            inputProps={{ maxLength: 360 }}
+                            {...form.register('store_description')}
+                          />
+                        </Grid>
+                        <Grid item xs={12} md={4}>
+                          <TextField
+                            fullWidth
+                            slotProps={SHRINK}
+                            label={t('settings.heroKicker')}
+                            helperText={
+                              fieldError(form.formState.errors.hero_kicker?.message, t) ??
+                              t('settings.heroKickerHelp')
+                            }
+                            error={Boolean(form.formState.errors.hero_kicker)}
+                            disabled={busy}
+                            inputProps={{ maxLength: 80 }}
+                            {...form.register('hero_kicker')}
+                          />
+                        </Grid>
+                        <Grid item xs={12} md={8}>
+                          <TextField
+                            fullWidth
+                            slotProps={SHRINK}
+                            label={t('settings.heroSubtitle')}
                             helperText={
                               fieldError(form.formState.errors.hero_subtitle?.message, t) ??
-                              t('settings.descriptionHelp')
+                              t('settings.heroSubtitleHelp')
                             }
                             error={Boolean(form.formState.errors.hero_subtitle)}
                             disabled={busy}
@@ -776,6 +822,22 @@ export function SettingsPage() {
                           </Grid>
                         </CapabilityFeature>
                       </Grid>
+                    </SectionCard>
+
+                    {/* Storefront V3 · P01 · Cabecera y avisos.
+
+                        Va en Marca y no en General porque es el CHROME de la
+                        vitrina —lo que se ve arriba— y vive al lado del
+                        logotipo, que es justo lo que el lockup decide enseñar o
+                        no. La barra de avisos les acompaña porque aparece en esa
+                        misma franja de la pantalla. */}
+                    <SectionCard
+                      icon={<CampaignRoundedIcon />}
+                      title={t('settings.identity.title')}
+                      subtitle={t('settings.identity.help')}
+                      padded
+                    >
+                      <StoreIdentitySection form={form} busy={busy} />
                     </SectionCard>
 
                     {/* Marca blanca: addon premium de suite (contrato §4.3). Es

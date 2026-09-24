@@ -122,6 +122,22 @@ export const publicStoreSchema = z.object({
    */
   value_props: z.unknown(),
   /**
+   * Storefront V3 · P01 · Identidad con roles semánticos.
+   *
+   * Los escalares llegan tipados con `catch`: un valor imposible cae a lo
+   * seguro en vez de dejar la vitrina en blanco. `announcement_messages` viaja
+   * CRUDO, como `value_props`, porque es una lista que puede venir de una base
+   * anterior a la migración `20260923180000` o escrita a mano, y validarla aquí
+   * haría fallar el `parse` de TODA la tienda por una barra de avisos. Quien
+   * decide qué se pinta es `sanitizeAnnouncements`, que descarta entrada a
+   * entrada.
+   */
+  store_description: z.string().nullable().catch(null).default(null),
+  hero_kicker: z.string().nullable().catch(null).default(null),
+  brand_lockup: z.string().nullable().catch(null).default(null),
+  show_theme_toggle: z.boolean().nullable().catch(false).default(false),
+  announcement_messages: z.unknown(),
+  /**
    * H08 · País por defecto del checkout, derivado de las zonas de entrega de la
    * tienda (migración `20260913120000`). `null` si vende a varios países o no
    * configuró cobertura. `catch(null)` y `default(null)`: una base anterior a la

@@ -352,3 +352,59 @@ describe('la frontera de tipos generados no vuelve a quedar en cero (R11)', () =
     expect(text).toMatch(/export type Database\b/)
   })
 })
+
+/**
+ * Storefront V3 · P14 · La vitrina no puede arrastrarse de lado (R12).
+ *
+ * ## El fallo que esto impide
+ *
+ * `100vw` incluye el ancho de la barra de desplazamiento vertical. En cuanto hay
+ * barra —o sea, en casi cualquier página de tienda— una caja de `100vw` mide más
+ * que el hueco disponible y aparece una **barra horizontal en toda la tienda**.
+ * El visitante la nota como una página que «se mueve» al deslizar, y en un
+ * teléfono es peor: el gesto de desplazar vertical arrastra de lado.
+ *
+ * Es un fallo caro y de una línea, y la vitrina tiene seis sitios que podrían
+ * cometerlo: cada sección que se saca a sangre.
+ *
+ * ## La regla, con su única excepción
+ *
+ * El ancho de ventana se saca con `50vw` y el truco vive en **un solo sitio**
+ * —`StoreSectionFrame`, desde V3 · P06—. Ningún archivo de la vitrina escribe
+ * `100vw` para MEDIR algo.
+ *
+ * La excepción es `maxWidth`, y es lo contrario de este fallo: un tope de ancho
+ * no puede provocar desbordamiento, lo evita. Lo usa el panel de sugerencias del
+ * buscador para no salirse de la pantalla en un teléfono. Se permite nombrada,
+ * no en general.
+ *
+ * Se mira el texto SIN comentarios —este comentario nombra lo prohibido— y se
+ * dejan fuera los archivos de prueba, que lo nombran para comprobar que NO está.
+ */
+describe('la vitrina no usa 100vw para medir (R12)', () => {
+  it('ningún archivo de la vitrina lo escribe fuera de un tope de ancho', () => {
+    const culpables: string[] = []
+
+    for (const file of ALL) {
+      if (!file.path.startsWith('features/storefront/')) continue
+      if (file.path.endsWith('.test.ts') || file.path.endsWith('.test.tsx')) continue
+
+      for (const linea of file.code.split('\n')) {
+        if (!linea.includes('100vw')) continue
+        // Un tope de ancho es la excepción declarada arriba.
+        if (/maxWidth/.test(linea)) continue
+        culpables.push(`${file.path}: ${linea.trim()}`)
+      }
+    }
+
+    expect(culpables).toEqual([])
+  })
+
+  it('ni el archivo de estilos de la vitrina', () => {
+    const css = join(SRC, 'features/storefront/storefront.css')
+    if (!existsSync(css)) return
+    // Los comentarios de un `.css` no se quitan aquí: si alguno nombrara el
+    // valor prohibido, es mejor que salte y se reescriba el comentario.
+    expect(readFileSync(css, 'utf8')).not.toMatch(/100vw/)
+  })
+})

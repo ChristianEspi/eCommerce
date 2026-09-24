@@ -67,14 +67,32 @@ export function ThemeMiniPreview({ preset }: { preset: ThemePreset }) {
         overflow: 'hidden',
       }}
     >
-      {/* La barra: `compact` la recorta, que es media razón de ser del tema. */}
-      <Box
-        sx={{
-          height: definicion.headerVariant === 'compact' ? 6 : 9,
-          borderRadius: 0.5,
-          bgcolor: 'var(--neutral-soft)',
-        }}
-      />
+      {/**
+       * La barra.
+       *
+       * `compact` la recorta, que es media razón de ser de Catalog. Y `brand`
+       * (V3 · P02) no es «una barra más alta»: es otra composición, con la marca
+       * centrada y la navegación en su propia fila. La miniatura lo dibuja como
+       * dos franjas, porque es lo que se ve de lejos.
+       */}
+      {definicion.headerVariant === 'brand' ? (
+        <Stack sx={{ gap: `${Math.max(aire - 2, 2)}px`, alignItems: 'center' }}>
+          <Box
+            sx={{ height: 5, width: '34%', borderRadius: 4, bgcolor: 'var(--accent-soft)' }}
+          />
+          <Box
+            sx={{ height: 3, width: '68%', borderRadius: 4, bgcolor: 'var(--neutral-soft)' }}
+          />
+        </Stack>
+      ) : (
+        <Box
+          sx={{
+            height: definicion.headerVariant === 'compact' ? 6 : 9,
+            borderRadius: 0.5,
+            bgcolor: 'var(--neutral-soft)',
+          }}
+        />
+      )}
 
       {/**
        * La portada.
@@ -113,13 +131,20 @@ export function ThemeMiniPreview({ preset }: { preset: ThemePreset }) {
         </Stack>
       )}
 
-      {/* Las categorías: azulejos o píldoras. */}
-      <Stack direction="row" sx={{ gap: `${aire}px` }}>
-        {Array.from({ length: 4 }, (_, i) => (
+      {/**
+       * Las categorías: azulejos, píldoras o mosaico.
+       *
+       * El mosaico (V3 · P02) reparte tamaños DISTINTOS —la primera familia
+       * ocupa el doble— y eso es justo lo que no se puede transmitir con cuatro
+       * cajas iguales: azulejos iguales dicen que ninguna manda; un mosaico dice
+       * cuál manda.
+       */}
+      <Stack direction="row" sx={{ gap: `${aire}px` }} data-mini-cats={definicion.categoryVariant}>
+        {Array.from({ length: definicion.categoryVariant === 'mosaic' ? 3 : 4 }, (_, i) => (
           <Box
             key={i}
             sx={{
-              flex: 1,
+              flex: definicion.categoryVariant === 'mosaic' && i === 0 ? 2 : 1,
               height: definicion.categoryVariant === 'pills' ? 5 : 11,
               borderRadius: definicion.categoryVariant === 'pills' ? 999 : 0.5,
               bgcolor: 'var(--neutral-soft)',
@@ -150,15 +175,33 @@ export function ThemeMiniPreview({ preset }: { preset: ThemePreset }) {
                 aspectRatio: PROPORCION[definicion.imageRatio] ?? '1 / 1',
                 borderRadius: 0.5,
                 bgcolor: 'var(--neutral-soft)',
-                // La tarjeta `comfortable` respira; la `compact` no. Se ve en el
-                // borde, que es lo único que cabe a este tamaño.
+                /**
+                 * Lo que distingue a las tres, en lo único que cabe a este
+                 * tamaño: el borde.
+                 *
+                 *  · `comfortable` lo lleva — es una tarjeta con marco;
+                 *  · `compact` no, porque el marco se come el ancho útil;
+                 *  · `editorial` (V3 · P02) tampoco, y a propósito: suelta el
+                 *    recuadro para que mande la fotografía. Se distingue de la
+                 *    compacta por el aire de debajo, no por el borde.
+                 */
                 border:
                   definicion.productCardVariant === 'comfortable'
                     ? '1px solid var(--border)'
                     : 'none',
               }}
             />
-            <Box sx={{ height: 2, borderRadius: 4, bgcolor: 'var(--border)' }} />
+            <Box
+              sx={{
+                height: 2,
+                // La editorial pone el texto debajo de la foto con aire, no
+                // pegado: es su jerarquía —imagen, nombre, precio— y es lo que
+                // la separa de la compacta a este tamaño.
+                mt: definicion.productCardVariant === 'editorial' ? '2px' : 0,
+                borderRadius: 4,
+                bgcolor: 'var(--border)',
+              }}
+            />
           </Stack>
         ))}
       </Box>

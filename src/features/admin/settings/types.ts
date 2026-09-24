@@ -12,6 +12,13 @@ import {
   sanitizeStorefrontStyle,
 } from '@/features/storefront/theme/presets'
 import {
+  BRAND_LOCKUPS,
+  DEFAULT_BRAND_LOCKUP,
+  IDENTITY_LIMITS,
+  sanitizeAnnouncements,
+  type StoreAnnouncement,
+} from '@/features/storefront/identity'
+import {
   VALUE_PROPS_LIMITS,
   VALUE_PROP_ICON_KEYS,
   sanitizeValueProps,
@@ -122,6 +129,20 @@ export const storeSettingsSchema = z.object({
    * las resuelve en `toForm`.
    */
   value_props: z.unknown(),
+  /**
+   * Identidad V3 (Storefront V3 · P01).
+   *
+   * Los tres de texto y el booleano llegan tipados —son escalares, y un valor
+   * imposible no puede dejar la pantalla sin cargar porque `catch` lo devuelve
+   * a lo seguro—. `announcement_messages` viaja CRUDO por el mismo motivo que
+   * `value_props`: es una lista que puede venir escrita a mano, y validarla
+   * aquí haría fallar el `parse` de toda la pantalla por una barra de avisos.
+   */
+  store_description: z.string().nullable().default(null),
+  hero_kicker: z.string().nullable().default(null),
+  brand_lockup: z.enum(BRAND_LOCKUPS).nullable().catch(null).default(null),
+  show_theme_toggle: z.boolean().nullable().catch(false).default(false),
+  announcement_messages: z.unknown(),
 })
 export type StoreSettings = z.infer<typeof storeSettingsSchema>
 
@@ -163,6 +184,30 @@ export const valuePropsField = z.custom<readonly StoreValueProp[]>(
   (valor) => valuePropsListSchema.safeParse(valor).success,
   { message: 'settings.error.invalid' },
 )
+
+/**
+ * La barra de avisos tal y como la declara el FORMULARIO (V3 · P01).
+ *
+ * Replica el CHECK de la migración `20260923180000`, incluido el `strict`: una
+ * clave que no esté en la lista pasaría la validación del formulario y moriría
+ * en la base con un error genérico. Y aquí el texto es obligatorio —el saneador
+ * tolera una entrada vacía porque sirve a una fila que se está editando; esto
+ * decide si se guarda—.
+ */
+const announcementsField = z
+  .array(
+    z
+      .object({
+        text: z
+          .string()
+          .trim()
+          .min(1, 'settings.error.announcement')
+          .max(IDENTITY_LIMITS.announcementTextMax, 'settings.error.announcement'),
+      })
+      .strict(),
+  )
+  .max(IDENTITY_LIMITS.announcementsMax)
+  .default([]) satisfies z.ZodType<StoreAnnouncement[], z.ZodTypeDef, unknown>
 
 const optionalText = (max: number, error: string) =>
   z
@@ -264,6 +309,20 @@ export const storeFormSchema = z.object({
    * policy, no esta pantalla.
    */
   value_props: valuePropsField,
+  /**
+   * Identidad V3 (Storefront V3 · P01). Contenido del comercio, no marca
+   * blanca: se guardan siempre para owner/admin.
+   *
+   * `store_description` es el resumen ESTABLE —pie, datos del negocio, reserva
+   * de SEO— y `hero_subtitle` se queda con la campaña. Hasta V3 eran el mismo
+   * campo, y estrenar campaña cambiaba de paso lo que la tienda decía de sí
+   * misma en todas sus páginas.
+   */
+  store_description: optionalText(IDENTITY_LIMITS.descriptionMax, 'settings.error.description'),
+  hero_kicker: optionalText(IDENTITY_LIMITS.kickerMax, 'settings.error.kicker'),
+  brand_lockup: z.enum(BRAND_LOCKUPS),
+  show_theme_toggle: z.boolean(),
+  announcement_messages: announcementsField,
 })
 export type StoreFormValues = z.infer<typeof storeFormSchema>
 
@@ -309,6 +368,22 @@ export function toForm(name: string, settings: StoreSettings | null): StoreFormV
      * escrito a su nombre—. La lista vacía significa «usa las de plataforma».
      */
     value_props: sanitizeValueProps(settings?.value_props),
+    /**
+     * Identidad V3. Los textos llegan crudos —el formulario los recorta— y los
+     * dos de lista cerrada caen a su defecto, que es el comportamiento que la
+     * cabecera ya tenía: `logo_name` y sin selector de tema.
+     *
+     * `store_description` NO cae a `hero_subtitle` aquí, y es deliberado: esto
+     * prepara lo que se va a GUARDAR, y copiar la bajada del hero dentro de la
+     * descripción volvería a atar los dos campos justo en el momento en que se
+     * están separando. El respaldo de compatibilidad vive en la LECTURA de la
+     * vitrina (`resolveStoreDescription`), donde no escribe nada.
+     */
+    store_description: settings?.store_description ?? '',
+    hero_kicker: settings?.hero_kicker ?? '',
+    brand_lockup: settings?.brand_lockup ?? DEFAULT_BRAND_LOCKUP,
+    show_theme_toggle: settings?.show_theme_toggle ?? false,
+    announcement_messages: sanitizeAnnouncements(settings?.announcement_messages),
   }
 }
 

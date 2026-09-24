@@ -47,6 +47,7 @@ export interface ReadinessSignal {
     | 'logo'
     | 'hero'
     | 'contact'
+    | 'description'
     | 'product-images'
     | 'category-images'
     | 'brand-logos'
@@ -64,6 +65,23 @@ export interface ReadinessStoreFields {
   readonly support_email: string | null
   readonly contact_phone: string | null
   readonly contact_address: string | null
+  /**
+   * Identidad V3 (P01), que cambia lo que se puede considerar un hueco.
+   *
+   * `brand_lockup` dice si el comercio quiere logotipo o su nombre escrito;
+   * `store_description` es el resumen que usan el pie, la información del
+   * negocio y el respaldo de SEO. Los dos son opcionales porque esta pantalla
+   * se usa también con tiendas anteriores a V3, donde las columnas no existían.
+   */
+  readonly brand_lockup?: string | null
+  readonly store_description?: string | null
+  /**
+   * La bajada del hero, que hasta V3 ERA la descripción publicable de la
+   * tienda. Sirve de respaldo de compatibilidad, igual que en la vitrina
+   * (`resolveStoreDescription`): a una tienda de V2 no se le pide escribir algo
+   * que ya tenía escrito en otro sitio.
+   */
+  readonly hero_subtitle?: string | null
 }
 
 /** Lo que hay que contar contra la base. */
@@ -108,17 +126,39 @@ export function readinessSignals(
 
   const contacto = [store.support_email, store.contact_phone, store.contact_address].filter(lleno)
 
+  /**
+   * El logotipo solo falta si la tienda lo USA (V3 · P11).
+   *
+   * Desde P01 el comercio elige su lockup: `logo_name`, `logo` o `name`. Quien
+   * eligió `name` quiere su nombre escrito —es una decisión de marca, no un
+   * descuido— y pedirle un logotipo era pedirle que rellene un hueco que él
+   * mismo cerró. Con las otras dos, el logotipo sí es lo que se espera ver.
+   */
+  const usaLogotipo = (store.brand_lockup ?? 'logo_name') !== 'name'
+  const logoListo = usaLogotipo ? lleno(store.logo_url) : true
+
+  /**
+   * Y la portada tiene RESPALDOS desde P04.
+   *
+   * Sin banner, el hero no se queda en blanco: usa la foto de un producto
+   * rebajado, la de una familia o el degradado de la suite con el lema del
+   * comercio. Así que «no hay banner» solo es un hueco cuando además no hay
+   * ninguna foto de producto publicada — ahí sí la portada se queda sin imagen.
+   */
+  const heroListo =
+    lleno(store.banner_url) || (counts.products > 0 && counts.productsWithImage > 0)
+
   return [
     {
       id: 'logo',
-      state: lleno(store.logo_url) ? 'ok' : 'todo',
-      done: lleno(store.logo_url) ? 1 : 0,
+      state: logoListo ? 'ok' : 'todo',
+      done: logoListo ? 1 : 0,
       total: 1,
     },
     {
       id: 'hero',
-      state: lleno(store.banner_url) ? 'ok' : 'todo',
-      done: lleno(store.banner_url) ? 1 : 0,
+      state: heroListo ? 'ok' : 'todo',
+      done: heroListo ? 1 : 0,
       total: 1,
     },
     {
@@ -128,6 +168,24 @@ export function readinessSignals(
       state: contacto.length > 0 ? 'ok' : 'todo',
       done: contacto.length,
       total: 3,
+    },
+    {
+      /**
+       * El resumen estable del comercio (V3 · P01).
+       *
+       * Lo usan el pie, la información del negocio y el respaldo de SEO cuando
+       * no hay descripción de página. Sin él, un buscador y el previo de un
+       * chat se quedan con el nombre a secas.
+       *
+       * Vale la bajada del hero como respaldo de compatibilidad —es lo que la
+       * vitrina usaba antes de que existiera el campo, y a lo que sigue cayendo
+       * al leerlo— para no pedirle a una tienda de V2 que escriba algo que ya
+       * tenía escrito en otro sitio.
+       */
+      id: 'description',
+      state: lleno(store.store_description) || lleno(store.hero_subtitle) ? 'ok' : 'todo',
+      done: lleno(store.store_description) || lleno(store.hero_subtitle) ? 1 : 0,
+      total: 1,
     },
     {
       id: 'product-images',

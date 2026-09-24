@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router-dom'
 import { renderWithProviders } from '@/test/render'
 import { createFakeSupabase, makeSession, type FakeSupabase } from '@/test/supabaseMock'
@@ -305,6 +305,7 @@ beforeEach(() => {
   holder.client = null
 })
 
+
 describe('resolución del tenant por slug', () => {
   it('resuelve la tienda del slug y pinta su identidad, no la de casa', async () => {
     renderStorefront(backend(), '/s/casa-nordica')
@@ -352,9 +353,23 @@ describe('resolución del tenant por slug', () => {
    * oscuro» cuando estás en claro—, que es lo único útil de leer antes de
    * pulsarlo, y es lo que oye un lector de pantalla.
    */
-  it('la cabecera deja cambiar de tema, y el botón dice a dónde va', async () => {
-    const user = userEvent.setup()
+  it('sin configurarlo, la cabecera NO ofrece selector de tema (V3 · P01/P03)', async () => {
+    // Estaba en la cabecera de toda tienda sin que ningún comercio lo hubiera
+    // pedido, compitiendo por atención con el carrito. Lo que NO desaparece es
+    // el tema oscuro: la vitrina sigue respetando la preferencia del sistema.
     renderStorefront(backend(), '/s/casa-nordica')
+
+    const header = await screen.findByRole('banner')
+    expect(within(header).queryByRole('button', { name: 'Tema oscuro' })).not.toBeInTheDocument()
+    expect(within(header).queryByRole('button', { name: 'Tema claro' })).not.toBeInTheDocument()
+  })
+
+  it('si el comercio lo enciende, deja cambiar de tema y dice a dónde va', async () => {
+    const user = userEvent.setup()
+    renderStorefront(
+      backend({ public_stores: [store({ show_theme_toggle: true })] }),
+      '/s/casa-nordica',
+    )
 
     const header = await screen.findByRole('banner')
     const boton = within(header).getByRole('button', { name: 'Tema oscuro' })
@@ -384,10 +399,31 @@ describe('resolución del tenant por slug', () => {
     renderStorefront(fake, '/s/casa-nordica')
 
     const header = await screen.findByRole('banner')
-    expect(within(header).getByRole('img', { name: 'Casa Nórdica' })).toHaveAttribute(
-      'src',
-      `https://firmado.test/${path}`,
-    )
+    /**
+     * Se busca por `src`, no por nombre accesible (V3 · P03).
+     *
+     * Con el lockup `logo_name` —el defecto— el logotipo va DECORATIVO: el
+     * nombre de la tienda está escrito al lado, y ponerle también `alt` hacía
+     * que un lector de pantalla anunciara «Casa Nórdica Casa Nórdica». El
+     * enlace de la marca sigue teniendo su nombre; lo que perdió es el duplicado.
+     */
+    const logo = within(header).getByAltText('')
+    expect(logo).toHaveAttribute('src', `https://firmado.test/${path}`)
+    expect(logo).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('con el lockup «solo logotipo», el logotipo SÍ lleva el nombre', async () => {
+    // Ahí el nombre no está escrito al lado, así que el logotipo es lo único
+    // que identifica la tienda y tiene que anunciarse.
+    const fake = backend({
+      public_stores: [store({ logo_url: 'https://cdn.test/logo.png', brand_lockup: 'logo' })],
+    })
+    renderStorefront(fake, '/s/casa-nordica')
+
+    const header = await screen.findByRole('banner')
+    expect(within(header).getByRole('img', { name: 'Casa Nórdica' })).toBeInTheDocument()
+    // Y el nombre no se repite en texto.
+    expect(within(header).queryByText('Casa Nórdica')).not.toBeInTheDocument()
   })
 
   it('una referencia de marca que no es https ni ruta del bucket se descarta', async () => {
@@ -404,10 +440,7 @@ describe('resolución del tenant por slug', () => {
     renderStorefront(fake, '/s/casa-nordica')
 
     const header = await screen.findByRole('banner')
-    expect(within(header).getByRole('img', { name: 'Casa Nórdica' })).toHaveAttribute(
-      'src',
-      'https://cdn.test/logo.png',
-    )
+    expect(within(header).getByAltText('')).toHaveAttribute('src', 'https://cdn.test/logo.png')
   })
 
   it('el contacto del tenant vuelve al pie, y sin inventar nada alrededor', async () => {
@@ -455,9 +488,23 @@ describe('resolución del tenant por slug', () => {
     expect(
       await screen.findByRole('heading', { name: 'Casa Nórdica', level: 1 }),
     ).toBeInTheDocument()
+    /**
+     * Sin bajada configurada, la portada NO escribe una (V3 · P04).
+     *
+     * Hasta V3 la plataforma rellenaba con «Explora el catálogo, revisa precios
+     * y disponibilidad al día»: copy comercial en la tienda de alguien que no lo
+     * había escrito. Lo que queda es su nombre, su titular y las puertas al
+     * catálogo — que es lo que la plataforma sí puede afirmar.
+     */
     expect(
-      screen.getByText('Explora el catálogo, revisa precios y disponibilidad al día.'),
-    ).toBeInTheDocument()
+      screen.queryByText('Explora el catálogo, revisa precios y disponibilidad al día.'),
+    ).not.toBeInTheDocument()
+    // Y el nombre no se escribe DOS veces DENTRO DE LA PORTADA: sin titular
+    // propio, el antetítulo que lo repetía encima del `h1` desaparece. Fuera de
+    // la portada sigue estando donde debe —cabecera y pie—, así que se mira
+    // solo la portada.
+    const portada = document.querySelector('[data-hero-variant]') as HTMLElement
+    expect(within(portada).getAllByText('Casa Nórdica')).toHaveLength(1)
     expect(screen.queryByText('Contacto')).not.toBeInTheDocument()
   })
 
@@ -493,7 +540,10 @@ describe('catálogo', () => {
     renderStorefront(backend(), '/s/casa-nordica?ver=todo')
 
     expect(await screen.findByText('Silla de roble')).toBeInTheDocument()
-    expect(screen.getByText('8 resultados')).toBeInTheDocument()
+    // El recuento se ESPERA desde V3 · P09: la barra del catálogo viaja en su
+    // propio trozo —no existe en la portada— así que llega un instante después
+    // de la rejilla. Los productos no esperan a nada.
+    expect(await screen.findByText('8 resultados')).toBeInTheDocument()
     expect(screen.getByText('-14%')).toBeInTheDocument()
     // Siete disponibles y uno agotado: lo que importa es que el estado se
     // pinte por producto, no cuántos hay en el catálogo de prueba.
@@ -688,7 +738,7 @@ describe('catálogo', () => {
 describe('recorrer el catálogo', () => {
   it('el botón de volver arriba no existe hasta que hace falta', async () => {
     renderStorefront(backend(), '/s/casa-nordica')
-    await screen.findAllByRole('button', { name: 'Guardar en favoritos' })
+    await screen.findAllByRole('button', { name: /^Guardar en favoritos/ })
 
     // Arriba del todo no aporta nada y taparía una esquina del catálogo: ni
     // siquiera está en el árbol, así que tampoco en el orden de tabulación.
@@ -706,14 +756,14 @@ describe('favoritos', () => {
     const user = userEvent.setup()
     renderStorefront(backend(), '/s/casa-nordica?ver=todo')
 
-    const guardar = await screen.findAllByRole('button', { name: 'Guardar en favoritos' })
+    const guardar = await screen.findAllByRole('button', { name: /^Guardar en favoritos/ })
     expect(guardar[0]).toHaveAttribute('aria-pressed', 'false')
 
     await user.click(guardar[0]!)
 
     // El mismo botón cambia de nombre: «guardar» y «quitar» son dos acciones
     // distintas, y quien no ve el relleno del icono necesita oírlo.
-    const quitar = await screen.findByRole('button', { name: 'Quitar de favoritos' })
+    const quitar = await screen.findByRole('button', { name: /^Quitar de favoritos/ })
     expect(quitar).toHaveAttribute('aria-pressed', 'true')
 
     // Sin sesión el favorito vive en el navegador: es lo que hace que siga ahí
@@ -797,12 +847,29 @@ describe('ficha de producto', () => {
     expect(within(viewer).getByText('Imagen 2 de 2')).toBeInTheDocument()
   })
 
-  it('sin descripción lo dice, en vez de dejar un hueco', async () => {
+  it('sin descripción no ofrece el apartado, y el detalle sigue teniendo qué decir', async () => {
+    /**
+     * Cambio deliberado en V3 · P10.
+     *
+     * Antes la descripción era una tarjeta a lo ancho que siempre estaba, así
+     * que sin texto había que escribir «todavía no tiene descripción» para que
+     * no quedara una caja vacía. Ahora el detalle es un acordeón: un apartado
+     * que se abre para decir que no hay nada es peor que no ofrecerlo, y la
+     * zona no queda hueca porque los datos del producto siguen ahí.
+     *
+     * La frase no desaparece del producto: la vista rápida —que sí tiene un
+     * sitio fijo para el texto— la sigue usando.
+     */
     renderStorefront(backend(), '/s/casa-nordica/product/silla-lino')
 
-    expect(
-      await screen.findByText('Este producto todavía no tiene descripción.'),
-    ).toBeInTheDocument()
+    const detalle = await waitFor(() => {
+      const zona = document.querySelector('[data-product-details]')
+      expect(zona).not.toBeNull()
+      return zona as HTMLElement
+    })
+    expect(detalle.querySelector('[data-detail-panel="description"]')).toBeNull()
+    expect(detalle.querySelector('[data-detail-panel="sheet"]')).not.toBeNull()
+    expect(screen.queryByText('Este producto todavía no tiene descripción.')).not.toBeInTheDocument()
   })
 
   /**
@@ -1165,5 +1232,474 @@ describe('vista rápida de un producto con variantes', () => {
       '/s/casa-nordica/product/camiseta',
     )
     expect(within(dialogo).queryByRole('link', { name: /Elegir opciones/ })).not.toBeInTheDocument()
+  })
+})
+
+/**
+ * Storefront V3 · P09 · El catálogo en el teléfono, y el de escritorio intacto.
+ *
+ * ## Qué defiende este bloque
+ *
+ * **Que el teléfono no reciba una columna de filtros antes de los productos.**
+ * Era el fallo concreto: quien buscaba algo veía primero marcas, familias e
+ * interruptores, y los resultados empezaban pasada la primera pantalla.
+ *
+ * **Que no se recorte ninguna opción por caber en un cajón.** El panel que se
+ * abre es el MISMO componente, con los mismos filtros y las mismas facetas.
+ *
+ * **Que el estado siga viviendo en la URL.** Es lo que hace que una búsqueda
+ * filtrada se comparta, que atrás deshaga y que recargar no borre nada. Un
+ * cajón con su propio estado interno rompería las tres cosas.
+ *
+ * **Que el conteo siga siendo el de los resultados.** Ni recomendados, ni
+ * familias, ni marcas de la salida de abajo.
+ */
+describe('el catálogo en el teléfono', () => {
+  /** Espera a que el cajón esté montado y lo devuelve. */
+  async function abrirCajon(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('button', { name: /Filtros/ }))
+    return await waitFor(() => {
+      const encontrado = document.querySelector('[data-filter-drawer]')
+      expect(encontrado).not.toBeNull()
+      return encontrado as HTMLElement
+    })
+  }
+
+  it('la barra ofrece Filtros y Ordenar, y el panel largo no va antes de los productos', async () => {
+    renderStorefront(backend(), '/s/casa-nordica?ver=todo')
+    await screen.findByText('Silla de roble')
+
+    expect(document.querySelector('[data-catalog-toolbar]')).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Filtros' })).toBeInTheDocument()
+
+    // La columna de filtros no se pinta hasta escritorio: en el teléfono iba
+    // ENCIMA de los productos, y eso era media pantalla de interruptores antes
+    // del primer resultado.
+    const columna = document.querySelector('[data-filter-frame="columna"]') as HTMLElement
+    expect(columna).not.toBeNull()
+    // Y la barra —con los productos justo debajo— va ANTES que la columna en
+    // el documento, que es el orden que recorre un lector de pantalla y el que
+    // sigue el tabulador. Con los filtros primero, llegar al primer producto
+    // costaba treinta tabulaciones.
+    const barra = document.querySelector('[data-catalog-toolbar]') as HTMLElement
+    expect(barra.compareDocumentPosition(columna) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('el cajón se abre con el MISMO panel, sin recortar filtros', async () => {
+    const user = userEvent.setup()
+    renderStorefront(backend(), '/s/casa-nordica?ver=todo')
+    await screen.findByText('Silla de roble')
+
+    // Antes de abrirlo no está montado: su módulo llega con el primer clic.
+    expect(document.querySelector('[data-filter-drawer]')).toBeNull()
+
+    const cajon = await abrirCajon(user)
+
+    // El panel entero: los dos interruptores de estado y las listas de facetas.
+    expect(within(cajon).getByText('Solo en oferta')).toBeInTheDocument()
+    expect(within(cajon).getByText('Solo disponibles')).toBeInTheDocument()
+    expect(within(cajon).getByText('Mesas')).toBeInTheDocument()
+    // Y su salida, que dice lo que hace.
+    expect(within(cajon).getByRole('button', { name: /Ver resultados/ })).toBeInTheDocument()
+  })
+
+  it('se cierra con Escape: es un diálogo, no un panel pegado', async () => {
+    const user = userEvent.setup()
+    renderStorefront(backend(), '/s/casa-nordica?ver=todo')
+    await screen.findByText('Silla de roble')
+
+    await abrirCajon(user)
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(document.querySelector('[data-filter-drawer]')).toBeNull())
+  })
+
+  it('filtrar desde el cajón escribe en la URL, como el panel de escritorio', async () => {
+    const user = userEvent.setup()
+    renderStorefront(backend(), '/s/casa-nordica?ver=todo')
+    await screen.findByText('Silla de roble')
+
+    const cajon = await abrirCajon(user)
+    await user.click(within(cajon).getByText('Solo disponibles'))
+
+    /**
+     * El estado vive en la URL —se comparte, atrás lo deshace y recargar no lo
+     * borra— y se comprueba por lo que la vitrina enseña: la píldora de lo
+     * puesto solo existe si el parámetro llegó, porque sale de leer la URL.
+     *
+     * No se mira `window.location`: estas pruebas montan un `MemoryRouter`,
+     * donde la barra del navegador no se mueve por diseño.
+     */
+    /**
+     * Y se comprueba con el cajón CERRADO, que es la otra mitad de que esto
+     * sea un diálogo: mientras está abierto, MUI marca el resto de la página
+     * como `aria-hidden`, así que buscar por rol allí no encuentra nada — y eso
+     * está bien, es lo que hace que un lector de pantalla no lea dos capas a la
+     * vez.
+     *
+     * El estado vive en la URL —se comparte, atrás lo deshace y recargar no lo
+     * borra— y aquí se ve por lo que la vitrina enseña: la píldora de lo puesto
+     * solo existe si el parámetro llegó, porque sale de leer la URL. No se mira
+     * `window.location`: estas pruebas montan un `MemoryRouter`, donde la barra
+     * del navegador no se mueve por diseño.
+     */
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(document.querySelector('[data-filter-drawer]')).toBeNull())
+    expect(
+      await screen.findByRole('button', { name: 'Quitar Solo disponibles' }),
+    ).toBeInTheDocument()
+  })
+
+  it('«Quitar filtros» limpia y deja el catálogo, no la portada', async () => {
+    const user = userEvent.setup()
+    renderStorefront(backend(), '/s/casa-nordica?c=mesas&d=1')
+    await screen.findByText('Mesa extensible')
+
+    const cajon = await abrirCajon(user)
+    // El único «Quitar filtros» es el del pie del cajón: el panel esconde el
+    // suyo ahí dentro, porque dos botones iguales no se distinguen.
+    await user.click(within(cajon).getByRole('button', { name: 'Quitar filtros' }))
+
+    // Sigue siendo el CATÁLOGO —quien pulsa «quitar» quiere verlo todo, no
+    // volver a la portada— y no queda ninguna píldora puesta.
+    expect(await screen.findByText('Silla de roble')).toBeInTheDocument()
+    await waitFor(() => expect(document.querySelector('[data-active-filters]')).toBeNull())
+  })
+
+  it('lo puesto se ve en píldoras que se quitan de una, con nombre propio', async () => {
+    const user = userEvent.setup()
+    renderStorefront(backend(), '/s/casa-nordica?c=mesas')
+    await screen.findByText('Mesa extensible')
+
+    // «Quitar Mesas», no «Mesas»: la píldora de la barra de familias PONE el
+    // filtro y esta lo quita, así que no pueden llamarse igual.
+    const quitar = screen.getByRole('button', { name: 'Quitar Mesas' })
+    expect(document.querySelector('[data-active-filters]')).toHaveAttribute(
+      'data-active-filters',
+      '1',
+    )
+
+    await user.click(quitar)
+    // Quitar la familia devuelve el resto del catálogo.
+    expect(await screen.findByText('Silla de roble')).toBeInTheDocument()
+    await waitFor(() => expect(document.querySelector('[data-active-filters]')).toBeNull())
+  })
+
+  it('el botón de filtros dice cuántos hay puestos', async () => {
+    renderStorefront(backend(), '/s/casa-nordica?c=mesas&d=1&oferta=1')
+    await screen.findByRole('button', { name: /Filtros/ })
+
+    // Tres: familia, disponibilidad y rebajado. El nombre accesible lo dice,
+    // porque un globo con un número no lo lee nadie.
+    expect(screen.getByRole('button', { name: 'Filtros (3 activos)' })).toBeInTheDocument()
+    expect(document.querySelector('[data-catalog-toolbar]')).toHaveAttribute(
+      'data-catalog-toolbar',
+      '3',
+    )
+  })
+
+  it('sin filtros no hay píldoras ni contador', async () => {
+    renderStorefront(backend(), '/s/casa-nordica?ver=todo')
+    await screen.findByText('Silla de roble')
+
+    expect(document.querySelector('[data-active-filters]')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Filtros' })).toBeInTheDocument()
+  })
+})
+
+describe('el catálogo de escritorio sigue haciendo lo mismo', () => {
+  it('la columna de filtros ya no parece una tarjeta de backoffice', async () => {
+    renderStorefront(backend(), '/s/casa-nordica?ver=todo')
+    await screen.findByText('Silla de roble')
+
+    const columna = document.querySelector('[data-filter-frame="columna"]') as HTMLElement
+    const estilo = getComputedStyle(columna)
+    expect(estilo.boxShadow).toBe('none')
+    expect(estilo.borderStyle === '' || estilo.borderStyle === 'none').toBe(true)
+  })
+
+  it('el conteo de resultados no se contamina con la salida de abajo', async () => {
+    // `ExploreMore` pinta familias y marcas cuando el resultado es escaso, y
+    // NUNCA suma al número: son una salida, no resultados.
+    renderStorefront(backend(), '/s/casa-nordica?q=extensible')
+    await screen.findByText('Mesa extensible')
+
+    const barra = document.querySelector('[data-catalog-toolbar]') as HTMLElement
+    expect(barra.textContent).toContain('1 resultado')
+    // Y el número coincide con las tarjetas pintadas, que es la comprobación
+    // que se rompería el día que algo se sumara a la lista.
+    expect(document.querySelectorAll('[data-card-variant]')).toHaveLength(1)
+
+    // La salida existe —un resultado es poco— y no lleva ni un producto: solo
+    // familias y marcas, que son navegación. Nadie puede confundir una puerta a
+    // «Mesas» con un resultado de su búsqueda.
+    const salida = await waitFor(() => {
+      const encontrada = document.querySelector('[data-explore-more]')
+      expect(encontrada).not.toBeNull()
+      return encontrada as HTMLElement
+    })
+    expect(salida.querySelectorAll('[data-card-variant]')).toHaveLength(0)
+  })
+})
+
+/**
+ * Storefront V3 · P10 · La ficha comercial.
+ *
+ * ## Qué defiende este bloque
+ *
+ * **Que la barra de compra del teléfono diga lo MISMO que la columna.** No
+ * calcula nada: recibe el precio ya resuelto —con acuerdo comercial si lo hay—
+ * y usa el mismo camino al carrito. Dos caminos con dos reglas es cómo se acaba
+ * cobrando otro precio del que se enseñó.
+ *
+ * **Que no exista donde no debe.** En escritorio no se renderiza —no se
+ * esconde: no se renderiza, para que un lector de pantalla no anuncie dos
+ * botones de «añadir» donde hay uno— y con el producto agotado tampoco.
+ *
+ * **Que el detalle no invente apartados.** Solo se ofrece lo que existe, y no
+ * hay ni una palabra sobre envíos, plazos o devoluciones: la plataforma no
+ * conoce esas políticas.
+ *
+ * **Que la ficha deje de ser una suma de tarjetas.** La galería y la columna de
+ * compra ya no van en `Card` con borde y sombra.
+ */
+describe('la ficha en el teléfono', () => {
+  /** Hace creer al navegador simulado que la pantalla es de teléfono. */
+  function pantallaDeTelefono() {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn((query: string) => ({
+        // Lo que pregunta la barra es `(max-width:899.95px)`; cualquier otra
+        // consulta —«menos movimiento», por ejemplo— sigue diciendo que no.
+        matches: query.includes('max-width'),
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        onchange: null,
+        dispatchEvent: vi.fn(),
+      })),
+    )
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('la barra de compra enseña el precio y lleva al carrito', async () => {
+    pantallaDeTelefono()
+    const user = userEvent.setup()
+    renderStorefront(backend(), '/s/casa-nordica/product/silla-roble')
+
+    const barra = await waitFor(() => {
+      const encontrada = document.querySelector('[data-purchase-bar]')
+      expect(encontrada).not.toBeNull()
+      return encontrada as HTMLElement
+    })
+
+    /**
+     * El mismo precio que la columna de arriba, no uno recalculado.
+     *
+     * Se normalizan los espacios: el formateador de moneda separa el símbolo
+     * del número con un espacio duro (U+00A0), que no es el que se escribe en
+     * una prueba.
+     */
+    const precioEnLaBarra = (barra.textContent ?? '').replace(/\u00a0/g, ' ')
+    expect(precioEnLaBarra).toContain('S/ 389.00')
+
+    await user.click(within(barra).getByRole('button', { name: /Agregar al carrito/ }))
+    expect(await screen.findByText('Añadido al carrito')).toBeInTheDocument()
+  })
+
+  it('en escritorio la barra no se renderiza, no solo se esconde', async () => {
+    // `display: none` quita el elemento de la pantalla, no del documento: un
+    // lector de pantalla anunciaría dos botones de «añadir» donde hay uno.
+    renderStorefront(backend(), '/s/casa-nordica/product/silla-roble')
+    await screen.findByRole('heading', { level: 1, name: 'Silla de roble' })
+
+    expect(document.querySelector('[data-purchase-bar]')).toBeNull()
+    expect(screen.getAllByRole('button', { name: /Agregar al carrito/ })).toHaveLength(1)
+  })
+
+  it('con el producto agotado no hay barra: un botón apagado ahí no ofrece nada', async () => {
+    pantallaDeTelefono()
+    renderStorefront(backend(), '/s/casa-nordica/product/silla-lino')
+    await screen.findByRole('heading', { level: 1, name: 'Silla de lino' })
+
+    // «Sin stock» sale dos veces —la etiqueta de la columna y la fila de la
+    // ficha de datos— y las dos son correctas: una es el estado y la otra el
+    // dato. Lo que se comprueba aquí es que NO haya barra.
+    expect((await screen.findAllByText('Sin stock')).length).toBeGreaterThan(0)
+    expect(document.querySelector('[data-purchase-bar]')).toBeNull()
+  })
+})
+
+describe('el detalle de la ficha', () => {
+  it('ofrece la descripción y los datos, y la primera viene abierta', async () => {
+    renderStorefront(backend(), '/s/casa-nordica/product/silla-roble')
+
+    const detalle = await waitFor(() => {
+      const zona = document.querySelector('[data-product-details]')
+      expect(zona).not.toBeNull()
+      return zona as HTMLElement
+    })
+
+    // Dos apartados: descripción y datos.
+    expect(detalle).toHaveAttribute('data-product-details', '2')
+    // Y la descripción abierta: un acordeón todo cerrado esconde que hay algo
+    // dentro.
+    const cabeceras = within(detalle).getAllByRole('button')
+    expect(cabeceras[0]).toHaveAttribute('aria-expanded', 'true')
+    expect(within(detalle).getByText(/Roble macizo/)).toBeInTheDocument()
+  })
+
+  it('se abre y se cierra con el teclado, porque es un botón de verdad', async () => {
+    const user = userEvent.setup()
+    renderStorefront(backend(), '/s/casa-nordica/product/silla-roble')
+
+    const detalle = await waitFor(() => {
+      const zona = document.querySelector('[data-product-details]')
+      expect(zona).not.toBeNull()
+      return zona as HTMLElement
+    })
+
+    const datos = within(detalle).getByRole('button', { name: 'Datos del producto' })
+    expect(datos).toHaveAttribute('aria-expanded', 'false')
+
+    datos.focus()
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(datos).toHaveAttribute('aria-expanded', 'true'))
+  })
+
+  it('no inventa envíos, plazos ni devoluciones', async () => {
+    renderStorefront(backend(), '/s/casa-nordica/product/silla-roble')
+
+    const detalle = await waitFor(() => {
+      const zona = document.querySelector('[data-product-details]')
+      expect(zona).not.toBeNull()
+      return zona as HTMLElement
+    })
+
+    const texto = (detalle.textContent ?? '').toLowerCase()
+    for (const inventado of ['devoluc', 'reembols', 'garantía de', 'días hábiles', 'envío gratis']) {
+      expect(texto).not.toContain(inventado)
+    }
+  })
+})
+
+describe('la ficha ya no es una suma de tarjetas', () => {
+  it('la galería y la columna de compra no llevan borde ni sombra de tarjeta', async () => {
+    renderStorefront(backend(), '/s/casa-nordica/product/silla-roble')
+    await screen.findByRole('heading', { level: 1, name: 'Silla de roble' })
+
+    const galeria = document.querySelector('[data-pdp-gallery]') as HTMLElement
+    const compra = document.querySelector('[data-pdp-purchase]') as HTMLElement
+    expect(galeria).not.toBeNull()
+    expect(compra).not.toBeNull()
+
+    for (const caja of [galeria, compra]) {
+      const estilo = getComputedStyle(caja)
+      expect(estilo.boxShadow === '' || estilo.boxShadow === 'none').toBe(true)
+    }
+  })
+
+  it('las sugerencias son filas de producto, no rejillas de catálogo', async () => {
+    // Tres rejillas seguidas al pie de una ficha son doce tarjetas compitiendo
+    // con el producto que se está mirando.
+    renderStorefront(backend(), '/s/casa-nordica/product/silla-roble')
+    await screen.findByRole('heading', { level: 1, name: 'Silla de roble' })
+
+    const fila = await waitFor(() => {
+      const encontrada = document.querySelector('[data-row-layout]')
+      expect(encontrada).not.toBeNull()
+      return encontrada as HTMLElement
+    })
+    // Y su salida lleva al catálogo de la familia del producto, que es a donde
+    // quiere ir quien descarta esto.
+    const salida = within(fila).getAllByRole('link', { name: /Ver todo/ })[0]
+    expect(salida).toHaveAttribute('href', '/s/casa-nordica?c=sillas')
+  })
+})
+
+/**
+ * Storefront V3 · P14 · Accesibilidad de lo que V3 añadió, junto.
+ *
+ * Seis piezas nuevas con superficie de interacción —el cajón de filtros, la
+ * barra del catálogo, la barra de compra, la zona de detalle, la barra de avisos
+ * y el muro de logotipos— y cada una podía haber traído su propio fallo: un
+ * diálogo sin nombre, dos controles con el mismo nombre, un encabezado de más.
+ *
+ * Lo que se comprueba aquí es lo que no cubren las pruebas de cada fase por
+ * separado: que **al juntarlas** la página sigue teniendo un solo `h1` y que
+ * ningún par de controles tabulables comparte nombre accesible.
+ */
+describe('V3 no rompió el árbol de accesibilidad', () => {
+  /** Los nombres accesibles de los botones que se pueden tabular. */
+  function nombresDeBotones(): string[] {
+    return screen
+      .getAllByRole('button')
+      .filter((control) => control.getAttribute('tabindex') !== '-1')
+      .map((control) => (control.getAttribute('aria-label') ?? control.textContent ?? '').trim())
+      .filter((nombre) => nombre !== '')
+  }
+
+  it('la portada tiene un solo `h1` con todo encendido', async () => {
+    // El fallo clásico de una fase de UI: una sección nueva que se declara `h1`
+    // «porque es importante» y deja la página con dos.
+    renderStorefront(backend(), '/s/casa-nordica')
+    await screen.findByText('Silla de roble')
+
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+  })
+
+  it('el catálogo también, y su columna de filtros es una región con nombre', async () => {
+    renderStorefront(backend(), '/s/casa-nordica?ver=todo')
+    await screen.findByText('Silla de roble')
+
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+    // `aside` con nombre: es lo que permite saltársela con un lector de pantalla.
+    expect(await screen.findByRole('complementary', { name: 'Filtros' })).toBeInTheDocument()
+  })
+
+  it('en el catálogo ningún par de controles tabulables se llama igual', async () => {
+    /**
+     * Es la comprobación que cazó dos fallos reales de V3: la píldora que quita
+     * un filtro se llamaba igual que la que lo pone —efectos opuestos, mismo
+     * nombre— y la barra de compra duplicaba «Agregar al carrito».
+     *
+     * Se excluyen los nombres que llevan dentro el nombre de un producto: un
+     * botón de añadir por tarjeta es correcto y se distingue por ahí.
+     */
+    renderStorefront(backend(), '/s/casa-nordica?ver=todo&c=mesas')
+    await screen.findByText('Mesa extensible')
+
+    const cuenta = new Map<string, number>()
+    for (const nombre of nombresDeBotones()) {
+      cuenta.set(nombre, (cuenta.get(nombre) ?? 0) + 1)
+    }
+
+    const repetidos = [...cuenta.entries()]
+      .filter(([nombre, veces]) => veces > 1 && !/Silla|Mesa/.test(nombre))
+      .map(([nombre, veces]) => `${nombre} ×${veces}`)
+
+    expect(repetidos).toEqual([])
+  })
+
+  it('la ficha tiene un solo `h1` y su detalle son botones con estado', async () => {
+    renderStorefront(backend(), '/s/casa-nordica/product/silla-roble')
+    await screen.findByRole('heading', { level: 1, name: 'Silla de roble' })
+
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+
+    const detalle = await waitFor(() => {
+      const zona = document.querySelector('[data-product-details]')
+      expect(zona).not.toBeNull()
+      return zona as HTMLElement
+    })
+    // Cada apartado es un botón con `aria-expanded`: es lo que un lector de
+    // pantalla necesita para decir si está abierto.
+    for (const cabecera of within(detalle).getAllByRole('button')) {
+      expect(cabecera).toHaveAttribute('aria-expanded')
+    }
   })
 })

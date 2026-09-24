@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { useForm } from 'react-hook-form'
@@ -30,7 +30,19 @@ import { storeFormSchema, toForm, type StoreFormValues } from './types'
 /** Cuenta los renders del anfitrión: un `watch` realimentado se ve aquí. */
 let renders = 0
 
-function Anfitrion({ inicial }: { inicial?: Partial<StoreFormValues> }) {
+function Anfitrion({
+  inicial,
+  conTienda = false,
+}: {
+  inicial?: Partial<StoreFormValues>
+  /**
+   * Monta también el panel «Cómo se ve tu tienda» (V3 · P12).
+   *
+   * Apagado por defecto: ese panel necesita tienda y hace sus cuentas contra la
+   * base, y la mayoría de las pruebas de esta pantalla no van de eso.
+   */
+  conTienda?: boolean
+}) {
   renders += 1
   const form = useForm<StoreFormValues>({
     resolver: zodResolver(storeFormSchema),
@@ -40,7 +52,12 @@ function Anfitrion({ inicial }: { inicial?: Partial<StoreFormValues> }) {
 
   return (
     <>
-      <StorefrontDesignSection form={form} />
+      <StorefrontDesignSection
+        form={form}
+        {...(conTienda
+          ? { storeId: 'aaaa1111-1111-4111-8111-111111111111', storeSlug: 'botica' }
+          : {})}
+      />
       {/* Espejo del estado: lo que se guardaría si alguien pulsara Guardar. */}
       <pre data-testid="valores">{JSON.stringify(form.watch())}</pre>
       <span data-testid="sucio">{String(form.formState.isDirty)}</span>
@@ -49,9 +66,12 @@ function Anfitrion({ inicial }: { inicial?: Partial<StoreFormValues> }) {
   )
 }
 
-function pintar(inicial?: Partial<StoreFormValues>) {
+function pintar(inicial?: Partial<StoreFormValues>, opciones: { conTienda?: boolean } = {}) {
   renders = 0
-  renderWithProviders(<Anfitrion inicial={inicial} />, { route: '/app/settings' })
+  renderWithProviders(
+    <Anfitrion inicial={inicial} conTienda={opciones.conTienda ?? false} />,
+    { route: '/app/settings' },
+  )
 }
 
 function valores(): StoreFormValues {
@@ -184,7 +204,9 @@ describe('ajustar el tema', () => {
 
   it('se cuenta lo personalizado, y sin nada dice que todo lo hereda', () => {
     pintar({ storefront_style: { contentWidth: 'xl', imageRatio: 'portrait' } })
-    expect(screen.getByText('2 de 7 ajustes personalizados')).toBeInTheDocument()
+    // Ocho desde V3 · P02: el contrato gana el encaje de la foto, que hasta
+    // entonces estaba cableado dentro de la tarjeta.
+    expect(screen.getByText('2 de 8 ajustes personalizados')).toBeInTheDocument()
 
     cleanup()
     pintar()
@@ -211,8 +233,9 @@ describe('ajustar el tema', () => {
     await abrirGrupo(user, 'Producto')
     await user.click(screen.getByLabelText('Tarjeta de producto'))
 
-    // premium hereda tarjeta cómoda y proporción vertical; retail, compacta.
-    expect(screen.getByRole('option', { name: 'Usar tema: Cómoda' })).toBeInTheDocument()
+    // premium hereda tarjeta EDITORIAL desde V3 · P02 —la que suelta el
+    // recuadro y deja mandar a la fotografía—; retail sigue compacta.
+    expect(screen.getByRole('option', { name: 'Usar tema: Editorial' })).toBeInTheDocument()
   })
 
   it('pisar un ajuste guarda ese y solo ese', async () => {
@@ -751,5 +774,239 @@ describe('reordenar arrastrando', () => {
       .filter(Boolean)
     // «Marcas» pasa a estar antes que cualquier otra sección de la portada.
     expect(titulos.indexOf('Marcas')).toBeGreaterThan(-1)
+  })
+})
+
+/**
+ * Storefront V3 · P12 · La presentación por sección, desde el taller.
+ *
+ * ## Qué defiende este bloque
+ *
+ * **Que la lista siga siendo una lista.** El panel se abre; los tres
+ * desplegables no viven en la fila. Trece filas con seis controles cada una son
+ * 78 controles en la columna estrecha del taller.
+ *
+ * **Que solo se ofrezca lo que la sección admite.** Las opciones salen de la
+ * misma tabla que valida la base: ofrecer aquí algo que la base rechaza es un
+ * formulario que no guarda.
+ *
+ * **Que lo heredado diga lo que hereda.** «Usar Fila», no «Automático».
+ *
+ * **Que lo guardado sea lo mínimo y con la VERSIÓN correcta.** Una lista con
+ * presentaciones guardada como versión 1 dice de sí misma que no las lleva, y
+ * el validador de la base la rechaza.
+ *
+ * **Y que arrastrar y las flechas sigan funcionando**, que es lo que no puede
+ * romper una fase de UI.
+ */
+describe('cómo se enseña cada sección', () => {
+  /** Abre el panel de una sección por su nombre. */
+  async function abrirPanel(user: ReturnType<typeof userEvent.setup>, nombre: string) {
+    await user.click(screen.getByRole('button', { name: new RegExp(`Cómo se enseña: ${nombre}`) }))
+    return await waitFor(() => {
+      const panel = document.querySelector('[data-presentation-popover]')
+      expect(panel).not.toBeNull()
+      return panel as HTMLElement
+    })
+  }
+
+  it('la fila no lleva los desplegables: se abren en un panel', async () => {
+    const user = userEvent.setup()
+    pintar()
+
+    // Antes de abrir nada, ningún panel.
+    expect(document.querySelector('[data-presentation-popover]')).toBeNull()
+
+    const panel = await abrirPanel(user, 'Ofertas')
+    expect(panel).toHaveAttribute('data-presentation-popover', 'offers')
+  })
+
+  it('solo ofrece las composiciones de esa sección', async () => {
+    const user = userEvent.setup()
+    pintar()
+
+    const panel = await abrirPanel(user, 'Ofertas')
+    await user.click(within(panel).getByLabelText('Composición'))
+
+    const opciones = (await screen.findAllByRole('option')).map((o) => o.textContent)
+    // Las de ofertas: banda o mensaje al lado. Nada de rejillas de producto ni
+    // de mosaicos de familia.
+    expect(opciones.some((texto) => texto?.includes('Banda'))).toBe(true)
+    expect(opciones.some((texto) => texto?.includes('Mensaje al lado'))).toBe(true)
+    expect(opciones.some((texto) => texto?.includes('Muro de logotipos'))).toBe(false)
+  })
+
+  it('una sección que no elige composición no enseña ese desplegable', async () => {
+    const user = userEvent.setup()
+    pintar()
+
+    // El hero trae su variante en el contrato del tema: ofrecer otra aquí
+    // serían dos verdades para el mismo píxel.
+    const panel = await abrirPanel(user, 'Portada')
+    expect(within(panel).queryByLabelText('Composición')).toBeNull()
+    // El ancho sí, que lo admite cualquier sección.
+    expect(within(panel).getByLabelText('Ancho')).toBeInTheDocument()
+  })
+
+  it('lo heredado dice lo que hereda, no «automático»', async () => {
+    const user = userEvent.setup()
+    pintar()
+
+    const panel = await abrirPanel(user, 'Novedades')
+    // Universal resuelve `rail` para producto: el desplegable lo escribe.
+    // Se mira el TEXTO del panel: el valor visible de un select de MUI no vive
+    // en el input, que es el que lleva la etiqueta.
+    await user.click(within(panel).getByLabelText('Composición'))
+    expect(
+      await screen.findByRole('option', { name: 'Usar tema: Fila que se desplaza' }),
+    ).toBeInTheDocument()
+  })
+
+  it('elegir una composición la guarda, y la lista pasa a versión 2', async () => {
+    const user = userEvent.setup()
+    pintar()
+
+    const panel = await abrirPanel(user, 'Novedades')
+    await user.click(within(panel).getByLabelText('Composición'))
+    await user.click(await screen.findByRole('option', { name: /Rejilla, todos iguales/ }))
+
+    await waitFor(() => {
+      const guardado = valores().home_layout
+      const seccion = guardado.sections.find((s) => s.id === 'new-arrivals')
+      expect(seccion?.presentation).toEqual({ variant: 'grid' })
+      // La versión describe el CONTENIDO: con presentaciones, es la 2.
+      expect(guardado.version).toBe(2)
+    })
+  })
+
+  it('volver a lo heredado borra la clave y devuelve la lista a versión 1', async () => {
+    const user = userEvent.setup()
+    pintar({
+      home_layout: {
+        version: 2,
+        sections: [{ id: 'new-arrivals', enabled: true, presentation: { variant: 'grid' } }],
+      },
+    })
+
+    const panel = await abrirPanel(user, 'Novedades')
+    await user.click(within(panel).getByLabelText('Composición'))
+    // La primera opción es la heredada.
+    await user.click((await screen.findAllByRole('option'))[0] as HTMLElement)
+
+    await waitFor(() => {
+      const guardado = valores().home_layout
+      expect(guardado.sections.find((s) => s.id === 'new-arrivals')?.presentation).toBeUndefined()
+      // Sin nada personalizado, vuelve a declararse V1: no se sube la versión
+      // «porque estamos en V3».
+      expect(guardado.version).toBe(1)
+    })
+  })
+
+  it('«Quitar personalización» limpia la sección entera', async () => {
+    const user = userEvent.setup()
+    pintar({
+      home_layout: {
+        version: 2,
+        sections: [
+          {
+            id: 'offers',
+            enabled: true,
+            presentation: { variant: 'split', surface: 'soft', width: 'bleed' },
+          },
+        ],
+      },
+    })
+
+    const panel = await abrirPanel(user, 'Ofertas')
+    await user.click(within(panel).getByRole('button', { name: 'Quitar personalización' }))
+
+    await waitFor(() => {
+      const guardado = valores().home_layout
+      expect(guardado.sections.find((s) => s.id === 'offers')?.presentation).toBeUndefined()
+      expect(guardado.version).toBe(1)
+    })
+  })
+
+  it('el botón de la fila marca la sección que lleva algo personalizado', async () => {
+    pintar({
+      home_layout: {
+        version: 2,
+        sections: [{ id: 'offers', enabled: true, presentation: { surface: 'soft' } }],
+      },
+    })
+
+    expect(document.querySelector('[data-presentation-open="offers"]')).toHaveAttribute(
+      'data-presentation-custom',
+      'true',
+    )
+    // Y la que no, no lo marca.
+    expect(
+      document.querySelector('[data-presentation-open="new-arrivals"]'),
+    ).not.toHaveAttribute('data-presentation-custom')
+  })
+
+  it('las flechas de subir y bajar siguen ahí, con el panel en medio', async () => {
+    // Es lo que no puede romper una fase de UI: arrastrar no se puede hacer con
+    // el teclado.
+    pintar()
+
+    expect(screen.getByRole('button', { name: /Subir: Ofertas/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Bajar: Ofertas/ })).toBeInTheDocument()
+  })
+})
+
+describe('los campos de marca no se editan en dos sitios', () => {
+  it('el taller no repite el lockup ni el interruptor de tema: lleva a Marca', async () => {
+    // El encargo de la fase los pedía en el grupo de estructura, y ponerlos
+    // sería tener la misma propiedad editable en dos pestañas: el día que las
+    // dos no coincidan, ninguna es la verdad.
+    const user = userEvent.setup()
+    pintar()
+
+    expect(screen.queryByLabelText('Lockup de marca')).toBeNull()
+
+    // El grupo viene plegado —los ajustes son la excepción— así que se abre.
+    await abrirGrupo(user, 'Estructura')
+    const enlace = screen.getByRole('link', { name: 'Marca' })
+    expect(enlace).toHaveAttribute('href', '#branding')
+  })
+})
+
+describe('readiness lleva a donde se arregla', () => {
+  it('cada señal por mejorar ofrece su enlace, y las que están al día no', async () => {
+    pintar({ logo_url: null }, { conTienda: true })
+
+    const enlace = await waitFor(() => {
+      const encontrado = document.querySelector('[data-readiness-link="logo"]')
+      expect(encontrado).not.toBeNull()
+      return encontrado as HTMLElement
+    })
+    // El logotipo se sube en Marca, que es una pestaña de esta misma página.
+    expect(enlace).toHaveAttribute('href', '#branding')
+
+    // Y con el logotipo puesto, la señal no ofrece nada que arreglar.
+    expect(
+      document.querySelector('[data-readiness="logo"][data-state="ok"]'),
+    ).toBeNull()
+  })
+
+  it('la señal que vive en otra pantalla lleva a su ruta, no a una pestaña', async () => {
+    /**
+     * Se usa la de PÁGINAS y no la de fotos de producto, y el motivo es una
+     * regla del panel que conviene no perder de vista: una señal que no tiene
+     * nada que medir está al día. Sin catálogo no hay productos sin foto, así
+     * que esa línea sale en verde y —con razón— no ofrece nada que arreglar.
+     * Las páginas sí: cero páginas es cero.
+     */
+    pintar(undefined, { conTienda: true })
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-readiness-link="pages"]')).toHaveAttribute(
+        'href',
+        '/app/content',
+      )
+    })
+    // Y las que no tienen nada que medir no ofrecen enlace: no hay nada roto.
+    expect(document.querySelector('[data-readiness-link="product-images"]')).toBeNull()
   })
 })

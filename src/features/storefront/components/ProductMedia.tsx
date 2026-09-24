@@ -56,7 +56,13 @@ export function ProductMedia({
    *    una foto de estudio —un logotipo apaisado, una imagen con márgenes—: con
    *    `cover` sale ampliado y descentrado, y parece un fallo de la tienda.
    */
-  fit?: 'cover' | 'contain'
+  /**
+   * Cómo encaja la foto. Además de los dos literales acepta una VARIABLE de CSS
+   * (Storefront V3 · P02): así la decisión la toma el tema en la frontera
+   * —`--sf-media-fit`— y este componente no tiene que preguntar qué tema hay
+   * puesto. Sigue habiendo reserva, por si la variable no existe.
+   */
+  fit?: 'cover' | 'contain' | (string & {})
 }) {
   const tinte = tintFor(alt)
 
