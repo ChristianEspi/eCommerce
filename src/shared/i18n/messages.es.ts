@@ -191,6 +191,13 @@ export const es = {
     'settings.design.value.portrait': 'Vertical',
     'settings.design.value.landscape': 'Horizontal',
     'settings.design.value.spacious': 'Amplio',
+    // Storefront V3 · P02 · Las tres composiciones nuevas y el encaje de foto.
+    'settings.design.value.brand': 'De marca',
+    'settings.design.value.editorial': 'Editorial',
+    'settings.design.value.mosaic': 'Mosaico',
+    'settings.design.value.cover': 'Llena el marco',
+    'settings.design.value.contain': 'Cabe entera',
+    'settings.design.field.mediaFit': 'Encaje de la foto',
     'settings.design.home.title': 'Portada de la tienda',
     'settings.design.home.help':
       'Enciende, apaga y ordena las secciones. El contenido de cada una sigue saliendo de tu catálogo y de tus páginas.',

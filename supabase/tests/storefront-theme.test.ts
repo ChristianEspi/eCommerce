@@ -65,6 +65,24 @@ const ESTILO_COMPLETO = {
   contentWidth: 'xl',
   imageRatio: 'portrait',
   sectionSpacing: 'spacious',
+  // Storefront V3 · P02 · La clave que salió de `ProductCard`, donde estaba
+  // cableada en `contain` para todas las tiendas.
+  productMediaFit: 'cover',
+}
+
+/**
+ * Las tres composiciones que V3 añade, cada una en su clave (P02).
+ *
+ * Van en su propio objeto y no dentro del completo porque lo que se comprueba
+ * es distinto: que la lista blanca de la base CRECIÓ donde tenía que crecer.
+ * Premium las usa las tres, así que si la base las rechazara, el preset que da
+ * personalidad a Premium no se podría ni guardar.
+ */
+const ESTILO_V3 = {
+  headerVariant: 'brand',
+  productCardVariant: 'editorial',
+  categoryVariant: 'mosaic',
+  productMediaFit: 'contain',
 }
 
 const LAYOUT_VALIDO = {
@@ -223,6 +241,33 @@ describe('D · un estilo dentro del contrato', () => {
   })
 })
 
+describe('E2 · el contrato V3, en la lista blanca de la base', () => {
+  it('acepta las tres composiciones nuevas y el encaje', async () => {
+    // Si la base las rechazara, el preset que da personalidad a Premium no se
+    // podría guardar: sus tres variantes son exactamente estas.
+    const filas = await guardar('storefront_style', JSON.stringify(ESTILO_V3))
+    expect(filas).toHaveLength(1)
+  })
+
+  it.each(Object.entries(ESTILO_V3))('acepta %s a solas', async (clave, valor) => {
+    // Una a una, porque la lista blanca se recorre clave a clave: un objeto
+    // completo podría pasar por casualidad si el validador mirara solo la
+    // primera.
+    const filas = await guardar('storefront_style', JSON.stringify({ [clave]: valor }))
+    expect(filas).toHaveLength(1)
+  })
+
+  it('los valores de V2 siguen entrando: la lista solo CRECIÓ', async () => {
+    // Por eso esta migración no necesita revalidar ni una fila: una función más
+    // permisiva no puede invalidar lo que ya pasaba.
+    const filas = await guardar(
+      'storefront_style',
+      JSON.stringify({ headerVariant: 'standard', productCardVariant: 'comfortable', categoryVariant: 'tiles' }),
+    )
+    expect(filas).toHaveLength(1)
+  })
+})
+
 describe('E · un estilo fuera del contrato', () => {
   const FUERA: Array<[string, unknown]> = [
     // Las cuatro formas de intentar meter presentación arbitraria. Ninguna
@@ -242,6 +287,23 @@ describe('E · un estilo fuera del contrato', () => {
     // Fuera del contrato A PROPÓSITO (P01): tres enteros libres no son una
     // elección entre opciones nombradas.
     ['gridColumns', { gridColumns: { xs: 11, sm: 11, lg: 11 } }],
+    /**
+     * Storefront V3 · P02 · Lo que la clave nueva NO abre.
+     *
+     * `productMediaFit` alimenta un `object-fit` a través de una variable de
+     * CSS, así que es el sitio más tentador de todo el contrato para colar CSS
+     * arbitrario. La lista tiene dos valores y ninguno más: los otros de
+     * `object-fit` que existen en CSS —`fill`, `none`, `scale-down`— se
+     * rechazan igual que una inyección, porque el criterio no es «parece
+     * peligroso» sino «está nombrado».
+     */
+    ['un encaje de CSS que no está en la lista', { productMediaFit: 'fill' }],
+    ['otro más', { productMediaFit: 'scale-down' }],
+    ['CSS colado en el encaje', { productMediaFit: 'none;background:url(//evil)' }],
+    // Y las variantes que V3 tampoco añadió a las listas que sí crecieron.
+    ['una cabecera inventada', { headerVariant: 'megamenu' }],
+    ['una tarjeta inventada', { productCardVariant: 'gigante' }],
+    ['unas familias inventadas', { categoryVariant: 'carrusel' }],
   ]
 
   it.each(FUERA)('rechaza %s', async (_caso, valor) => {

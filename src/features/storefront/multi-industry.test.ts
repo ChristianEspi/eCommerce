@@ -228,6 +228,8 @@ describe('los cuatro temas sirven a cualquier rubro', () => {
         'contentWidth',
         'imageRatio',
         'sectionSpacing',
+        // Storefront V3 · P02 · El encaje de la foto, que salió de la tarjeta.
+        'productMediaFit',
         'gridColumns',
       ])
     }

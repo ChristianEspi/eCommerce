@@ -183,14 +183,24 @@ export function ProductCard({
           ...(available ? {} : { '& img': { filter: 'grayscale(1)', opacity: 0.5 } }),
         }}
       >
-        {/* La proporción la pone el tema: cuadrada para un envase, vertical
-            para una prenda. Con RESERVA cuadrada, que es la de siempre — y solo
-            aquí: el carrito y el resumen de pago siguen con su miniatura
-            cuadrada, porque ahí la foto identifica, no vende. */}
+        {/* La proporción Y el encaje los pone el TEMA (V3 · P02).
+
+            La proporción ya venía de ahí: cuadrada para un envase, vertical
+            para una prenda. El encaje estaba cableado en `contain`, que es lo
+            correcto para un catálogo de referencias fotografiadas sobre fondo
+            claro —recortar una caja de medicamento se come el principio
+            activo— y lo equivocado para una tienda de moda, donde el encuadre
+            completo deja franjas vacías arriba y abajo de cada prenda.
+
+            No hay `if` por tema aquí dentro: los dos llegan como variables de
+            CSS desde la frontera `.sf-scope`, con RESERVA —cuadrada y
+            `contain`, las de siempre— para cuando esta tarjeta se pinta fuera
+            de la vitrina. El carrito y el resumen de pago siguen con su
+            miniatura cuadrada: ahí la foto identifica, no vende. */}
         <ProductMedia
           url={imageUrl}
           alt={product.primary_image_alt ?? product.name}
-          fit="contain"
+          fit="var(--sf-media-fit, contain)"
           ratio="var(--sf-image-ratio, 1 / 1)"
         />
 

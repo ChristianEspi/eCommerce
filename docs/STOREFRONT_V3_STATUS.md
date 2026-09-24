@@ -12,7 +12,7 @@ Storefront V2 completo.
 
 # P00 · Línea base, rama y evidencia inicial
 
-**Commit:** `<pendiente>` · **Ciclos correctivos:** 0 de 3
+**Commit:** `9217828` · **Ciclos correctivos:** 0 de 3
 
 ## Estado del workspace, y qué se protege
 
@@ -119,7 +119,7 @@ hace valioso.
 
 # P01 · Identidad de la tienda con roles semánticos
 
-**Commit:** `<pendiente>` · **Ciclos correctivos:** 1 de 3
+**Commit:** `60196f0` · **Ciclos correctivos:** 1 de 3
 
 ## El problema
 
@@ -232,5 +232,123 @@ fases y dejado el rediseño sin su contrato terminado.
 | `npm run build` | **PASS** |
 | `npm run test:db` | **PASS** — 137 ficheros, 3625 tests |
 | `npm run bundle:report` | **PASS** — portada 399,8 kB (techo 405; base 398,8) |
+
+`PHASE_RESULT: PASS`
+
+---
+
+# P02 · Theme Engine V3: personalidades reales y encaje de foto
+
+**Commit:** `<pendiente>` · **Ciclos correctivos:** 2 de 3
+
+## El problema
+
+Dos, y el segundo era un acoplamiento con consecuencias comerciales.
+
+**Premium se distinguía en las medidas, no en la forma.** Declaraba
+`standard` / `comfortable` / `tiles`: las mismas piezas que Universal con más
+aire y proporción vertical. El pack V3 rechaza eso explícitamente como rediseño,
+y con razón — un tema que solo cambia el relleno no es una personalidad.
+
+**`ProductCard` traía `fit="contain"` cableado.** Es la decisión correcta para un
+catálogo de referencias fotografiadas sobre fondo claro —recortar una caja de
+medicamento se come el principio activo; recortar un tornillo, la métrica— y la
+equivocada para una tienda de moda, donde el encuadre completo deja franjas
+vacías arriba y abajo de cada prenda y la rejilla se ve descosida. Con la
+decisión dentro del componente no había forma de tener las dos sin un `if` por
+tema dentro de la tarjeta, que es justo lo que este contrato existe para evitar.
+
+## Lo que se hizo
+
+### El contrato pasa de 7 claves a 8, y tres listas crecen
+
+| Clave | V2 | V3 |
+|---|---|---|
+| `headerVariant` | `standard` · `compact` | **+ `brand`** |
+| `productCardVariant` | `comfortable` · `compact` | **+ `editorial`** |
+| `categoryVariant` | `tiles` · `pills` | **+ `mosaic`** |
+| `productMediaFit` | *(cableado en la tarjeta)* | **`cover` · `contain`** |
+
+Las tres composiciones nuevas no son medidas: `brand` reparte la cabecera en dos
+filas con la marca centrada; `editorial` suelta el recuadro de la tarjeta para
+que mande la fotografía; `mosaic` da a las familias tamaños distintos, que es lo
+que dice cuál manda —azulejos iguales dicen que ninguna—.
+
+### Premium estrena las tres
+
+| Preset | header | hero | card | categorías | fit |
+|---|---|---|---|---|---|
+| Universal | standard | product | comfortable | tiles | **contain** |
+| Retail | standard | product | compact | tiles | contain |
+| **Premium** | **brand** | statement | **editorial** | **mosaic** | **cover** |
+| Catalog | compact | product | compact | pills | contain |
+
+Y la clave nueva tiene un sitio donde de verdad cambia algo: Premium es el único
+con `cover`, porque es el tema que se elige cuando la fotografía **es** el
+argumento de venta.
+
+### Desvío declarado: Universal se queda en `contain`
+
+El prompt de la fase proponía `cover` para Universal. Se conserva `contain`, y
+por dos motivos que apuntan al mismo sitio:
+
+1. Universal es el tema de quien **no ha elegido**, y la plataforma no sabe qué
+   vende. `cover` recorta, y recortar la foto de otro es pérdida de información
+   irreversible desde la vitrina.
+2. El mismo prompt exige que Universal conserve una apariencia compatible. Hoy
+   **todas** las tiendas ven `contain` (estaba cableado), así que poner `cover`
+   habría recortado las fotos de cada tienda que nunca eligió tema.
+
+Los dos requisitos del prompt chocaban entre sí; se resuelve del lado que no
+destruye datos ajenos. Quien quiera el encuadre lleno lo tiene a un control de
+distancia, o eligiendo Premium.
+
+### La decisión sale del componente
+
+`--sf-media-fit` viaja como variable de CSS desde la frontera `.sf-scope`, y
+`ProductMedia` la recibe por su prop `fit` con reserva (`contain`). No hay ni un
+`if (theme === …)` dentro de la tarjeta: el tema decide una vez, en la frontera,
+y los componentes leen. Se añaden también `data-store-cats` y `data-store-media`
+al DOM, los dos de lista cerrada.
+
+### Migración `20260923190000_theme_contract_v3.sql`
+
+`create or replace` de `ebim.storefront_style_is_valid` con las ocho claves. La
+migración V2 no se toca. Sigue rechazando claves desconocidas y aceptando objetos
+parciales, con los mismos grants y `search_path` vacío.
+
+**No hace falta revalidar ninguna fila**: la lista solo crece, y una función más
+permisiva no puede invalidar lo que ya pasaba.
+
+## Ciclos correctivos
+
+1. Seis pruebas rojas al crecer el contrato, todas de gates deliberados: el censo
+   de valores probados de `theme-contract.test.tsx`, la altura de la cabecera
+   —que ahora tiene tres alturas y no dos—, el inventario de claves del estilo
+   normalizado, y dos textos del taller («2 de 7» → «2 de 8», y el resumen de
+   Premium, que pasa de «Cómoda» a «Editorial»). Se actualizaron declarando los
+   valores nuevos, sin relajar lo que comprueban.
+2. `multi-industry.test.ts` fija por inventario las claves de `ThemeDefinition`
+   para que nadie cuele un campo `industry`. Se añadió `productMediaFit` a la
+   lista esperada, conservando intacta la prohibición.
+
+## Tests
+
+| Archivo | Casos |
+|---|---|
+| `theme/contract-v3.test.ts` | **Nuevo**, 17. Las tres listas crecieron; el encaje es clave del contrato; **los valores de V2 siguen validando**; el saneador y el esquema aceptan lo nuevo; **un encaje inventado no llega como CSS** —ni `fill`, ni `scale-down`, ni una inyección—; un valor inventado cae al del preset; el estilo normalizado trae siempre el encaje; sigue aceptando parciales. Y las personalidades: Premium estrena las tres composiciones, es el único con `cover`, Universal conserva exactamente lo de antes, Catalog y Retail siguen siendo el productivo y el denso, ninguna combinación se repite y **cada composición nueva la usa al menos un preset** — un contrato con opciones que nadie usa declara trabajo que no se hizo. |
+| `supabase/tests/storefront-theme.test.ts` | 98 → **104**. Bloque nuevo: la base acepta las tres composiciones y el encaje, una a una y juntas, y los valores de V2 siguen entrando. Y seis rechazos nuevos: los otros `object-fit` que existen en CSS (`fill`, `scale-down`), CSS colado en el encaje y las tres variantes que V3 **no** añadió. |
+| `theme/theme-contract.test.tsx`, `theme/theme.test.ts`, `settings/storefront-design.test.tsx`, `multi-industry.test.ts` | Actualizados para el contrato de ocho claves, con las alturas de las tres cabeceras y el nuevo censo. |
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 303 ficheros, 6012 tests |
+| `npm run build` | **PASS** |
+| `npm run test:db` | **PASS** — 137 ficheros, 3637 tests |
+| `npm run bundle:report` | **PASS** — portada 400,1 kB (techo 405) |
 
 `PHASE_RESULT: PASS`

@@ -96,6 +96,12 @@ const ETIQUETA_VALOR: Record<string, MessageKey> = {
   portrait: 'settings.design.value.portrait',
   landscape: 'settings.design.value.landscape',
   spacious: 'settings.design.value.spacious',
+  // Storefront V3 · P02
+  brand: 'settings.design.value.brand',
+  editorial: 'settings.design.value.editorial',
+  mosaic: 'settings.design.value.mosaic',
+  cover: 'settings.design.value.cover',
+  contain: 'settings.design.value.contain',
   lg: 'settings.design.value.lg',
   xl: 'settings.design.value.xl',
 }

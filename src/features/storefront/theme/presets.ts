@@ -53,6 +53,27 @@ export const THEME_PRESETS: Readonly<Record<ThemePreset, ThemeDefinition>> = {
     contentWidth: 'lg',
     imageRatio: 'square',
     sectionSpacing: 'comfortable',
+    /**
+     * `contain`, que es lo que la tarjeta hacía cableado para todas las tiendas
+     * (Storefront V3 · P02).
+     *
+     * ## Desvío consciente del prompt de la fase, que proponía `cover`
+     *
+     * Universal es el tema de quien no ha elegido, y la plataforma NO sabe qué
+     * vende. `cover` recorta: en una caja de medicamento se come el nombre del
+     * principio activo, y en un tornillo, la métrica. Es pérdida de información
+     * sobre la foto de otro, y es irreversible desde la vitrina.
+     *
+     * Y hay un segundo motivo, del mismo prompt: exige que Universal conserve
+     * una apariencia compatible. Hoy TODAS las tiendas ven `contain`, así que
+     * poner `cover` aquí recortaría las fotos de cada tienda que nunca eligió
+     * tema. Los dos requisitos chocaban; se resuelve del lado que no destruye
+     * datos ajenos.
+     *
+     * Quien quiera el encuadre lleno lo tiene a un control de distancia —o
+     * eligiendo Premium, que es donde la fotografía manda—.
+     */
+    productMediaFit: 'contain',
     gridColumns: { xs: 2, sm: 3, lg: 4 },
   },
   retail: {
@@ -64,21 +85,48 @@ export const THEME_PRESETS: Readonly<Record<ThemePreset, ThemeDefinition>> = {
     contentWidth: 'lg',
     imageRatio: 'square',
     sectionSpacing: 'compact',
+    // Retail vende producto envasado y fotografiado sobre fondo claro, donde el
+    // recorte se come justo lo que identifica la referencia.
+    productMediaFit: 'contain',
     gridColumns: { xs: 2, sm: 4, lg: 5 },
   },
   premium: {
     id: 'premium',
-    // `standard` y no una variante «minimal» propia: hoy solo hay una
-    // cabecera y su versión reducida. Inventar una tercera aquí sería declarar
-    // una opción sin nada detrás — premium ya se distingue por la portada, la
-    // proporción vertical, tres columnas y el aire.
-    headerVariant: 'standard',
+    /**
+     * Storefront V3 · P02 · Premium pasa a ser BRAND-FIRST de verdad.
+     *
+     * Hasta V3 declaraba `standard` / `comfortable` / `tiles`: las mismas piezas
+     * que Universal con más aire y proporción vertical. Se distinguía en las
+     * medidas, no en la composición — y eso es exactamente lo que el pack V3
+     * rechaza como rediseño.
+     *
+     * Las tres variantes nuevas le dan su propia forma:
+     *
+     *  · `brand` — la marca al centro y la navegación en su fila. Una tienda de
+     *    marca no compite por el clic en la primera pantalla, compite por ser
+     *    reconocida.
+     *  · `editorial` — la tarjeta suelta el recuadro y deja mandar a la
+     *    fotografía, con el texto debajo.
+     *  · `mosaic` — las familias en azulejos de tamaños distintos, que es lo que
+     *    dice cuál manda. Azulejos iguales reparten la atención por igual.
+     */
+    headerVariant: 'brand',
     heroVariant: 'statement',
-    productCardVariant: 'comfortable',
-    categoryVariant: 'tiles',
+    productCardVariant: 'editorial',
+    categoryVariant: 'mosaic',
     contentWidth: 'lg',
     imageRatio: 'portrait',
     sectionSpacing: 'spacious',
+    /**
+     * El ÚNICO preset con `cover`, y por eso existe la clave.
+     *
+     * Premium es el tema que se elige cuando la fotografía es el argumento de
+     * venta: ropa, muebles, joyería. Ahí `contain` deja franjas vacías arriba y
+     * abajo de cada prenda y la rejilla se ve descosida, mientras que el recorte
+     * no pierde nada que importe — la foto es de estudio y está encuadrada para
+     * esto.
+     */
+    productMediaFit: 'cover',
     gridColumns: { xs: 2, sm: 2, lg: 3 },
   },
   catalog: {
@@ -90,6 +138,9 @@ export const THEME_PRESETS: Readonly<Record<ThemePreset, ThemeDefinition>> = {
     contentWidth: 'xl',
     imageRatio: 'square',
     sectionSpacing: 'compact',
+    // Seis columnas de referencias: recortar aquí haría irreconocible la mitad
+    // del catálogo.
+    productMediaFit: 'contain',
     gridColumns: { xs: 2, sm: 4, lg: 6 },
   },
 } as const

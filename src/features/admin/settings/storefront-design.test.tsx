@@ -184,7 +184,9 @@ describe('ajustar el tema', () => {
 
   it('se cuenta lo personalizado, y sin nada dice que todo lo hereda', () => {
     pintar({ storefront_style: { contentWidth: 'xl', imageRatio: 'portrait' } })
-    expect(screen.getByText('2 de 7 ajustes personalizados')).toBeInTheDocument()
+    // Ocho desde V3 · P02: el contrato gana el encaje de la foto, que hasta
+    // entonces estaba cableado dentro de la tarjeta.
+    expect(screen.getByText('2 de 8 ajustes personalizados')).toBeInTheDocument()
 
     cleanup()
     pintar()
@@ -211,8 +213,9 @@ describe('ajustar el tema', () => {
     await abrirGrupo(user, 'Producto')
     await user.click(screen.getByLabelText('Tarjeta de producto'))
 
-    // premium hereda tarjeta cómoda y proporción vertical; retail, compacta.
-    expect(screen.getByRole('option', { name: 'Usar tema: Cómoda' })).toBeInTheDocument()
+    // premium hereda tarjeta EDITORIAL desde V3 · P02 —la que suelta el
+    // recuadro y deja mandar a la fotografía—; retail sigue compacta.
+    expect(screen.getByRole('option', { name: 'Usar tema: Editorial' })).toBeInTheDocument()
   })
 
   it('pisar un ajuste guarda ese y solo ese', async () => {

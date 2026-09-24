@@ -228,6 +228,13 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'settings.design.value.portrait': 'Portrait',
     'settings.design.value.landscape': 'Landscape',
     'settings.design.value.spacious': 'Spacious',
+    // Storefront V3 · P02
+    'settings.design.value.brand': 'Brand-first',
+    'settings.design.value.editorial': 'Editorial',
+    'settings.design.value.mosaic': 'Mosaic',
+    'settings.design.value.cover': 'Fill the frame',
+    'settings.design.value.contain': 'Fit the whole photo',
+    'settings.design.field.mediaFit': 'Photo fit',
     'settings.design.home.title': 'Store home page',
     'settings.design.home.help':
       'Turn sections on or off and reorder them. What each one shows still comes from your catalog and your pages.',

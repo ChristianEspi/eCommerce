@@ -6,6 +6,7 @@ import {
   HOME_SECTION_IDS,
   IMAGE_RATIOS,
   PRODUCT_CARD_VARIANTS,
+  PRODUCT_MEDIA_FITS,
   SECTION_SPACINGS,
   THEME_PRESET_IDS,
   type HomeLayout,
@@ -114,6 +115,10 @@ const CLAVES_DE_ESTILO = [
   ['contentWidth', CONTENT_WIDTHS],
   ['imageRatio', IMAGE_RATIOS],
   ['sectionSpacing', SECTION_SPACINGS],
+  // Storefront V3 · P02. Entra en la MISMA tabla que las siete de V2: es lo que
+  // impide el fallo clásico de añadir una opción y que una de las dos funciones
+  // se quede sin enterarse.
+  ['productMediaFit', PRODUCT_MEDIA_FITS],
 ] as const satisfies ReadonlyArray<readonly [keyof StorefrontStyle, readonly string[]]>
 
 /**
@@ -167,6 +172,8 @@ export function normalizeStorefrontStyle(
     contentWidth: base.contentWidth,
     imageRatio: base.imageRatio,
     sectionSpacing: base.sectionSpacing,
+    // Storefront V3 · P02.
+    productMediaFit: base.productMediaFit,
     ...sanitizeStorefrontStyle(valor),
   }
 }

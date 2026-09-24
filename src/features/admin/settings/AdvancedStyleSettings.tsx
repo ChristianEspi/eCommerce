@@ -22,13 +22,14 @@ import {
   HERO_VARIANTS,
   IMAGE_RATIOS,
   PRODUCT_CARD_VARIANTS,
+  PRODUCT_MEDIA_FITS,
   SECTION_SPACINGS,
   type StorefrontStyle,
   type ThemePreset,
 } from '@/features/storefront/theme/types'
 
 /**
- * Los siete ajustes que se le pueden pisar al tema (Storefront V2 · P10).
+ * Los ajustes finos que se le pueden pisar al tema (V2 · P10, ampliado en V3 · P02).
  *
  * ## Qué eran, y por qué molestaban
  *
@@ -56,7 +57,8 @@ import {
  *
  * ## Lo que NO cambia
  *
- * El contrato. Siguen siendo las siete claves cerradas de `StorefrontStyle`,
+ * El contrato. Siguen siendo las claves cerradas de `StorefrontStyle` —ocho
+ * desde V3, con el encaje de la foto—,
  * con sus listas cerradas, y pisar sigue siendo escribir la clave en
  * `storefront_style` y heredar, borrarla. Esto es la misma decisión mejor
  * presentada, no una decisión nueva.
@@ -79,6 +81,12 @@ const ETIQUETA_VALOR: Record<string, MessageKey> = {
   portrait: 'settings.design.value.portrait',
   landscape: 'settings.design.value.landscape',
   spacious: 'settings.design.value.spacious',
+  // Storefront V3 · P02
+  brand: 'settings.design.value.brand',
+  editorial: 'settings.design.value.editorial',
+  mosaic: 'settings.design.value.mosaic',
+  cover: 'settings.design.value.cover',
+  contain: 'settings.design.value.contain',
 }
 
 interface Ajuste {
@@ -92,7 +100,7 @@ interface Ajuste {
  *
  * Las listas salen del contrato (`theme/types.ts`), no de una copia: añadir un
  * valor allí lo hace aparecer aquí, y eso es lo que impide que el formulario se
- * quede ofreciendo seis opciones cuando ya hay siete.
+ * quede ofreciendo dos opciones cuando el contrato ya tiene tres.
  *
  * El reparto no es alfabético: responde a tres preguntas distintas. Qué piezas
  * tiene la tienda y cómo son de grandes (estructura), cómo se enseña lo que se
@@ -124,6 +132,18 @@ const GRUPOS = [
         etiqueta: 'settings.design.field.card',
       },
       { clave: 'imageRatio', valores: IMAGE_RATIOS, etiqueta: 'settings.design.field.ratio' },
+      /**
+       * Storefront V3 · P02 · Cómo encaja la foto en su marco.
+       *
+       * Va en Producto y no en Espaciado porque es una decisión sobre la FOTO
+       * del producto, no sobre el aire: recortar o no recortar cambia qué se ve
+       * de lo que se vende.
+       */
+      {
+        clave: 'productMediaFit',
+        valores: PRODUCT_MEDIA_FITS,
+        etiqueta: 'settings.design.field.mediaFit',
+      },
     ],
   },
   {
@@ -144,7 +164,7 @@ const GRUPOS = [
   ajustes: readonly Ajuste[]
 }>
 
-/** Las siete claves, para contar sin repetir la lista. */
+/** Las claves del contrato, para contar sin repetir la lista. */
 export const CLAVES_DE_ESTILO: readonly (keyof StorefrontStyle)[] = GRUPOS.flatMap((grupo) =>
   grupo.ajustes.map((ajuste) => ajuste.clave),
 )

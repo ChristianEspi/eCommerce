@@ -109,6 +109,8 @@ describe('el estilo de la tienda', () => {
       contentWidth: THEME_PRESETS.premium.contentWidth,
       imageRatio: THEME_PRESETS.premium.imageRatio,
       sectionSpacing: THEME_PRESETS.premium.sectionSpacing,
+      // Storefront V3 · P02 · El encaje de la foto, que salió de la tarjeta.
+      productMediaFit: THEME_PRESETS.premium.productMediaFit,
     })
   })
 
@@ -160,6 +162,8 @@ describe('el estilo de la tienda', () => {
       'heroVariant',
       'imageRatio',
       'productCardVariant',
+      // Storefront V3 · P02
+      'productMediaFit',
       'sectionSpacing',
     ])
     // Y lo valido del mismo objeto se conserva: una clave sucia no invalida
