@@ -357,7 +357,7 @@ permisiva no puede invalidar lo que ya pasaba.
 
 # P03 · Cabecera, navegación y barra de avisos
 
-**Commit:** `<pendiente>` · **Ciclos correctivos:** 2 de 3
+**Commit:** `bae138c` · **Ciclos correctivos:** 2 de 3
 
 ## El problema
 
@@ -454,5 +454,100 @@ suyo en Apariencia.
 | `npm run test` | **PASS** — 304 ficheros, 6034 tests |
 | `npm run build` | **PASS** |
 | `npm run bundle:report` | **PASS** — portada 400,8 kB (techo 405) |
+
+`PHASE_RESULT: PASS`
+
+---
+
+# P04 · La portada editorial: respaldos reales y sin copy inventado
+
+**Commit:** `<pendiente>` · **Ciclos correctivos:** 2 de 3
+
+## Los dos problemas
+
+**Caía al degradado demasiado pronto.** Sin `banner_url` el hero era un
+rectángulo de color. Una tienda con quinientas fotos dentro y sin banner —que es
+toda tienda el primer día— abría con algo que se lee como «a medio montar».
+
+**Se repetía y se inventaba.** El antetítulo pintaba **siempre** el nombre de la
+tienda y el titular caía al nombre cuando no había `hero_title`: toda tienda sin
+lema propio abría con su nombre dos veces, uno encima del otro. Y la bajada,
+cuando no había, la escribía la plataforma — «Explora el catálogo, revisa precios
+y disponibilidad al día», copy comercial en la tienda de alguien que no lo había
+pedido.
+
+## Lo que se hizo
+
+### Cuatro escalones de respaldo, y tres son fotos del comercio
+
+```
+1 · banner_url            → el banner que el comercio subió; manda siempre
+2 · collage 1-3 fotos     → productos publicados, de datos YA cargados
+3 · foto de una familia   → si alguna categoría tiene
+4 · degradado del acento  → último recurso: COLOR, no una foto de archivo
+```
+
+`data-hero-media` declara cuál se está usando, así que la cadena es comprobable
+sin comparar capturas.
+
+**Ni una consulta nueva.** Las fotos salen de los productos que la portada ya
+tiene repartidos (`ofertas`, `destacados`, `novedades`) cruzados con las
+miniaturas que ya firmó para sus filas. Decorar una portada no puede costar una
+petición por visita, y menos una por foto. Una URL sin firmar no cuenta: un
+`src` con la ruta cruda del bucket da 403 y el hero se quedaría con un hueco en
+vez de caer al respaldo siguiente.
+
+El collage **cambia de forma** con el número: una foto alta, dos columnas, o una
+grande con dos apiladas. Una foto estirada al ancho de dos no es una composición.
+Y va al lado del texto, no debajo: son fotos de producto sobre fondo claro, y
+poner texto blanco encima las estropea. En el teléfono, texto y botón primero.
+
+### La regla de no repetirse
+
+| | antes | ahora |
+|---|---|---|
+| kicker del comercio | no existía | manda cuando está |
+| sin kicker, titular ≠ nombre | nombre arriba + titular | igual (el nombre da contexto) |
+| sin kicker, titular = nombre | **nombre dos veces** | una sola vez |
+| sin bajada | copy de la plataforma | **nada** |
+
+Se retira la clave `store.hero.fallbackSubtitle` de los dos diccionarios: dejarla
+invitaba a volver a rellenar la portada de otro.
+
+## Lo que se conservó a propósito
+
+`StoreFeaturedHero` —la portada de producto— **no se tocó**. El prompt pedía
+«pulir composición», y la actual ya cumple lo que pide el resto del punto:
+precio, descuento y CTA reales resueltos por el motor comercial, sin badges de
+relleno, con `contain` para no recortar el producto y con controles accesibles.
+Cambiarla habría sido riesgo sobre pricing real sin ganancia demostrable; lo que
+sí gana en esta fase es la variante `statement`, que era la que no competía.
+
+## Ciclos correctivos
+
+1. La prueba de «respaldos neutrales» de `storefront-ui.test.tsx` exigía la
+   bajada inventada. Se invierte: ahora comprueba que **no** está y que el nombre
+   se escribe una sola vez dentro de la portada.
+2. Dos localizadores míos mal puestos en las pruebas nuevas: la portada se busca
+   por su atributo y no por su nombre accesible —el nombre **es** el titular, que
+   es justo lo que cambia en cada caso—, y el botón de rebajas se llama «Ver lo
+   rebajado», no «ofertas».
+
+## Tests
+
+| Archivo | Casos |
+|---|---|
+| `components/hero-v3.test.tsx` | **Nuevo**, 18. Los cuatro escalones en orden, con el banner ganando a todo; el collage cambia de forma con 1, 2 y 3 fotos, corta en tres y es decorativo; una URL vacía no cuenta. Verdad: sin titular propio el nombre se escribe una vez, con titular el nombre da contexto, con kicker manda el kicker y el nombre no se cuela, el kicker funciona incluso cuando el titular es el nombre, sin bajada **no se inventa** y con bajada se pinta la suya. Puertas: siempre al catálogo, a lo rebajado **solo si hay**, **ni un precio** en la portada editorial, y sin slug la portada sigue pintándose sin enlaces. |
+| `storefront-ui.test.tsx` | Actualizado: la portada sin datos ya no escribe una bajada y no repite el nombre. |
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 305 ficheros, 6052 tests |
+| `npm run build` | **PASS** |
+| `npm run bundle:report` | **PASS** — portada 401,3 kB (techo 405) |
 
 `PHASE_RESULT: PASS`

@@ -340,7 +340,6 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.seo.catalogOf': 'Online catalog of',
     'store.catalog.loadingMore': 'Loading more products…',
     'store.catalog.endOfList': 'No more results.',
-    'store.hero.fallbackSubtitle': 'Browse the catalog, with up-to-date prices and availability.',
     'store.catalog.title': 'Catalog',
     'store.catalog.search': 'Search products',
     'store.catalog.items': 'products',

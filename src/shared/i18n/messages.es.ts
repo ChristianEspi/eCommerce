@@ -301,8 +301,6 @@ export const es = {
     'store.seo.catalogOf': 'Catálogo en línea de',
     'store.catalog.loadingMore': 'Cargando más productos…',
     'store.catalog.endOfList': 'No hay más resultados.',
-    'store.hero.fallbackSubtitle':
-      'Explora el catálogo, revisa precios y disponibilidad al día.',
     'store.catalog.title': 'Catálogo',
     'store.catalog.search': 'Buscar productos',
     'store.catalog.items': 'productos',

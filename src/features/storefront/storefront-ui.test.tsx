@@ -487,9 +487,23 @@ describe('resolución del tenant por slug', () => {
     expect(
       await screen.findByRole('heading', { name: 'Casa Nórdica', level: 1 }),
     ).toBeInTheDocument()
+    /**
+     * Sin bajada configurada, la portada NO escribe una (V3 · P04).
+     *
+     * Hasta V3 la plataforma rellenaba con «Explora el catálogo, revisa precios
+     * y disponibilidad al día»: copy comercial en la tienda de alguien que no lo
+     * había escrito. Lo que queda es su nombre, su titular y las puertas al
+     * catálogo — que es lo que la plataforma sí puede afirmar.
+     */
     expect(
-      screen.getByText('Explora el catálogo, revisa precios y disponibilidad al día.'),
-    ).toBeInTheDocument()
+      screen.queryByText('Explora el catálogo, revisa precios y disponibilidad al día.'),
+    ).not.toBeInTheDocument()
+    // Y el nombre no se escribe DOS veces DENTRO DE LA PORTADA: sin titular
+    // propio, el antetítulo que lo repetía encima del `h1` desaparece. Fuera de
+    // la portada sigue estando donde debe —cabecera y pie—, así que se mira
+    // solo la portada.
+    const portada = document.querySelector('[data-hero-variant]') as HTMLElement
+    expect(within(portada).getAllByText('Casa Nórdica')).toHaveLength(1)
     expect(screen.queryByText('Contacto')).not.toBeInTheDocument()
   })
 

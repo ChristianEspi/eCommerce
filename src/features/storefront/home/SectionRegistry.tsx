@@ -83,6 +83,54 @@ const ContentBlocks = lazy(() =>
  * una sección que se calla porque no tiene nada cierto que decir.
  */
 
+/**
+ * Las fotos del collage del hero (Storefront V3 · P04).
+ *
+ * ## De dónde salen, y por qué de ahí
+ *
+ * De los productos que la portada YA tiene cargados y de las miniaturas que YA
+ * firmó para sus filas. Cero consultas nuevas: decorar una portada no puede
+ * costar una petición por visita, y menos una por foto — con tres fotos serían
+ * tres firmas de URL antes del primer pintado.
+ *
+ * El orden importa: primero lo rebajado —que es lo que la tienda quiere enseñar
+ * y ya viene ordenado por descuento— y después el catálogo. Si lo rebajado no
+ * tiene fotos, el catálogo completa; si nadie tiene fotos, el hero cae a su
+ * siguiente respaldo, que es lo correcto.
+ */
+function fotosParaElCollage(data: HomeSectionData): string[] {
+  const candidatos = [...data.ofertas, ...data.destacados, ...data.novedades]
+  const firmadas = { ...data.thumbsOfertas, ...data.thumbsCatalogo, ...data.thumbsNovedades }
+
+  const urls: string[] = []
+  for (const producto of candidatos) {
+    if (urls.length >= 3) break
+    const ruta = producto.primary_image_path
+    if (!ruta) continue
+    const url = firmadas[ruta]
+    // Sin firmar todavía no vale: un `src` con la ruta cruda del bucket da 403
+    // y el hero se quedaría con un hueco en vez de caer a su respaldo.
+    if (!url || urls.includes(url)) continue
+    urls.push(url)
+  }
+  return urls
+}
+
+/**
+ * La foto de una familia, para el respaldo siguiente al collage.
+ *
+ * Misma regla: sale de las familias que la portada ya cargó, y solo si alguna
+ * tiene foto de verdad. La plataforma no pone una imagen de archivo en la
+ * portada de nadie.
+ */
+function primeraFotoDeFamilia(data: HomeSectionData): string | null {
+  for (const familia of data.categorias) {
+    const url = familia.imageUrl
+    if (url && url.trim() !== '') return url
+  }
+  return null
+}
+
 /** Aplica el tope de la tienda, si lo hay. Sin tope, la lista entera. */
 function conTope<T>(lista: readonly T[], maxItems: number | undefined): readonly T[] {
   return typeof maxItems === 'number' ? lista.slice(0, maxItems) : lista
@@ -120,7 +168,14 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
    */
   hero: (data: HomeSectionData, maxItems) => {
     const editorial = data.cmsTraePortada ? null : (
-      <StoreHero store={data.store} storeSlug={data.storeSlug} hasOffers={data.hayOfertas} />
+      <StoreHero
+        store={data.store}
+        storeSlug={data.storeSlug}
+        hasOffers={data.hayOfertas}
+        // Storefront V3 · P04 · Las fotos del collage, de datos YA cargados.
+        media={fotosParaElCollage(data)}
+        categoryImage={primeraFotoDeFamilia(data)}
+      />
     )
 
     if (data.theme.style.heroVariant === 'statement') return editorial
