@@ -128,25 +128,45 @@ test.describe('la vitrina, a los tres anchos', () => {
       await page.setViewportSize({ width: ancho.width, height: ancho.height })
       await page.goto(`${TIENDA}?ver=todo`)
       await esperarCatalogo(page)
-      await page.locator('a[href*="/product/"]').first().click()
+
+      /**
+       * Se navega a la URL de la ficha, NO se pulsa la tarjeta.
+       *
+       * Pulsar una tarjeta abre la VISTA RÁPIDA —es lo que se diseñó en V2 ·
+       * P14: un diálogo con la galería y el añadir al carrito, sin salir del
+       * catálogo— y ese diálogo no tiene `h1`, que también es correcto: un modal
+       * no puede secuestrar el encabezado de la página que hay detrás.
+       *
+       * La primera versión de esta celda pulsaba y esperaba un `h1`, así que
+       * medía la vista rápida creyendo que medía la ficha.
+       */
+      const enlace = page.locator('a[href*="/product/"]').first()
+      const destino = await enlace.getAttribute('href')
+      expect(destino, 'el catálogo no ofreció ningún enlace a una ficha').toBeTruthy()
+      await page.goto(destino as string)
 
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
       // La zona de detalle es de P10 y no depende del catálogo.
       await expect(page.locator('[data-product-details]')).toBeVisible()
 
-      if (ancho.id === 'mobile') {
-        /**
-         * La barra de compra del teléfono.
-         *
-         * `toHaveCount` y no `toBeVisible`: solo se pinta cuando el producto se
-         * puede comprar, y el primer producto del catálogo de demostración
-         * puede estar agotado cualquier día. Lo que se comprueba es que no haya
-         * DOS —que es el fallo que tendría—; que aparezca cuando hay stock lo
-         * comprueban las pruebas de unidad, donde el stock se controla.
-         */
+      /**
+       * La barra de compra, contra su corte REAL (`max-width: 899.95px`).
+       *
+       * No es «mobile sí, lo demás no»: a 768 px la ficha ya es de una sola
+       * columna —la de compra deja de estar al lado de la galería— así que la
+       * barra tiene el mismo sentido que en un teléfono. El corte es el mismo
+       * que usa la cabecera para su buscador, y por eso tableta cuenta como
+       * estrecho. La primera versión de esta celda asumía mi etiqueta en vez de
+       * la del contrato, y cazó eso.
+       *
+       * `count` y no `toBeVisible`: la barra solo se pinta si el producto se
+       * puede comprar, y el primero del catálogo de demostración puede estar
+       * agotado cualquier día. Lo que se fija es que no haya DOS —el fallo que
+       * tendría— y que en escritorio no exista, que sí es incondicional.
+       */
+      if (ancho.width < 900) {
         expect(await page.locator('[data-purchase-bar]').count()).toBeLessThanOrEqual(1)
       } else {
-        // En escritorio no existe, y eso sí es incondicional.
         await expect(page.locator('[data-purchase-bar]')).toHaveCount(0)
       }
 

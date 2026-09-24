@@ -91,7 +91,7 @@ de bloques.
 | `npm run bundle:report` | **PASS** — los cuatro recorridos dentro del techo |
 | `npm run scan:secrets` | **PASS** — sin hallazgos; `service_role` en su sitio |
 | `npm run test:db` | **PASS** — **137 ficheros, 3653 tests** contra Postgres real (PGlite) |
-| Playwright | **NOT_RUN** — sin binario de navegador en esta máquina. Causa exacta y comandos abajo. |
+| Playwright | **PASS** — 9 de 9 celdas de la matriz visual; la décima (el taller) se salta sola por falta de sesión de backoffice. |
 
 ### Bundle: final contra la línea base de P00
 
@@ -156,8 +156,9 @@ en los carruseles, y contraste garantizado con `accent-deep` para texto.
 
 ### Responsive
 
-Sin barra de desplazamiento horizontal: la comprobación de verdad es la matriz visual de Playwright
-(`NOT_RUN` aquí), y a falta de navegador se añadió la regla **R12** en `architecture.test.ts`:
+Sin barra de desplazamiento horizontal, **comprobado en un navegador de verdad**: las nueve celdas
+de la matriz miden `scrollWidth` contra `innerWidth` a 1280, 768 y 390, y ninguna se arrastra. Como
+segunda red está la regla **R12** en `architecture.test.ts`:
 ningún archivo de la vitrina escribe `100vw` para medir. `100vw` incluye el ancho de la barra
 vertical, y es el fallo clásico de una línea que arrastra la tienda entera de lado. La única
 excepción es un `maxWidth` —un tope de ancho no puede provocar desbordamiento, lo evita— y está
@@ -167,29 +168,39 @@ Las diferencias entre teléfono y escritorio se comprueban por estructura, que e
 puede ver: el orden del documento, la presencia del cajón, el marco del panel y las reglas CSS con
 sus `@media` intactos.
 
-## Playwright: `NOT_RUN`, con causa exacta
+## Playwright: ejecutada, y encontró un defecto real
 
-```
-Error: browserType.launch: Executable doesn't exist at
-C:\Users\...\AppData\Local\ms-playwright\chromium_headless_shell-1243\...
-```
+`npx playwright install chromium` + `npx playwright test --project=escritorio visual-matrix`:
+**9 celdas en verde** —portada, catálogo y ficha × 1280/768/390—, consola limpia en todas y nueve
+capturas en `test-results/visual/`. La décima, la del taller de diseño, se salta a sí misma con su
+motivo escrito: necesita sesión de backoffice, y una prueba roja por falta de entorno enseña a
+ignorar el rojo.
 
-No hay binario de navegador instalado en esta máquina. La matriz está escrita
-(`e2e/visual-matrix.e2e.ts`, diez celdas) y `npx playwright test --list` las descubre. Se ejecuta
-con:
+Y justificó su existencia en la primera ejecución: **un comentario de código se estaba pintando en
+la ficha de producto**, en los tres anchos, entre la disponibilidad y la barra de compra.
 
-```powershell
-npx playwright install chromium
-npx playwright test --project=escritorio visual-matrix
-```
+En JSX, `//` solo es comentario donde hay JavaScript. El que explica el `role="group"` del grupo de
+compra vivía justo después del `return (` de `AddToCart`, donde era código; al envolver ese retorno
+en un fragmento —para añadir la barra de compra del teléfono, en P10— quedó **dentro** del
+fragmento, y cuatro líneas sobre lectores de pantalla pasaron a ser contenido visible.
 
-Necesita además el servidor de desarrollo con `.env` —lo levanta la propia configuración— y una
-sesión de backoffice para la celda del taller; sin ella esa celda se salta a sí misma con su motivo
-escrito, en vez de fallar. **No se declara PASS.**
+Ninguna de las 6 289 pruebas de unidad lo vio: el texto de sobra no rompía una sola aserción. Hizo
+falta mirar una captura.
+
+Arreglado con llaves (`{/* … */}`), y con una red en `storefront-ui.test.tsx` que cubre la clase
+entera: el texto visible de portada, catálogo y ficha no puede contener un acento invertido. Es un
+marcador limpio —los comentarios de este repo están llenos de ellos y ninguna copia de interfaz usa
+uno, porque las comillas de la copia son angulares—. Comprobado que la red funciona: reintroduciendo
+el fallo, la ficha se pone roja.
+
+Se descartó hacerlo con una regla sobre el texto de los archivos: `return <LoadingState />` seguido
+de un comentario a nivel de sentencia es indistinguible, sin analizar el árbol, de un comentario en
+posición de hijos. Se intentó y daba doce falsos positivos.
 
 ## Limitaciones
 
-1. **Playwright no se ejecutó** (arriba). Es el único gate de todo V3 sin correr.
+1. **La celda del taller de la matriz visual no se ejecuta** sin sesión de backoffice en el servidor
+   de desarrollo. Las otras nueve sí, y están en verde.
 2. **Los lineamientos EBIM no se pudieron leer.** La ruta montada
    (`<unidad>:\.shortcut-targets-by-id\…\EBIM-Plataforma\`) no resolvió en esta máquina y tampoco el
    acceso directo `<Drive>:\Mi unidad\EBIM-Plataforma.lnk`. Se trabajó con
@@ -250,7 +261,7 @@ escrito, en vez de fallar. **No se declara PASS.**
 | PDP comercial, no panels de backoffice | ✅ sin tarjetas, detalle plegado, barra de compra |
 | El editor controla lo nuevo sin volverse complejo | ✅ panel por sección, no 78 controles en la lista |
 | Preview y storefront con paridad comprobable | ✅ 15 pruebas de paridad; tres piezas compartidas |
-| Existe una matriz visual desktop/tablet/mobile | ⚠️ escrita, **NOT_RUN** sin navegador |
+| Existe una matriz visual desktop/tablet/mobile | ✅ ejecutada: 9/9 en verde, y encontró un defecto real |
 | typecheck, lint, unit, build, secret scan, bundle | ✅ todos verdes |
 | DB tests verdes | ✅ 3653 |
 | No hay push ni deploy | ✅ |
