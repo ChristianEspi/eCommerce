@@ -2048,6 +2048,7 @@ explicados en el informe final, uno por uno.
 | `storefront/multi-industry.test.ts` | 11 → **14**. El diccionario COMPLETO de los dos idiomas, con lista de excepciones **vacía**; y una prueba de que las claves que V3 añadió existen, para que la auditoría no pase por estar vacía. |
 | `storefront/storefront-ui.test.tsx` | 70 → **74**. Un solo `h1` en portada, catálogo y ficha; la columna de filtros como región con nombre; **ningún par de controles tabulables con el mismo nombre**; y el detalle con `aria-expanded`. |
 | `architecture.test.ts` | +2. La regla R12 y su excepción nombrada. |
+| `storefront-ui.test.tsx` (2.ª ronda) | +3. **Ningún comentario de código se pinta**: el texto visible de portada, catálogo y ficha no contiene acentos invertidos. Nació de un defecto real que cazó la matriz visual, y está verificada reintroduciéndolo. |
 
 ## Gates
 

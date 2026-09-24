@@ -708,10 +708,16 @@ function AddToCart({
 
   return (
     <>
-    // `role="group"` con nombre: la variante, la cantidad y el botón son UNA
-    // sola decisión, y anunciarlos sueltos deja al lector de pantalla leyendo
-    // tres controles sin relación. Además distingue este botón de los que ahora
-    // llevan las tarjetas de «también te puede interesar», que se llaman igual.
+    {/* `role="group"` con nombre: la variante, la cantidad y el botón son UNA
+        sola decisión, y anunciarlos sueltos deja al lector de pantalla leyendo
+        tres controles sin relación. Además distingue este botón de los que ahora
+        llevan las tarjetas de «también te puede interesar», que se llaman igual.
+
+        Y va con llaves: dentro de un fragmento, `//` NO es un comentario — es
+        texto, y se pinta. Antes de V3 · P10 este mismo comentario estaba justo
+        después del `return (`, donde sí era código; al envolver el retorno en
+        un fragmento para añadir la barra de compra, pasó a ser contenido. Lo
+        cazó la matriz visual de P13 en la ficha, en los tres anchos. */}
     <Stack
       ref={grupoDeCompra}
       role="group"

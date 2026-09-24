@@ -1703,3 +1703,69 @@ describe('V3 no rompió el árbol de accesibilidad', () => {
     }
   })
 })
+
+/**
+ * Storefront V3 · P14 · Ningún comentario de código acaba pintado.
+ *
+ * ## El fallo, que ocurrió de verdad
+ *
+ * En JSX, `//` solo es un comentario donde hay JavaScript: en la lista de
+ * atributos de una etiqueta, o justo después de un `return (`. En la posición de
+ * los HIJOS es **texto**, y el navegador lo pinta.
+ *
+ * Pasó en la ficha de producto al cerrar P10. El comentario que explica el
+ * `role="group"` del grupo de compra llevaba tiempo justo después del `return (`
+ * de `AddToCart`, donde era código. Al envolver ese retorno en un fragmento
+ * —para añadir la barra de compra del teléfono— quedó DENTRO del fragmento, y
+ * cuatro líneas sobre lectores de pantalla se pintaron entre la disponibilidad
+ * y la barra, en los tres anchos.
+ *
+ * Ninguna prueba de unidad lo vio: el texto de sobra no rompía una sola
+ * aserción. Lo cazó la matriz visual de P13 al mirar la captura.
+ *
+ * ## Por qué esta prueba y no una regla de linter
+ *
+ * La regla de la comunidad es `react/jsx-no-comment-textnodes`, de
+ * `eslint-plugin-react`, que este repo no tiene; añadir la dependencia por una
+ * regla era más cambio que esto. Y escribirla a mano sobre el TEXTO del archivo
+ * no funciona: `return <LoadingState />` seguido de un comentario a nivel de
+ * sentencia es indistinguible, sin analizar el árbol, de un comentario en
+ * posición de hijos. Se intentó y daba doce falsos positivos.
+ *
+ * Aquí se mira el RENDER, que es donde el fallo se manifiesta y donde no hay
+ * ambigüedad posible.
+ *
+ * ## La firma que se busca
+ *
+ * El acento invertido. Los comentarios de este repo están llenos de ellos
+ * —`` `role="group"` ``, `` `auto` ``, `` `50vw` ``— y **ningún** texto de
+ * interfaz usa uno: las comillas de la copia son «angulares». Es un marcador
+ * limpio, sin falsos positivos, y cubre la clase entera.
+ */
+describe('ningún comentario de código se pinta en la vitrina', () => {
+  it.each([
+    ['la portada', '/s/casa-nordica'],
+    ['el catálogo', '/s/casa-nordica?ver=todo'],
+    ['la ficha', '/s/casa-nordica/product/silla-roble'],
+  ])('%s no enseña acentos invertidos ni rutas de comentario', async (_donde, ruta) => {
+    renderStorefront(backend(), ruta)
+    // Cualquiera de las dos, y puede salir varias veces: basta con que la
+    // pantalla haya resuelto para poder leer su texto entero.
+    await waitFor(() =>
+      expect(screen.getAllByText(/Silla de roble|Mesa extensible/).length).toBeGreaterThan(0),
+    )
+
+    const visible = document.body.textContent ?? ''
+
+    // El acento invertido: marcador de código, nunca de copia.
+    expect(visible).not.toContain('`')
+
+    /**
+     * Y una barra doble que no venga de una URL. Se permiten `http://` y
+     * `https://` porque un enlace legítimo del comercio los lleva; cualquier
+     * otra `//` en texto visible es una línea de comentario que se escapó.
+     */
+    const sinUrls = visible.replace(/https?:\/\//g, '')
+    expect(sinUrls).not.toContain('//')
+  })
+})
