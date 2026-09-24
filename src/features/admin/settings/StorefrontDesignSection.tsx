@@ -8,10 +8,12 @@ import {
   type StorefrontStyle,
   type ThemePreset,
 } from '@/features/storefront/theme/types'
+import { THEME_PRESETS } from '@/features/storefront/theme/presets'
 import { AdvancedStyleSettings } from './AdvancedStyleSettings'
 import { themeColumnsReady } from './api'
 import { HomeLayoutEditor } from './HomeLayoutEditor'
 import { StorefrontPreview } from './StorefrontPreview'
+import { ThemeMiniPreview } from './ThemeMiniPreview'
 import type { StoreFormValues } from './types'
 
 /**
@@ -72,6 +74,29 @@ const AYUDA_TEMA: Record<ThemePreset, MessageKey> = {
   retail: 'settings.design.theme.retailHelp',
   premium: 'settings.design.theme.premiumHelp',
   catalog: 'settings.design.theme.catalogHelp',
+}
+
+/**
+ * El texto de cada valor del contrato, para el resumen de la tarjeta (P12).
+ *
+ * El resumen se arma de la DEFINICIÓN del preset, no de una frase escrita a
+ * mano: el día que `retail` pase de cinco columnas a seis, la tarjeta lo dice
+ * sin que nadie la toque. Una descripción redactada se queda vieja en silencio.
+ */
+const ETIQUETA_VALOR: Record<string, MessageKey> = {
+  standard: 'settings.design.value.standard',
+  compact: 'settings.design.value.compact',
+  product: 'settings.design.value.product',
+  statement: 'settings.design.value.statement',
+  comfortable: 'settings.design.value.comfortable',
+  tiles: 'settings.design.value.tiles',
+  pills: 'settings.design.value.pills',
+  square: 'settings.design.value.square',
+  portrait: 'settings.design.value.portrait',
+  landscape: 'settings.design.value.landscape',
+  spacious: 'settings.design.value.spacious',
+  lg: 'settings.design.value.lg',
+  xl: 'settings.design.value.xl',
 }
 
 /** El valor que significa «no lo piso, lo hereda del tema». */
@@ -191,7 +216,7 @@ export function StorefrontDesignSection({
                   }}
                   sx={{
                     cursor: busy ? 'default' : 'pointer',
-                    p: 2,
+                    p: 1.5,
                     borderRadius: `${R.lg}px`,
                     border: '2px solid',
                     borderColor: elegido ? 'var(--accent)' : 'var(--border)',
@@ -200,10 +225,17 @@ export function StorefrontDesignSection({
                     '&:focus-visible': { outline: '2px solid var(--accent)', outlineOffset: 2 },
                   }}
                 >
+                  {/* La miniatura va PRIMERO: elegir un tema es una decisión
+                      visual, y hasta P12 se tomaba leyendo cuatro frases. Se
+                      dibuja con la definición del preset, así que no se
+                      desincroniza de la tienda. */}
+                  <ThemeMiniPreview preset={id} />
+
                   <Typography
                     sx={{
                       fontSize: TS.bodyStrong,
                       fontWeight: 800,
+                      mt: 1,
                       color: elegido ? 'var(--accent-deep)' : 'var(--text)',
                     }}
                   >
@@ -211,6 +243,13 @@ export function StorefrontDesignSection({
                   </Typography>
                   <Typography sx={{ fontSize: TS.label, color: 'var(--muted)', mt: 0.5 }}>
                     {t(AYUDA_TEMA[id])}
+                  </Typography>
+                  {/* Y las diferencias en datos, para quien no puede ver la
+                      miniatura y para quien quiere el número exacto. */}
+                  <Typography
+                    sx={{ fontSize: TS.label, color: 'var(--muted)', mt: 0.5, fontWeight: 700 }}
+                  >
+                    {resumen(id, t)}
                   </Typography>
                 </Box>
               )
@@ -267,4 +306,19 @@ export function StorefrontDesignSection({
       </Box>
     </Box>
   )
+}
+
+/**
+ * Las diferencias del tema, en una línea y sacadas de su definición.
+ *
+ * Columnas, tarjeta y portada: las tres que de verdad cambian cómo se ve una
+ * tienda. Salen de `THEME_PRESETS`, así que cambiar un preset cambia esta línea.
+ */
+function resumen(preset: ThemePreset, t: (key: MessageKey) => string): string {
+  const d = THEME_PRESETS[preset]
+  return [
+    t('settings.design.theme.columns').replace('{n}', String(d.gridColumns.lg)),
+    t(ETIQUETA_VALOR[d.productCardVariant] ?? 'settings.design.style.inherit'),
+    t(ETIQUETA_VALOR[d.heroVariant] ?? 'settings.design.style.inherit'),
+  ].join(' · ')
 }

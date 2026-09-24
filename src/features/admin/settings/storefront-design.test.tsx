@@ -1,10 +1,10 @@
-import { cleanup, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { renderWithProviders } from '@/test/render'
-import { DEFAULT_HOME_LAYOUT } from '@/features/storefront/theme/presets'
+import { DEFAULT_HOME_LAYOUT, THEME_PRESETS } from '@/features/storefront/theme/presets'
 import { HOME_SECTION_IDS } from '@/features/storefront/theme/types'
 import { StorefrontDesignSection } from './StorefrontDesignSection'
 import { storeFormSchema, toForm, type StoreFormValues } from './types'
@@ -287,7 +287,9 @@ describe('ordenar la portada', () => {
     const primera = DEFAULT_HOME_LAYOUT.sections[0]?.id
     expect(primera).toBe('hero')
     expect(screen.getByRole('button', { name: 'Subir: Portada' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Bajar: Boletín' })).toBeDisabled()
+    // Desde P12 la última ORDENABLE es la última que se pinta: «Boletín» ya no
+    // está en la lista, está en «Próximamente» y no tiene flechas.
+    expect(screen.getByRole('button', { name: 'Bajar: Datos del negocio' })).toBeDisabled()
   })
 
   it('bajar una sección la mueve una posición, con el teclado', async () => {
@@ -326,13 +328,43 @@ describe('ordenar la portada', () => {
     expect(screen.getByRole('checkbox', { name: 'Mostrar: Datos del negocio' })).toBeEnabled()
   })
 
-  it('una sección sin componente todavía no se puede encender', () => {
+  /**
+   * «Próximamente» (Storefront V2 · P12).
+   *
+   * Las secciones sin componente estaban mezcladas con las demás, apagadas y
+   * con una nota debajo, y se podían subir y bajar como si significara algo.
+   * Ordenar lo que no se pinta es ordenar nada, y además empujaba a las de
+   * verdad fuera de sitio.
+   */
+  it('una sección sin componente no se puede encender NI ordenar', () => {
     pintar()
 
-    expect(screen.getByRole('checkbox', { name: 'Mostrar: Boletín' })).toBeDisabled()
-    // Y se dice por qué, en vez de esconderla: quien la busca y no la
-    // encuentra no sabe si no existe o si no la ha visto.
-    expect(screen.getAllByText('Todavía no disponible').length).toBeGreaterThan(0)
+    // Ni interruptor ni flechas: un control desactivado invita a pulsarlo.
+    expect(screen.queryByRole('checkbox', { name: 'Mostrar: Boletín' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Boletín/ })).not.toBeInTheDocument()
+  })
+
+  it('pero se sigue enseñando, y se dice por qué', () => {
+    // Esconderla sería más limpio y peor: quien busca «boletín» y no lo
+    // encuentra no sabe si no existe o si no lo ha visto.
+    pintar()
+
+    expect(screen.getByText('Próximamente')).toBeInTheDocument()
+    expect(screen.getByText('Boletín')).toBeInTheDocument()
+    expect(screen.getAllByText(/Todavía no disponible/).length).toBeGreaterThan(0)
+  })
+
+  it('reordenar las activas no mueve a las pendientes de su sitio', () => {
+    // El array guardado lleva las trece. Si al mover una activa se arrastrara
+    // una pendiente, el orden guardado cambiaría por algo que el comercio no
+    // tocó — la clase de diferencia que aparece meses después como «yo no moví
+    // eso».
+    pintar()
+    const antes = valores().home_layout.sections.findIndex((s) => s.id === 'newsletter')
+
+    screen.getByRole('button', { name: 'Bajar: Portada' }).click()
+
+    expect(valores().home_layout.sections.findIndex((s) => s.id === 'newsletter')).toBe(antes)
   })
 
   it('el tope solo aparece donde significa algo', () => {
@@ -554,5 +586,170 @@ describe('el taller de diseño', () => {
 
     expect(despues).toBeGreaterThan(antes)
     expect(despues - antes).toBeLessThan(10)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// El selector visual y el editor compacto (Storefront V2 · P12)
+// ---------------------------------------------------------------------------
+
+/**
+ * Elegir un tema es una decisión VISUAL.
+ *
+ * Hasta P12 se tomaba leyendo cuatro frases de una línea. «Visual y editorial:
+ * fotos grandes, más aire» describe bien `premium` y no dice cuántas columnas
+ * tiene, que es lo que de verdad cambia la pantalla.
+ *
+ * Las miniaturas se dibujan con la DEFINICIÓN del preset. Cuatro capturas
+ * habrían sido más bonitas y estarían mal el mismo día que alguien cambie un
+ * valor: una imagen no se entera de que `retail` pasó de cinco columnas a seis.
+ */
+describe('el selector visual de temas', () => {
+  const miniatura = (preset: string) =>
+    document.querySelector(`[data-theme-mini="${preset}"]`) as HTMLElement | null
+
+  it('cada tarjeta lleva su miniatura', () => {
+    pintar()
+
+    for (const preset of ['universal', 'retail', 'premium', 'catalog']) {
+      expect(miniatura(preset)).toBeInTheDocument()
+    }
+  })
+
+  it('la miniatura sale de la definición del preset, no de un dibujo fijo', () => {
+    // `retail` declara cinco columnas y `premium` tres. Si esto se rompe al
+    // cambiar un preset, la miniatura estaba mintiendo.
+    pintar()
+
+    const columnas = (preset: string) =>
+      miniatura(preset)?.querySelector('[data-mini-columns]')?.getAttribute('data-mini-columns')
+
+    expect(columnas('retail')).toBe(String(THEME_PRESETS.retail.gridColumns.lg))
+    expect(columnas('premium')).toBe(String(THEME_PRESETS.premium.gridColumns.lg))
+    expect(columnas('retail')).not.toBe(columnas('premium'))
+  })
+
+  it('las miniaturas no se anuncian: lo que se lee es el texto de al lado', () => {
+    pintar()
+
+    expect(miniatura('universal')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('cada tarjeta dice sus diferencias en datos, para quien no ve la miniatura', () => {
+    pintar()
+
+    const catalogo = tema('catálogo')
+    expect(catalogo.textContent).toContain(`${THEME_PRESETS.catalog.gridColumns.lg} columnas`)
+    // Y la tarjeta de producto y la portada que trae el preset.
+    expect(catalogo.textContent).toContain('Compacta')
+  })
+
+  it('siguen siendo cuatro opciones excluyentes y se ve cuál está elegida', async () => {
+    const user = userEvent.setup()
+    pintar()
+
+    await user.click(tema('premium'))
+
+    expect(tema('premium')).toHaveAttribute('aria-checked', 'true')
+    expect(tema('universal')).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getAllByRole('radio')).toHaveLength(4)
+  })
+
+  it('ninguna tarjeta ata un tema a un rubro', () => {
+    // El resumen se arma con la definición, así que no puede colar un rubro sin
+    // querer; esta prueba lo fija por si alguien redacta uno a mano.
+    pintar()
+
+    // Por palabra entera: «cómoda» es el nombre de una tarjeta de producto y
+    // contiene «moda» sin hablar de ropa.
+    const prohibidos = ['farmacia', 'botica', 'moda', 'calzado', 'zapatilla', 'restaurante']
+    const texto = screen.getByRole('radiogroup').textContent?.toLowerCase() ?? ''
+    for (const palabra of prohibidos) {
+      expect(texto).not.toMatch(new RegExp(`\b${palabra}`))
+    }
+  })
+})
+
+/**
+ * Arrastrar, como AÑADIDO.
+ *
+ * Los botones siguen siendo el camino completo: arrastrar no se puede hacer con
+ * el teclado. Lo que se comprueba aquí es que arrastrar hace lo mismo que las
+ * flechas, no que las sustituye.
+ */
+describe('reordenar arrastrando', () => {
+  /** Un arrastre nativo: empezar, pasar por encima y soltar. */
+  function arrastrar(desde: HTMLElement, hasta: HTMLElement) {
+    fireEvent.dragStart(desde)
+    fireEvent.dragOver(hasta)
+    fireEvent.drop(hasta)
+  }
+
+  const fila = (id: string) => document.querySelector(`[data-section="${id}"]`) as HTMLElement
+
+  it('soltar una sección sobre otra la lleva a su posición', () => {
+    pintar()
+
+    // Portada · Servicios · Ofertas → soltar «Portada» sobre «Ofertas» la deja
+    // DONDE estaba «Ofertas», que al bajar significa justo detrás de ella.
+    arrastrar(fila('hero'), fila('offers'))
+
+    const orden = valores().home_layout.sections.map((s) => s.id)
+    expect(orden.slice(0, 3)).toEqual(['services', 'offers', 'hero'])
+  })
+
+  it('arrastrar hacia arriba también funciona', () => {
+    pintar()
+
+    arrastrar(fila('offers'), fila('hero'))
+
+    expect(valores().home_layout.sections[0]?.id).toBe('offers')
+  })
+
+  it('soltar una sección sobre sí misma no cambia nada', () => {
+    pintar()
+    const antes = JSON.stringify(valores().home_layout)
+
+    arrastrar(fila('hero'), fila('hero'))
+
+    expect(JSON.stringify(valores().home_layout)).toBe(antes)
+  })
+
+  it('las flechas SIGUEN ahí y hacen lo mismo', async () => {
+    // La prueba que impide que un día arrastrar sustituya a las flechas y la
+    // pantalla deje de servirle a quien no usa ratón.
+    const user = userEvent.setup()
+    pintar()
+
+    await user.click(screen.getByRole('button', { name: 'Bajar: Portada' }))
+
+    expect(valores().home_layout.sections[0]?.id).toBe('services')
+    expect(valores().home_layout.sections[1]?.id).toBe('hero')
+  })
+
+  it('el orden guardado sigue teniendo las trece secciones', () => {
+    // Reordenar no puede perder ninguna por el camino: la que se cayera del
+    // array volvería a aparecer al final en la próxima normalización, en un
+    // sitio que el comercio no eligió.
+    pintar()
+
+    arrastrar(fila('trust'), fila('hero'))
+
+    const orden = valores().home_layout.sections.map((s) => s.id)
+    expect(orden).toHaveLength(HOME_SECTION_IDS.length)
+    expect(new Set(orden).size).toBe(HOME_SECTION_IDS.length)
+  })
+
+  it('arrastrar se refleja en la vista previa sin guardar', () => {
+    pintar()
+
+    arrastrar(fila('brands'), fila('hero'))
+
+    const marco = screen.getByTestId('preview-frame')
+    const titulos = Array.from(marco.querySelectorAll('h1, h2, p, span'))
+      .map((n) => n.textContent)
+      .filter(Boolean)
+    // «Marcas» pasa a estar antes que cualquier otra sección de la portada.
+    expect(titulos.indexOf('Marcas')).toBeGreaterThan(-1)
   })
 })

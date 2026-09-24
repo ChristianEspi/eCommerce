@@ -1388,7 +1388,7 @@ formulario, y cualquier combinación pasa la validación.
 
 # P11 · La vista previa responsive deja de ser una maqueta estrujada
 
-**Commit:** `<pendiente>` · **Ciclos correctivos:** 1 de 3
+**Commit:** `a7b5ba9` · **Ciclos correctivos:** 1 de 3
 
 ## El problema
 
@@ -1483,6 +1483,102 @@ encoger.
 | `npm run typecheck` | **PASS** |
 | `npm run lint` | **PASS** |
 | `npm run test` | **PASS** — 297 ficheros, 5869 tests |
+| `npm run build` | **PASS** |
+
+`PHASE_RESULT: PASS`
+
+---
+
+# P12 · Selector visual de temas y editor de portada compacto
+
+**Commit:** `<pendiente>` · **Ciclos correctivos:** 1 de 3
+
+## El problema
+
+**Elegir un tema se hacía leyendo cuatro frases.** «Visual y editorial: fotos
+grandes, más aire y menos ruido alrededor» describe bien `premium` y no dice
+cuántas columnas tiene, que es lo que de verdad cambia la pantalla. La decisión
+más visual de la configuración se tomaba a ciegas.
+
+Y en el editor de portada, las secciones **sin componente estaban mezcladas** con
+las demás: apagadas, con una nota debajo y con sus flechas de subir y bajar
+activas. Ordenar lo que no se pinta es ordenar nada, y además empujaba a las de
+verdad fuera de sitio. Trece filas a 56 px eran 730 px de lista dentro de la
+columna de configuración del taller.
+
+## Lo que se hizo
+
+### Miniaturas dibujadas con la definición del preset
+
+`ThemeMiniPreview` lee `THEME_PRESETS[id]` y dibuja la silueta: la barra (recortada
+si es `compact`), la portada (`product` enseña producto con una tarjeta al lado;
+`statement` es una banda con el lema), las categorías (azulejos o píldoras) y la
+rejilla con **tantas columnas como diga el preset**, con la proporción de foto y
+el aire que declare.
+
+Cuatro capturas de pantalla habrían sido más bonitas y estarían mal el mismo día
+que alguien cambie un valor: una imagen no se entera de que `retail` pasó de
+cinco columnas a seis, y entonces el comercio elige su tienda mirando algo que ya
+no existe. Es el mismo argumento que sostiene la vista previa grande, aplicado al
+sitio donde se toma la decisión.
+
+Las miniaturas son `aria-hidden` y debajo va el **resumen en datos** —«5 columnas
+· Compacta · Producto en oferta»—, armado también con la definición: quien no
+puede ver la miniatura tiene la misma información, y nadie tiene que redactar una
+frase que se quede vieja en silencio.
+
+Sigue siendo un `radiogroup` de cuatro opciones excluyentes, con el estado elegido
+inequívoco, y ninguna tarjeta ata un tema a un rubro.
+
+### Editor de portada V2
+
+| | Antes | Ahora |
+|---|---|---|
+| Fila | interruptor · nombre · nota · tope · flechas, a 56 px | asa · interruptor · nombre · tope · flechas, compacta |
+| Arrastrar | no | **sí**, con la API nativa y **cero dependencias** |
+| Teclado | flechas | **las mismas flechas, intactas** |
+| Pendientes | mezcladas, apagadas y ordenables | grupo «Próximamente» al final, sin interruptor ni flechas |
+| `business-info` | pendiente | ordenable y encendible (lo implementó P09) |
+| `newsletter` | pendiente | sigue pendiente: no hay dónde guardar la suscripción ni el consentimiento |
+
+**Arrastrar es un añadido, nunca un sustituto.** Arrastrar no se puede hacer con
+el teclado, y una parte de la gente que administra una tienda no usa ratón. Hay
+una prueba dedicada a que las flechas sigan haciendo lo mismo, que es la que
+impide que un día arrastrar las desplace.
+
+Sin librería: son decenas de kilobytes en el paquete del backoffice para mover
+trece filas. El índice de origen viaja en un `ref` —fiable y síncrono al soltar— y
+también en el `dataTransfer`, porque sin `setData` Firefox no inicia el arrastre.
+
+**Las pendientes no se mueven de su sitio guardado.** El array es uno solo y lleva
+las trece; reordenar las activas las vuelca en sus propias posiciones y deja las
+pendientes con su índice. Si al mover una activa se arrastrara una pendiente, el
+orden guardado cambiaría por algo que el comercio no tocó — la clase de diferencia
+que aparece meses después como «yo no moví eso».
+
+## Ciclo correctivo
+
+1. Dos pruebas rojas, las dos por consecuencias esperadas del cambio: «Boletín»
+   ya no tiene interruptor ni flechas. Se reescribieron para exigir **más** que
+   antes —que no exista el control, en vez de que exista desactivado— y se añadió
+   la que comprueba que reordenar las activas no la mueve de su sitio.
+   Y dos fallos míos en pruebas nuevas: «cómoda» contiene «moda» (la prohibición
+   de rubros pasa a comparar por palabra entera) y una aserción sobre el destino
+   de un arrastre hacia abajo que describía mal el resultado de un `splice`.
+
+## Tests
+
+| Archivo | Casos |
+|---|---|
+| `settings/storefront-design.test.tsx` | 44 → **58**. Selector: cada tarjeta lleva miniatura; la miniatura **sale de la definición** (`retail` y `premium` no coinciden en columnas y cada una coincide con su preset); las miniaturas no se anuncian; cada tarjeta dice sus diferencias en datos; siguen siendo cuatro excluyentes con estado visible; ninguna ata un tema a un rubro. Arrastrar: soltar sobre otra la lleva a su posición, hacia arriba también, sobre sí misma no cambia nada, **las flechas siguen ahí y hacen lo mismo**, el orden guardado sigue teniendo las trece sin repetidas, y se refleja en la vista previa sin guardar. «Próximamente»: no se puede encender **ni ordenar**, se sigue enseñando con su motivo, y reordenar las activas no la mueve. |
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 297 ficheros, 5883 tests |
 | `npm run build` | **PASS** |
 
 `PHASE_RESULT: PASS`

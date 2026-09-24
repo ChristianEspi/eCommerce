@@ -200,6 +200,14 @@ export const es = {
     'settings.design.home.down': 'Bajar',
     'settings.design.home.maxItems': 'Máximo',
     'settings.design.home.pending': 'Todavía no disponible',
+    // P12 · Las pendientes van en su propio grupo: ordenar lo que no se pinta
+    // es ordenar nada, y empujaba a las de verdad fuera de sitio.
+    'settings.design.home.pendingGroup': 'Próximamente',
+    'settings.design.home.pendingGroupHelp':
+      'Están en el contrato de la portada y todavía no pintan nada. Se enseñan para que sepas que existen.',
+    'settings.design.home.drag': 'Arrastra para cambiar el orden',
+    // P12 · El resumen de diferencias de cada tema, armado con su definición.
+    'settings.design.theme.columns': '{n} columnas',
     'settings.design.section.hero': 'Portada',
     'settings.design.section.services': 'Servicios',
     'settings.design.section.offers': 'Ofertas',

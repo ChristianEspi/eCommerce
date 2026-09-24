@@ -237,6 +237,14 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'settings.design.home.down': 'Move down',
     'settings.design.home.maxItems': 'Maximum',
     'settings.design.home.pending': 'Not available yet',
+    // P12 · Pending sections get their own group: ordering what is not
+    // painted orders nothing, and it pushed the real ones out of place.
+    'settings.design.home.pendingGroup': 'Coming soon',
+    'settings.design.home.pendingGroupHelp':
+      'They are in the home contract and do not paint anything yet. They show up so you know they exist.',
+    'settings.design.home.drag': 'Drag to reorder',
+    // P12 · Each theme's summary of differences, built from its definition.
+    'settings.design.theme.columns': '{n} columns',
     'settings.design.section.hero': 'Cover',
     'settings.design.section.services': 'Services',
     'settings.design.section.offers': 'Deals',
