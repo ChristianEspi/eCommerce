@@ -1,15 +1,34 @@
 import ImageRoundedIcon from '@mui/icons-material/ImageRounded'
 import { Box } from '@mui/material'
 import { R } from '@/theme/tokens'
+import { tintFor } from '../tint'
 
 /**
- * Imagen de producto con **fallback neutral**.
+ * Imagen de producto con un hueco que parece INTENCIONADO.
  *
  * El catálogo casi nunca llega con todas las fotos puestas, y el bucket es
- * privado, así que una firma caducada también deja el `src` vacío. En los dos
- * casos se pinta un marcador de tokens de suite — no un logotipo, no una marca
- * de agua, no una imagen de archivo: nada que le ponga a la tienda una
- * identidad que no eligió.
+ * privado, así que una firma caducada también deja el `src` vacío. Lo que se
+ * pinta entonces no puede ser —y hasta P07 era— un rectángulo gris con un icono
+ * de imagen en medio: eso es exactamente lo que dibuja un esqueleto de carga, y
+ * media rejilla así se lee como una tienda que no terminó de cargar.
+ *
+ * ## Qué se pinta ahora
+ *
+ * Un panel con el tinte que le toca al NOMBRE del producto —los mismos seis
+ * tintes de orientación que usan las puertas de categoría y las marcas— y el
+ * icono como marca de agua grande en la esquina, que es la misma gramática que
+ * el resto de la vitrina. Se lee como una pieza diseñada, no como un fallo.
+ *
+ * El tinte sale del nombre y no al azar: el mismo producto cae siempre en el
+ * mismo color, así que una rejilla sin fotos se puede recorrer —cada hueco
+ * tiene sitio propio— y recargar no lo baraja.
+ *
+ * ## Lo que sigue sin pintarse
+ *
+ * Ni un logotipo, ni una imagen de archivo, ni una marca de agua de la suite:
+ * nada que le ponga a la tienda una identidad que no eligió. Los tintes son
+ * señalización, no marca — el acento del comercio sigue siendo el único color
+ * de acción.
  */
 export function ProductMedia({
   url,
@@ -39,17 +58,27 @@ export function ProductMedia({
    */
   fit?: 'cover' | 'contain'
 }) {
+  const tinte = tintFor(alt)
+
   return (
     <Box
+      data-media={url ? 'photo' : 'placeholder'}
       sx={{
+        position: 'relative',
         aspectRatio: ratio,
         width: '100%',
-        bgcolor: 'var(--neutral-soft)',
+        // Con foto, el gris de siempre: solo se ve el instante anterior a que
+        // la imagen pinte. Sin foto, el tinte del producto.
+        ...(url
+          ? { bgcolor: 'var(--neutral-soft)', color: 'var(--muted)' }
+          : {
+              background: `linear-gradient(150deg, ${tinte.bg} 0%, color-mix(in srgb, ${tinte.fg} 10%, ${tinte.bg}) 100%)`,
+              color: tinte.fg,
+            }),
         borderRadius: `${R.md}px`,
         overflow: 'hidden',
         display: 'grid',
         placeItems: 'center',
-        color: 'var(--muted)',
       }}
     >
       {url ? (
@@ -70,7 +99,25 @@ export function ProductMedia({
           }}
         />
       ) : (
-        <ImageRoundedIcon sx={{ fontSize: sizePx }} aria-hidden />
+        <>
+          {/* Marca de agua: el mismo icono, enorme y casi transparente en la
+              esquina. Es lo que convierte el hueco en una pieza con intención
+              en vez de en un esqueleto que no terminó. */}
+          <Box
+            aria-hidden
+            sx={{
+              position: 'absolute',
+              right: '-8%',
+              bottom: '-12%',
+              opacity: 0.14,
+              pointerEvents: 'none',
+              lineHeight: 0,
+            }}
+          >
+            <ImageRoundedIcon sx={{ fontSize: sizePx * 3.2 }} />
+          </Box>
+          <ImageRoundedIcon sx={{ position: 'relative', fontSize: sizePx, opacity: 0.7 }} aria-hidden />
+        </>
       )}
     </Box>
   )

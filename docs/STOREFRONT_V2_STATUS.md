@@ -999,3 +999,89 @@ uno, no tres copias**.
 Ciclos correctivos usados: **0 de 3**.
 
 `PHASE_RESULT: PASS`
+
+---
+
+# P07 — Product Card y catálogo V2
+
+**HEAD inicial:** `150969d` · **Sin migración.**
+
+## 1. Las tres presentaciones de la tarjeta, de verdad
+
+Hasta P07 la diferencia entre presentaciones eran **medidas**: relleno, cuerpo del nombre, aire de la
+rejilla. Se notaba poco, y sobre todo no se notaba lo que cada tema promete — «editorial» y «denso»
+no son dos tamaños del mismo dibujo.
+
+| Presentación | Qué cambia | Por qué |
+|---|---|---|
+| **densa** (`retail`, `catalog`) | la categoría no se pinta | con cinco o seis columnas, el nombre de la familia sale truncado y se come la línea que necesita el nombre del **producto**, que es lo que se busca. No se encoge la letra —eso sería miniaturizar hasta lo ilegible—: se quita lo que sobra |
+| **editorial** (`premium`) | sin canto ni sombra en reposo; la sombra vuelve al apuntar | la rejilla deja de leerse como una cuadrícula de fichas y pasa a ser una secuencia de imágenes |
+| **editorial** | no pinta la pastilla «disponible» | `in` es el estado **esperado** de un producto publicado: repetida en cada tarjeta no informa, decora |
+| todas | **`out` se pinta siempre**, en los cuatro temas | eso sí es información, y es la que decide si el botón sirve |
+
+Y **ni un `if` por tema dentro del componente**: la tarjeta pone sus clases (`eb-card`,
+`eb-card-eyebrow`, `eb-card-state[data-stock]`) y la hoja de estilos decide desde la frontera. Esa es
+la diferencia entre tematizar y tener cuatro tarjetas — con cuatro ramas, la que se olvida de pintar
+el botón de comprar es un tema donde no se puede comprar.
+
+**Lo que no cambia en ninguna:** enlace al producto, corazón, vista rápida, comprar o elegir
+opciones, precio, tachado y aviso de agotado. Ya lo fijaba `ProductCard.theme.test.tsx` y sigue verde.
+
+## 2. El hueco sin foto dejaba de parecer un producto y parecía un fallo
+
+`ProductMedia` sin `url` pintaba un rectángulo gris con un icono de imagen en medio. Eso es
+**exactamente lo que dibuja un esqueleto de carga**, y media rejilla así se lee como una tienda que
+no terminó de cargar — que es el caso normal de un catálogo recién importado.
+
+Ahora el hueco es un panel con el tinte que le toca al **nombre** del producto y el icono como marca
+de agua grande en la esquina: la misma gramática que las puertas de categoría y las marcas. El tinte
+sale del nombre y no al azar, así que el mismo producto cae siempre en el mismo color, una rejilla
+sin fotos se puede recorrer y recargar no la baraja.
+
+Sigue sin pintarse ni un logotipo ni una imagen de archivo: nada que le ponga a la tienda una
+identidad que no eligió.
+
+## 3. El catálogo con pocos resultados
+
+Dos tarjetas y media pantalla de blanco debajo. Quien buscó algo y encontró dos cosas se va, y lo que
+le falta es una salida.
+
+`ExploreMore`, nuevo: **«También puedes explorar»**, debajo de los resultados, en su propia sección,
+con su propio título y separada por una línea. Aparece con **0 resultados** y con **1–3** (el mismo
+umbral que usa la fila de la portada para crecer).
+
+**La regla que no se rompe: esto no forma parte del conteo.** No lleva ni un producto — solo familias
+y marcas, que son navegación y nadie confunde con un resultado. Productos «recomendados» dentro de la
+rejilla serían resultados que el filtro no devolvió, y el contador de arriba pasaría a mentir: «2
+resultados» sobre nueve tarjetas.
+
+De dónde salen: familias del árbol que la pantalla ya tiene cargado y marcas de las facetas de la
+búsqueda. **Cero peticiones nuevas.** Se excluye lo que ya está filtrado —ofrecer como salida el
+sitio donde uno está no es una salida—, se corta en seis por grupo, y si no queda nada que ofrecer la
+sección no se pinta.
+
+## Lo que NO se tocó
+
+Filtros, parámetros de la URL (`?q &c &d &b &sort &ver &p &oferta`), orden, paginación y resolución
+server-side del catálogo: intactos. El precio comercial B2B de la tarjeta, intacto y con su prueba
+(`b2b-price.test.tsx`).
+
+## Tests
+
+| Archivo | Casos |
+|---|---|
+| `components/explore-more.test.tsx` | **Nuevo**, 10. La sección va aparte con su título; familias y marcas como enlaces; no ofrece donde ya se está; no se pinta sin nada que ofrecer ni con todo filtrado; **no contiene ni un producto**; corta en seis. Y tres casos que leen `storefront.css` para fijar las presentaciones de la tarjeta —el entorno de pruebas no aplica hojas de estilo (`css: false`), así que se comprueba el texto de la hoja, la misma técnica de `presets-behaviour.test.ts`—, incluido que el selector nombre `data-stock='in'` y **no** `'out'`. |
+| `ProductCard.theme.test.tsx`, `ProductCard.test.tsx`, `b2b-price.test.tsx`, `ProductMedia.test.tsx` | Sin cambios y verdes: la tarjeta sigue haciendo lo mismo en los cuatro temas. |
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 293 ficheros, 5784 tests |
+| `npm run build` | **PASS** |
+
+Ciclos correctivos usados: **0 de 3**.
+
+`PHASE_RESULT: PASS`

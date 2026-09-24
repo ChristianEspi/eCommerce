@@ -2352,6 +2352,10 @@ export const es = {
     // el catálogo, que es lo único que promete y lo único que hace.
     'store.row.exploreTitle': 'Recorre el catálogo',
     'store.row.exploreBody': 'Busca, filtra y ordena todo lo publicado.',
+    // La salida de un catálogo con pocos resultados (Storefront V2 · P07). No
+    // es parte del conteo y no lleva productos: solo familias y marcas.
+    'store.explore.title': 'También puedes explorar',
+    'store.explore.subtitle': 'Otras familias y marcas de esta tienda.',
     'store.catalog.back': 'Volver a la portada',
     'store.catalog.all': 'Todo el catálogo',
     'store.catalog.resultsFor': 'Resultados para',

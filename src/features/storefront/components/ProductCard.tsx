@@ -128,6 +128,7 @@ export function ProductCard({
 
   return (
     <Card
+      className="eb-card"
       onMouseEnter={() => onPrefetch?.(product.slug)}
       sx={{
         position: 'relative',
@@ -272,6 +273,13 @@ export function ProductCard({
       <Stack sx={{ gap: 0.5, flex: 1 }}>
         {product.category_name && (
           <Typography
+            // La categoría es CONTEXTO, y cuánto contexto cabe depende del tema:
+            // `compact` reparte cinco o seis columnas y ahí el nombre truncado
+            // de la familia roba la línea que necesita el del producto;
+            // `premium` la esconde porque su argumento es la foto, no la
+            // taxonomía. Lo decide la hoja de estilos desde la frontera, no un
+            // `if` aquí dentro — ver `storefront.css`.
+            className="eb-card-eyebrow"
             sx={{
               fontSize: 10.5,
               fontWeight: 800,
@@ -378,6 +386,12 @@ export function ProductCard({
             fila no se pinta: allí no hay botón al que condicionar. */}
         {compact ? null : (
         <Box
+          className="eb-card-state"
+          // `in` es el estado ESPERADO de un producto publicado, y por eso hay
+          // temas que no lo pintan: una pastilla verde repetida en cada tarjeta
+          // de la rejilla no informa, decora. `out` se pinta SIEMPRE, en los
+          // cuatro: eso sí es información, y es la que decide si el botón sirve.
+          data-stock={available ? 'in' : 'out'}
           sx={{
             alignSelf: 'flex-start',
             px: 0.875,

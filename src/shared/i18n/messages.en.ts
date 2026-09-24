@@ -3107,6 +3107,8 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.row.seeAll': 'See all',
     'store.row.exploreTitle': 'Browse the catalogue',
     'store.row.exploreBody': 'Search, filter and sort everything published.',
+    'store.explore.title': 'You can also explore',
+    'store.explore.subtitle': 'Other families and brands in this store.',
     'store.catalog.back': 'Back to the shop front',
     'store.catalog.all': 'The whole catalogue',
     'store.catalog.resultsFor': 'Results for',

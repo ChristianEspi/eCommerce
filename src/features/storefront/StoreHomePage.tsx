@@ -13,6 +13,7 @@ import { EmptyState, ErrorState } from '@/shared/ui/states'
 import { TS } from '@/theme/tokens'
 import { BackToTop } from './components/BackToTop'
 import { CategoryBar } from './components/CategoryBar'
+import { ExploreMore } from './components/ExploreMore'
 import { ProductGrid, ProductGridSkeleton } from './components/ProductGrid'
 import { useFavorites } from './useFavorites'
 import { StoreFilterPanel } from './components/StoreFilterPanel'
@@ -56,6 +57,15 @@ const ProductQuickView = lazyPage(() =>
 
 /** Cuántos resultados por página. El «ver más» suma otra tanda. */
 const PAGE_SIZE = 24
+
+/**
+ * A partir de cuántos resultados la rejilla ya se sostiene sola (P07).
+ *
+ * El mismo número que usa la fila de la portada para crecer, y por el mismo
+ * motivo: con tres tarjetas o menos queda media pantalla en blanco debajo, y
+ * quien buscó algo y encontró poco necesita una salida.
+ */
+const POCOS_RESULTADOS = 3
 
 const SORTS: readonly SearchSort[] = ['relevance', 'price-asc', 'price-desc', 'name', 'recent']
 
@@ -899,6 +909,39 @@ export function StoreHomePage() {
             </Typography>
           )}
             </Box>
+          )}
+
+          {/* P07 · Con pocos resultados, una salida que NO es un resultado.
+
+              Va DEBAJO de la rejilla, en su propia sección y con su propio
+              título, y no lleva ni un producto: solo familias y marcas. Meter
+              productos «recomendados» dentro de la rejilla sería añadir a la
+              lista cosas que el filtro no devolvió, y el contador de arriba
+              pasaría a mentir — «2 resultados» sobre nueve tarjetas.
+
+              El umbral es el mismo que usa la fila de la portada para crecer:
+              hasta tres, la pantalla se queda corta. */}
+          {results.isSuccess && total > 0 && total <= POCOS_RESULTADOS && (
+            <ExploreMore
+              storeSlug={storeSlug}
+              categories={familias.map((f) => ({ code: f.slug, name: f.name }))}
+              brands={brandOptions}
+              selectedCategory={categorySlug}
+              selectedBrand={brand}
+            />
+          )}
+
+          {/* Y sin NINGÚN resultado, la misma salida bajo el estado vacío: el
+              botón de quitar filtros arregla el caso de quien filtró de más,
+              pero no el de quien buscó algo que esta tienda no vende. */}
+          {results.isSuccess && total === 0 && (
+            <ExploreMore
+              storeSlug={storeSlug}
+              categories={familias.map((f) => ({ code: f.slug, name: f.name }))}
+              brands={brandOptions}
+              selectedCategory={categorySlug}
+              selectedBrand={brand}
+            />
           )}
         </Box>
       </Stack>
