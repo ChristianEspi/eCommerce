@@ -17,6 +17,7 @@ import {
   Fab,
   Menu,
   MenuItem,
+  Stack,
   Toolbar,
   Typography,
   useMediaQuery,
@@ -31,12 +32,15 @@ import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
 import { SkipToContentLink, CONTENT_ANCHOR } from '@/shared/ui/SkipToContentLink'
 import { AppearanceProvider } from '@/theme/AppearanceProvider'
 import { useAppearance } from '@/theme/appearance-context'
-import { R, SH, TS } from '@/theme/tokens'
+import { SH, TS } from '@/theme/tokens'
 import { StorefrontNotFoundError } from './api'
 import { notFoundMeta } from './seo'
 import { initials } from './branding'
+import { resolveShowThemeToggle } from './identity'
 import { StoreCategoryNav } from './components/StoreCategoryNav'
 import { StoreFooter } from './components/StoreFooter'
+import { StoreAnnouncementBar } from './components/StoreAnnouncementBar'
+import { StoreBrandLockup } from './components/StoreBrandLockup'
 import { StoreQuickSearch } from './components/StoreQuickSearch'
 import { CartDrawer } from './cart/CartDrawer'
 import { CartProvider } from './cart/CartProvider'
@@ -366,6 +370,37 @@ function Shell({ children }: { children: ReactNode }) {
   )
 }
 
+/**
+ * La cabecera de la tienda, en tres composiciones (Storefront V3 · P03).
+ *
+ * ## Qué cambió, y por qué no son tres cabeceras
+ *
+ * Hasta V3 había UNA barra —logotipo, buscador, acciones— y `headerVariant`
+ * solo le cambiaba la altura y el alto de la caja de búsqueda. Un tema que
+ * solo cambia medidas no es una personalidad, y la primera pantalla de una
+ * tienda premium se veía igual que la de un catálogo de ferretería.
+ *
+ * Ahora son tres REPARTOS de las mismas piezas:
+ *
+ *  · `standard` — marca a la izquierda, buscador al centro, acciones a la
+ *    derecha. La de siempre, y la que ve quien no eligió tema.
+ *  · `compact` — la marca se encoge y el buscador ocupa lo que suelta. Para un
+ *    catálogo de miles de referencias, donde quien llega ya sabe qué quiere.
+ *  · `brand` — la marca al CENTRO y grande, con las acciones a un lado y el
+ *    buscador debajo. Una tienda de marca no compite por el clic en la primera
+ *    pantalla: compite por ser reconocida.
+ *
+ * Las piezas son las mismas en las tres —`StoreBrandLockup`,
+ * `StoreQuickSearch`, los cuatro botones— y ninguna variante quita ninguna. Un
+ * tema que dejara la tienda sin carrito dejaría de ser un tema.
+ *
+ * ## Lo que NINGUNA variante hace
+ *
+ * Esconder el buscador en el teléfono. Se probó en V2 y fue un error:
+ * ocultarlo por debajo de `md` dejaba a quien llegaba por teléfono sin forma
+ * de buscar en un catálogo de cientos de productos. Baja a su propia fila, y
+ * ahí sigue en las tres.
+ */
 function StoreHeader({ store, storeSlug }: { store: PublicStore; storeSlug: string }) {
   /**
    * El buscador se MUEVE, no se duplica.
@@ -379,17 +414,44 @@ function StoreHeader({ store, storeSlug }: { store: PublicStore; storeSlug: stri
    * Con la consulta de medios se renderiza UNO, en el sitio que le toca.
    */
   const enMovil = useMediaQuery('(max-width:899.95px)')
-  // El tema decide el ANCHO de la barra, su altura y el alto de la caja de
-  // búsqueda; nada de lo que la barra CONTIENE —buscador, cuenta, carrito,
-  // familias— depende de él. Un tema que quitara uno de esos tres dejaría de
-  // ser un tema. Desde P05 los tres valores viajan como variables de CSS
-  // (`--sf-content-w`, `--sf-header-h*`, `--sf-search-h`), así que aquí no hace
-  // falta leer el estilo.
+
+  /**
+   * La composición la elige el TEMA; el contenido, nunca.
+   *
+   * El tema ya decidía el ancho de la barra, su altura y el alto de la caja de
+   * búsqueda, y los tres viajan como variables de CSS desde P05. Lo que V3 añade
+   * es el REPARTO, y eso sí hay que leerlo aquí: son árboles distintos, no
+   * medidas distintas.
+   */
+  const { style } = useStorefrontTheme()
+  const variante = style.headerVariant
+
+  // En el teléfono las tres se comportan igual, y a propósito: dos filas de
+  // marca centrada en 390 px se comen media pantalla antes del primer producto.
+  const deMarca = variante === 'brand' && !enMovil
+  const compacta = variante === 'compact'
+
+  const acciones = (
+    <>
+      {/* Las páginas del CMS —quiénes somos, envíos, términos— NO viven aquí.
+          La cabecera de una tienda tiene tres trabajos: buscar, entrar a lo
+          tuyo y ver el carrito; cada enlace que se le añade compite con esos
+          tres y ninguno de ellos vende. Se leen una vez, casi siempre
+          buscándolas, y su sitio de siempre es el pie. */}
+      <ThemeButton store={store} />
+      <FavoritesButton storeSlug={storeSlug} storeId={store.store_id} />
+      <AccountButton storeSlug={storeSlug} />
+      <CartButton />
+    </>
+  )
+
+  const buscador = <StoreQuickSearch storeSlug={storeSlug} />
 
   return (
     <Box
       component="header"
       className="sf-header"
+      data-header-variant={variante}
       sx={{
         position: 'sticky',
         top: 0,
@@ -401,88 +463,72 @@ function StoreHeader({ store, storeSlug }: { store: PublicStore; storeSlug: stri
         borderBottom: '1px solid var(--sf-line)',
       }}
     >
+      {/* Los avisos del comercio, ENCIMA de todo y solo si los escribió. Ver
+          `StoreAnnouncementBar`: la plataforma no genera ninguno. */}
+      <StoreAnnouncementBar messages={store.announcement_messages} />
+
       <Container
         maxWidth={false}
         disableGutters
         sx={{ maxWidth: 'var(--sf-content-w)', mx: 'auto' }}
       >
-        <Toolbar
-          sx={{
-            gap: 1.5,
-            px: { xs: 2, md: 3 },
-            minHeight: { xs: 'var(--sf-header-h)', md: 'var(--sf-header-h-md)' },
-          }}
-        >
-          <Box
-            component={Link}
-            to={`/s/${storeSlug}`}
+        {deMarca ? (
+          /**
+           * La composición de marca: dos filas.
+           *
+           * Arriba la marca, centrada y grande, con las acciones a la derecha
+           * —en su sitio de siempre, porque mover el carrito de sitio por tema
+           * sería cambiar dónde se compra—. Debajo el buscador, centrado y
+           * acotado: accesible, pero visualmente secundario.
+           *
+           * Las acciones van en posición absoluta para que la marca quede
+           * centrada respecto a la PÁGINA y no respecto al hueco que le dejan:
+           * con `space-between` el logotipo se descentra en cuanto el carrito
+           * gana una insignia de dos cifras.
+           */
+          <Box sx={{ px: { xs: 2, md: 3 }, pt: 1.5, pb: 1 }}>
+            <Box sx={{ position: 'relative', display: 'grid', placeItems: 'center' }}>
+              <StoreBrandLockup store={store} storeSlug={storeSlug} size="lg" center />
+              <Stack
+                direction="row"
+                sx={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', alignItems: 'center', gap: 0.5 }}
+              >
+                {acciones}
+              </Stack>
+            </Box>
+            <Box sx={{ maxWidth: 520, mx: 'auto', mt: 1.25 }}>{buscador}</Box>
+          </Box>
+        ) : (
+          <Toolbar
             sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1.25,
-              textDecoration: 'none',
-              color: 'inherit',
-              minWidth: 0,
-              flexShrink: 0,
+              gap: compacta ? 1 : 1.5,
+              px: { xs: 2, md: 3 },
+              minHeight: { xs: 'var(--sf-header-h)', md: 'var(--sf-header-h-md)' },
             }}
           >
-            {store.logo_url ? (
-              <Box
-                component="img"
-                src={store.logo_url}
-                alt={store.name}
-                sx={{ height: 30, maxWidth: 160, objectFit: 'contain' }}
-              />
-            ) : (
-              // Sin logo: iniciales sobre el acento del tenant. Neutro y suyo,
-              // en vez de plantar el isotipo EBIM como si fuera su marca.
-              <Box
-                aria-hidden
-                sx={{
-                  width: 34,
-                  height: 34,
-                  flexShrink: 0,
-                  display: 'grid',
-                  placeItems: 'center',
-                  borderRadius: `${R.sm}px`,
-                  bgcolor: 'var(--accent-soft)',
-                  color: 'var(--accent-deep)',
-                  fontWeight: 800,
-                  fontSize: TS.label,
-                }}
-              >
-                {initials(store.name)}
+            <StoreBrandLockup
+              store={store}
+              storeSlug={storeSlug}
+              // La compacta encoge la marca para que el buscador ocupe lo que
+              // suelta: es lo que la convierte en «search first» de verdad y no
+              // en la estándar con doce píxeles menos.
+              size={compacta ? 'sm' : 'md'}
+            />
+
+            {/* El buscador vive en la cabecera y no en el cuerpo del catálogo:
+                es lo primero que se usa para llegar a un producto, y desde aquí
+                está en TODAS las pantallas de la tienda. En el teléfono baja a
+                su propia fila —ver abajo—, porque a 360 px no cabe junto al
+                logotipo y el carrito sin dejar los tres apretados. */}
+            {!enMovil && (
+              <Box sx={{ display: 'flex', flex: 1, minWidth: 0, mx: compacta ? 0.5 : 1 }}>
+                {buscador}
               </Box>
             )}
-            <Typography
-              component="span"
-              sx={{ fontWeight: 800, fontSize: 15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-            >
-              {store.name}
-            </Typography>
-          </Box>
 
-          {/* El buscador vive en la cabecera y no en el cuerpo del catalogo:
-              es lo primero que se usa para llegar a un producto, y desde aqui
-              esta en TODAS las pantallas de la tienda, no solo en la portada.
-              Se oculta en movil, donde la barra no da para el logo, el menu,
-              la cuenta, el carrito Y una caja de texto. */}
-          {!enMovil && (
-            <Box sx={{ display: 'flex', flex: 1, minWidth: 0, mx: 1 }}>
-              <StoreQuickSearch storeSlug={storeSlug} />
-            </Box>
-          )}
-
-          {/* Las paginas del CMS —quienes somos, envios, terminos— NO viven
-              aqui. La cabecera de una tienda tiene tres trabajos: buscar,
-              entrar a lo tuyo y ver el carrito; cada enlace que se le anade
-              compite con esos tres y ninguno de ellos vende. Se leen una vez,
-              casi siempre buscandolas, y su sitio de siempre es el pie. */}
-          <ThemeButton />
-          <FavoritesButton storeSlug={storeSlug} storeId={store.store_id} />
-          <AccountButton storeSlug={storeSlug} />
-          <CartButton />
-        </Toolbar>
+            {acciones}
+          </Toolbar>
+        )}
 
         {/* En móvil, el buscador baja a su propia fila.
 
@@ -490,15 +536,8 @@ function StoreHeader({ store, storeSlug }: { store: PublicStore; storeSlug: stri
             sustituía nada, así que quien llegaba por teléfono no tenía forma de
             buscar en un catálogo de 570 productos — le quedaba recorrer las
             familias una por una. La cabecera declara tres trabajos y cumplía
-            dos.
-
-            En fila propia y no dentro de la barra porque a 360 px no cabe junto
-            al logo y el carrito sin dejar los tres apretados. */}
-        {enMovil && (
-          <Box sx={{ pb: 1 }}>
-            <StoreQuickSearch storeSlug={storeSlug} />
-          </Box>
-        )}
+            dos. Vale para las TRES variantes: ninguna esconde la búsqueda. */}
+        {enMovil && <Box sx={{ px: 2, pb: 1 }}>{buscador}</Box>}
       </Container>
 
       {/* Las familias, bajo la barra y en TODAS las pantallas de la tienda.
@@ -509,37 +548,6 @@ function StoreHeader({ store, storeSlug }: { store: PublicStore; storeSlug: stri
   )
 }
 
-/**
- * Menú de páginas administrables (P11-SaaS).
- *
- * Existe porque una página que solo se alcanza escribiendo su URL es media
- * funcionalidad: el comercio la crea y nadie llega. Qué páginas salen aquí lo
- * decide `content_pages.show_in_nav`, y la lista la resuelve el servidor ya
- * filtrada por publicación, vigencia y canal.
- *
- * Se esconde en móvil: en una barra que ya lleva cuenta y carrito, tres enlaces
- * más empujan el nombre de la tienda fuera de la pantalla. Las páginas siguen
- * alcanzables desde los bloques de contenido y desde el pie.
- */
-/**
- * Paginas de la tienda —quienes somos, envios, terminos—, en el PIE.
- *
- * Estaban en la cabecera y se las llevaba el sitio que necesitan el buscador,
- * la cuenta y el carrito. Son paginas que se consultan una vez y casi nunca de
- * memoria: al pie se las encuentra igual, y ademas es donde se buscan las
- * legales.
- *
- * Sigue siendo un `<nav>` con nombre: quien navega por regiones con un lector
- * de pantalla las encuentra por ahi, este arriba o abajo.
- */
-/**
- * Las categorias de la tienda, ya cargadas.
- *
- * Vive aparte del encabezado para que la consulta de categorias no vuelva a
- * pedirse cada vez que cambia algo de la barra (buscador, carrito): son datos
- * de tienda, no de pantalla, y `usePublicCategories` los comparte con la
- * portada por clave de consulta — una sola llamada para las dos.
- */
 function StoreCategories({ storeSlug, storeId }: { storeSlug: string; storeId: string }) {
   const { data } = usePublicCategories(storeId)
   /**
@@ -728,10 +736,27 @@ function HeaderAction({
  * nombre viaja en `aria-label`, así que quien usa lector de pantalla lo oye
  * igual.
  */
-function ThemeButton() {
+/**
+ * El selector claro/oscuro, que ahora lo decide el COMERCIO (V3 · P01/P03).
+ *
+ * Estaba en la cabecera de toda tienda sin que ningún comercio lo hubiera
+ * pedido. En una herramienta de trabajo un botón de tema es útil; en una tienda
+ * compite por atención con el carrito, y lo que se ve en la primera pantalla es
+ * lo que dice a qué se dedica la página.
+ *
+ * Viene APAGADO. Lo que no desaparece es el tema oscuro: la vitrina sigue
+ * respetando la preferencia del sistema de quien llega y lo que ese visitante
+ * hubiera elegido antes. Lo que se va es el control, no el modo.
+ *
+ * Y no toca el backoffice, que tiene el suyo en Apariencia: esto solo mira la
+ * configuración de la tienda pública.
+ */
+function ThemeButton({ store }: { store: PublicStore }) {
   const { t } = useI18n()
   const { appearance, toggleMode } = useAppearance()
   const oscuro = appearance.mode === 'dark'
+
+  if (!resolveShowThemeToggle(store.show_theme_toggle)) return null
 
   return (
     <HeaderAction

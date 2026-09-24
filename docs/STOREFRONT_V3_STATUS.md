@@ -239,7 +239,7 @@ fases y dejado el rediseño sin su contrato terminado.
 
 # P02 · Theme Engine V3: personalidades reales y encaje de foto
 
-**Commit:** `<pendiente>` · **Ciclos correctivos:** 2 de 3
+**Commit:** `12b3d2e` · **Ciclos correctivos:** 2 de 3
 
 ## El problema
 
@@ -350,5 +350,109 @@ permisiva no puede invalidar lo que ya pasaba.
 | `npm run build` | **PASS** |
 | `npm run test:db` | **PASS** — 137 ficheros, 3637 tests |
 | `npm run bundle:report` | **PASS** — portada 400,1 kB (techo 405) |
+
+`PHASE_RESULT: PASS`
+
+---
+
+# P03 · Cabecera, navegación y barra de avisos
+
+**Commit:** `<pendiente>` · **Ciclos correctivos:** 2 de 3
+
+## El problema
+
+Había **una** barra —logotipo, buscador, acciones— y `headerVariant` solo le
+cambiaba la altura y el alto de la caja de búsqueda. Doce píxeles. La primera
+pantalla de una tienda premium se veía igual que la de un catálogo de
+ferretería, y eso es lo primero que dice a qué se dedica una página.
+
+Además: la cabecera pintaba logotipo **y** nombre siempre —y la mayoría de los
+logotipos comerciales ya llevan el nombre dentro, así que esas tiendas lo
+enseñaban dos veces— y ofrecía un selector claro/oscuro que ningún comercio
+había pedido, compitiendo por atención con el carrito.
+
+## Lo que se hizo
+
+### Tres repartos de las mismas piezas
+
+| | marca | buscador | acciones |
+|---|---|---|---|
+| `standard` | izquierda, `md` | centro, en la barra | derecha |
+| `compact` | izquierda, **`sm`** | **centro ancho**, gana lo que la marca suelta | derecha, compactas |
+| `brand` | **centro, `lg`** | **debajo**, acotado a 520 px | derecha, sobre la marca |
+
+No son tres cabeceras: son tres composiciones de `StoreBrandLockup`,
+`StoreQuickSearch` y los cuatro botones. **Ninguna variante quita ninguna
+pieza** —un tema que dejara la tienda sin carrito dejaría de ser un tema— y hay
+una prueba por variante que lo comprueba.
+
+En la de marca las acciones van en posición absoluta para que el logotipo quede
+centrado respecto a la **página** y no respecto al hueco que le dejan: con
+`space-between`, el logotipo se descentraba en cuanto el carrito ganaba una
+insignia de dos cifras.
+
+**En el teléfono las tres se comportan igual**, y a propósito: dos filas de marca
+centrada en 390 px se comen media pantalla antes del primer producto. Y ninguna
+esconde el buscador — se probó en V2 y dejaba a quien llegaba por teléfono sin
+forma de buscar en un catálogo de cientos de referencias.
+
+### `StoreBrandLockup`: la marca deja de duplicarse
+
+Una pieza, tres modos y un tamaño que decide la composición —nunca el contenido—.
+Con `logo_name` el logotipo va **decorativo** (`alt=""`, `aria-hidden`) porque el
+nombre está escrito al lado: hasta V3 un lector de pantalla anunciaba «Atelier
+Norte Atelier Norte». Con `logo` el logotipo sí se anuncia, porque entonces es
+lo único que identifica la tienda. Y `logo` sin logotipo cae al nombre en vez de
+dejar el hueco.
+
+### `StoreAnnouncementBar`: solo lo que el comercio escribió
+
+No existe si no hay avisos, y no hay ni uno por defecto. Escritorio: los dos, uno
+al lado del otro. Teléfono: uno, rotando cada cinco segundos — y **sin rotar** con
+`prefers-reduced-motion`, porque un mensaje que cambia solo es movimiento y hay
+gente a la que le sienta mal.
+
+`role="status"` y no `aria-live="assertive"`: es información de servicio, y
+`assertive` interrumpiría a media frase a quien esté escuchando la página. La
+rotación es estado de React y no CSS a propósito: con opacidades los dos
+mensajes estarían siempre en el documento y se leerían seguidos, como una sola
+frase.
+
+### El selector de tema, apagado
+
+`ThemeButton` devuelve `null` salvo que el comercio lo haya encendido. Lo que no
+desaparece es el tema oscuro: la vitrina sigue respetando la preferencia del
+sistema de quien llega. Se va el control, no el modo. El backoffice conserva el
+suyo en Apariencia.
+
+## Ciclos correctivos
+
+1. Tres pruebas de `storefront-ui.test.tsx` rojas, las tres por consecuencias
+   buscadas: el selector de tema ya no sale por defecto —se añadió el caso que
+   fija que **no** está y el que lo enciende— y el logotipo junto al nombre ya no
+   duplica el nombre accesible, así que las dos aserciones pasan a buscarlo por
+   `src` y se añade el caso de «solo logotipo», donde sí se anuncia.
+2. Dos supuestos míos equivocados en las pruebas nuevas, corregidos en las
+   pruebas: el carrito es un **botón** (abre el cajón, no navega) y no un enlace;
+   y la navegación de familias existe también en el pie, así que buscarla en todo
+   el documento encontraba dos — se busca dentro de la cabecera y esperando, que
+   es lo que hace la tienda real.
+
+## Tests
+
+| Archivo | Casos |
+|---|---|
+| `storefront/header-v3.test.tsx` | **Nuevo**, 20. Las tres variantes se declaran en el DOM y **ninguna quita buscador, carrito, cuenta ni marca**; las tres dejan llegar a las familias; la de marca reparte en dos filas de verdad —su buscador no está en la barra— y cada variante trae su altura. Lockup: los tres modos, el logotipo decorativo cuando el nombre está al lado, «solo logotipo» anunciándose, «solo nombre» respetado con logotipo y «solo logotipo» sin logotipo cayendo al nombre. Barra: no existe sin avisos ni con lista vacía, pinta lo escrito, va encima de la barra, descarta lo corrupto, el marcado se queda en texto y se anuncia como estado. Selector de tema apagado en las tres composiciones y funcionando con teclado al encenderlo. Y la cabecera no nombra ningún rubro. |
+| `storefront-ui.test.tsx` | 50 → **52**, con los dos casos nuevos del selector y del lockup. |
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 304 ficheros, 6034 tests |
+| `npm run build` | **PASS** |
+| `npm run bundle:report` | **PASS** — portada 400,8 kB (techo 405) |
 
 `PHASE_RESULT: PASS`

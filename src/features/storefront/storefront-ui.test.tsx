@@ -352,9 +352,23 @@ describe('resolución del tenant por slug', () => {
    * oscuro» cuando estás en claro—, que es lo único útil de leer antes de
    * pulsarlo, y es lo que oye un lector de pantalla.
    */
-  it('la cabecera deja cambiar de tema, y el botón dice a dónde va', async () => {
-    const user = userEvent.setup()
+  it('sin configurarlo, la cabecera NO ofrece selector de tema (V3 · P01/P03)', async () => {
+    // Estaba en la cabecera de toda tienda sin que ningún comercio lo hubiera
+    // pedido, compitiendo por atención con el carrito. Lo que NO desaparece es
+    // el tema oscuro: la vitrina sigue respetando la preferencia del sistema.
     renderStorefront(backend(), '/s/casa-nordica')
+
+    const header = await screen.findByRole('banner')
+    expect(within(header).queryByRole('button', { name: 'Tema oscuro' })).not.toBeInTheDocument()
+    expect(within(header).queryByRole('button', { name: 'Tema claro' })).not.toBeInTheDocument()
+  })
+
+  it('si el comercio lo enciende, deja cambiar de tema y dice a dónde va', async () => {
+    const user = userEvent.setup()
+    renderStorefront(
+      backend({ public_stores: [store({ show_theme_toggle: true })] }),
+      '/s/casa-nordica',
+    )
 
     const header = await screen.findByRole('banner')
     const boton = within(header).getByRole('button', { name: 'Tema oscuro' })
@@ -384,10 +398,31 @@ describe('resolución del tenant por slug', () => {
     renderStorefront(fake, '/s/casa-nordica')
 
     const header = await screen.findByRole('banner')
-    expect(within(header).getByRole('img', { name: 'Casa Nórdica' })).toHaveAttribute(
-      'src',
-      `https://firmado.test/${path}`,
-    )
+    /**
+     * Se busca por `src`, no por nombre accesible (V3 · P03).
+     *
+     * Con el lockup `logo_name` —el defecto— el logotipo va DECORATIVO: el
+     * nombre de la tienda está escrito al lado, y ponerle también `alt` hacía
+     * que un lector de pantalla anunciara «Casa Nórdica Casa Nórdica». El
+     * enlace de la marca sigue teniendo su nombre; lo que perdió es el duplicado.
+     */
+    const logo = within(header).getByAltText('')
+    expect(logo).toHaveAttribute('src', `https://firmado.test/${path}`)
+    expect(logo).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('con el lockup «solo logotipo», el logotipo SÍ lleva el nombre', async () => {
+    // Ahí el nombre no está escrito al lado, así que el logotipo es lo único
+    // que identifica la tienda y tiene que anunciarse.
+    const fake = backend({
+      public_stores: [store({ logo_url: 'https://cdn.test/logo.png', brand_lockup: 'logo' })],
+    })
+    renderStorefront(fake, '/s/casa-nordica')
+
+    const header = await screen.findByRole('banner')
+    expect(within(header).getByRole('img', { name: 'Casa Nórdica' })).toBeInTheDocument()
+    // Y el nombre no se repite en texto.
+    expect(within(header).queryByText('Casa Nórdica')).not.toBeInTheDocument()
   })
 
   it('una referencia de marca que no es https ni ruta del bucket se descarta', async () => {
@@ -404,10 +439,7 @@ describe('resolución del tenant por slug', () => {
     renderStorefront(fake, '/s/casa-nordica')
 
     const header = await screen.findByRole('banner')
-    expect(within(header).getByRole('img', { name: 'Casa Nórdica' })).toHaveAttribute(
-      'src',
-      'https://cdn.test/logo.png',
-    )
+    expect(within(header).getByAltText('')).toHaveAttribute('src', 'https://cdn.test/logo.png')
   })
 
   it('el contacto del tenant vuelve al pie, y sin inventar nada alrededor', async () => {
