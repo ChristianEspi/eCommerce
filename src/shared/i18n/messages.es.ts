@@ -221,6 +221,17 @@ export const es = {
     'settings.design.preview.tablet': 'Tableta',
     'settings.design.preview.mobile': 'Móvil',
     'settings.design.preview.empty': 'No hay ninguna sección encendida.',
+    // P11 · Dos formas de mirar y el ajuste del lienzo.
+    'settings.design.preview.mode': 'Forma de ver',
+    'settings.design.preview.focus': 'Enfoque',
+    'settings.design.preview.compare': 'Comparar',
+    'settings.design.preview.zoom': 'Tamaño del lienzo',
+    'settings.design.preview.fit': 'Ajustar',
+    'settings.design.preview.actual': 'Tamaño real',
+    // El ancho lógico va SIEMPRE escrito: sin él, ajustar convertiría la
+    // vista previa en «algo pequeño» en vez de en 1280 px al 62 %.
+    'settings.design.preview.size': '{device} · {w} px',
+    'settings.design.preview.scaled': '{device} · {w} px al {pct} %',
     'settings.design.unavailable':
       'El diseño de tienda estará disponible en cuanto se aplique la última actualización de la base de datos. Mientras tanto tu tienda se ve como siempre y el resto de la configuración funciona con normalidad.',
     'store.home.title': 'Catálogo',

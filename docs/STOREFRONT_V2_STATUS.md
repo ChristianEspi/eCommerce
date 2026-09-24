@@ -1289,7 +1289,7 @@ nombre y ni un enlace sin texto o con un destino que no lleva a ninguna parte.
 
 # P10 · «Diseño de tienda» se convierte en un taller
 
-**Commit:** `<pendiente>` · **Ciclos correctivos:** 1 de 3
+**Commit:** `2b0e4bb` · **Ciclos correctivos:** 1 de 3
 
 ## El problema
 
@@ -1380,6 +1380,109 @@ formulario, y cualquier combinación pasa la validación.
 | `npm run typecheck` | **PASS** |
 | `npm run lint` | **PASS** |
 | `npm run test` | **PASS** — 295 ficheros, 5843 tests |
+| `npm run build` | **PASS** |
+
+`PHASE_RESULT: PASS`
+
+---
+
+# P11 · La vista previa responsive deja de ser una maqueta estrujada
+
+**Commit:** `<pendiente>` · **Ciclos correctivos:** 1 de 3
+
+## El problema
+
+**Cambiar el ancho de una caja a 390 px no hace que las media queries
+reaccionen.** Una media query mide la **ventana**, no la caja. Así que la vista
+previa «móvil» se pintaba dentro de una ventana de escritorio y todos los
+valores elegidos eran los de escritorio: lo que se veía era una tienda de
+escritorio estrujada en 390 px, que es exactamente lo que no se quería ver.
+
+Y la propia vista previa lo empeoraba a mano: usaba `--sf-main-pad-md`,
+`--sf-hero-title-md`, `--sf-header-h-md` y `--sf-grid-lg` **fijos**. Ni siquiera
+al estrujarse cambiaba de valores — el teléfono enseñaba el titular de 52 px y
+las cuatro columnas del escritorio.
+
+Nada de esto se ve en una captura de pantalla del escritorio, que es por lo que
+sobrevivió tanto tiempo: la vista previa *parecía* funcionar.
+
+## Lo que se hizo
+
+### Cada marco resuelve sus propios puntos de corte
+
+`theme/preview-frame.ts` declara los anchos de referencia (1280 · 768 · 390) y
+produce, para un ancho dado, un juego de variables `--sfp-*` que **apuntan** a la
+variante `--sf-*` que le tocaría a la tienda a ese ancho.
+
+```
+390 px  → --sfp-hero-title: var(--sf-hero-title)     --sfp-grid-cols: var(--sf-grid-xs, 2)
+768 px  → --sfp-hero-title: var(--sf-hero-title)     --sfp-grid-cols: var(--sf-grid-sm, 3)
+1280 px → --sfp-hero-title: var(--sf-hero-title-md)  --sfp-grid-cols: var(--sf-grid-lg, 4)
+```
+
+Se cuelgan del propio marco, así que **tres marcos hermanos resuelven tres
+juegos distintos a la vez**, en la misma pantalla, sin un solo `@media`, sin
+`iframe` y sin duplicar una medida: los `--sfp-*` no contienen valores, contienen
+la ELECCIÓN — que es justo lo que la media query hacía y aquí no puede hacer.
+
+El módulo vive en `theme/` y no en el backoffice a propósito: lo que declara es
+el comportamiento responsive **de la vitrina**, y tiene que cambiar el día que
+cambien sus componentes. Si viviera en la pantalla de configuración, el día que
+la rejilla mueva su corte de 1200 a 1100 la vista previa seguiría enseñando
+cuatro columnas donde la tienda enseña cinco, y nadie se enteraría.
+
+La tableta es el caso que más se equivoca a ojo, y hay una prueba solo para él:
+768 reparte columnas como pantalla mediana pero **mantiene el aire y los cuerpos
+del teléfono**, porque 768 no llega a 900.
+
+### Enfoque y Comparar
+
+Dos preguntas distintas, dos controles. «¿Cómo se ve en el teléfono?» se responde
+mirando un marco grande; «¿se ve bien en los tres?» se responde viéndolos a la
+vez. Un solo selector de cuatro posiciones mezclaba el tamaño con la forma de
+mirar.
+
+En comparación: el escritorio arriba ocupando la fila entera, y **tableta y móvil
+debajo, uno al lado del otro**. No es estética: 1280 + 768 + 390 son 2438 px y no
+caben en fila ni en un monitor de 27 pulgadas, mientras que 768 + 390 sí caben
+bajo el escritorio. Y la comparación que de verdad se hace —¿tableta *y*
+móvil?— queda con los dos marcos pegados.
+
+### Ajustar al ancho, sin esconder la dimensión lógica
+
+`zoom` y no `transform: scale`: `zoom` participa en la maquetación, así que el
+hueco que deja el marco encoge con él; con `scale`, la caja seguiría midiendo
+1280 px de alto y dejaría un desierto debajo. Se aplica a la **bandeja** y no a
+cada marco, porque en comparación los tres tienen que encoger lo mismo o dejarían
+de ser comparables.
+
+Nunca agranda, y **cada marco lleva su ancho lógico escrito debajo**: «Escritorio
+· 1280 px», o «Escritorio · 1280 px al 62 %» cuando se está ajustando. Sin eso,
+ajustar convertiría la vista previa en «algo pequeño». Y sin poder medir el
+lienzo no se escala nada: encoger a un factor inventado sería peor que no
+encoger.
+
+## Ciclo correctivo
+
+1. Una prueba leía las columnas de la rejilla en el atributo `style` y las
+   medidas van por clase (emotion). Corregida leyendo el estilo **calculado**, que
+   es donde están de verdad — no relajando la aserción: sigue exigiendo
+   `var(--sfp-grid-cols)` y sigue prohibiendo `--sf-grid-lg`.
+
+## Tests
+
+| Archivo | Casos |
+|---|---|
+| `theme/preview-frame.test.ts` | **Nuevo**, 8. Los tres dispositivos caen en su escalón; los bordes son los de la vitrina (599/600, 899/900, 1199/1200); por debajo de 900 se usan los valores base y por encima los anchos; la tableta se queda en los estrechos; las columnas apuntan a la variable del tema y **ninguna variable inventa un valor** —todas son un `var(--sf-…)`—. |
+| `settings/preview-responsive.test.tsx` | **Nuevo**, 18. El móvil usa valores de móvil aunque la ventana sea de escritorio; el escritorio los anchos; la rejilla **lee** `--sfp-grid-cols` y no `--sf-grid-lg`; el tema manda en cuánto y el marco en cuál; los tres marcos conviven cada uno en su escalón sin pisarse; tema y ajuste llegan a los tres; la comparación se queda dentro del lienzo y no arrastra la página del backoffice; enfoque vuelve a uno; cada marco lleva su ancho escrito; sin poder medir no se escala ni se habla de porcentajes; los tres grupos de botones se anuncian por separado y se manejan con el teclado; y la vista previa no pinta ni un enlace ni un botón — es un dibujo del tema, no la tienda. |
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 297 ficheros, 5869 tests |
 | `npm run build` | **PASS** |
 
 `PHASE_RESULT: PASS`

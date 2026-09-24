@@ -258,6 +258,15 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'settings.design.preview.tablet': 'Tablet',
     'settings.design.preview.mobile': 'Mobile',
     'settings.design.preview.empty': 'No section is turned on.',
+    // P11 · Two ways to look, plus how the canvas is sized.
+    'settings.design.preview.mode': 'How to look',
+    'settings.design.preview.focus': 'Focus',
+    'settings.design.preview.compare': 'Compare',
+    'settings.design.preview.zoom': 'Canvas size',
+    'settings.design.preview.fit': 'Fit',
+    'settings.design.preview.actual': 'Actual size',
+    'settings.design.preview.size': '{device} · {w} px',
+    'settings.design.preview.scaled': '{device} · {w} px at {pct}%',
     'settings.design.unavailable':
       'Storefront design will be available once the latest database update is applied. In the meantime your store looks exactly as it did and the rest of the settings work as usual.',
     'admin.settings.appearance.mode': 'Mode',
