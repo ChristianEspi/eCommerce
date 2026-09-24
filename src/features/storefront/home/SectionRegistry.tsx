@@ -1,4 +1,16 @@
 import { Suspense, lazy } from 'react'
+/**
+ * El muro de logotipos viene ESTÁTICO, y es a propósito (V3 · P07).
+ *
+ * Sacarlo a su propio trozo parecía gratis —lo ve una minoría de las tiendas—
+ * y sale al revés: comparte `BrandRow`, `BrandLogo` y `SectionHeading` con la
+ * fila de marcas, que sí es el defecto de tres temas y ya viaja en la portada.
+ * El empaquetador acaba con un trozo aparte que depende ESTÁTICAMENTE del de la
+ * portada: mismos bytes en el primer pintado, una petición más, y la portada
+ * deja de ser un punto de entrada con nombre propio —con lo que el informe de
+ * bundle ya no la encuentra—. Medido en P07: 403.0 kB en los dos casos.
+ */
+import { BrandLogoWall } from '../components/BrandLogoWall'
 import { BrandRow } from '../components/BrandRow'
 import { BrandTrustStrip } from '../components/BrandTrustStrip'
 import { Stack } from '@mui/material'
@@ -45,6 +57,14 @@ const CategoryDoorGrid = lazy(() =>
 )
 const CategoryPills = lazy(() =>
   import('../components/CategoryDoors').then((modulo) => ({ default: modulo.CategoryPills })),
+)
+/**
+ * El mosaico también por `lazy` (Storefront V3 · P07), por lo mismo que las
+ * otras dos: la sección viene apagada en los cuatro temas, y su módulo no tiene
+ * por qué pesar en la portada de quien no la enciende.
+ */
+const CategoryMosaic = lazy(() =>
+  import('../components/CategoryMosaic').then((modulo) => ({ default: modulo.CategoryMosaic })),
 )
 
 const ContentBlocks = lazy(() =>
@@ -310,10 +330,11 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
      *
      * La presentación llega ya resuelta, así que aquí no hay `auto` que decidir:
      * `resolveSectionPresentation` puso el valor del tema donde la sección no
-     * dijo nada. El mosaico llega en P07, con su componente.
+     * dijo nada.
      */
     const comoSeEnsenan = presentation?.variant ?? data.theme.style.categoryVariant
     const pills = comoSeEnsenan === 'pills'
+    const mosaico = comoSeEnsenan === 'mosaic'
 
     // Las puertas llegan por `lazy`, sin fallback: lo que hay debajo no se
     // mueve de sitio —la sección ya tiene su título— y un esqueleto de cuatro
@@ -322,7 +343,24 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
       <Suspense fallback={null}>
         <Stack component="section" aria-label={data.t('store.categories.shopBy')} sx={{ gap: 1.5 }}>
           <SectionHeading title={data.t('store.categories.shopBy')} />
-          {pills ? (
+          {mosaico ? (
+            /**
+             * El MOSAICO (Storefront V3 · P07): la primera familia ocupa el doble.
+             *
+             * Los azulejos dicen que ninguna familia manda —y eso es correcto en
+             * Universal—; el mosaico dice cuál manda, que es lo que convierte
+             * una fila de puertas en una portada editorial.
+             *
+             * Las puertas son las MISMAS: misma foto, mismo tinte de reserva,
+             * mismo icono y mismo enlace con su filtro. Un mosaico con otro tipo
+             * de puerta serían dos componentes que hay que arreglar dos veces.
+             */
+            <CategoryMosaic
+              categories={familias}
+              storeSlug={data.storeSlug}
+              ariaLabel={data.t('store.categories.shopBy')}
+            />
+          ) : pills ? (
             <CategoryPills
               categories={familias}
               storeSlug={data.storeSlug}
@@ -344,14 +382,40 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
    * Las marcas, al lado de las categorías: se compra por marca tanto como por
    * familia.
    */
-  brands: (data, maxItems) => (
-    <BrandRow
-      brands={conTope(data.brands, maxItems)}
-      selected={data.brandSelected}
-      onSelect={data.onSelectBrand}
-      seeAllHref={`/s/${data.storeSlug}?ver=todo`}
-    />
-  ),
+  brands: (data, maxItems, presentation) => {
+    const marcas = conTope(data.brands, maxItems)
+
+    /**
+     * Tarjetas o muro de logotipos (Storefront V3 · P07).
+     *
+     * Son dos preguntas distintas. Las tarjetas dan a cada marca su caja, su
+     * nombre y su CUENTA de productos: es lo correcto cuando la marca es un
+     * FILTRO y quien busca quiere saber cuántas referencias hay detrás.
+     *
+     * El muro no informa, RECONOCE — y para eso el logotipo tiene que estar
+     * limpio: sin caja, sin tinte y sin la cuenta al lado. Quien duda de una
+     * tienda en línea deja de dudar cuando ve nombres que ya conoce.
+     */
+    if (presentation?.variant === 'logos') {
+      return (
+        <BrandLogoWall
+          brands={marcas}
+          selected={data.brandSelected}
+          onSelect={data.onSelectBrand}
+          seeAllHref={`/s/${data.storeSlug}?ver=todo`}
+        />
+      )
+    }
+
+    return (
+      <BrandRow
+        brands={marcas}
+        selected={data.brandSelected}
+        onSelect={data.onSelectBrand}
+        seeAllHref={`/s/${data.storeSlug}?ver=todo`}
+      />
+    )
+  },
 
   /**
    * Novedades, sobre un tinte (P06).
@@ -463,7 +527,21 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
    * Reconocimiento al cierre: quien duda de una tienda en línea deja de dudar
    * cuando ve nombres que ya conoce.
    */
-  trust: (data) => <BrandTrustStrip brands={data.brands} storeSlug={data.storeSlug} />,
+  /**
+   * Reconocimiento al cierre — y sin repetir la sección de marcas (V3 · P07).
+   *
+   * `brands` y `trust` salen de la misma lista, así que una portada con las dos
+   * encendidas enseñaba dos veces lo mismo con dos maquetaciones distintas. Eso
+   * se lee como un fallo de la tienda, no como una decisión.
+   *
+   * `trust` sigue en el contrato porque su trabajo es otro —cerrar la página con
+   * nombres conocidos, no ofrecer un filtro— y sigue siendo la franja compacta
+   * de siempre. Lo que se añade es que **se calla si `brands` ya lo dijo**.
+   */
+  trust: (data) =>
+    data.marcasAparte ? null : (
+      <BrandTrustStrip brands={data.brands} storeSlug={data.storeSlug} />
+    ),
 
   /**
    * Quién es este comercio y cómo se le encuentra (Storefront V2 · P09).

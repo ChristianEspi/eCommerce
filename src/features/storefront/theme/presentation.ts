@@ -177,35 +177,31 @@ const AUTO_POR_TEMA: Readonly<
   /**
    * Premium · ritmo editorial.
    *
-   * `spotlight` para producto —pocas piezas, grandes—, `logos` para marcas
-   * —un muro de logotipos reconocibles vale más que tarjetas con cuenta— y la
-   * banda de ofertas a sangre, que es lo que rompe la lista de bandas iguales.
-   */
-  /**
-   * Premium · ritmo editorial.
-   *
    * `spotlight` para producto: pocas piezas, grandes, con la puerta al catálogo
    * al lado. Es lo que rompe la lista de bandas iguales.
    *
-   * ## Por qué `cards` y `band` y no `logos` y `split`
+   * `logos` llega en P07, con su componente: un muro de logotipos limpio, sin
+   * caja y sin la cuenta de productos al lado. En una tienda de marca eso no
+   * informa, reconoce — y quien duda de una tienda en línea deja de dudar cuando
+   * ve nombres que ya conoce.
    *
-   * Porque el muro de logotipos y la banda partida son de P07, donde se
-   * construyen sus componentes. `auto` no puede resolver a una variante que
-   * nadie pinta: sería un contrato que dice que algo cambia y no cambia nada —el
-   * mismo defecto que `heroVariant` tuvo en V2 durante tres fases—. La lista
-   * cerrada ya las acepta, así que P07 solo tiene que cambiar esta línea.
+   * La banda partida (`split`) sigue siendo `band`: su composición es de P08,
+   * con los bloques editoriales del CMS. `auto` no puede resolver a algo que
+   * nadie pinta —sería un contrato que dice que cambia algo y no cambia nada—.
    */
-  premium: { product: 'spotlight', brands: 'cards', offers: 'band', bleedOffers: true },
+  premium: { product: 'spotlight', brands: 'logos', offers: 'band', bleedOffers: true },
   /**
    * Catalog · productividad.
    *
    * Carrusel y contenido contenido: la primera pantalla tiene que ser catálogo,
    * no decoración a sangre.
    */
-  // `cards` y no `logos` por lo mismo que en Premium: el muro de logotipos es
-  // de P07, y `auto` no puede resolver a algo que nadie pinta. Se cambia allí,
-  // en una línea, cuando el componente exista.
-  catalog: { product: 'rail', brands: 'cards', offers: 'band', bleedOffers: false },
+  /**
+   * `logos` también en Catalog, y por un motivo distinto del de Premium: en un
+   * catálogo de miles de referencias, la marca es una forma de ACOTAR, y un muro
+   * se recorre con la vista más rápido que una fila de tarjetas con su cuenta.
+   */
+  catalog: { product: 'rail', brands: 'logos', offers: 'band', bleedOffers: false },
 }
 
 /** Lo que `auto` resuelve para las familias: lo que el contrato del tema dice. */

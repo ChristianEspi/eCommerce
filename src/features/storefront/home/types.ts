@@ -167,6 +167,16 @@ export interface HomeSectionData {
    * por su cuenta es una dependencia que no se ve al leer el registro.
    */
   readonly destacadosAparte: boolean
+
+  /**
+   * ¿Está `brands` encendida como sección propia? (Storefront V3 · P07)
+   *
+   * La misma coordinación que `destacadosAparte`, y por el mismo motivo: las dos
+   * secciones de marcas salen de la misma lista, y con las dos encendidas la
+   * portada enseñaba dos veces lo mismo. `trust` se calla cuando `brands` ya lo
+   * dijo.
+   */
+  readonly marcasAparte: boolean
 }
 
 /**

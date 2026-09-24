@@ -148,11 +148,23 @@ describe('`auto` resuelve por tema, nunca por rubro', () => {
      * La regla que evita repetir el fallo de `heroVariant` en V2: estuvo tres
      * fases declarado y sin consumidor.
      *
-     * El muro de logotipos y la banda partida son de P07. Hasta entonces `auto`
-     * no puede resolverlos, aunque la lista cerrada ya los acepte — un contrato
-     * que dice que algo cambia y no cambia nada es peor que no tenerlo.
+     * El muro de logotipos entra en la lista en P07, cuando `BrandLogoWall`
+     * existe de verdad: hasta esa fase `auto` no podía resolverlo, aunque la
+     * lista cerrada ya lo aceptara. La banda partida (`split`) sigue fuera —es
+     * de P08— y por eso ningún tema la resuelve todavía; un contrato que dice
+     * que algo cambia y no cambia nada es peor que no tenerlo.
      */
-    const pintadas = ['rail', 'grid', 'spotlight', 'cards', 'band', 'tiles', 'pills', 'mosaic']
+    const pintadas = [
+      'rail',
+      'grid',
+      'spotlight',
+      'cards',
+      'logos',
+      'band',
+      'tiles',
+      'pills',
+      'mosaic',
+    ]
     for (const preset of THEME_PRESET_IDS) {
       for (const id of HOME_SECTION_IDS) {
         const { variant } = resolver(id, preset)

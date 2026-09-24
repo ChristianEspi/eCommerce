@@ -40,6 +40,11 @@ export function BrandTrustStrip({
     <Stack
       component="section"
       aria-label={t('store.trust.title')}
+      // Marca estructural: la franja y la sección de marcas salen de la misma
+      // lista, y el compositor apaga esta cuando la otra está encendida. Poder
+      // señalarla sin depender de cómo esté redactado hoy su título es lo que
+      // hace comprobable esa regla (V3 · P07).
+      data-brand-trust="true"
       sx={{
         gap: 1.5,
         p: { xs: 2, md: 3 },

@@ -632,6 +632,21 @@ export function StoreHomePage() {
   )
 
   /**
+   * ¿Están las MARCAS encendidas como sección propia? (Storefront V3 · P07)
+   *
+   * La misma coordinación, por el mismo motivo. `brands` y `trust` salen de la
+   * misma lista de marcas: con las dos encendidas, la portada enseñaba dos veces
+   * lo mismo con dos maquetaciones distintas, y eso se lee como un fallo de la
+   * tienda y no como una decisión.
+   *
+   * Vive aquí y no en un `useContext` porque una sección que consulta a otra por
+   * su cuenta es una dependencia que no se ve al leer el registro.
+   */
+  const marcasAparte = tema.layout.sections.some(
+    (seccion) => seccion.id === 'brands' && seccion.enabled,
+  )
+
+  /**
    * H07 · Las familias para la sección `categories`: raíces, en el orden que el
    * comercio les dio. Salen de la MISMA consulta que la barra de la cabecera
    * (`usePublicCategories` comparte clave), así que no cuestan una petición.
@@ -747,6 +762,7 @@ export function StoreHomePage() {
     onPrefetch: prefetchProduct,
     onSelectBrand: (code) => update('b', code),
     destacadosAparte,
+    marcasAparte,
   }
 
   return (

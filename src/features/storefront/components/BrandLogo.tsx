@@ -40,14 +40,34 @@ export function BrandLogo({
   name,
   url,
   size,
+  marco = 'tarjeta',
 }: {
   name: string
   /** URL ya firmada, o `null` si la marca no tiene logo. */
   url: string | null
   size: number
+  /**
+   * Cómo se enmarca el logo (Storefront V3 · P07).
+   *
+   * `tarjeta` es el de siempre: hueco con fondo de tarjeta y línea alrededor.
+   * Es lo correcto dentro de una tarjeta de marca, donde el logo es un dato más
+   * junto al nombre y la cuenta, y la línea lo separa de ellos.
+   *
+   * `limpio` quita la línea y el fondo. Lo pide el muro de logotipos: un muro
+   * es reconocimiento, y doce recuadros de 1 px alrededor de doce identidades
+   * ajenas convierten el muro en una tabla. El hueco sigue siendo del mismo
+   * tamaño y el logo sigue `contain` — lo que se va es la caja, no la
+   * protección contra el estirado ni contra el salto de contenido.
+   *
+   * Lo que NO hace `limpio` es tocar los colores del archivo: si el logotipo
+   * trae su propio fondo, ese fondo se ve. Recortarlo o pasarlo a monocromo
+   * sería editar la identidad de un tercero.
+   */
+  marco?: 'tarjeta' | 'limpio'
 }) {
   const [roto, setRoto] = useState(false)
   const tinte = tintFor(name)
+  const limpio = marco === 'limpio'
 
   if (url && !roto) {
     return (
@@ -62,10 +82,11 @@ export function BrandLogo({
           borderRadius: 'var(--sf-radius-sm)',
           // Fondo de la tarjeta y no el tinte: un logo viene casi siempre sobre
           // blanco, y ponerlo sobre un pastel lo deja con un halo cuadrado.
-          bgcolor: 'var(--card)',
-          border: '1px solid var(--sf-line)',
+          // En el muro no hay caja: el azulejo ya da el aire, y la línea sobraba.
+          bgcolor: limpio ? 'transparent' : 'var(--card)',
+          border: limpio ? 'none' : '1px solid var(--sf-line)',
           overflow: 'hidden',
-          p: 0.5,
+          p: limpio ? 0 : 0.5,
         }}
       >
         {/* Un `<img>` de verdad y no `Box component="img"`: MUI se queda

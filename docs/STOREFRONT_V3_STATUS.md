@@ -658,7 +658,7 @@ de 150 px, que es donde un nombre de producto deja de entrar en dos líneas.
 
 # P06 · Home Layout V2: merchandising y full bleed
 
-**Commit:** `<pendiente>` · **Ciclos correctivos:** 3 de 3
+**Commit:** `128cdeb` · **Ciclos correctivos:** 3 de 3
 
 ## El problema
 
@@ -778,5 +778,177 @@ actualiza ninguna fila.**
 | `npm run build` | **PASS** |
 | `npm run test:db` | **PASS** — 137 ficheros, 3653 tests |
 | `npm run bundle:report` | **PASS** — portada 402,6 kB (techo 405) |
+
+`PHASE_RESULT: PASS`
+
+---
+
+# P07 · Mosaico de familias y muro de logotipos
+
+`ESTADO: PASS`
+
+## Qué se hizo, y qué pregunta contesta cada pieza
+
+V2 ya aceptaba foto de categoría y logotipo de marca; lo que no había era una
+composición que los aprovechara. Las familias salían siempre como cuatro puertas
+del mismo tamaño y las marcas siempre como tarjetas con su cuenta de productos —
+dos respuestas correctas, usadas también donde la pregunta era otra.
+
+### El mosaico (`CategoryMosaic`)
+
+Los azulejos reparten la atención a partes iguales: cuatro puertas del mismo
+tamaño dicen «estas cuatro cosas valen lo mismo». Es lo correcto cuando ninguna
+familia manda, y sigue siendo lo de Universal y Retail.
+
+El mosaico dice **cuál manda**: la primera familia ocupa el doble de área en las
+dos direcciones, y eso es lo que convierte una fila de puertas en una portada
+editorial.
+
+Tres decisiones que no se ven pero sostienen el resto:
+
+- **No reordena.** La pieza principal es la primera que ordenó el comercio, no
+  la que tenga mejor foto. Subir al frente «la que queda bien» sería decidir por
+  él cuál es su familia principal.
+- **Con una o dos familias no destaca nada.** Una puerta «destacada» sobre nada
+  no destaca: queda un hueco. De tres en adelante hay jerarquía que enseñar.
+- **Tope de seis.** Un mosaico de diez piezas deja de tener jerarquía y pasa a
+  ser una cuadrícula irregular. Lo que pase de seis se queda fuera, y la sección
+  sigue teniendo su salida al catálogo.
+
+Y las puertas son **las mismas** de los azulejos (`CategoryDoor`): misma foto,
+mismo tinte de reserva, mismo icono, mismo enlace con su filtro. Un mosaico con
+otro tipo de puerta serían dos componentes que hay que arreglar dos veces.
+
+**En el teléfono no hay mosaico.** En 390 px, «el doble de área» es una puerta
+que ocupa media pantalla y dos que no se leen. El `span` vive dentro del `@media`
+de escritorio y la base son dos columnas iguales — que es el error clásico de
+los mosaicos, y hay una prueba que se pone roja el día que alguien lo saque del
+`md`.
+
+### El muro de logotipos (`BrandLogoWall`)
+
+Las tarjetas dan a cada marca su caja, su nombre y su **cuenta de productos**:
+es lo correcto cuando la marca es un FILTRO y quien busca quiere saber cuántas
+referencias hay detrás.
+
+Un muro no informa, **reconoce**. Quien duda de una tienda en línea deja de
+dudar cuando ve nombres que ya conoce, y para eso el logotipo tiene que estar
+limpio: sin caja, sin tinte y sin «12 productos» al lado. Columnas `auto-fit`
+con mínimo en `clamp`, así que se lee igual con tres marcas y con treinta.
+
+Lo que **no** se hace con una identidad ajena:
+
+- **No se deforma**: `contain` y hueco de tamaño fijo. Un logotipo apaisado
+  recortado a un cuadrado es un trozo de letra.
+- **No se pinta en gris.** Pasar todos los logotipos a monocromo queda ordenado
+  y cambia la identidad de cada marca, que no es nuestra. Si algún día se ofrece,
+  será una opción explícita del comercio, no un defecto.
+- **No se inventa.** La marca sin logotipo cae a su monograma, que es lo que ya
+  hacía `BrandLogo`.
+
+Para quitar la caja sin perder lo que la hacía segura, `BrandLogo` estrena
+`marco: 'tarjeta' | 'limpio'`: `limpio` quita la línea y el fondo y **conserva**
+el hueco fijo —que es lo que evita el salto de contenido al cargar— y el
+`contain`.
+
+### `brands` y `trust` ya no dicen lo mismo dos veces
+
+Las dos secciones salen de la misma lista de marcas. Con las dos encendidas, la
+portada enseñaba dos veces los mismos nombres con dos maquetaciones distintas, y
+eso se lee como un fallo de la tienda, no como una decisión.
+
+`trust` **sigue en el contrato** —su trabajo es cerrar la página con nombres
+conocidos, no ofrecer un filtro— y sigue siendo la franja compacta de siempre.
+Lo que se añade es que **se calla si `brands` ya lo dijo**, con el mismo
+mecanismo que ya usaba `destacadosAparte`: un dato resuelto arriba
+(`marcasAparte`), no un `if` dentro del componente.
+
+## Diferencias con lo que sugería el prompt
+
+1. **Los azulejos del muro son BOTONES, no enlaces.** El prompt pedía
+   «navegación clara». La primera versión hacía cada logotipo un enlace a
+   `?marca=…`, y eso era un error doble: el catálogo lee el filtro de marca en
+   `?b=`, así que el enlace no filtraba nada, y además rompía la promesa de las
+   tarjetas, donde pulsar una marca filtra la vitrina que ya se está mirando y
+   volver a pulsarla la suelta. Ahora el muro usa el mismo `onSelect` —que
+   escribe `?b=` en la URL, con lo que el filtro se comparte y el botón de atrás
+   lo deshace— y la salida al catálogo completo está en la cabecera, donde
+   también la tienen las tarjetas.
+2. **La cuenta de productos no se «muestra si existe» en el muro.** El prompt la
+   admitía en `cards` y el modelo la tiene siempre (sale de las facetas del
+   buscador). En el muro se omite igual: en una composición de reconocimiento,
+   «12 productos» es ruido. Quien quiera el dato lo tiene en las tarjetas y en el
+   catálogo, donde la marca sí es un filtro.
+3. **El muro se queda ESTÁTICO en el paquete de la portada.** Sacarlo a su propio
+   trozo parecía gratis —lo ve una minoría de las tiendas— y sale al revés:
+   comparte `BrandRow`, `BrandLogo` y `SectionHeading` con la fila de marcas, que
+   ya viaja en la portada. El empaquetador acaba con un trozo aparte que depende
+   **estáticamente** del de la portada: los mismos bytes en el primer pintado,
+   una petición más, y la portada deja de ser un punto de entrada con nombre
+   propio, con lo que el informe de bundle ya no la encuentra. Medido: 403,0 kB
+   en los dos casos. El mosaico sí va por `lazy`, porque solo arrastra
+   `CategoryDoors`, que también es perezoso.
+
+## Archivos principales
+
+| Archivo | Qué cambia |
+|---|---|
+| `components/CategoryMosaic.tsx` | **Nuevo.** Reparto por cantidad, tope de seis, pieza principal solo en escritorio, `data-category-mosaic` / `data-mosaic-cell`. |
+| `components/BrandLogoWall.tsx` | **Nuevo.** Muro `auto-fit`, azulejos que filtran, nombre debajo, sin cuenta, `data-brand-wall` / `data-brand-tile`. |
+| `components/BrandLogo.tsx` | `marco: 'tarjeta' \| 'limpio'`; sin caja no se pierde el hueco fijo ni el `contain`. |
+| `components/BrandTrustStrip.tsx` | `data-brand-trust`: marca estructural para poder comprobar que se calla sin depender de cómo esté redactado su título. |
+| `home/SectionRegistry.tsx` | Rama de mosaico en `categories`, rama de muro en `brands`, `trust` mudo cuando `brands` está encendida. |
+| `home/types.ts` · `StoreHomePage.tsx` | `marcasAparte`, resuelto donde ya se resuelve `destacadosAparte`. |
+| `theme/presentation.ts` | Premium y Catalog resuelven `logos`; Premium ya resolvía `mosaic`. |
+
+**Migraciones: ninguna.** El contrato de presentación de P06 ya aceptaba
+`mosaic` y `logos` en base; esta fase solo los pinta.
+
+## Ciclos correctivos
+
+1. La prueba de P06 «ningún tema resuelve una variante que nadie pinta todavía»
+   se puso roja a propósito: era la guardia que impedía declarar `logos` antes de
+   tener el componente. Al existir el muro, `logos` entra en la lista de
+   pintadas; `split` sigue fuera, que es de P08.
+2. `getComputedStyle` no sirve para lo que este mosaico tiene que defender: jsdom
+   no evalúa media queries y de un valor por punto de ruptura devuelve la cadena
+   vacía. Se leen las reglas que el sistema de estilos inyecta, con sus `@media`
+   intactos, y así la prueba dice literalmente «dos columnas en el teléfono,
+   `span 2` solo a partir de 900 px».
+3. Dos locators míos estaban mal: el `aria-label` de la sección de familias y el
+   del propio mosaico son el mismo texto —había que señalar el mosaico por su
+   atributo—, y `BrandRow` traduce con su propio `useI18n`, no con la `t` de
+   identidad del compositor, así que la de-duplicación se comprueba por
+   estructura (`#marcas` / `[data-brand-trust]`) y no por una cadena.
+4. El intento de sacar el muro a su propio trozo (ver diferencia 3) rompió la
+   atribución del informe de bundle. Revertido, con el porqué escrito donde está
+   el import.
+
+## Tests
+
+| Archivo | Casos |
+|---|---|
+| `components/category-brand-v3.test.tsx` | **Nuevo**, 21. Mosaico con 1, 2, 3, 6 y 10 familias; no reordena; familia con foto y sin foto; el enlace conserva ruta y filtro; en el teléfono dos columnas y el doble de área **solo** en escritorio. Muro: logotipo entero sin estirar con su hueco reservado, marca sin logotipo al monograma, sin caja —y la misma marca **sí** con línea dentro de una tarjeta—, sin cuenta de productos, sin marcas no pinta sección, azulejo que filtra y se suelta, salida al catálogo intacta. Y ninguna de las dos composiciones nombra un rubro. |
+| `home/HomeComposer.test.tsx` | +7. La sección pedida en mosaico se pinta en mosaico y sin pedir nada siguen los azulejos; las marcas pedidas como logotipos se pintan como muro y sin pedir nada siguen las tarjetas con su cuenta; la franja de cierre sola se pinta, se calla con `brands` encendida y vuelve al apagarla. |
+| `theme/presentation.test.ts` | Lista de variantes pintadas al día: entra `logos`, `split` sigue fuera. |
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 309 ficheros, 6150 tests |
+| `npm run build` | **PASS** |
+| `npm run bundle:report` | **PASS** — portada 403,0 kB (techo 405) |
+
+`npm run test:db` no se repite: esta fase no toca base ni migraciones.
+
+## Pendiente real
+
+El techo de la portada queda a **2 kB**. P08 trae bloques editoriales del CMS y
+la banda partida; si no caben, lo que hay que mover a `lazy` es algo que **no**
+comparta módulos con la portada eager — el muro de logotipos ya demostró que
+partir por ahí no ahorra nada.
 
 `PHASE_RESULT: PASS`

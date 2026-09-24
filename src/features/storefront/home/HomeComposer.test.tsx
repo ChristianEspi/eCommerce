@@ -107,6 +107,7 @@ function datos(overrides: Partial<HomeSectionData> = {}): HomeSectionData {
     onPrefetch: vi.fn(),
     onSelectBrand: vi.fn(),
     destacadosAparte: false,
+    marcasAparte: false,
     ...overrides,
   } as HomeSectionData
 }
@@ -427,5 +428,109 @@ describe('el copy de las demás filas dice lo que el dato sabe', () => {
 
     expect(screen.getByText('store.row.newSubtitle')).toBeInTheDocument()
     expect(screen.getByText('store.row.newEyebrow')).toBeInTheDocument()
+  })
+})
+
+/**
+ * Storefront V3 · P07 · Cómo se ENSEÑAN las familias y las marcas.
+ *
+ * La sección es la misma —los mismos datos, el mismo enlace, el mismo filtro—
+ * y lo que cambia es la composición. Eso tiene que venir de la presentación
+ * resuelta (sección → tema), nunca de un `if` sobre el rubro del comercio
+ * dentro del registro.
+ */
+describe('las familias y las marcas cambian de composición, no de contenido', () => {
+  const FAMILIAS = [
+    { category_id: 'c-1', name: 'Familia 1', slug: 'familia-1' },
+    { category_id: 'c-2', name: 'Familia 2', slug: 'familia-2' },
+    { category_id: 'c-3', name: 'Familia 3', slug: 'familia-3' },
+  ]
+
+  it('la sección pedida en mosaico se pinta en mosaico', async () => {
+    pintar(
+      layout([
+        {
+          id: 'categories',
+          enabled: true,
+          presentation: { variant: 'mosaic', surface: 'plain', width: 'contained' },
+        },
+      ]),
+      datos({ categorias: FAMILIAS }),
+    )
+
+    // El mosaico llega por `lazy`, como las puertas: primero hay que esperar a
+    // que el trozo esté.
+    await screen.findByRole('link', { name: /Familia 1/ })
+    expect(document.querySelector('[data-category-mosaic]')).toHaveAttribute(
+      'data-category-mosaic',
+      '3',
+    )
+  })
+
+  it('sin pedir nada, el tema por defecto sigue dando azulejos', async () => {
+    pintar(layout([{ id: 'categories', enabled: true }]), datos({ categorias: FAMILIAS }))
+
+    // Las puertas siguen ahí —el enlace con su filtro es el de siempre— pero
+    // ninguna manda sobre las otras.
+    expect(await screen.findByRole('link', { name: /Familia 1/ })).toHaveAttribute(
+      'href',
+      '/s/botica?c=familia-1',
+    )
+    expect(document.querySelector('[data-category-mosaic]')).toBeNull()
+  })
+
+  it('las marcas pedidas como logotipos se pintan como muro', () => {
+    pintar(
+      layout([
+        {
+          id: 'brands',
+          enabled: true,
+          presentation: { variant: 'logos', surface: 'plain', width: 'contained' },
+        },
+      ]),
+    )
+
+    expect(document.querySelector('[data-brand-wall]')).toHaveAttribute('data-brand-wall', '1')
+    // El muro reconoce; no informa. La cuenta de productos es de la tarjeta.
+    expect(screen.queryByText(/\b4\b/)).not.toBeInTheDocument()
+  })
+
+  it('sin pedir nada, las marcas siguen siendo tarjetas con su cuenta', () => {
+    pintar(layout([{ id: 'brands', enabled: true }]))
+
+    expect(document.querySelector('[data-brand-wall]')).toBeNull()
+    expect(screen.getAllByText('Genfar').length).toBeGreaterThan(0)
+  })
+})
+
+describe('marcas y reconocimiento no se pintan dos veces', () => {
+  it('la franja de cierre sola se pinta', () => {
+    pintar(layout([{ id: 'trust', enabled: true }]))
+
+    expect(document.querySelector('[data-brand-trust]')).not.toBeNull()
+    expect(screen.getAllByText('Genfar').length).toBeGreaterThan(0)
+  })
+
+  it('con la sección de marcas encendida, la franja se calla', () => {
+    // Las dos salen de la misma lista: con las dos encendidas la portada
+    // enseñaba dos veces lo mismo con dos maquetaciones distintas, y eso se lee
+    // como un fallo de la tienda.
+    pintar(
+      layout([
+        { id: 'brands', enabled: true },
+        { id: 'trust', enabled: true },
+      ]),
+      datos({ marcasAparte: true }),
+    )
+
+    // La sección de marcas sigue ahí —es la que ofrece el filtro—; la franja no.
+    expect(document.querySelector('#marcas')).not.toBeNull()
+    expect(document.querySelector('[data-brand-trust]')).toBeNull()
+  })
+
+  it('y sigue en el contrato: apagar `brands` la devuelve', () => {
+    pintar(layout([{ id: 'trust', enabled: true }]), datos({ marcasAparte: false }))
+
+    expect(document.querySelector('[data-brand-trust]')).not.toBeNull()
   })
 })
