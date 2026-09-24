@@ -1775,3 +1775,170 @@ si P13 o P14 necesitan margen ahí, el candidato es la vista previa del taller
 por `lazy` —solo se pinta en escritorio y es la mitad de la pantalla.
 
 `PHASE_RESULT: PASS`
+
+---
+
+# P13 · Paridad de la vista previa y matriz visual
+
+`ESTADO: PASS` · `PLAYWRIGHT: NOT_RUN`
+
+## El desvío, que es el problema real
+
+La vista previa del taller aproxima la tienda con piezas propias
+(`PreviewHeader`, `PreviewCard`, `PuertasDeEjemplo`…), y **tiene que hacerlo**:
+compartir el árbol entero de la vitrina arrastraría carrito, sesión y consultas
+al backoffice para dibujar una caja. El precio de aproximar es el desvío: cada
+vez que la vitrina estrena una composición, la vista previa se queda enseñando
+la anterior.
+
+Y es medible. Al empezar la fase, con seis fases de V3 encima, la vista previa
+**no representaba nada** de: las tres composiciones de cabecera (P03), la barra
+de avisos (P01), el lockup elegido (P01), la tarjeta editorial (P05), el mosaico
+de familias (P07), el muro de logotipos (P07) ni el merchandising de la portada
+—superficie y ancho a sangre— (P06). Siete opciones del formulario que el
+comercio no podía evaluar.
+
+## Lo que se comparte de verdad
+
+Tres piezas de la vitrina se usan **tal cual** en el taller, porque son
+presentacionales puras —reciben datos y devuelven marcado, sin consultas, sin
+carrito y sin sesión—:
+
+| Pieza | Qué aporta |
+|---|---|
+| `StoreBrandLockup` | Resuelve él mismo el lockup, así que sin logotipo «solo logotipo» **cae al nombre** en los dos lados. Estrena `storeSlug=""`: sin destino no se pinta como enlace, porque en una vista previa no hay a dónde ir. |
+| `StoreAnnouncementBar` | Sanea la lista con el mismo `sanitizeAnnouncements`: lo que la vitrina descarta, el taller también. |
+| `StoreSectionFrame` | El `50vw` del ancho a sangre vive en un solo sitio desde P06, y ahora el taller lo usa en vez de calcular el suyo. |
+
+Y la presentación de cada sección se resuelve con el **mismo**
+`resolveSectionPresentation`, así que el panel de P12 por fin cambia algo
+visible: el fondo de la banda, el ancho a sangre y la composición que el tema
+resuelve para `auto`.
+
+## Lo que se sigue aproximando, y por qué
+
+La cabecera completa, las puertas de familia, el muro de logotipos y la tarjeta
+de producto. Los cuatro arrastran lo que el encargo dice que no hay que
+arrastrar: buscador con sugerencias y carrito con su proveedor; enlaces a rutas
+de la vitrina que sacarían al comercio de la pantalla que está configurando;
+`useCart` y la cotización comercial de la tarjeta real.
+
+La regla que se añade es que **cada aproximación declara qué representa**:
+`data-preview-header`, `data-preview-card`, `data-preview-categories`,
+`data-preview-cat-cell`, `data-preview-brands`. Eso es lo que convierte el
+desvío en algo que una prueba puede ver: una variante nueva sin representación
+sale en rojo.
+
+Nuevas representaciones de esta fase: las tres cabeceras (la de marca con sus
+dos alturas), la tarjeta editorial **sin caja**, el mosaico con su pieza
+principal al doble, el muro de logotipos frente a las tarjetas, y la barra de
+avisos cuando el comercio escribió alguno.
+
+## La matriz visual
+
+`e2e/visual-matrix.e2e.ts`: nueve celdas de vitrina —portada, catálogo y ficha ×
+1280, 768 y 390— más el taller con sus cuatro temas en foco y la comparación.
+
+**No compara capturas contra una imagen de referencia, y es deliberado.** La
+vitrina de demostración es un catálogo REAL que cambia —precios, stock, fotos
+nuevas—, y una referencia de píxeles contra datos que cambian se pone roja cada
+semana por motivos que no son defectos; un umbral generoso para compensarlo es
+una referencia que ya no detecta nada. Lo que cada celda comprueba es
+comprobable:
+
+1. **que la página no se arrastra de lado** —el fallo más caro de una vitrina, y
+   el que jsdom no puede ver porque no calcula diseño—;
+2. **que la frontera del tema declara lo que le toca** en el DOM real;
+3. **que las piezas de V3 llegan al navegador**: composición de cabecera, de
+   portada, de tarjeta, la barra del catálogo, la columna de filtros escondida en
+   el teléfono, la zona de detalle de la ficha y la barra de compra —que en
+   escritorio **no debe existir**—;
+4. **que la consola está limpia**, con el vigilante que ya tenía la suite.
+
+Y guarda una captura de cada celda en `test-results/visual` como artefacto para
+la revisión de diseño: documentación, no aserción.
+
+`reducedMotion: 'reduce'` en todo el archivo. No es solo para que la captura no
+salga a medio movimiento: la vitrina **respeta** esa preferencia —el carrusel no
+gira, la barra de avisos no rota—, así que apagarla también comprueba que ese
+respeto funciona en un navegador de verdad.
+
+El tema de la tienda **no se cambia** desde las pruebas: dejaría la demo con el
+que dejó la última ejecución. Los cuatro se recorren en el taller, que resuelve
+el tema del formulario sin guardar — el único sitio donde se pueden ver los
+cuatro sin tocarle la tienda a nadie.
+
+## Playwright: `NOT_RUN`, con el motivo exacto
+
+```
+Error: browserType.launch: Executable doesn't exist at
+C:\Users\...\AppData\Local\ms-playwright\chromium_headless_shell-1243\...
+```
+
+No hay binario de navegador en esta máquina. Las diez celdas están escritas,
+`npx playwright test --list` las descubre, y se ejecutan con:
+
+```powershell
+npx playwright install chromium
+npx playwright test --project=escritorio visual-matrix
+```
+
+Necesita además el servidor de desarrollo con `.env` (lo levanta la propia
+configuración) y una sesión de backoffice para la celda del taller —sin ella esa
+celda **se salta a sí misma con su motivo escrito**, en vez de fallar: una prueba
+roja por falta de entorno enseña a ignorar el rojo. **No se declara PASS.**
+
+## Archivos principales
+
+| Archivo | Qué cambia |
+|---|---|
+| `settings/StorefrontPreview.tsx` | Cabecera con las tres composiciones y las piezas reales; `PreviewIdentity`; secciones envueltas en el marco real con su presentación resuelta; tarjeta editorial, mosaico y muro de logotipos. |
+| `settings/StorefrontDesignSection.tsx` | Baja la identidad del formulario a la vista previa. |
+| `storefront/components/StoreBrandLockup.tsx` | `storeSlug=""` → sin enlace. |
+| `settings/preview-parity.test.tsx` | **Nuevo.** Las pruebas de paridad. |
+| `e2e/visual-matrix.e2e.ts` | **Nuevo.** La matriz. |
+| `playwright.config.ts` | El proyecto `movil` ignora la matriz: fija su propio ancho por celda, correrla dos veces sería el mismo resultado. |
+
+**Migraciones: ninguna.**
+
+## Ciclos correctivos
+
+1. Tres suposiciones mías sobre las piezas compartidas: `StoreBrandLockup`
+   recibe un objeto `store` —no props sueltas— y resuelve el lockup él mismo;
+   `StoreAnnouncementBar` sanea la lista cruda; y `ResolvedStoreTheme` **no**
+   lleva identidad, y no debe: el tema decide presentación y la identidad es
+   contenido del comercio. Por eso viaja como `PreviewIdentity` aparte.
+2. El lockup real renderiza un `Link` a `/s/{slug}`, que dentro del taller
+   sacaría al comercio de la pantalla. En vez de duplicar el componente, acepta
+   destino vacío y se pinta sin enlace.
+3. Dejé una aserción de relleno (`typeof StorefrontLayout === 'function'`) que no
+   comprobaba nada. Fuera: esa mitad de la paridad la cubren
+   `layout-theme.test.tsx` y `header-v3.test.tsx` sobre el árbol real, y un test
+   que no comprueba nada da una falsa sensación de cobertura.
+
+## Tests
+
+| Archivo | Casos |
+|---|---|
+| `settings/preview-parity.test.tsx` | **Nuevo**, 15. El lockup: sin logotipo los dos lados caen al nombre, con logotipo y lockup de solo logotipo los dos dicen `logo`, y en el taller no es un enlace. La barra de avisos: lo que la vitrina descarta el taller también, y sin avisos ninguno la pinta. Representación: las tres cabeceras se distinguen, la editorial pierde la caja, el mosaico destaca la primera, el muro se distingue de las tarjetas, y la sección a sangre usa el **marco real**. Y los cuatro temas pintan su cabecera, su tarjeta y sus familias, con los mismos atributos que la vitrina. |
+| `e2e/visual-matrix.e2e.ts` | **Nuevo**, 10 celdas. `NOT_RUN` en esta máquina. |
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 313 ficheros, 6280 tests |
+| `npm run build` | **PASS** |
+| `npm run bundle:report` | **PASS** — portada 398,8 kB · ficha 391,2 kB · backoffice 425,7 kB |
+| `npm run scan:secrets` | **PASS** |
+| Playwright | **NOT_RUN** — sin binario de navegador. Motivo y comandos arriba. |
+
+## Pendiente real
+
+Ejecutar la matriz en una máquina con navegador. Es el único gate de todo V3 que
+queda sin correr, y lo que falta no es código: es `npx playwright install
+chromium` y un entorno con `.env`.
+
+`PHASE_RESULT: PASS`

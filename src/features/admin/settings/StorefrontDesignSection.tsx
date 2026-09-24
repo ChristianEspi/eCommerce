@@ -360,6 +360,19 @@ export function StorefrontDesignSection({
           themePreset={preset}
           style={estilo}
           layout={form.watch('home_layout')}
+          /**
+           * La identidad del comercio, sin guardar (V3 · P13).
+           *
+           * Es lo que le da paridad a la cabecera: el lockup elegido, el
+           * logotipo —o su ausencia, que cambia lo que se pinta— y los avisos
+           * escritos. Los tres se editan en Marca y se MIRAN aquí, que es la
+           * división que P12 dejó escrita.
+           */
+          identity={{
+            logoUrl: form.watch('logo_url'),
+            brandLockup: form.watch('brand_lockup'),
+            announcements: form.watch('announcement_messages'),
+          }}
         />
       </Box>
     </Box>

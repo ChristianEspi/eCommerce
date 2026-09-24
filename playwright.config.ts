@@ -59,7 +59,17 @@ export default defineConfig({
    */
   projects: [
     { name: 'escritorio', testIgnore: '**/commerce/**', use: { ...devices['Desktop Chrome'] } },
-    { name: 'movil', testIgnore: '**/commerce/**', use: { ...devices['Pixel 5'] } },
+    /**
+     * `movil` ignora la matriz visual de V3 · P13 a propósito: esa suite fija su
+     * propio ancho en cada celda —1280, 768 y 390— así que correrla también en
+     * un proyecto de teléfono sería ejecutar las mismas nueve celdas dos veces
+     * con el mismo resultado.
+     */
+    {
+      name: 'movil',
+      testIgnore: ['**/commerce/**', '**/visual-matrix.e2e.ts'],
+      use: { ...devices['Pixel 5'] },
+    },
     {
       name: 'comercio-escritorio',
       testMatch: '**/commerce/*.e2e.ts',

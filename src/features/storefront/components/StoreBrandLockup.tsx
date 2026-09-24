@@ -36,6 +36,14 @@ export function StoreBrandLockup({
     readonly logo_url?: string | null
     readonly brand_lockup?: string | null
   }
+  /**
+   * La tienda a la que lleva al pulsarlo.
+   *
+   * Cadena VACÍA = no lleva a ningún sitio y se pinta sin enlace. Lo usa la
+   * vista previa del backoffice (V3 · P13): allí el lockup se mira, no se
+   * navega, y un enlace a la vitrina dentro del taller sacaría al comercio de
+   * la pantalla que está configurando.
+   */
   storeSlug: string
   /**
    * Cuánto protagonismo le da la composición.
@@ -57,8 +65,7 @@ export function StoreBrandLockup({
 
   return (
     <Box
-      component={Link}
-      to={`/s/${storeSlug}`}
+      {...(storeSlug ? { component: Link, to: `/s/${storeSlug}` } : {})}
       data-brand-lockup={lockup}
       sx={{
         display: 'flex',
