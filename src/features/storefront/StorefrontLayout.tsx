@@ -38,7 +38,6 @@ import { initials } from './branding'
 import { StoreCategoryNav } from './components/StoreCategoryNav'
 import { StoreFooter } from './components/StoreFooter'
 import { StoreQuickSearch } from './components/StoreQuickSearch'
-import { AssistantDrawer } from './components/AssistantDrawer'
 import { CartDrawer } from './cart/CartDrawer'
 import { CartProvider } from './cart/CartProvider'
 import { useCart } from './cart/cart-context'
@@ -67,6 +66,22 @@ import '@fontsource/plus-jakarta-sans/latin-500.css'
 import '@fontsource/plus-jakarta-sans/latin-700.css'
 import '@fontsource/plus-jakarta-sans/latin-800.css'
 import './storefront.css'
+
+/**
+ * El asistente, por `lazy` y montado solo cuando se abre (P14).
+ *
+ * Estaba SIEMPRE montado —cerrado, pero montado— así que toda visita a la
+ * tienda descargaba su cajón, su conversación y la tarjeta de producto que
+ * pinta dentro. Es una pantalla que se abre pulsando un botón flotante: quien
+ * no lo pulsa no debería pagarla en el primer pintado.
+ *
+ * `asistenteUsado` existe para que la animación de cierre siga viéndose: una
+ * vez abierto, el cajón se queda montado y se cierra como siempre. Desmontarlo
+ * al cerrar lo haría desaparecer de golpe.
+ */
+const AssistantDrawer = lazy(() =>
+  import('./components/AssistantDrawer').then((modulo) => ({ default: modulo.AssistantDrawer })),
+)
 
 /** Solo se descarga con sesión: ver el comentario donde se monta. */
 const CommerceContextBar = lazy(() =>
@@ -100,6 +115,7 @@ export function StorefrontLayout() {
   // Antes de cualquier retorno temprano: el orden de los hooks no puede
   // depender de si la tienda cargo.
   const [asistenteAbierto, setAsistenteAbierto] = useState(false)
+  const [asistenteUsado, setAsistenteUsado] = useState(false)
   const enCheckout = /\/checkout\/?$/.test(pathname)
   // La sesión no cambia NADA de lo que se ve del catálogo —la vitrina se lee
   // siempre con el cliente anónimo— pero sí decide de quién es el carrito: con
@@ -228,7 +244,10 @@ export function StorefrontLayout() {
       <Fab
         color="primary"
         aria-label={t('store.assistant.open')}
-        onClick={() => setAsistenteAbierto(true)}
+        onClick={() => {
+          setAsistenteUsado(true)
+          setAsistenteAbierto(true)
+        }}
         sx={{
           position: 'fixed',
           right: { xs: 16, md: 24 },
@@ -240,12 +259,16 @@ export function StorefrontLayout() {
       </Fab>
       )}
 
-      <AssistantDrawer
-        open={asistenteAbierto}
-        onClose={() => setAsistenteAbierto(false)}
-        storeSlug={storeSlug as string}
-        storeId={store.store_id}
-      />
+      {asistenteUsado && (
+        <Suspense fallback={null}>
+          <AssistantDrawer
+            open={asistenteAbierto}
+            onClose={() => setAsistenteAbierto(false)}
+            storeSlug={storeSlug as string}
+            storeId={store.store_id}
+          />
+        </Suspense>
+      )}
           </StorefrontSurface>
         </StorefrontThemeProvider>
       </CartProvider>
@@ -310,10 +333,20 @@ function StoreMain({ children }: { children: ReactNode }) {
       // `tabIndex={-1}`: sin esto el salto mueve el scroll pero NO el
       // foco, y el siguiente Tab vuelve al principio de la cabecera.
       tabIndex={-1}
-      maxWidth={style.contentWidth}
+      // El ancho lo pone el TEMA, no la escala de MUI: ver `--sf-content-w` en
+      // `theme-context.ts`. `maxWidth={false}` apaga el tope de MUI —1200 px en
+      // `lg`, que en un monitor de 1920 dejaba 360 px de desierto a cada lado—
+      // y deja mandar a la variable. Los gutters del contenedor se conservan.
+      maxWidth={false}
+      data-content-width={style.contentWidth}
       sx={{
         flex: 1,
+        maxWidth: 'var(--sf-content-w)',
+        mx: 'auto',
         py: { xs: 'var(--sf-main-pad)', md: 'var(--sf-main-pad-md)' },
+        // El ancla del salto de contenido no puede quedar debajo de la cabecera
+        // pegajosa.
+        scrollMarginTop: 'var(--sf-anchor-offset)',
         '&:focus': { outline: 'none' },
       }}
     >
@@ -346,10 +379,12 @@ function StoreHeader({ store, storeSlug }: { store: PublicStore; storeSlug: stri
    * Con la consulta de medios se renderiza UNO, en el sitio que le toca.
    */
   const enMovil = useMediaQuery('(max-width:899.95px)')
-  // El tema decide el ANCHO de la barra y su altura; nada de lo que la barra
-  // contiene —buscador, cuenta, carrito, familias— depende de él. Un tema que
-  // quitara uno de esos tres dejaría de ser un tema.
-  const { style } = useStorefrontTheme()
+  // El tema decide el ANCHO de la barra, su altura y el alto de la caja de
+  // búsqueda; nada de lo que la barra CONTIENE —buscador, cuenta, carrito,
+  // familias— depende de él. Un tema que quitara uno de esos tres dejaría de
+  // ser un tema. Desde P05 los tres valores viajan como variables de CSS
+  // (`--sf-content-w`, `--sf-header-h*`, `--sf-search-h`), así que aquí no hace
+  // falta leer el estilo.
 
   return (
     <Box
@@ -366,7 +401,11 @@ function StoreHeader({ store, storeSlug }: { store: PublicStore; storeSlug: stri
         borderBottom: '1px solid var(--sf-line)',
       }}
     >
-      <Container maxWidth={style.contentWidth} disableGutters>
+      <Container
+        maxWidth={false}
+        disableGutters
+        sx={{ maxWidth: 'var(--sf-content-w)', mx: 'auto' }}
+      >
         <Toolbar
           sx={{
             gap: 1.5,

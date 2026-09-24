@@ -4,19 +4,19 @@ import {
   CircularProgress,
   ClickAwayListener,
   InputBase,
-  Paper,
-  Popper,
   Stack,
-  Typography,
 } from '@mui/material'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { SearchQuery } from '@/domain'
 import { useI18n } from '@/shared/i18n/i18n-context'
-import { formatMoney } from '@/shared/lib/format'
 import { useDebouncedValue } from '@/shared/lib/useDebouncedValue'
-import { R, TS } from '@/theme/tokens'
 import { useCatalogSearch, useSignedThumbnails } from '../hooks'
+
+/** El panel de sugerencias, que no hace falta hasta que se teclea. */
+const QuickSearchPanel = lazy(() =>
+  import('./StoreQuickSearchPanel').then((modulo) => ({ default: modulo.QuickSearchPanel })),
+)
 
 /** Id de la lista. Fijo: lo referencian `aria-controls` y cada opción. */
 const LIST_ID = 'store-quick-search-list'
@@ -169,144 +169,38 @@ export function StoreQuickSearch({ storeSlug }: { storeSlug: string }) {
           )}
         </Stack>
 
-        <Popper
-          open={showPanel}
-          anchorEl={anchor.current}
-          placement="bottom-start"
-          style={{ zIndex: 1300, width: anchor.current?.offsetWidth }}
-        >
-          <Paper
-            elevation={0}
-            sx={{
-              mt: 0.5,
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--sf-radius-sm)',
-              boxShadow: 'var(--shadow-lg)',
-              overflow: 'hidden',
-            }}
-          >
-            {hits.length === 0 ? (
-              <Typography sx={{ p: 2, fontSize: TS.body, color: 'var(--muted)' }}>
-                {results.isFetching ? t('common.loading') : t('store.search.empty')}
-              </Typography>
-            ) : (
-              <Stack role="listbox" id={LIST_ID}>
-                {hits.map((hit, index) => (
-                  <Stack
-                    key={hit.productId}
-                    id={`${LIST_ID}-${hit.productId}`}
-                    component="button"
-                    type="button"
-                    role="option"
-                    aria-selected={index === cursor}
-                    direction="row"
-                    onMouseEnter={() => setCursor(index)}
-                    onClick={() => goToProduct(hit.slug)}
-                    sx={{
-                      alignItems: 'center',
-                      gap: 1.25,
-                      p: 1,
-                      width: '100%',
-                      textAlign: 'left',
-                      background: 'none',
-                      border: 0,
-                      borderBottom: '1px solid var(--border)',
-                      cursor: 'pointer',
-                      font: 'inherit',
-                      color: 'inherit',
-                      '&:hover, &:focus-visible': { bgcolor: 'var(--neutral-soft)' },
-                      ...(hits[cursor]?.productId === hit.productId
-                        ? { bgcolor: 'var(--neutral-soft)' }
-                        : {}),
-                    }}
-                  >
-                    <Thumb
-                      url={hit.imagePath ? (thumbnails[hit.imagePath] ?? null) : null}
-                      alt={hit.imageAlt ?? hit.name}
-                    />
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography
-                        sx={{
-                          fontSize: 13.5,
-                          fontWeight: 700,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {hit.name}
-                      </Typography>
-                      {hit.categoryName && (
-                        <Typography sx={{ fontSize: 11.5, color: 'var(--muted)' }}>
-                          {hit.categoryName}
-                        </Typography>
-                      )}
-                    </Box>
-                    {hit.price && hit.currency && (
-                      <Typography sx={{ fontSize: 13, fontWeight: 800, whiteSpace: 'nowrap' }}>
-                        {formatMoney(Number(hit.price), hit.currency, locale)}
-                      </Typography>
-                    )}
-                  </Stack>
-                ))}
+        {/* La lista de sugerencias llega por `lazy` (Storefront V2 · P14).
 
-                <Stack
-                  component="button"
-                  type="button"
-                  onClick={goToCatalog}
-                  sx={{
-                    p: 1.25,
-                    background: 'none',
-                    border: 0,
-                    cursor: 'pointer',
-                    font: 'inherit',
-                    color: 'var(--accent-deep)',
-                    fontWeight: 800,
-                    fontSize: 13,
-                    '&:hover, &:focus-visible': { bgcolor: 'var(--neutral-soft)' },
-                  }}
-                >
-                  {t('store.search.seeAll')}
-                </Stack>
-              </Stack>
-            )}
-          </Paper>
-        </Popper>
+            Arrastra `Popper` y su motor de posicionamiento: ocho kilobytes
+            gzip que descargaba toda visita a la tienda, incluidas las que nunca
+            escriben nada aquí. Y no se nota: el panel solo aparece con dos
+            caracteres escritos, y para entonces hay un rebote de 250 ms y una
+            consulta de catálogo en vuelo — el módulo viaja con ella.
+
+            Lo que NO se movió es el `combobox`: la caja, sus atributos y el
+            teclado siguen aquí. Es lo que anuncia un lector de pantalla al
+            enfocar la cabecera, y no puede esperar a que llegue un módulo. */}
+        {showPanel && (
+          <Suspense fallback={null}>
+            <QuickSearchPanel
+              open={showPanel}
+              anchorEl={anchor.current}
+              listId={LIST_ID}
+              hits={hits}
+              thumbnails={thumbnails}
+              cursor={cursor}
+              loading={results.isFetching}
+              locale={locale}
+              emptyLabel={t('store.search.empty')}
+              loadingLabel={t('common.loading')}
+              seeAllLabel={t('store.search.seeAll')}
+              onHover={setCursor}
+              onPick={goToProduct}
+              onSeeAll={goToCatalog}
+            />
+          </Suspense>
+        )}
       </Box>
     </ClickAwayListener>
-  )
-}
-
-/**
- * Miniatura de la lista. Sin foto se pinta un hueco del mismo tamaño y NO nada:
- * una lista donde unas filas tienen imagen y otras no se descuadra entera, y el
- * salto se lee como un error de carga.
- */
-function Thumb({ url, alt }: { url: string | null; alt: string }) {
-  return (
-    <Box
-      sx={{
-        width: 44,
-        height: 44,
-        flexShrink: 0,
-        borderRadius: `${R.sm}px`,
-        bgcolor: 'var(--neutral-soft)',
-        overflow: 'hidden',
-        display: 'grid',
-        placeItems: 'center',
-      }}
-    >
-      {url ? (
-        <Box
-          component="img"
-          src={url}
-          alt={alt}
-          loading="lazy"
-          sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
-        />
-      ) : (
-        <SearchRoundedIcon aria-hidden sx={{ fontSize: 18, color: 'var(--muted)' }} />
-      )}
-    </Box>
   )
 }

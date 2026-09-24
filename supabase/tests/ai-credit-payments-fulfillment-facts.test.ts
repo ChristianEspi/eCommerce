@@ -151,6 +151,25 @@ async function intentoDeCobro(intent: string, n: number, status: string, code: s
   )
 }
 
+/**
+ * El «hoy» del fixture es el MISMO que el de la función que se prueba.
+ *
+ * `promised_to` se sembraba con `current_date` —la fecha de la SESIÓN— y
+ * `ebim.ai_fulfillment_facts` calcula el atraso con
+ * `(now() at time zone utc)::date`. En una máquina al oeste de Greenwich las
+ * dos fechas coinciden media jornada y discrepan la otra: pasadas las 19:00
+ * locales (UTC-5) el fixture sembraba «prometida hace 4 días» y la función
+ * leía 5, así que esta prueba fallaba sola por la hora del día.
+ *
+ * No es un fallo del cálculo —la función hace bien en trabajar en UTC, que es
+ * la zona en la que vive la base— sino de que el fixture medía con otra regla.
+ *
+ * OJO al cambiarlo: las demás siembras de este archivo siguen con
+ * `current_date` A PROPÓSITO, porque `ai_collections_facts` y las de pagos sí
+ * calculan con `current_date`. Que dos funciones hermanas usen bases de fecha
+ * distintas es una inconsistencia real del producto, anotada para el operador;
+ * unificarla cambia qué documentos cuentan como vencidos y no se decide aquí.
+ */
 async function entrega(opts: {
   order: string
   state: string
@@ -168,7 +187,7 @@ async function entrega(opts: {
      values ($1, $2, $3, $4, 1, 'delivery', 'Reparto', 'local_delivery', 'PEN', 0,
              '{"line1":"Av. Secreta 123"}'::jsonb, 'Maria Receptora', '999333444',
              $5::public.fulfillment_state,
-             case when $6::int is null then null else current_date - $6::int end,
+             case when $6::int is null then null else (now() at time zone 'utc')::date - $6::int end,
              now() - make_interval(days => $7), now() - make_interval(days => $7))
      returning id`,
     [tenant.organizationId, tenant.companyId, store, opts.order, opts.state, opts.prometidaHaceDias ?? null, opts.diasSinCambios],

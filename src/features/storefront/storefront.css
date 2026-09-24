@@ -282,6 +282,54 @@
 }
 
 /* ---------------------------------------------------------------------------
+   LAS TRES PRESENTACIONES, AHORA TAMBIEN EN LO QUE SE VE (P07)
+   ---------------------------------------------------------------------------
+   Hasta P07 la diferencia entre presentaciones eran MEDIDAS: relleno, cuerpo
+   del nombre, aire de la rejilla. Se notaba poco, y sobre todo no se notaba lo
+   que cada tema promete — «editorial» y «denso» no son dos tamanos del mismo
+   dibujo.
+
+   Lo que cambia aqui es QUE se pinta, y sigue sin haber un solo `if` por tema
+   dentro del componente: la tarjeta pone sus clases y la frontera decide. Esa
+   es la diferencia entre tematizar y tener cuatro tarjetas.
+
+   Lo que NO cambia en ninguna: el enlace al producto, el corazon, la vista
+   rapida, el boton de comprar o elegir opciones, el precio, el tachado y el
+   aviso de agotado. Un tema que quitara una de esas seria una tienda peor, no
+   otra presentacion. */
+
+/* DENSA (retail y catalog): la categoria se va.
+   Con cinco o seis columnas, el nombre de la familia sale truncado y se come la
+   linea que necesita el nombre del PRODUCTO, que es lo que se busca. No se
+   encoge la letra —eso seria miniaturizar hasta lo ilegible—: se quita lo que
+   sobra. */
+.sf-scope[data-store-cards='compact'] .eb-card-eyebrow {
+  display: none;
+}
+
+/* EDITORIAL (premium): la tarjeta se aparta y deja mandar a la foto.
+   Sin canto y sin sombra en reposo, la rejilla deja de leerse como una
+   cuadricula de fichas y pasa a ser una secuencia de imagenes; la sombra vuelve
+   al apuntar, que es cuando hace falta decir «esto se pulsa». */
+.sf-scope[data-store-theme='premium'] .eb-card {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.sf-scope[data-store-theme='premium'] .eb-card:hover {
+  box-shadow: var(--sf-shadow);
+}
+
+/* Y tampoco pinta la pastilla de «disponible».
+   `in` es el estado ESPERADO de un producto publicado: repetida en cada tarjeta
+   no informa, decora. `out` se pinta en los cuatro temas —esa si es informacion
+   y es la que decide si el boton sirve—, asi que el selector nombra el estado,
+   no la pastilla. */
+.sf-scope[data-store-theme='premium'] .eb-card-state[data-stock='in'] {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------------
    LO QUE UN TEMA NO TOCA: LA PROFUNDIDAD
    ---------------------------------------------------------------------------
    `--sf-line`, `--sf-shadow` y `--sf-media-bg` se quedan FUERA de los bloques de

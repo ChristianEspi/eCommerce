@@ -386,6 +386,13 @@ export const PUBLIC_PRODUCTS_VIEW = 'public_products' satisfies ViewName
 export const PUBLIC_PRODUCT_IMAGES_VIEW = 'public_product_images' satisfies ViewName
 // Ídem que las tablas del PIM: sin `satisfies` hasta que se regeneren los tipos.
 export const PUBLIC_PRODUCT_VARIANTS_VIEW = 'public_product_variants'
+/**
+ * Storefront V2 · P02 · Las marcas con producto publicado por tienda, con su
+ * logo. Existe porque las FACETAS de la búsqueda dan código, nombre y cuenta —
+ * lo que necesita un filtro— y nunca el logo; pedirlo marca a marca sería el
+ * N+1 que el rediseño prohíbe. Sin `satisfies` hasta regenerar los tipos.
+ */
+export const PUBLIC_BRANDS_VIEW = 'public_brands'
 
 // --- Buckets de Storage ----------------------------------------------------
 // Los dos son PRIVADOS: no hay URL pública ni para el dueño. Cada lado firma
@@ -628,6 +635,16 @@ export const STORE_NAVIGATION_PUBLIC_RPC = 'store_navigation_for_slug'
 // la portada tiene que aplicarse solo.
 export const STORE_PROMOTIONS_PUBLIC_RPC = 'store_promotions_for_slug'
 export const CATALOG_SEARCH_PUBLIC_RPC = 'catalog_search_for_slug'
+/**
+ * Storefront V2 · P08 · El ranking REAL de una tienda por unidades vendidas.
+ *
+ * Existe porque la portada titulaba «Lo más vendido» una lista que salía del
+ * orden por relevancia del buscador. Devuelve solo `product_id` y su orden: ni
+ * importes, ni unidades, ni un dato de nadie, y `anon` sigue sin GRANT sobre
+ * `orders`. Sin ventas devuelve cero filas, y entonces la vitrina deja de decir
+ * «lo más vendido».
+ */
+export const STORE_BEST_SELLERS_PUBLIC_RPC = 'store_best_sellers_for_slug'
 export const CATALOG_SUGGEST_PUBLIC_RPC = 'catalog_suggest_for_slug'
 export const CONTENT_PREVIEW_RPC = 'content_preview'
 export const CATALOG_SEARCH_RPC = 'catalog_search'

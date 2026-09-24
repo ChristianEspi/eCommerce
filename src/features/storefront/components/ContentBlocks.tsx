@@ -10,10 +10,29 @@ import { RichText } from '@/shared/ui/RichText'
 import { TS } from '@/theme/tokens'
 import type { ContentBlock, ContentCollectionItem } from '../content'
 import { moneyCorto, offerBadge, vigenciaTexto } from '../offer'
-import { iconoDe } from '../categoryIcon'
-import { tintFor } from '../tint'
+import { CategoryDoorGrid, type CategoryDoorItem } from './CategoryDoors'
 import { ProductMedia } from './ProductMedia'
 import { LoopingRow } from './LoopingRow'
+
+/**
+ * Las puertas de categoría se mudaron a `CategoryDoors.tsx` en Storefront
+ * V2 · P03: las usan el CMS, la portada y —desde P13— la vista previa del
+ * backoffice, y ninguna de las tres necesita el resolvedor de bloques del CMS
+ * para pintar un azulejo. Se reexportan para no tocar a quien las importaba de
+ * aquí.
+ */
+export { CategoryDoorGrid, type CategoryDoorItem }
+
+/**
+ * La foto de cada categoría, por id y ya firmada (Storefront V2 · P03).
+ *
+ * Llega firmada porque el bucket es privado y firmar por puerta serían tantas
+ * peticiones como categorías. Quien lo arma es la pantalla, que ya tiene la
+ * lista completa de categorías de la tienda.
+ */
+export type CategoryMedia = Readonly<
+  Record<string, { readonly imageUrl?: string | null; readonly imageAlt?: string | null }>
+>
 
 /**
  * Pinta los bloques de una página del CMS (P11-SaaS).
@@ -36,11 +55,19 @@ export function ContentBlocks({
   images,
   currency,
   leadingHeading = false,
+  categoryMedia = {},
 }: {
   blocks: readonly ContentBlock[]
   storeSlug: string
   /** Rutas de `store-assets` ya firmadas. */
   assets: Record<string, string>
+  /**
+   * Storefront V2 · P03 · La foto de cada categoría, por id y ya firmada.
+   *
+   * Opcional y vacío por defecto: una página del CMS que no la pase pinta sus
+   * puertas con tinte e icono, que es lo que hacían antes de esta fase.
+   */
+  categoryMedia?: CategoryMedia
   /** Rutas de `product-images` ya firmadas. */
   images: Record<string, string>
   /** Moneda de la tienda: sin ella, «20 de descuento» no dice de que. */
@@ -73,6 +100,7 @@ export function ContentBlocks({
               assets={assets}
               images={images}
               currency={currency}
+              categoryMedia={categoryMedia}
               heading={group[0].id === leadHeroId ? 'h1' : 'h2'}
             />
           )}
@@ -231,6 +259,7 @@ function ContentBlockView({
   assets,
   images,
   currency,
+  categoryMedia,
   heading,
 }: {
   block: ContentBlock
@@ -238,6 +267,7 @@ function ContentBlockView({
   assets: Record<string, string>
   images: Record<string, string>
   currency?: string
+  categoryMedia: CategoryMedia
   heading: 'h1' | 'h2'
 }) {
   switch (block.type) {
@@ -252,7 +282,13 @@ function ContentBlockView({
     case 'rich_text':
       return <RichTextBlock block={block} />
     case 'category_collection':
-      return <CategoryCollectionBlock block={block} storeSlug={storeSlug} />
+      return (
+        <CategoryCollectionBlock
+          block={block}
+          storeSlug={storeSlug}
+          categoryMedia={categoryMedia}
+        />
+      )
     default:
       return <ProductCollectionBlock block={block} storeSlug={storeSlug} images={images} />
   }
@@ -889,241 +925,41 @@ function RichTextBlock({ block }: { block: ContentBlock }) {
   )
 }
 
-/** Cuantas puertas de categoria caben a lo ancho sin apretarse. */
-const PUERTAS_A_LO_ANCHO = 4
-
 function CategoryCollectionBlock({
   block,
   storeSlug,
+  categoryMedia,
 }: {
   block: ContentBlock
   storeSlug: string
+  categoryMedia: CategoryMedia
 }) {
   const categories = block.items.filter(
     (item): item is Extract<ContentCollectionItem, { kind: 'category' }> => item.kind === 'category',
   )
   if (categories.length === 0) return null
 
+  /**
+   * La foto se CRUZA por `category_id`, no viene en el bloque.
+   *
+   * El resolvedor del CMS devuelve de cada categoría lo que necesita una
+   * puerta —id, slug y nombre— y no su media. Ampliar esa función SQL para
+   * traerla habría sido un cambio en el borde público del CMS por una foto
+   * opcional; la vitrina ya tiene las categorías de la tienda cargadas
+   * (`usePublicCategories`, la misma consulta que la barra de familias), así
+   * que basta cruzarlas. Cero peticiones nuevas y la mejora llega a los dos
+   * sitios a la vez, que es lo que pedía la fase.
+   */
+  const conFoto = categories.map((item) => ({
+    ...item,
+    ...(categoryMedia[item.category_id] ?? {}),
+  }))
+
   return (
     <Stack component="section" aria-label={block.title ?? undefined} sx={{ gap: 1.5 }}>
       <BlockHeading block={block} />
-      <CategoryDoorGrid categories={categories} storeSlug={storeSlug} ariaLabel={block.title ?? undefined} />
+      <CategoryDoorGrid categories={conFoto} storeSlug={storeSlug} ariaLabel={block.title ?? undefined} />
     </Stack>
-  )
-}
-
-/** Lo mínimo que una puerta necesita de una categoría, venga del CMS o del catálogo. */
-export interface CategoryDoorItem {
-  readonly category_id: string
-  readonly name: string
-  readonly slug: string
-}
-
-/**
- * Las puertas de categoría, sin cabecera.
- *
- * La usan el bloque `category_collection` del CMS y la sección `categories` de
- * la portada (H07), que pinta las familias REALES del tenant. Una sola
- * implementación: la misma familia tiene el mismo tinte e icono en los dos
- * sitios, y un arreglo de accesibilidad llega a los dos a la vez.
- */
-export function CategoryDoorGrid({
-  categories,
-  storeSlug,
-  ariaLabel,
-}: {
-  categories: readonly CategoryDoorItem[]
-  storeSlug: string
-  ariaLabel?: string
-}) {
-  return (
-    <>
-      {/* Puertas, no etiquetas.
-          Eran `Chip` en fila: el mismo tratamiento que un filtro activo del
-          catálogo, y aquí no filtran nada — llevan a otro sitio. Una fila de
-          píldoras grises tampoco se recorre con el rabillo del ojo, que es como
-          se lee una portada.
-
-          El tinte sale de `tintFor`, asignado por el NOMBRE: la misma familia
-          cae siempre en el mismo color aunque cambie de orden o entren otras. Un
-          color que baila en cada recarga no orienta, marea. Y no le quita el
-          acento al comercio: estos seis tintes son señalización, mientras que el
-          acento sigue siendo el único color de ACCIÓN. */}
-      {/* Rejilla mientras quepan, carrusel en cuanto no quepan.
-
-          No es un capricho de dos modos: con cuatro familias o menos, la
-          rejilla las enseña TODAS de una vez, y esconder tras una flecha algo
-          que cabe entero es esconderlo por nada. Pasadas las cuatro, la
-          rejilla las apretaba en filas de sobras desiguales —dos arriba y una
-          sola abajo— y ahi la fila que se desplaza es lo unico que mantiene
-          todas las puertas del mismo tamaño.
-
-          Es la misma regla que sigue `ScrollRow` con sus flechas: aparece
-          cuando hay algo a lo que ir. */}
-      {categories.length <= PUERTAS_A_LO_ANCHO ? (
-        <Box
-          sx={{
-            display: 'grid',
-            gap: { xs: 1.25, md: 2 },
-            gridTemplateColumns: {
-              xs: 'repeat(2, minmax(0, 1fr))',
-              sm: 'repeat(3, minmax(0, 1fr))',
-              md: `repeat(${Math.min(Math.max(categories.length, 2), 4)}, minmax(0, 1fr))`,
-            },
-          }}
-        >
-          {categories.map((category) => (
-            <CategoryDoor key={category.category_id} category={category} storeSlug={storeSlug} />
-          ))}
-        </Box>
-      ) : (
-        <LoopingRow
-          items={categories}
-          keyOf={(category) => category.category_id}
-          itemWidth={{ xs: '68%', sm: '42%', md: 260 }}
-          ariaLabel={ariaLabel}
-          render={(category, duplicada) => (
-            <CategoryDoor category={category} storeSlug={storeSlug} sinFoco={duplicada} />
-          )}
-        />
-      )}
-    </>
-  )
-}
-
-/**
- * Una puerta de categoría.
- *
- * Lo que la hace legible de un vistazo es que cada familia tiene SITIO propio:
- * su tinte y su icono, los dos derivados del nombre, así que se vuelve a
- * encontrar por el color antes de leerla. Es la misma asignación que usa la
- * barra de la cabecera — la categoría que arriba es azul, aquí también.
- *
- * La flecha no es decoración: dice que esto lleva a otro sitio, que es
- * exactamente lo que una píldora gris no decía.
- */
-function CategoryDoor({
-  category,
-  storeSlug,
-  sinFoco = false,
-}: {
-  category: CategoryDoorItem
-  storeSlug: string
-  /** La copia del bucle: se ve y se pulsa, pero no se tabula ni se anuncia. */
-  sinFoco?: boolean
-}) {
-  const { t } = useI18n()
-  const tinte = tintFor(category.name)
-  const Icono = iconoDe(category.name)
-
-  return (
-    <Box
-      component={Link}
-      to={`/s/${storeSlug}?c=${encodeURIComponent(category.slug)}`}
-      {...(sinFoco ? { tabIndex: -1 } : {})}
-      sx={{
-        position: 'relative',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 1,
-        p: { xs: 2, md: 2.5 },
-        minHeight: { xs: 132, md: 168 },
-        borderRadius: 'var(--sf-radius)',
-        textDecoration: 'none',
-        // Degradado del propio tinte en vez de un plano: una fila de rectángulos
-        // planos de color se lee como una tabla pintada, no como puertas.
-        background: `linear-gradient(150deg, ${tinte.bg} 0%, color-mix(in srgb, ${tinte.fg} 12%, ${tinte.bg}) 100%)`,
-        border: `1px solid ${tinte.line}`,
-        color: tinte.fg,
-        boxShadow: 'var(--sf-shadow)',
-        transition: 'transform .18s ease, box-shadow .18s ease',
-        '@media (hover: hover)': {
-          '&:hover': { transform: 'translateY(-2px)', boxShadow: 'var(--sf-shadow-hover)' },
-          '&:hover .sf-cat-flecha': { transform: 'translateX(3px)' },
-        },
-        '@media (prefers-reduced-motion: reduce)': {
-          transition: 'none',
-          '&:hover': { transform: 'none' },
-        },
-      }}
-    >
-      {/* Marca de agua: el mismo icono, enorme y casi transparente en la
-          esquina. Da cuerpo al azulejo sin meter una foto que habría que
-          mantener por categoría. */}
-      <Box
-        aria-hidden
-        sx={{
-          position: 'absolute',
-          right: -14,
-          bottom: -18,
-          opacity: 0.16,
-          color: tinte.fg,
-          pointerEvents: 'none',
-        }}
-      >
-        <Icono sx={{ fontSize: 104 }} />
-      </Box>
-
-      <Box
-        aria-hidden
-        sx={{
-          position: 'relative',
-          width: 42,
-          height: 42,
-          display: 'grid',
-          placeItems: 'center',
-          borderRadius: '50%',
-          bgcolor: 'var(--card)',
-          color: tinte.fg,
-          boxShadow: `0 6px 16px -10px ${tinte.fg}`,
-        }}
-      >
-        <Icono sx={{ fontSize: 22 }} />
-      </Box>
-
-      <Typography
-        sx={{
-          position: 'relative',
-          mt: 'auto',
-          fontSize: { xs: 16, md: 18 },
-          fontWeight: 800,
-          letterSpacing: '-0.02em',
-          lineHeight: 1.25,
-        }}
-      >
-        {category.name}
-      </Typography>
-
-      <Stack
-        direction="row"
-        sx={{
-          position: 'relative',
-          alignSelf: 'flex-start',
-          alignItems: 'center',
-          gap: 0.5,
-          px: 1.25,
-          py: 0.375,
-          borderRadius: 'var(--sf-pill)',
-          bgcolor: 'var(--card)',
-          fontSize: TS.label,
-          fontWeight: 800,
-        }}
-      >
-        {t('store.categories.see')}
-        <Box
-          className="sf-cat-flecha"
-          component="span"
-          aria-hidden
-          sx={{
-            transition: 'transform .18s ease',
-            '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
-          }}
-        >
-          →
-        </Box>
-      </Stack>
-    </Box>
   )
 }
 

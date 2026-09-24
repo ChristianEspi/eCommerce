@@ -52,7 +52,7 @@ function arbol(categories: readonly PublicCategory[]): Nodo[] {
  * Las categorías eran una fila de azulejos a media página: para cambiar de
  * familia había que volver arriba, y desde una ficha de producto no había forma
  * de llegar. En la cabecera están en TODAS las pantallas de la tienda, que es
- * lo que hace una botica de verdad.
+ * lo que hace cualquier comercio con un catalogo grande.
  *
  * ## Por qué un panel y no un enlace directo
  *
@@ -121,7 +121,13 @@ export function StoreCategoryNav({
       ref={contenedor}
       sx={{ position: 'relative', borderTop: '1px solid var(--sf-line)', bgcolor: 'var(--card)' }}
     >
-      <Container maxWidth="lg" disableGutters>
+      {/* El ancho es el del TEMA, no `lg` a secas.
+
+          Estaba escrito a mano, y en `catalog` —que usa `xl`— la barra de
+          familias quedaba más estrecha que la cabecera de arriba y que el
+          catálogo de abajo: tres anchos distintos en la misma pantalla, con
+          dos escalones visibles en el borde izquierdo. */}
+      <Container maxWidth={false} disableGutters sx={{ maxWidth: 'var(--sf-content-w)', mx: 'auto' }}>
         <Stack
           component="nav"
           direction="row"
@@ -129,7 +135,10 @@ export function StoreCategoryNav({
           sx={{
             gap: { xs: 1.5, md: 2.5 },
             px: { xs: 2, md: 3 },
-            py: 0.75,
+            // El aire lo pone la variante de cabecera: `compact` lo recorta, y
+            // eso —sumado a la barra y al buscador— es lo que le da a un
+            // catálogo de miles de referencias su primera pantalla de producto.
+            py: 'var(--sf-nav-pad, 6px)',
             overflowX: 'auto',
             scrollbarWidth: 'none',
             '&::-webkit-scrollbar': { display: 'none' },

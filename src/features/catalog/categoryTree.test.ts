@@ -22,6 +22,10 @@ function cat(name: string, parent: string | null = null, position = 0): Category
     name,
     position,
     is_active: true,
+    // La foto no entra en el árbol: la jerarquía y la sangría no dependen de
+    // ella, y una categoría sin foto es el caso normal (Storefront V2 · P03).
+    image_url: null,
+    image_alt: null,
   }
 }
 

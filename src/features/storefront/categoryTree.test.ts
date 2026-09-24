@@ -20,6 +20,10 @@ function cat(slug: string, parent: string | null = null): PublicCategory {
     slug,
     name: slug,
     position: 0,
+    // La foto no entra en el árbol ni en los contadores: una categoría sin foto
+    // es el caso normal (Storefront V2 · P03).
+    image_url: null,
+    image_alt: null,
   }
 }
 

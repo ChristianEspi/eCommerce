@@ -140,11 +140,13 @@ export interface StorefrontStyle {
  * pinta, se ignora. Y el orden de esta constante es el orden de reserva — el
  * que reciben las secciones que una configuración guardada no mencionaba.
  *
- * Ojo con dos de ellas: `business-info` y `newsletter` **no tienen componente
- * todavía**. Se declaran porque el contrato las contempla y porque una sección
- * declarada y apagada es más honesta que un identificador que aparece de golpe
- * tres fases después; se quedan apagadas por defecto hasta que exista qué
- * pintar.
+ * Ojo con `newsletter`: **no tiene componente todavía**. Se declara porque el
+ * contrato la contempla y porque una sección declarada y apagada es más honesta
+ * que un identificador que aparece de golpe tres fases después; se queda apagada
+ * hasta que exista dónde guardar una suscripción y su consentimiento.
+ *
+ * `business-info` estuvo en el mismo caso hasta P09 y ya pinta. Sigue apagada
+ * por defecto, que es distinto: ahí decide el comercio, no la plataforma.
  */
 export const HOME_SECTION_IDS = [
   'hero',

@@ -12,7 +12,7 @@ import { getSupabaseClient } from '@/shared/lib/supabase'
  * son funciones de servidor que arrancan preguntando quién eres, y sin JWT no
  * hay a quién responder. Ninguna acepta un id de cuenta — el vínculo entre la
  * persona y su empresa lo resuelve la base contra `business_account_users`, que
- * es lo que impide que alguien vea la deuda de otra botica escribiendo un uuid.
+ * es lo que impide que alguien vea la deuda de otra cuenta escribiendo un uuid.
  *
  * ## Todo llega como texto
  *

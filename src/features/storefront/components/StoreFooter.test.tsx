@@ -252,3 +252,77 @@ describe('el pie se puede recorrer con el teclado', () => {
     expect(enlaces[1]).toHaveFocus()
   })
 })
+
+/**
+ * El pie como estructura, no como maquetación (Storefront V2 · P09).
+ *
+ * Un pie es lo último que recorre quien navega por regiones con un lector de
+ * pantalla, y la última oportunidad de encontrar las condiciones de venta. Si
+ * no es un `contentinfo` con rótulos jerarquizados, para ese visitante es una
+ * lista de enlaces sueltos al final de un catálogo largo.
+ */
+describe('el pie es una estructura navegable', () => {
+  it('es la región de información del documento, y solo hay una', async () => {
+    await pintar({ support_email: 'hola@botica.pe' })
+
+    expect(screen.getAllByRole('contentinfo')).toHaveLength(1)
+  })
+
+  it('cada bloque se rotula en nivel dos, colgando del título de la página', async () => {
+    // Nivel dos y no tres: el pie no cuelga de la última sección de la portada,
+    // cuelga de la página. Y no nivel uno: partiría el documento en dos.
+    const pie = await pintar(
+      { support_email: 'hola@botica.pe' },
+      [{ slug: 'terminos', title: 'Términos y condiciones' }],
+      [{ slug: 'medicamentos', name: 'Medicamentos' }],
+    )
+
+    await within(pie).findByRole('heading', { name: 'Páginas de la tienda' })
+    const rotulos = within(pie)
+      .getAllByRole('heading')
+      .map((h) => ({ nivel: h.tagName, texto: h.textContent }))
+
+    expect(rotulos).toEqual([
+      { nivel: 'H2', texto: 'Contacto' },
+      { nivel: 'H2', texto: 'Categorías' },
+      { nivel: 'H2', texto: 'Páginas de la tienda' },
+    ])
+  })
+
+  it('ni un enlace vacío ni un destino que no lleva a ninguna parte', async () => {
+    // Un enlace sin texto es un tabulador que no dice a dónde va; un `href="#"`
+    // es un enlace que se pulsa y no pasa nada. Los dos salen de maquetar un
+    // pie con datos que no existen.
+    const pie = await pintar(
+      {
+        support_email: 'hola@botica.pe',
+        contact_phone: '987654321',
+        contact_address: 'Av. Arequipa 1234',
+      },
+      [{ slug: 'terminos', title: 'Términos y condiciones' }],
+      [{ slug: 'medicamentos', name: 'Medicamentos' }],
+    )
+
+    await within(pie).findByRole('navigation', { name: 'Páginas de la tienda' })
+    for (const enlace of within(pie).getAllByRole('link')) {
+      expect(enlace.textContent?.trim()).not.toBe('')
+      const destino = enlace.getAttribute('href') ?? ''
+      expect(destino).not.toBe('')
+      expect(destino).not.toBe('#')
+      expect(destino).toMatch(new RegExp(String.raw`^(/s/botica|mailto:|tel:)`))
+    }
+  })
+
+  it('las dos navegaciones del pie se distinguen por su nombre', async () => {
+    // Dos `<nav>` sin nombre en la misma región son «navigation» y «navigation»
+    // en la lista de regiones de un lector de pantalla.
+    const pie = await pintar(
+      {},
+      [{ slug: 'terminos', title: 'Términos y condiciones' }],
+      [{ slug: 'medicamentos', name: 'Medicamentos' }],
+    )
+
+    await within(pie).findByRole('navigation', { name: 'Páginas de la tienda' })
+    expect(within(pie).getByRole('navigation', { name: 'Categorías' })).toBeInTheDocument()
+  })
+})

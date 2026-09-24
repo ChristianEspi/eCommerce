@@ -1,12 +1,42 @@
-import { Box, Stack, Typography } from '@mui/material'
+import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded'
+import LocalOfferRoundedIcon from '@mui/icons-material/LocalOfferRounded'
+import { Box, Button, Stack, Typography } from '@mui/material'
+import { Link } from 'react-router-dom'
 import { useT } from '@/shared/i18n/i18n-context'
 import { TS } from '@/theme/tokens'
 import type { PublicStore } from '../types'
 
 /**
- * Banner de portada, configurable por el tenant desde `store_settings`.
+ * La portada EDITORIAL: la marca primero, el catálogo después.
  *
- * Los tres campos son opcionales y cada uno tiene su fallback:
+ * ## Qué es y qué no, desde Storefront V2 · P04
+ *
+ * Es la composición que el contrato llama `heroVariant: 'statement'`, y hasta
+ * P04 no se podía elegir: existía solo como RESERVA de
+ * `StoreFeaturedHero` —se pintaba cuando el catálogo no tenía nada rebajado—.
+ * Un tema podía declarar `statement` y no pasaba nada.
+ *
+ * Ahora es una de las dos portadas que el comercio elige, y la diferencia con
+ * la otra es de composición, no de padding:
+ *
+ *  · `product` abre con UN producto: foto, precio antes, precio ahora, botón de
+ *    comprar. Vende por la oferta concreta.
+ *  · `statement` (esto) abre con la MARCA: una imagen a sangre o el degradado
+ *    del acento, el lema del comercio a cuerpo grande y dos puertas —el
+ *    catálogo y, si hay algo rebajado, las ofertas—.
+ *
+ * ## Por qué aquí NO hay precios
+ *
+ * A propósito, y el contrato de P04 lo pide con esas palabras: «no duplicar
+ * lógica de pricing ni promociones dentro del hero». El precio de un producto
+ * se resuelve con lista de precios, canal, promociones y condiciones
+ * comerciales de la sesión; hacerlo dos veces, en dos componentes, es cómo se
+ * llega a una portada que anuncia un precio que el carrito no respeta. El enlace
+ * a ofertas es un ENLACE: lleva al catálogo filtrado y allí manda el mismo
+ * resolvedor de siempre.
+ *
+ * ## Los fallbacks, en orden
+ *
  *   · sin `banner_url` → degradado de tokens (`--hero-grad`), que ya lleva el
  *     acento del tenant; nunca una foto de archivo ni una marca ajena.
  *   · sin `hero_title` → el nombre de la tienda.
@@ -21,7 +51,26 @@ import type { PublicStore } from '../types'
  * Sin animación de entrada: es lo primero que se ve y un fundido solo retrasa
  * la lectura (y molesta con `prefers-reduced-motion`).
  */
-export function StoreHero({ store }: { store: PublicStore }) {
+export function StoreHero({
+  store,
+  storeSlug,
+  hasOffers = false,
+}: {
+  store: PublicStore
+  /**
+   * Para construir los enlaces. Opcional para no romper a quien ya montaba
+   * este componente sin él —una prueba, la reserva de otra sección—: sin slug
+   * no hay adónde enlazar y la portada se queda solo con su lema, que es
+   * exactamente lo que hacía antes de P04.
+   */
+  storeSlug?: string
+  /**
+   * ¿Hay algo rebajado ahora mismo? Lo sabe la página, que ya lo consultó para
+   * su banda de ofertas. Aquí NO se vuelve a preguntar: una segunda consulta
+   * para decidir si se pinta un botón es una petición por visita.
+   */
+  hasOffers?: boolean
+}) {
   const t = useT()
   const title = store.hero_title?.trim() || store.name
   const subtitle = store.hero_subtitle?.trim() || t('store.hero.fallbackSubtitle')
@@ -31,6 +80,9 @@ export function StoreHero({ store }: { store: PublicStore }) {
     <Box
       component="section"
       aria-label={title}
+      // La marca de qué composición se está pintando. Es lo que hace que
+      // `heroVariant` sea comprobable sin mirar píxeles.
+      data-hero-variant="statement"
       sx={{
         position: 'relative',
         borderRadius: 'var(--sf-radius)',
@@ -150,6 +202,62 @@ export function StoreHero({ store }: { store: PublicStore }) {
         >
           {subtitle}
         </Typography>
+
+        {/* Las puertas. Sin ellas, la portada editorial era un cartel bonito
+            del que no se salía: había que bajar hasta la primera fila para
+            entrar al catálogo. La de ofertas solo aparece si hay algo
+            rebajado — un botón que lleva a una lista vacía es peor que no
+            tenerlo. */}
+        {storeSlug && (
+          <Stack
+            direction="row"
+            sx={{ gap: 1, flexWrap: 'wrap', rowGap: 1, mt: 0.5 }}
+          >
+            <Button
+              component={Link}
+              to={`/s/${storeSlug}?ver=todo`}
+              variant="contained"
+              endIcon={<ArrowForwardRoundedIcon />}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 700,
+                borderRadius: 'var(--sf-pill)',
+                px: 2.25,
+                // Blanco sobre el velo y tinta al revés: es el único par que
+                // garantiza contraste con cualquier foto y con cualquier
+                // acento del tenant.
+                bgcolor: '#FFFFFF',
+                color: 'var(--accent-deep)',
+                boxShadow: 'none',
+                '&:hover': { bgcolor: '#FFFFFF', boxShadow: 'none' },
+              }}
+            >
+              {t('store.hero.browseCatalog')}
+            </Button>
+            {hasOffers && (
+              <Button
+                component={Link}
+                to={`/s/${storeSlug}?oferta=1`}
+                variant="outlined"
+                startIcon={<LocalOfferRoundedIcon />}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  borderRadius: 'var(--sf-pill)',
+                  px: 2,
+                  color: '#FFFFFF',
+                  borderColor: 'color-mix(in srgb, #FFFFFF 70%, transparent)',
+                  '&:hover': {
+                    borderColor: '#FFFFFF',
+                    bgcolor: 'color-mix(in srgb, #FFFFFF 12%, transparent)',
+                  },
+                }}
+              >
+                {t('store.hero.seeOffers')}
+              </Button>
+            )}
+          </Stack>
+        )}
       </Stack>
     </Box>
   )

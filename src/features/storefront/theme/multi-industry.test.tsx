@@ -108,7 +108,10 @@ const ESCENARIOS: readonly Escenario[] = [
 
 function backend(
   e: Escenario,
-  extra: { store?: Record<string, unknown>; categorias?: Array<{ slug: string; name: string }> } = {},
+  extra: {
+    store?: Record<string, unknown>
+    categorias?: Array<{ slug: string; name: string; image_url?: string; image_alt?: string }>
+  } = {},
 ): FakeSupabase {
   const producto = {
     product_id: 'cccc1111-1111-4111-8111-111111111111',
@@ -159,6 +162,10 @@ function backend(
             slug: c.slug,
             name: c.name,
             position: i + 1,
+            // P03 · La foto es OPCIONAL: solo la trae quien la declara en el
+            // escenario. El resto pinta tinte e icono, como antes de la fase.
+            image_url: c.image_url ?? null,
+            image_alt: c.image_alt ?? null,
           }))
         : [
             {
@@ -349,5 +356,232 @@ describe.each(RUBROS)('portada de $rubro con la sección de familias ($tema)', (
       expect(puertas.length).toBeGreaterThan(0)
       expect(puertas[0]).toHaveAttribute('href', `/s/tienda?c=${slug}`)
     }
+  })
+})
+
+/**
+ * Storefront V2 · P01 · La franja de la portada no habla de un rubro.
+ *
+ * ## Qué defiende este bloque
+ *
+ * Antes de P01 la franja bajo la portada anunciaba «Atención farmacéutica» y
+ * «Retiro en tienda» en TODAS las tiendas. Eran dos afirmaciones que el código
+ * no puede sostener: una sobre la plantilla del comercio y otra sobre su local.
+ * Una zapatería abría su tienda ofreciendo asesoría farmacéutica.
+ *
+ * La prueba no comprueba que el texto sea bonito: comprueba la LÍNEA. Lo que la
+ * plataforma afirma sola es lo que hace el código; todo lo demás lo escribe el
+ * comercio y sale solo en su tienda.
+ */
+const VOCABULARIO_DE_RUBRO = [
+  /farmac/i,
+  /laboratorio/i,
+  /registro sanitario/i,
+  /pharmacist/i,
+  /health registry/i,
+  /catalogue labs/i,
+]
+
+describe('la franja de propuestas de valor', () => {
+  it('sin nada configurado enseña SOLO lo que hace el código', async () => {
+    // La zapatería, que es la tienda que el fallo original contaminaba.
+    await abrir(ESCENARIOS[1] as Escenario)
+
+    const franja = await screen.findByRole('region', { name: 'Cómo compras aquí' })
+    expect(within(franja).getByText('Envío a domicilio')).toBeInTheDocument()
+    expect(within(franja).getByText('Compra segura')).toBeInTheDocument()
+    // Hay correo de contacto en el escenario, así que la atención sí se anuncia.
+    expect(within(franja).getByText('Atención al cliente')).toBeInTheDocument()
+    // Y lo que el código no sabe, no se anuncia: el local y la plantilla.
+    expect(within(franja).queryByText('Retiro en tienda')).not.toBeInTheDocument()
+    expect(within(franja).queryByText('Asesoría especializada')).not.toBeInTheDocument()
+  })
+
+  it('la atención solo se ofrece si hay a dónde escribir', async () => {
+    await abrir(ESCENARIOS[1] as Escenario, '/s/tienda', {
+      store: { support_email: null, contact_phone: null },
+    })
+
+    const franja = await screen.findByRole('region', { name: 'Cómo compras aquí' })
+    expect(within(franja).queryByText('Atención al cliente')).not.toBeInTheDocument()
+    expect(within(franja).getByText('Compra segura')).toBeInTheDocument()
+  })
+
+  it.each(ESCENARIOS)('en $rubro no aparece vocabulario de otro rubro', async (e) => {
+    cleanup()
+    await abrir(e)
+
+    const franja = await screen.findByRole('region', { name: 'Cómo compras aquí' })
+    const texto = franja.textContent ?? ''
+    for (const patron of VOCABULARIO_DE_RUBRO) expect(texto).not.toMatch(patron)
+  })
+
+  it('el claim especializado sale SOLO en la tienda que lo escribió', async () => {
+    // La botica configura lo suyo. Es contenido de su fila, no una rama del
+    // código: no hay ningún sitio donde el programa sepa que es una botica.
+    await abrir(ESCENARIOS[2] as Escenario, '/s/tienda', {
+      store: {
+        value_props: [
+          { iconKey: 'expertise', title: 'Atención farmacéutica', body: 'Pregunta al químico', enabled: true },
+          { iconKey: 'certification', title: 'Registro sanitario', enabled: true },
+        ],
+      },
+    })
+
+    const suya = await screen.findByRole('region', { name: 'Cómo compras aquí' })
+    expect(within(suya).getByText('Atención farmacéutica')).toBeInTheDocument()
+    expect(within(suya).getByText('Pregunta al químico')).toBeInTheDocument()
+    expect(within(suya).getByText('Registro sanitario')).toBeInTheDocument()
+    // Configurar SUSTITUYE: no se completa con las de plataforma.
+    expect(within(suya).queryByText('Compra segura')).not.toBeInTheDocument()
+
+    cleanup()
+
+    // La zapatería, MISMA versión del código y sin configurar nada.
+    await abrir(ESCENARIOS[1] as Escenario)
+    const ajena = await screen.findByRole('region', { name: 'Cómo compras aquí' })
+    expect(within(ajena).queryByText('Atención farmacéutica')).not.toBeInTheDocument()
+    expect(within(ajena).queryByText('Registro sanitario')).not.toBeInTheDocument()
+  })
+
+  it('una entrada mal formada no tumba la portada', async () => {
+    await abrir(ESCENARIOS[1] as Escenario, '/s/tienda', {
+      store: { value_props: 'esto no es una lista' },
+    })
+
+    // La tienda sigue en pie y la franja cae a las de plataforma.
+    const franja = await screen.findByRole('region', { name: 'Cómo compras aquí' })
+    expect(within(franja).getByText('Compra segura')).toBeInTheDocument()
+  })
+
+  it('la tienda que apagó sus propuestas no deja una caja vacía', async () => {
+    await abrir(ESCENARIOS[1] as Escenario, '/s/tienda', {
+      store: {
+        value_props: [{ iconKey: 'delivery', title: 'Envíos 24 h', enabled: false }],
+      },
+    })
+
+    await screen.findByRole('banner')
+    expect(screen.queryByRole('region', { name: 'Cómo compras aquí' })).not.toBeInTheDocument()
+  })
+})
+
+describe('el cierre de la portada tampoco afirma nada que no sepa', () => {
+  /**
+   * La banda de marcas tenía una pastilla fija con «Productos originales» y un
+   * subtítulo que hablaba de distribución autorizada, registro sanitario y
+   * trazabilidad. Tres afirmaciones sobre la cadena de suministro de otro,
+   * escritas por la plataforma y puestas en todas las tiendas por igual.
+   */
+  it('las marcas se presentan por lo que son: las del catálogo', async () => {
+    await abrir(ESCENARIOS[1] as Escenario, '/s/tienda', {
+      store: { home_layout: { version: 1, sections: [{ id: 'trust', enabled: true }] } },
+    })
+
+    await screen.findByRole('banner')
+    expect(screen.queryByText('Productos originales')).not.toBeInTheDocument()
+    expect(screen.queryByText(/registro sanitario/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Distribuidor autorizado/i)).not.toBeInTheDocument()
+  })
+})
+
+/**
+ * Storefront V2 · P03 · La foto de una categoría llega a la portada.
+ *
+ * Es la prueba de que la mejora es de DATOS y no de rubro: el mismo código pinta
+ * una puerta con fotografía cuando la categoría la tiene y una puerta de tinte
+ * con icono cuando no, en cualquiera de los cuatro temas.
+ */
+describe('las puertas de categoría con fotografía', () => {
+  const CON_FOTO = [
+    { slug: 'abrigos', name: 'Abrigos', image_url: 'https://cdn.ejemplo.com/abrigos.webp' },
+    { slug: 'camisas', name: 'Camisas' },
+  ]
+
+  async function portadaConCategorias(tema: string) {
+    const base = ESCENARIOS[0] as Escenario
+    await abrir({ ...base, tema }, '/s/tienda', {
+      store: { home_layout: { version: 1, sections: [{ id: 'categories', enabled: true }] } },
+      categorias: CON_FOTO,
+    })
+    return screen.findByRole('region', { name: 'Compra por categoría' })
+  }
+
+  /**
+   * Los tres temas que piden AZULEJOS. `catalog` no está aquí y no es un olvido:
+   * desde P04 pide píldoras, y ahí la foto no cabe. Ver la prueba siguiente.
+   */
+  it.each(['universal', 'retail', 'premium'])(
+    'en el tema %s la que tiene foto la enseña y la que no cae al tinte',
+    async (tema) => {
+      cleanup()
+      const seccion = await portadaConCategorias(tema)
+
+      const conFoto = within(seccion).getAllByRole('link', { name: /Abrigos/ })[0]
+      const sinFoto = within(seccion).getAllByRole('link', { name: /Camisas/ })[0]
+
+      expect(conFoto).toHaveAttribute('data-category-door', 'photo')
+      expect(sinFoto).toHaveAttribute('data-category-door', 'tint')
+      expect(conFoto?.querySelector('img')?.getAttribute('src')).toBe(
+        'https://cdn.ejemplo.com/abrigos.webp',
+      )
+    },
+  )
+
+  /**
+   * La otra mitad del contrato `categoryVariant`, cerrado en P04.
+   *
+   * `catalog` es el tema de quien tiene miles de referencias: sus familias son
+   * NAVEGACIÓN densa, no puertas. Una píldora de 36 px de alto no puede enseñar
+   * una fotografía —saldría una franja de tres píxeles— y forzarla sería el
+   * clásico «la opción existe pero no se nota». Aquí se fija que el tema cambia
+   * la COMPOSICIÓN y que, aun así, las dos familias siguen llegando a su
+   * catálogo filtrado.
+   */
+  it('en el tema catalog las familias son píldoras, y siguen llevando a su catálogo', async () => {
+    cleanup()
+    const seccion = await portadaConCategorias('catalog')
+
+    expect(seccion.querySelectorAll('[data-category-pill]').length).toBe(2)
+    expect(seccion.querySelector('[data-category-door]')).toBeNull()
+    expect(within(seccion).getByRole('link', { name: /Abrigos/ })).toHaveAttribute(
+      'href',
+      '/s/tienda?c=abrigos',
+    )
+    expect(within(seccion).getByRole('link', { name: /Camisas/ })).toHaveAttribute(
+      'href',
+      '/s/tienda?c=camisas',
+    )
+  })
+
+  it('las dos siguen llevando al catálogo filtrado por su familia', async () => {
+    const seccion = await portadaConCategorias('universal')
+
+    expect(within(seccion).getAllByRole('link', { name: /Abrigos/ })[0]).toHaveAttribute(
+      'href',
+      '/s/tienda?c=abrigos',
+    )
+    expect(within(seccion).getAllByRole('link', { name: /Camisas/ })[0]).toHaveAttribute(
+      'href',
+      '/s/tienda?c=camisas',
+    )
+  })
+
+  it('una tienda sin ninguna foto pinta la sección igual que antes de P03', async () => {
+    const base = ESCENARIOS[1] as Escenario
+    await abrir(base, '/s/tienda', {
+      store: { home_layout: { version: 1, sections: [{ id: 'categories', enabled: true }] } },
+      categorias: [
+        { slug: 'zapatillas', name: 'Zapatillas' },
+        { slug: 'botas', name: 'Botas' },
+      ],
+    })
+
+    const seccion = await screen.findByRole('region', { name: 'Compra por categoría' })
+    expect(seccion.querySelector('img')).toBeNull()
+    expect(within(seccion).getAllByRole('link', { name: /Zapatillas/ })[0]).toHaveAttribute(
+      'data-category-door',
+      'tint',
+    )
   })
 })

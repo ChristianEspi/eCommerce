@@ -584,6 +584,11 @@ describe('L · el formulario de Configuración puede guardar lo que enseña', ()
     ['theme_preset', `'retail'`],
     ['storefront_style', `'{}'::jsonb`],
     ['home_layout', `'{"version": 1, "sections": []}'::jsonb`],
+    // Storefront V2 · P01. Entra en esta lista por el mismo motivo que las
+    // otras: una columna nueva NO hereda el GRANT de UPDATE, y olvidarse de
+    // nombrarla rompe TODO guardado de la pantalla con un 42501 que el mensaje
+    // achaca al rol.
+    ['value_props', `'[]'::jsonb`],
   ] as const
 
   it.each(EDITABLES)('un owner puede escribir %s', async (columna, valor) => {
