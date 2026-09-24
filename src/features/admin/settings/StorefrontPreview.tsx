@@ -13,7 +13,26 @@ import {
   type PreviewViewportId,
 } from '@/features/storefront/theme/preview-frame'
 import { resolveStoreTheme, type ResolvedStoreTheme } from '@/features/storefront/theme/resolve'
-import type { HomeLayout, HomeSectionId, StorefrontStyle } from '@/features/storefront/theme/types'
+import type {
+  HomeLayout,
+  HomeSectionId,
+  StorefrontStyle,
+} from '@/features/storefront/theme/types'
+/**
+ * Tres piezas de la vitrina, importadas TAL CUAL (Storefront V3 · P13).
+ *
+ * Las tres son presentacionales puras —reciben datos y devuelven marcado, sin
+ * consultas, sin carrito y sin sesión—, así que compartirlas es paridad gratis:
+ * lo que el comercio ve aquí es literalmente el mismo componente que verá su
+ * comprador. Aproximarlas era lo que producía el desvío que esta fase persigue.
+ */
+import { StoreAnnouncementBar } from '@/features/storefront/components/StoreAnnouncementBar'
+import { StoreBrandLockup } from '@/features/storefront/components/StoreBrandLockup'
+import { StoreSectionFrame } from '@/features/storefront/components/StoreSectionFrame'
+import {
+  resolveSectionPresentation,
+  type ResolvedPresentation,
+} from '@/features/storefront/theme/presentation'
 import '@/features/storefront/storefront.css'
 
 /**
@@ -101,16 +120,43 @@ const ANCHO_COMPARAR = Math.max(
   previewWidth('tablet') + previewWidth('mobile') + 16,
 )
 
+/**
+ * La identidad del comercio que la vista previa necesita (V3 · P13).
+ *
+ * Tres campos de P01: el logotipo —o su ausencia—, qué lockup se eligió y los
+ * avisos escritos. **No vienen del tema**, y eso es lo importante: el tema
+ * decide presentación y esto es CONTENIDO del comercio. Mezclarlos en
+ * `ResolvedStoreTheme` sería la confusión que el contrato evita.
+ *
+ * Viaja en un objeto y no en tres props porque hay cuatro sitios que montan un
+ * marco —el foco y los tres de la comparación— y tres parámetros repetidos
+ * cuatro veces se desincronizan solos.
+ */
+export interface PreviewIdentity {
+  readonly logoUrl: string | null
+  readonly brandLockup: string | null
+  readonly announcements: unknown
+}
+
+const SIN_IDENTIDAD: PreviewIdentity = {
+  logoUrl: null,
+  brandLockup: null,
+  announcements: [],
+}
+
 export function StorefrontPreview({
   storeName,
   themePreset,
   style,
   layout,
+  identity = SIN_IDENTIDAD,
 }: {
   storeName: string
   themePreset: string
   style: Partial<StorefrontStyle>
   layout: HomeLayout
+  /** Con defecto para que la pantalla siga montándose desde cualquier sitio. */
+  identity?: PreviewIdentity
 }) {
   const { t } = useI18n()
   const [modo, setModo] = useState<Modo>('focus')
@@ -282,9 +328,15 @@ export function StorefrontPreview({
               tema={tema}
               storeName={storeName}
               escala={escala}
+              identity={identity}
             />
           ) : (
-            <Comparacion tema={tema} storeName={storeName} escala={escala} />
+            <Comparacion
+              tema={tema}
+              storeName={storeName}
+              escala={escala}
+              identity={identity}
+            />
           )}
         </Box>
       </Box>
@@ -307,10 +359,12 @@ function Comparacion({
   tema,
   storeName,
   escala,
+  identity,
 }: {
   tema: ResolvedStoreTheme
   storeName: string
   escala: number
+  identity: PreviewIdentity
 }) {
   return (
     <Box
@@ -322,15 +376,23 @@ function Comparacion({
         justifyContent: 'center',
       }}
     >
-      <Box sx={{ gridArea: 'desktop', justifySelf: 'center' }}>
-        <MarcoDeVistaPrevia viewport="desktop" tema={tema} storeName={storeName} escala={escala} />
-      </Box>
-      <Box sx={{ gridArea: 'tablet' }}>
-        <MarcoDeVistaPrevia viewport="tablet" tema={tema} storeName={storeName} escala={escala} />
-      </Box>
-      <Box sx={{ gridArea: 'mobile' }}>
-        <MarcoDeVistaPrevia viewport="mobile" tema={tema} storeName={storeName} escala={escala} />
-      </Box>
+      {(['desktop', 'tablet', 'mobile'] as const).map((viewport) => (
+        <Box
+          key={viewport}
+          sx={{
+            gridArea: viewport,
+            ...(viewport === 'desktop' ? { justifySelf: 'center' } : {}),
+          }}
+        >
+          <MarcoDeVistaPrevia
+            viewport={viewport}
+            tema={tema}
+            storeName={storeName}
+            escala={escala}
+            identity={identity}
+          />
+        </Box>
+      ))}
     </Box>
   )
 }
@@ -348,11 +410,13 @@ function MarcoDeVistaPrevia({
   tema,
   storeName,
   escala,
+  identity,
 }: {
   viewport: PreviewViewportId
   tema: ResolvedStoreTheme
   storeName: string
   escala: number
+  identity: PreviewIdentity
 }) {
   const { t } = useI18n()
   const ancho = previewWidth(viewport)
@@ -382,7 +446,7 @@ function MarcoDeVistaPrevia({
           overflow: 'hidden',
         }}
       >
-        <PreviewHeader storeName={storeName} />
+        <PreviewHeader storeName={storeName} tema={tema} identity={identity} />
 
         <Box sx={{ p: 'var(--sfp-main-pad)', display: 'grid', gap: 'var(--sfp-section-gap)' }}>
           {encendidas.length === 0 ? (
@@ -390,15 +454,41 @@ function MarcoDeVistaPrevia({
               {t('settings.design.preview.empty')}
             </Typography>
           ) : (
-            encendidas.map((seccion) => (
-              <SeccionDeEjemplo
-                key={seccion.id}
-                id={seccion.id}
-                titulo={t(NOMBRE_SECCION[seccion.id])}
-                tema={tema}
-                storeName={storeName}
-              />
-            ))
+            encendidas.map((seccion) => {
+              /**
+               * La presentación de la sección, resuelta con el MISMO resolvedor
+               * de la vitrina (V3 · P13).
+               *
+               * Es lo que hace que la vista previa enseñe de verdad el
+               * merchandising de P06: el fondo de la banda, el ancho a sangre y
+               * la composición que el tema resuelve para `auto`. Sin esto, las
+               * tres opciones del panel de P12 no cambiaban nada aquí — y una
+               * opción que no se puede evaluar es una opción que no se usa.
+               */
+              const presentacion = resolveSectionPresentation({
+                id: seccion.id,
+                presentation: seccion.presentation,
+                preset: tema.preset,
+                categoryVariant: tema.style.categoryVariant,
+                productCardVariant: tema.style.productCardVariant,
+              })
+
+              return (
+                <StoreSectionFrame
+                  key={seccion.id}
+                  presentation={presentacion}
+                  sectionId={seccion.id}
+                >
+                  <SeccionDeEjemplo
+                    id={seccion.id}
+                    titulo={t(NOMBRE_SECCION[seccion.id])}
+                    tema={tema}
+                    storeName={storeName}
+                    presentacion={presentacion}
+                  />
+                </StoreSectionFrame>
+              )
+            })
           )}
         </Box>
       </Box>
@@ -469,48 +559,134 @@ function factorDeAjuste(
  * exactamente eso, rectángulos grises donde luego habrá cosas. El alto sigue
  * saliendo del marco.
  */
-function PreviewHeader({ storeName }: { storeName: string }) {
+/**
+ * La cabecera de la vista previa, con las TRES composiciones (V3 · P13).
+ *
+ * ## Qué cambia respecto a V2
+ *
+ * Pintaba siempre lo mismo: nombre, buscador y carrito en una línea. Con
+ * `headerVariant` el contrato tiene tres árboles distintos —`standard`,
+ * `compact` y `brand`— y una opción del formulario que no cambia nada en la
+ * vista previa es una opción que el comercio no puede evaluar. Es el mismo
+ * fallo que tenía `heroVariant` antes de V2 · P13, y se arregla igual.
+ *
+ * `brand` es la de dos alturas: la marca centrada arriba y la navegación
+ * debajo. Es lo que hace que Premium se sienta editorial, y aquí era invisible.
+ *
+ * ## El lockup y la barra de avisos son los REALES
+ *
+ * `StoreBrandLockup` y `StoreAnnouncementBar` son presentacionales puros
+ * —reciben textos y devuelven marcado, sin consultas, sin carrito y sin
+ * sesión— así que aquí se usan tal cual en vez de aproximarlos. Es donde el
+ * encargo de la fase pide paridad de verdad: la decisión de enseñar el
+ * logotipo, el nombre o los dos se ve exactamente como se va a ver.
+ *
+ * Lo que NO se comparte es el resto del árbol de la cabecera real: arrastra
+ * buscador con sugerencias, carrito con su proveedor y sesión. Eso acoplaría el
+ * backoffice a tres dominios para dibujar una caja gris.
+ */
+function PreviewHeader({
+  storeName,
+  tema,
+  identity,
+}: {
+  storeName: string
+  tema: ResolvedStoreTheme
+  identity: PreviewIdentity
+}) {
   const { t } = useI18n()
+  const variante = tema.style.headerVariant
 
-  return (
+  const marca = (
+    <StoreBrandLockup
+      // El componente REAL, con la forma que recibe en la vitrina: resuelve él
+      // mismo el lockup, así que sin logotipo «solo logotipo» cae al nombre —y
+      // eso hay que poder verlo aquí, que es de lo que va esta fase.
+      store={{
+        name: storeName,
+        logo_url: identity.logoUrl,
+        brand_lockup: identity.brandLockup,
+      }}
+      // Sin destino: en la vista previa el lockup se mira, no se navega.
+      storeSlug=""
+      size={variante === 'brand' ? 'lg' : 'sm'}
+      center={variante === 'brand'}
+    />
+  )
+
+  const buscador = (
     <Box
-      className="sf-header"
       sx={{
+        flex: 1,
+        minWidth: 0,
+        px: 1.25,
+        height: 'var(--sf-search-h)',
         display: 'flex',
         alignItems: 'center',
-        gap: 1,
-        px: 2,
-        minHeight: 'var(--sfp-header-h)',
-        borderBottom: '1px solid var(--sf-line)',
+        borderRadius: 'var(--sf-pill)',
+        border: '1px solid var(--sf-line)',
+        bgcolor: 'var(--sf-media-bg)',
+        fontSize: 12,
+        color: 'var(--muted)',
+        overflow: 'hidden',
+        whiteSpace: 'nowrap',
       }}
     >
-      <Typography sx={{ fontWeight: 800, fontSize: 15, whiteSpace: 'nowrap' }}>
-        {storeName}
-      </Typography>
-      <Box
-        sx={{
-          flex: 1,
-          minWidth: 0,
-          mx: 1.5,
-          px: 1.25,
-          height: 'var(--sf-search-h)',
-          display: 'flex',
-          alignItems: 'center',
-          borderRadius: 'var(--sf-pill)',
-          border: '1px solid var(--sf-line)',
-          bgcolor: 'var(--sf-media-bg)',
-          fontSize: 12,
-          color: 'var(--muted)',
-          overflow: 'hidden',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {t('settings.design.preview.search')}
-      </Box>
-      <Typography sx={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>
-        {t('settings.design.preview.cart')}
-      </Typography>
+      {t('settings.design.preview.search')}
     </Box>
+  )
+
+  const carrito = (
+    <Typography sx={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>
+      {t('settings.design.preview.cart')}
+    </Typography>
+  )
+
+  return (
+    <Stack data-preview-header={variante}>
+      {/* La barra de avisos, solo si el comercio escribió alguno: es su
+          contrato desde P01, y en la vista previa hay que poder verlo. */}
+      {/* La barra de avisos, con el componente REAL: sanea la lista él mismo,
+          así que aquí se le pasa lo que hay en el formulario —incluido lo que
+          no vale— y se ve exactamente lo que verá el comprador. */}
+      <StoreAnnouncementBar messages={identity.announcements} />
+
+      {variante === 'brand' ? (
+        // Dos alturas: la marca manda y la navegación la acompaña debajo.
+        <Stack
+          className="sf-header"
+          sx={{
+            gap: 0.75,
+            px: 2,
+            py: 1,
+            borderBottom: '1px solid var(--sf-line)',
+            alignItems: 'center',
+          }}
+        >
+          {marca}
+          <Stack direction="row" sx={{ gap: 1.5, alignItems: 'center', width: '100%' }}>
+            {buscador}
+            {carrito}
+          </Stack>
+        </Stack>
+      ) : (
+        <Stack
+          className="sf-header"
+          direction="row"
+          sx={{
+            alignItems: 'center',
+            gap: 1.5,
+            px: 2,
+            minHeight: 'var(--sfp-header-h)',
+            borderBottom: '1px solid var(--sf-line)',
+          }}
+        >
+          {marca}
+          {buscador}
+          {carrito}
+        </Stack>
+      )}
+    </Stack>
   )
 }
 
@@ -613,11 +789,14 @@ function SeccionDeEjemplo({
   titulo,
   tema,
   storeName,
+  presentacion,
 }: {
   id: HomeSectionId
   titulo: string
   tema: ResolvedStoreTheme
   storeName: string
+  /** Ya resuelta por quien monta el marco: aquí no se vuelve a decidir. */
+  presentacion: ResolvedPresentation
 }) {
   const { t } = useI18n()
 
@@ -626,10 +805,14 @@ function SeccionDeEjemplo({
   if (id === 'services') return <FranjaDeServicios />
 
   if (id === 'categories') {
-    return <PuertasDeEjemplo titulo={titulo} variante={tema.style.categoryVariant} />
+    // La variante RESUELTA, no la del tema a secas: si la sección pidió
+    // mosaico, el mosaico es lo que hay que enseñar aquí.
+    return <PuertasDeEjemplo titulo={titulo} variante={presentacion.variant} />
   }
 
-  if (id === 'brands' || id === 'trust') return <MarcasDeEjemplo titulo={titulo} />
+  if (id === 'brands' || id === 'trust') {
+    return <MarcasDeEjemplo titulo={titulo} variante={presentacion.variant} />
+  }
 
   if (CON_PRODUCTOS.has(id)) {
     return (
@@ -727,13 +910,32 @@ function FranjaDeServicios() {
 function PuertasDeEjemplo({ titulo, variante }: { titulo: string; variante: string }) {
   const { t } = useI18n()
   const pildoras = variante === 'pills'
+  /**
+   * El mosaico (V3 · P13): la primera familia ocupa el doble de área.
+   *
+   * Es la composición que Premium resuelve por defecto desde P07, y aquí se
+   * veía igual que los azulejos — o sea, no se veía. Se aproxima con un reparto
+   * de rejilla en vez de montar `CategoryMosaic`, porque ese arrastra las
+   * puertas reales con sus enlaces a la vitrina: en el taller, un clic no puede
+   * sacar al comercio de la pantalla que está configurando.
+   */
+  const mosaico = variante === 'mosaic'
 
   return (
     <Stack sx={{ gap: 1 }}>
       <TituloDeBanda titulo={titulo} />
       <Box
         data-preview-categories={variante}
-        sx={{ display: 'flex', gap: 1, flexWrap: pildoras ? 'wrap' : 'nowrap' }}
+        sx={
+          mosaico
+            ? {
+                display: 'grid',
+                gap: 1,
+                gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+                gridAutoRows: 'minmax(36px, auto)',
+              }
+            : { display: 'flex', gap: 1, flexWrap: pildoras ? 'wrap' : 'nowrap' }
+        }
       >
         {[1, 2, 3, 4].map((n) =>
           pildoras ? (
@@ -755,8 +957,15 @@ function PuertasDeEjemplo({ titulo, variante }: { titulo: string; variante: stri
           ) : (
             <Stack
               key={n}
+              data-preview-cat-cell={mosaico && n === 1 ? 'lead' : 'follow'}
               sx={{
-                flex: 1,
+                ...(mosaico
+                  ? // La primera manda: dos columnas y dos filas, como en la
+                    // vitrina. Las demás la acompañan.
+                    n === 1
+                    ? { gridColumn: 'span 2', gridRow: 'span 2' }
+                    : {}
+                  : { flex: 1 }),
                 minWidth: 0,
                 gap: 0.5,
                 p: 0.75,
@@ -769,7 +978,7 @@ function PuertasDeEjemplo({ titulo, variante }: { titulo: string; variante: stri
             >
               <Box
                 sx={{
-                  height: 28,
+                  height: mosaico && n === 1 ? 64 : 28,
                   borderRadius: 'var(--sf-radius-sm)',
                   bgcolor: 'var(--sf-media-bg)',
                 }}
@@ -786,47 +995,80 @@ function PuertasDeEjemplo({ titulo, variante }: { titulo: string; variante: stri
 }
 
 /** Las marcas: monogramas, como los pinta la vitrina cuando no hay logotipo. */
-function MarcasDeEjemplo({ titulo }: { titulo: string }) {
+/**
+ * Las marcas, con sus DOS composiciones (V3 · P13).
+ *
+ * `cards` es la de siempre: cada marca en su píldora, con su monograma y su
+ * nombre. `logos` es el muro de P07 —piezas iguales, sin caja y sin la cuenta
+ * de productos—, que es lo que Premium y Catalog resuelven por defecto y aquí
+ * no se veía de ninguna manera.
+ *
+ * Las cinco marcas son de ejemplo y lo dicen —«Marca A»—: fixtures genéricas,
+ * sin un solo nombre de rubro, que es lo que el encargo de la fase pide.
+ */
+function MarcasDeEjemplo({ titulo, variante }: { titulo: string; variante: string }) {
   const { t } = useI18n()
+  const muro = variante === 'logos'
 
   return (
-    <Stack sx={{ gap: 1 }}>
+    <Stack sx={{ gap: 1 }} data-preview-brands={muro ? 'logos' : 'cards'}>
       <TituloDeBanda titulo={titulo} />
-      <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap' }}>
+      <Box
+        sx={
+          muro
+            ? {
+                display: 'grid',
+                gap: 1,
+                gridTemplateColumns: 'repeat(auto-fit, minmax(72px, 1fr))',
+              }
+            : { display: 'flex', gap: 1, flexWrap: 'wrap' }
+        }
+      >
         {['A', 'B', 'C', 'D', 'E'].map((letra) => (
           <Stack
             key={letra}
-            direction="row"
+            direction={muro ? 'column' : 'row'}
             sx={{
-              gap: 0.75,
+              gap: muro ? 0.375 : 0.75,
               alignItems: 'center',
+              justifyContent: 'center',
               px: 1,
-              py: 0.5,
-              borderRadius: 'var(--sf-pill)',
-              border: '1px solid var(--sf-line)',
+              py: muro ? 1 : 0.5,
+              // El muro va sin caja: es lo que lo distingue de las tarjetas, y
+              // lo que deja que el logotipo sea lo único que se ve.
+              ...(muro
+                ? {}
+                : { borderRadius: 'var(--sf-pill)', border: '1px solid var(--sf-line)' }),
             }}
           >
             <Box
               sx={{
-                width: 18,
-                height: 18,
+                width: muro ? 28 : 18,
+                height: muro ? 28 : 18,
                 display: 'grid',
                 placeItems: 'center',
-                borderRadius: '50%',
+                borderRadius: muro ? 'var(--sf-radius-sm)' : '50%',
                 bgcolor: 'var(--accent-soft)',
                 color: 'var(--accent-deep)',
-                fontSize: 10,
+                fontSize: muro ? 13 : 10,
                 fontWeight: 800,
               }}
             >
               {letra}
             </Box>
-            <Typography sx={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)' }}>
+            <Typography
+              sx={{
+                fontSize: muro ? 10 : 11,
+                fontWeight: 700,
+                color: 'var(--muted)',
+                textAlign: 'center',
+              }}
+            >
               {t('settings.design.preview.demoBrand').replace('{n}', letra)}
             </Typography>
           </Stack>
         ))}
-      </Stack>
+      </Box>
     </Stack>
   )
 }
@@ -842,17 +1084,29 @@ function MarcasDeEjemplo({ titulo }: { titulo: string }) {
 function PreviewCard({ numero, variante }: { numero: number; variante: string }) {
   const { t } = useI18n()
   const comoda = variante === 'comfortable'
+  /**
+   * La tarjeta EDITORIAL (V3 · P13).
+   *
+   * Es la de Premium desde P05, y su rasgo no es el relleno: es que **no tiene
+   * caja**. Sin borde, sin sombra y sin fondo, la foto se queda sola — y en la
+   * vista previa se pintaba con caja como las otras dos, así que elegir Premium
+   * no cambiaba nada aquí.
+   *
+   * La línea no desaparece, se vuelve transparente: igual que en la vitrina,
+   * porque quitarla movería la rejilla un píxel al pasar el ratón.
+   */
+  const editorial = variante === 'editorial'
 
   return (
     <Stack
       data-preview-card={variante}
       sx={{
         gap: 'var(--sf-card-gap)',
-        p: 'var(--sfp-card-pad)',
+        p: editorial ? 0 : 'var(--sfp-card-pad)',
         borderRadius: 'var(--sf-radius)',
-        border: '1px solid var(--sf-line)',
-        boxShadow: 'var(--sf-shadow)',
-        bgcolor: 'var(--card)',
+        border: editorial ? '1px solid transparent' : '1px solid var(--sf-line)',
+        boxShadow: editorial ? 'none' : 'var(--sf-shadow)',
+        bgcolor: editorial ? 'transparent' : 'var(--card)',
         minWidth: 0,
       }}
     >

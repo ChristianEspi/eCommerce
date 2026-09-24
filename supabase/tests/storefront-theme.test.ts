@@ -65,6 +65,24 @@ const ESTILO_COMPLETO = {
   contentWidth: 'xl',
   imageRatio: 'portrait',
   sectionSpacing: 'spacious',
+  // Storefront V3 · P02 · La clave que salió de `ProductCard`, donde estaba
+  // cableada en `contain` para todas las tiendas.
+  productMediaFit: 'cover',
+}
+
+/**
+ * Las tres composiciones que V3 añade, cada una en su clave (P02).
+ *
+ * Van en su propio objeto y no dentro del completo porque lo que se comprueba
+ * es distinto: que la lista blanca de la base CRECIÓ donde tenía que crecer.
+ * Premium las usa las tres, así que si la base las rechazara, el preset que da
+ * personalidad a Premium no se podría ni guardar.
+ */
+const ESTILO_V3 = {
+  headerVariant: 'brand',
+  productCardVariant: 'editorial',
+  categoryVariant: 'mosaic',
+  productMediaFit: 'contain',
 }
 
 const LAYOUT_VALIDO = {
@@ -223,6 +241,33 @@ describe('D · un estilo dentro del contrato', () => {
   })
 })
 
+describe('E2 · el contrato V3, en la lista blanca de la base', () => {
+  it('acepta las tres composiciones nuevas y el encaje', async () => {
+    // Si la base las rechazara, el preset que da personalidad a Premium no se
+    // podría guardar: sus tres variantes son exactamente estas.
+    const filas = await guardar('storefront_style', JSON.stringify(ESTILO_V3))
+    expect(filas).toHaveLength(1)
+  })
+
+  it.each(Object.entries(ESTILO_V3))('acepta %s a solas', async (clave, valor) => {
+    // Una a una, porque la lista blanca se recorre clave a clave: un objeto
+    // completo podría pasar por casualidad si el validador mirara solo la
+    // primera.
+    const filas = await guardar('storefront_style', JSON.stringify({ [clave]: valor }))
+    expect(filas).toHaveLength(1)
+  })
+
+  it('los valores de V2 siguen entrando: la lista solo CRECIÓ', async () => {
+    // Por eso esta migración no necesita revalidar ni una fila: una función más
+    // permisiva no puede invalidar lo que ya pasaba.
+    const filas = await guardar(
+      'storefront_style',
+      JSON.stringify({ headerVariant: 'standard', productCardVariant: 'comfortable', categoryVariant: 'tiles' }),
+    )
+    expect(filas).toHaveLength(1)
+  })
+})
+
 describe('E · un estilo fuera del contrato', () => {
   const FUERA: Array<[string, unknown]> = [
     // Las cuatro formas de intentar meter presentación arbitraria. Ninguna
@@ -242,6 +287,23 @@ describe('E · un estilo fuera del contrato', () => {
     // Fuera del contrato A PROPÓSITO (P01): tres enteros libres no son una
     // elección entre opciones nombradas.
     ['gridColumns', { gridColumns: { xs: 11, sm: 11, lg: 11 } }],
+    /**
+     * Storefront V3 · P02 · Lo que la clave nueva NO abre.
+     *
+     * `productMediaFit` alimenta un `object-fit` a través de una variable de
+     * CSS, así que es el sitio más tentador de todo el contrato para colar CSS
+     * arbitrario. La lista tiene dos valores y ninguno más: los otros de
+     * `object-fit` que existen en CSS —`fill`, `none`, `scale-down`— se
+     * rechazan igual que una inyección, porque el criterio no es «parece
+     * peligroso» sino «está nombrado».
+     */
+    ['un encaje de CSS que no está en la lista', { productMediaFit: 'fill' }],
+    ['otro más', { productMediaFit: 'scale-down' }],
+    ['CSS colado en el encaje', { productMediaFit: 'none;background:url(//evil)' }],
+    // Y las variantes que V3 tampoco añadió a las listas que sí crecieron.
+    ['una cabecera inventada', { headerVariant: 'megamenu' }],
+    ['una tarjeta inventada', { productCardVariant: 'gigante' }],
+    ['unas familias inventadas', { categoryVariant: 'carrusel' }],
   ]
 
   it.each(FUERA)('rechaza %s', async (_caso, valor) => {
@@ -295,11 +357,132 @@ describe('F · un orden de Home válido', () => {
   })
 })
 
+describe('G2 · Home Layout V2: la presentación de cada sección', () => {
+  it('V1 sigue siendo válido: ninguna tienda existente deja de validar', async () => {
+    // Es la mitad del trato de esta fase. La otra mitad —que V1 se RESUELVE
+    // igual que antes— se comprueba en las pruebas del normalizador.
+    const filas = await guardar(
+      'home_layout',
+      JSON.stringify({ version: 1, sections: [{ id: 'hero', enabled: true }] }),
+    )
+    expect(filas).toHaveLength(1)
+  })
+
+  it('acepta V2 con presentación completa', async () => {
+    const filas = await guardar(
+      'home_layout',
+      JSON.stringify({
+        version: 2,
+        sections: [
+          {
+            id: 'new-arrivals',
+            enabled: true,
+            maxItems: 12,
+            presentation: { variant: 'rail', surface: 'soft', width: 'bleed' },
+          },
+        ],
+      }),
+    )
+    expect(filas).toHaveLength(1)
+  })
+
+  it('acepta V2 con presentación PARCIAL: lo que falta es auto', async () => {
+    const filas = await guardar(
+      'home_layout',
+      JSON.stringify({
+        version: 2,
+        sections: [{ id: 'categories', enabled: true, presentation: { variant: 'mosaic' } }],
+      }),
+    )
+    expect(filas).toHaveLength(1)
+  })
+
+  it('acepta una sección SIN presentación dentro de un layout V2', async () => {
+    const filas = await guardar(
+      'home_layout',
+      JSON.stringify({
+        version: 2,
+        sections: [
+          { id: 'hero', enabled: true },
+          { id: 'brands', enabled: true, presentation: { variant: 'logos' } },
+        ],
+      }),
+    )
+    expect(filas).toHaveLength(1)
+  })
+
+  /**
+   * Lo que se rechaza, y el motivo de cada caso.
+   *
+   * Los interesantes no son los de inyección —esos no llegan ni a un filtro,
+   * porque la clave no está nombrada— sino los de SIGNIFICADO: una variante de
+   * producto en el hero no es peligrosa, es que no quiere decir nada. Aceptarla
+   * sería un contrato que promete un ritmo que nadie sabe pintar.
+   */
+  const PRESENTACION_FUERA: Array<[string, unknown]> = [
+    [
+      'una variante de producto en el hero',
+      { id: 'hero', enabled: true, presentation: { variant: 'spotlight' } },
+    ],
+    [
+      'una variante de marcas en una fila de producto',
+      { id: 'featured', enabled: true, presentation: { variant: 'logos' } },
+    ],
+    [
+      'una variante de producto en las familias',
+      { id: 'categories', enabled: true, presentation: { variant: 'rail' } },
+    ],
+    [
+      'una variante inventada',
+      { id: 'featured', enabled: true, presentation: { variant: 'carrusel-3d' } },
+    ],
+    [
+      'contraste donde taparía las fotos de las familias',
+      { id: 'categories', enabled: true, presentation: { surface: 'contrast' } },
+    ],
+    [
+      'una superficie inventada',
+      { id: 'offers', enabled: true, presentation: { surface: 'neon' } },
+    ],
+    [
+      'un ancho inventado',
+      { id: 'offers', enabled: true, presentation: { width: 'fullscreen' } },
+    ],
+    [
+      'CSS colado en la presentación',
+      { id: 'offers', enabled: true, presentation: { css: '.x{display:none}' } },
+    ],
+    [
+      'una URL de fondo',
+      { id: 'offers', enabled: true, presentation: { backgroundUrl: 'https://evil.test/x.png' } },
+    ],
+    [
+      'un número de columnas',
+      { id: 'featured', enabled: true, presentation: { columns: 11 } },
+    ],
+    [
+      'una presentación que no es objeto',
+      { id: 'featured', enabled: true, presentation: 'rail' },
+    ],
+    [
+      'un valor que no es texto',
+      { id: 'featured', enabled: true, presentation: { variant: 3 } },
+    ],
+  ]
+
+  it.each(PRESENTACION_FUERA)('rechaza %s', async (_caso, seccion) => {
+    await rechazado('home_layout', JSON.stringify({ version: 2, sections: [seccion] }))
+  })
+})
+
 describe('G · un orden de Home inválido', () => {
   const FUERA: Array<[string, unknown]> = [
     ['una sección que no existe', { version: 1, sections: [{ id: 'banner-ads', enabled: true }] }],
     ['una sección con nombre de rubro', { version: 1, sections: [{ id: 'pharmacy', enabled: true }] }],
-    ['una versión futura', { version: 2, sections: [] }],
+    // V2 es válida desde V3 · P06 —añade la presentación por sección—, así que
+    // la «futura» pasa a ser la 3. Aceptar una versión desconocida sería
+    // prometer que se sabe leerla.
+    ['una versión futura', { version: 3, sections: [] }],
     ['una versión que no es número', { version: '1', sections: [] }],
     ['sin versión', { sections: [] }],
     ['sin secciones', { version: 1 }],

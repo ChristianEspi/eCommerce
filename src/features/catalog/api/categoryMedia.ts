@@ -1,5 +1,6 @@
 import { STORE_ASSETS_BUCKET } from '@/shared/lib/db-schema'
 import { ALLOWED_IMAGE_TYPES } from './images'
+import { optimizeImageFile } from '@/shared/lib/imageOptimizer'
 import { catalogClient } from './client'
 import { CatalogError, catalogErrorFromDb } from './errors'
 
@@ -92,19 +93,24 @@ export async function uploadCategoryImage(input: {
   storeId: string
   file: File
 }): Promise<string> {
-  const validation = validateCategoryImage(input.file)
+  // Se reduce antes de validar (V3 · P11): una puerta de familia ocupa como
+  // mucho media pantalla de escritorio, y la pieza principal del mosaico el
+  // doble de área.
+  const { file } = await optimizeImageFile(input.file, 'category')
+
+  const validation = validateCategoryImage(file)
   if (!validation.ok) throw new CatalogError(validation.key, 'ARCHIVO_INVALIDO')
 
   const path = buildCategoryImagePath({
     organizationId: input.organizationId,
     storeId: input.storeId,
-    mimeType: input.file.type,
+    mimeType: file.type,
   })
 
   const { error } = await catalogClient()
     .storage.from(STORE_ASSETS_BUCKET)
-    .upload(path, input.file, {
-      contentType: input.file.type,
+    .upload(path, file, {
+      contentType: file.type,
       upsert: false,
       // La ruta lleva un uuid: el contenido de este objeto nunca cambia.
       cacheControl: '604800',

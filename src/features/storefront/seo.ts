@@ -7,6 +7,7 @@ import {
   storeTitle,
   type PageMeta,
 } from '@/shared/seo/meta'
+import { resolveStoreDescription } from './identity'
 import type { PublicProduct, PublicStore } from './types'
 
 /**
@@ -49,7 +50,12 @@ export function storePath(storeSlug: string, rest = ''): string {
 export function homeMeta(context: StoreSeoContext, catalogOf: string): PageMeta {
   const { store } = context
   const description =
-    clampDescription(store.hero_subtitle) ?? clampDescription(`${catalogOf} ${store.name}`)
+    // P01 de V3 · La descripción ESTABLE del comercio antes que la bajada de
+    // campaña: lo que un buscador indexa no debería cambiar cada temporada.
+    // `resolveStoreDescription` ya cae a `hero_subtitle` para las tiendas que
+    // todavía no la han escrito, así que ninguna pierde su meta descripción.
+    clampDescription(resolveStoreDescription(store)) ??
+    clampDescription(`${catalogOf} ${store.name}`)
 
   return {
     ...base(context),

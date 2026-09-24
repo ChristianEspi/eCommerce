@@ -11,6 +11,7 @@ import {
   HERO_VARIANTS,
   IMAGE_RATIOS,
   PRODUCT_CARD_VARIANTS,
+  PRODUCT_MEDIA_FITS,
   SECTION_SPACINGS,
   type StorefrontStyle,
 } from './types'
@@ -342,9 +343,12 @@ describe('headerVariant cambia la barra', () => {
 
     expect(frontera.getAttribute('data-store-header')).toBe(variante)
     // La altura de la barra sale del tema, no de un número en el componente.
-    expect(variableDe(frontera, '--sf-header-h-md')).toBe(
-      variante === 'compact' ? '56px' : '68px',
-    )
+    //
+    // `brand` es la única MÁS alta (V3 · P02): reparte su contenido en dos
+    // filas —marca centrada arriba, navegación debajo— así que necesita el alto
+    // de las dos. `compact` recorta y `standard` es la de siempre.
+    const altura = { standard: '68px', compact: '56px', brand: '76px' }
+    expect(variableDe(frontera, '--sf-header-h-md')).toBe(altura[variante])
   })
 })
 
@@ -513,15 +517,20 @@ describe('los presets usan lo que declaran', () => {
       contentWidth: CONTENT_WIDTHS.length,
       imageRatio: IMAGE_RATIOS.length,
       sectionSpacing: SECTION_SPACINGS.length,
+      // Storefront V3 · P02 · La clave que salió de la tarjeta.
+      productMediaFit: PRODUCT_MEDIA_FITS.length,
     }
     expect(probados).toEqual({
-      headerVariant: 2,
+      // V3 suma `brand`, `editorial` y `mosaic`: las tres composiciones que
+      // le dan a Premium una forma propia en vez de las medidas de Universal.
+      headerVariant: 3,
       heroVariant: 2,
-      productCardVariant: 2,
-      categoryVariant: 2,
+      productCardVariant: 3,
+      categoryVariant: 3,
       contentWidth: 2,
       imageRatio: 3,
       sectionSpacing: 3,
+      productMediaFit: 2,
     })
   })
 })

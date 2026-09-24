@@ -168,6 +168,10 @@ export const es = {
     'settings.design.style.noneCustom': 'Todo lo hereda del tema.',
     'settings.design.style.groupCount': '{n} personalizados en este grupo',
     'settings.design.style.group.structure': 'Estructura',
+    'settings.design.style.group.brandElsewhere':
+      'El lockup, el interruptor de tema y la barra de avisos se configuran una sola vez, en',
+    'settings.design.style.group.brandLink': 'Marca',
+    'settings.readiness.goTo': 'Ir a configurarlo',
     'settings.design.style.group.product': 'Producto',
     'settings.design.style.group.spacing': 'Espaciado y ancho',
     'settings.design.workspace.config': 'Configuración del diseño',
@@ -191,6 +195,13 @@ export const es = {
     'settings.design.value.portrait': 'Vertical',
     'settings.design.value.landscape': 'Horizontal',
     'settings.design.value.spacious': 'Amplio',
+    // Storefront V3 · P02 · Las tres composiciones nuevas y el encaje de foto.
+    'settings.design.value.brand': 'De marca',
+    'settings.design.value.editorial': 'Editorial',
+    'settings.design.value.mosaic': 'Mosaico',
+    'settings.design.value.cover': 'Llena el marco',
+    'settings.design.value.contain': 'Cabe entera',
+    'settings.design.field.mediaFit': 'Encaje de la foto',
     'settings.design.home.title': 'Portada de la tienda',
     'settings.design.home.help':
       'Enciende, apaga y ordena las secciones. El contenido de cada una sigue saliendo de tu catálogo y de tus páginas.',
@@ -263,9 +274,34 @@ export const es = {
     'settings.readiness.todo': 'Por mejorar',
     'settings.readiness.count': '{n} de {total}',
     'settings.readiness.logo': 'Logotipo de la tienda',
-    'settings.readiness.logoWhy': 'Sin él, la cabecera y el pie enseñan las iniciales del nombre.',
+    'settings.readiness.logoWhy':
+      'Sin él, la cabecera y el pie enseñan tu nombre escrito. Si elegiste el nombre como marca, no hace falta.',
     'settings.readiness.hero': 'Imagen de portada',
-    'settings.readiness.heroWhy': 'Sin ella, la portada se pinta con el degradado de tu color.',
+    'settings.readiness.heroWhy':
+      'Sin ella, la portada abre con la foto de un producto; si tampoco hay fotos, con el degradado de tu color.',
+    // V3 · P12 · La presentación de una sección de la portada.
+    'settings.design.presentation.title': 'Cómo se enseña',
+    'settings.design.presentation.variant': 'Composición',
+    'settings.design.presentation.surface': 'Fondo',
+    'settings.design.presentation.width': 'Ancho',
+    'settings.design.presentation.clear': 'Quitar personalización',
+    'settings.design.presentation.open': 'Cómo se enseña',
+    'settings.design.value.rail': 'Fila que se desplaza',
+    'settings.design.value.grid': 'Rejilla, todos iguales',
+    'settings.design.value.spotlight': 'Destacado: el primero manda',
+    'settings.design.value.cards': 'Tarjetas con su cuenta',
+    'settings.design.value.logos': 'Muro de logotipos',
+    'settings.design.value.band': 'Banda, una al lado de otra',
+    'settings.design.value.split': 'Mensaje al lado',
+    'settings.design.value.plain': 'Sin fondo',
+    'settings.design.value.soft': 'Fondo suave',
+    'settings.design.value.contrast': 'Fondo con contraste',
+    'settings.design.value.contained': 'Ancho de la página',
+    'settings.design.value.bleed': 'De borde a borde',
+    'settings.design.value.fixed': 'La suya',
+    'settings.readiness.description': 'Descripción de la tienda',
+    'settings.readiness.descriptionWhy':
+      'Es el resumen que se lee en el pie y el que ve un buscador cuando comparten tu enlace.',
     'settings.readiness.contact': 'Forma de contacto',
     'settings.readiness.contactWhy':
       'Con un correo, un teléfono o una dirección se pintan el pie y la sección de datos del negocio.',
@@ -294,8 +330,6 @@ export const es = {
     'store.seo.catalogOf': 'Catálogo en línea de',
     'store.catalog.loadingMore': 'Cargando más productos…',
     'store.catalog.endOfList': 'No hay más resultados.',
-    'store.hero.fallbackSubtitle':
-      'Explora el catálogo, revisa precios y disponibilidad al día.',
     'store.catalog.title': 'Catálogo',
     'store.catalog.search': 'Buscar productos',
     'store.catalog.items': 'productos',
@@ -305,6 +339,14 @@ export const es = {
     'store.catalog.noResults': 'Sin resultados',
     'store.catalog.noResultsBody': 'Prueba con otra palabra o quita los filtros.',
     'store.catalog.clear': 'Quitar filtros',
+    // V3 · P09 · La barra del catálogo en el teléfono. «Filtros» a secas y no
+    // «Seleccionar filtros»: es un botón, y el título del panel ya lo explica.
+    'store.catalog.filters': 'Filtros',
+    // V3 · P10 · La zona de detalle de la ficha y la barra de compra del móvil.
+    'store.product.detailsSection': 'Detalle del producto',
+    'store.catalog.filtersActive': 'activos',
+    'store.catalog.removeFilter': 'Quitar',
+    'store.catalog.showResults': 'Ver resultados',
     'store.slider.label': 'Novedades y campañas',
     'store.slider.prev': 'Anterior',
     'store.slider.next': 'Siguiente',
@@ -1319,6 +1361,40 @@ export const es = {
     'settings.name': 'Nombre comercial',
     'settings.nameHelp': 'Es el nombre que ve el comprador en la vitrina.',
     'settings.description': 'Descripción',
+    // Storefront V3 · P01 · Tres roles donde antes había uno. `settings.description`
+    // se conserva porque lo usan otras pantallas; lo que cambia es que la tarjeta
+    // de identidad ya no mete la bajada del hero en el pie de la tienda.
+    'settings.storeDescription': 'Descripción de la tienda',
+    'settings.storeDescriptionHelp':
+      'Resumen estable del negocio. Se usa en el pie, en los datos del negocio y como reserva para buscadores. No caduca con las campañas (hasta 360 caracteres).',
+    'settings.heroKicker': 'Línea superior de la portada',
+    'settings.heroKickerHelp':
+      'Texto corto encima del titular, opcional. Sirve para que la portada no repita el nombre de la tienda (hasta 80).',
+    'settings.heroSubtitle': 'Mensaje de la portada',
+    'settings.heroSubtitleHelp':
+      'La bajada del titular de la portada. Puede cambiar con cada campaña sin tocar la descripción de la tienda (hasta 240).',
+    // Cabecera y avisos (pestaña Marca).
+    'settings.identity.title': 'Cabecera y avisos',
+    'settings.identity.help':
+      'Qué se ve en la parte de arriba de tu tienda: tu marca, el selector de tema y la barra de avisos.',
+    'settings.identity.lockup': 'Identidad en la cabecera',
+    'settings.identity.lockupHelp':
+      'Si tu logotipo ya lleva el nombre dentro, elige solo logotipo para no verlo dos veces. Sin logotipo se enseña el nombre.',
+    'settings.identity.lockup.logoName': 'Logotipo y nombre',
+    'settings.identity.lockup.logo': 'Solo logotipo',
+    'settings.identity.lockup.name': 'Solo nombre',
+    'settings.identity.themeToggle': 'Selector claro/oscuro en la tienda',
+    'settings.identity.themeToggleHelp':
+      'Apagado, tu tienda respeta la preferencia del dispositivo de quien la visita, sin ofrecer un botón que compita con el carrito.',
+    'settings.identity.announcements': 'Barra de avisos',
+    'settings.identity.announcementsHelp':
+      'Hasta dos mensajes cortos sobre la cabecera. Los escribes tú: la plataforma no añade ninguno.',
+    'settings.identity.announcementsEmpty': 'Sin avisos: la barra no se pinta.',
+    'settings.identity.announcementText': 'Aviso {n}',
+    'settings.identity.announcementAdd': 'Añadir aviso',
+    'settings.identity.announcementRemove': 'Quitar aviso',
+    'settings.error.kicker': 'Usa como máximo 80 caracteres.',
+    'settings.error.announcement': 'Escribe un texto de 1 a 80 caracteres.',
     'settings.descriptionHelp':
       'Una frase corta bajo el nombre de la tienda (hasta 240 caracteres).',
     'settings.contact': 'Contacto',
@@ -2647,10 +2723,22 @@ export const es = {
     'content.blocks.slidesHint':
       'Las imágenes se cargan en «Imágenes», desde la lista de bloques, una vez guardado.',
     'content.blocks.layout': 'Disposición',
-    'content.blocks.layout.carousel': 'Carrusel — pasan una a una',
-    'content.blocks.layout.grid': 'Mosaico — todas a la vez',
+    'content.blocks.layout.media.carousel': 'Carrusel — pasan una a una',
+    'content.blocks.layout.media.grid': 'Mosaico — todas a la vez',
+    'content.blocks.layout.products.grid': 'Rejilla — todos del mismo tamaño',
+    'content.blocks.layout.products.rail': 'Fila — se desplaza de lado',
+    'content.blocks.layout.products.editorial': 'Editorial — foto grande, sin caja',
+    'content.blocks.layout.products.spotlight': 'Destacado — el primero manda',
+    'content.blocks.layout.products.split': 'Mensaje al lado — texto y productos',
+    'content.blocks.layout.categories.tiles': 'Puertas — altas, con foto o color',
+    'content.blocks.layout.categories.pills': 'Píldoras — una línea compacta',
+    'content.blocks.layout.categories.photo-grid': 'Rejilla de fotos — todas a la vez',
+    'content.blocks.layout.categories.mosaic': 'Mosaico — la primera manda',
+    'content.blocks.layout.banner.contained': 'Dentro del ancho de la página',
+    'content.blocks.layout.banner.bleed': 'De borde a borde',
+    'content.blocks.layout.banner.split': 'Texto al lado de la imagen',
     'content.blocks.layoutHelp':
-      'Las mismas imágenes: el carrusel las pasa solo, el mosaico las pone en fila para compararlas de un vistazo.',
+      'El mismo contenido con otra disposición: cambiarla no obliga a volver a subir ni a elegir nada.',
     'content.blocks.columnsHelp': 'Cuántas caben por fila en pantalla grande. En móvil siempre va una.',
     'content.error.missingTarget': 'Ese producto o esa categoría ya no existe.',
     'content.error.notFound': 'No encontramos lo que buscabas.',

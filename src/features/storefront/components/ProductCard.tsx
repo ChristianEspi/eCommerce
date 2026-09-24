@@ -18,6 +18,8 @@ import { TS } from '@/theme/tokens'
 import { track } from '../analytics'
 import { useAddToCart } from '../cart/useAddToCart'
 import type { CommercialPrice } from '../commerce/catalogPrices'
+import { useStorefrontTheme } from '../theme/useStorefrontTheme'
+import type { ProductCardVariant } from '../theme/types'
 import { discountPercent, type PublicProduct } from '../types'
 import { ProductMedia } from './ProductMedia'
 
@@ -67,7 +69,8 @@ export function ProductCard({
   onQuickView,
   favorite,
   onToggleFavorite,
-  compact = false,
+  reduced = false,
+  variant,
   commercialPrice = null,
 }: {
   product: PublicProduct
@@ -97,7 +100,7 @@ export function ProductCard({
   /** Sin esto no se pinta el corazón: quien no ofrece guardar, no lo enseña. */
   onToggleFavorite?: (productId: string) => void
   /**
-   * La misma tarjeta, para una FILA.
+   * La misma tarjeta, REDUCIDA para una fila (antes `compact`).
    *
    * En la rejilla del catálogo la tarjeta es el sitio donde se decide comprar,
    * y por eso lleva estado y botón. En una fila de la portada es un escaparate:
@@ -108,8 +111,26 @@ export function ProductCard({
    *
    * Lo que se quita es lo que se decide DENTRO de la ficha; no se quita ni el
    * precio ni el descuento, que es lo que hace que alguien entre.
+   *
+   * ## Por qué dejó de llamarse `compact` (Storefront V3 · P05)
+   *
+   * Porque conflictaba con el contrato. `productCardVariant: 'compact'` es una
+   * DENSIDAD que elige el tema —la de Retail y Catalog— y este booleano es una
+   * decisión de la FILA: «esta tarjeta es un anuncio, no un mostrador». Con el
+   * mismo nombre, la fila que giraba forzaba `compact` y Premium acababa con
+   * tarjetas de catálogo denso en su portada editorial. Son dos ejes distintos y
+   * ahora se llaman distinto.
    */
-  compact?: boolean
+  reduced?: boolean
+  /**
+   * La presentación que pide el TEMA. Sin ella se lee del contexto de la
+   * vitrina, que es lo que hace que la rejilla, las filas y el cajón del
+   * asistente coincidan sin que nadie tenga que acordarse de pasarla.
+   *
+   * Se acepta como prop para la vista previa del backoffice y para las pruebas,
+   * que necesitan pintar las tres sin montar cuatro tiendas.
+   */
+  variant?: ProductCardVariant
   /**
    * El precio de ESTA sesión, si el servidor lo cotizó para la colección y
    * mejora el público (N03, `useCatalogCommercialPrices`). La tarjeta no lo
@@ -120,6 +141,17 @@ export function ProductCard({
 }) {
   const { t, locale } = useI18n()
   const { agregar, pending } = useAddToCart()
+  /**
+   * La presentación, resuelta una vez (Storefront V3 · P05).
+   *
+   * Del contexto del tema, con la prop como excepción. No hay ni un
+   * `if (theme === 'premium')` en este archivo: lo que hay son tres
+   * presentaciones nombradas, y quien elige es el contrato.
+   */
+  const { style } = useStorefrontTheme()
+  const presentacion = variant ?? style.productCardVariant
+  const denso = presentacion === 'compact'
+  const editorial = presentacion === 'editorial'
   const discount = discountPercent(product)
   const available = product.in_stock !== false
   const hasVariants = product.kind === 'variant'
@@ -128,19 +160,34 @@ export function ProductCard({
   return (
     <Card
       className="eb-card"
+      data-card-variant={presentacion}
+      data-card-reduced={reduced ? 'true' : undefined}
       onMouseEnter={() => onPrefetch?.(product.slug)}
       sx={{
         position: 'relative',
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        p: compact ? 1 : { xs: 'var(--sf-card-pad)', md: 'var(--sf-card-pad-md)' },
-        gap: compact ? 0.75 : 'var(--sf-card-gap)',
+        p: denso ? 1 : editorial ? 0 : { xs: 'var(--sf-card-pad)', md: 'var(--sf-card-pad-md)' },
+        gap: denso ? 0.75 : 'var(--sf-card-gap)',
         borderRadius: 'var(--sf-radius)',
-        // La separación entre tarjetas la da la sombra, no el borde: una línea
-        // nítida alrededor de cada una convierte la rejilla en una cuadrícula.
-        border: '1px solid var(--sf-line)',
-        boxShadow: 'var(--sf-shadow)',
+        /**
+         * La superficie, que es lo que distingue `editorial` de lejos (V3 · P05).
+         *
+         * En `comfortable` y `compact` la separación entre tarjetas la da la
+         * sombra, no el borde: una línea nítida alrededor de cada una convierte
+         * la rejilla en una cuadrícula.
+         *
+         * En `editorial` no hay ninguna de las dos. La tarjeta desaparece y lo
+         * que queda es la fotografía sobre el fondo de la página, con el texto
+         * debajo: es la diferencia que se ve en una captura sin inspeccionar
+         * nada, y es lo que pide una tienda que vende por contemplación. El
+         * relieve aparece solo al apuntar o al enfocar — ahí sí hace falta saber
+         * qué tarjeta está activa.
+         */
+        border: editorial ? '1px solid transparent' : '1px solid var(--sf-line)',
+        boxShadow: editorial ? 'none' : 'var(--sf-shadow)',
+        bgcolor: editorial ? 'transparent' : undefined,
         // El movimiento es la única señal de que la tarjeta es pulsable, así
         // que se anula entero con prefers-reduced-motion en vez de acortarlo.
         transition: 'transform .18s ease, box-shadow .18s ease, border-color .18s ease',
@@ -183,14 +230,24 @@ export function ProductCard({
           ...(available ? {} : { '& img': { filter: 'grayscale(1)', opacity: 0.5 } }),
         }}
       >
-        {/* La proporción la pone el tema: cuadrada para un envase, vertical
-            para una prenda. Con RESERVA cuadrada, que es la de siempre — y solo
-            aquí: el carrito y el resumen de pago siguen con su miniatura
-            cuadrada, porque ahí la foto identifica, no vende. */}
+        {/* La proporción Y el encaje los pone el TEMA (V3 · P02).
+
+            La proporción ya venía de ahí: cuadrada para un envase, vertical
+            para una prenda. El encaje estaba cableado en `contain`, que es lo
+            correcto para un catálogo de referencias fotografiadas sobre fondo
+            claro —recortar una caja de medicamento se come el principio
+            activo— y lo equivocado para una tienda de moda, donde el encuadre
+            completo deja franjas vacías arriba y abajo de cada prenda.
+
+            No hay `if` por tema aquí dentro: los dos llegan como variables de
+            CSS desde la frontera `.sf-scope`, con RESERVA —cuadrada y
+            `contain`, las de siempre— para cuando esta tarjeta se pinta fuera
+            de la vitrina. El carrito y el resumen de pago siguen con su
+            miniatura cuadrada: ahí la foto identifica, no vende. */}
         <ProductMedia
           url={imageUrl}
           alt={product.primary_image_alt ?? product.name}
-          fit="contain"
+          fit="var(--sf-media-fit, contain)"
           ratio="var(--sf-image-ratio, 1 / 1)"
         />
 
@@ -212,7 +269,18 @@ export function ProductCard({
           <IconButton
             size="small"
             aria-pressed={Boolean(favorite)}
-            aria-label={favorite ? t('store.favorite.remove') : t('store.favorite.add')}
+            /**
+             * El nombre del producto va DENTRO del nombre accesible (V3 · P14).
+             *
+             * Una rejilla de veinticuatro tarjetas tenía veinticuatro botones
+             * llamados «Guardar en favoritos»: quien la recorre con un lector de
+             * pantalla oía la misma frase veinticuatro veces sin saber de qué
+             * producto. El nombre del producto es lo único que los distingue.
+             *
+             * En `title` se queda el texto corto: es el aviso al pasar el ratón,
+             * y ahí el producto ya se está viendo.
+             */
+            aria-label={`${favorite ? t('store.favorite.remove') : t('store.favorite.add')}: ${product.name}`}
             title={favorite ? t('store.favorite.remove') : t('store.favorite.add')}
             onClick={() => onToggleFavorite(product.product_id)}
             sx={{
@@ -302,7 +370,7 @@ export function ProductCard({
         <Typography
           component="h3"
           sx={{
-            fontSize: compact ? 13.5 : 'var(--sf-card-title)',
+            fontSize: denso ? 13.5 : 'var(--sf-card-title)',
             fontWeight: 650,
             lineHeight: 1.35,
             letterSpacing: '-0.005em',
@@ -350,7 +418,7 @@ export function ProductCard({
           <Typography
             className="tnum"
             sx={{
-              fontSize: compact ? 16 : 'var(--sf-card-price)',
+              fontSize: denso ? 16 : 'var(--sf-card-price)',
               fontWeight: 800,
               letterSpacing: '-0.02em',
               lineHeight: 1.2,
@@ -391,7 +459,7 @@ export function ProductCard({
         {/* El estado, en pastilla: en una línea de texto suelta se confunde con
             el resto de la ficha, y es lo que decide si el botón sirve. En la
             fila no se pinta: allí no hay botón al que condicionar. */}
-        {compact ? null : (
+        {reduced ? null : (
         <Box
           className="eb-card-state"
           // `in` es el estado ESPERADO de un producto publicado, y por eso hay
@@ -418,7 +486,7 @@ export function ProductCard({
 
       {/* Por encima de la capa que hace pulsable la tarjeta: pulsar aquí compra,
           no navega. */}
-      {compact ? null : (
+      {reduced ? null : (
       <Button
         fullWidth
         variant={available ? 'contained' : 'outlined'}
@@ -459,6 +527,10 @@ export function ProductCard({
           boxShadow: 'none',
           '&:hover': { boxShadow: 'none' },
         }}
+        // Igual que el corazón: el texto visible se queda corto —la tarjeta
+        // entera dice de qué producto es— y el nombre accesible lleva el
+        // producto, porque un lector de pantalla anuncia el botón solo.
+        aria-label={`${hasVariants ? t('store.product.chooseOptions') : t('store.product.addToCart')}: ${product.name}`}
       >
         {hasVariants ? t('store.product.chooseOptions') : t('store.product.addToCart')}
       </Button>

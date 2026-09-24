@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import CategoryRoundedIcon from '@mui/icons-material/CategoryRounded'
 import { en } from '@/shared/i18n/messages.en'
 import { es } from '@/shared/i18n/messages.es'
+// El diccionario COMPLETO de los dos idiomas: el español está partido en dos
+// archivos, y auditar solo uno dejaba fuera media suite (V3 · P14).
+import { MESSAGES } from '@/shared/i18n/messages.all'
 import { iconoDe } from '@/shared/ui/categoryIcon'
 import { PLATFORM_VALUE_PROPS, VALUE_PROP_COPY, VALUE_PROP_ICON_KEYS } from './valueProps'
 import { THEME_PRESETS } from './theme/presets'
@@ -228,6 +231,8 @@ describe('los cuatro temas sirven a cualquier rubro', () => {
         'contentWidth',
         'imageRatio',
         'sectionSpacing',
+        // Storefront V3 · P02 · El encaje de la foto, que salió de la tarjeta.
+        'productMediaFit',
         'gridColumns',
       ])
     }
@@ -251,5 +256,74 @@ describe('los cuatro temas sirven a cualquier rubro', () => {
     })
 
     expect(new Set(huellas).size).toBe(THEME_PRESET_IDS.length)
+  })
+})
+
+/**
+ * Storefront V3 · P14 · La auditoría, ampliada a TODO lo que se lee.
+ *
+ * ## Por qué hacía falta ampliarla
+ *
+ * Las comprobaciones anteriores mirán `store.*` —lo que ve un comprador— y
+ * `settings.design.*` —lo que ve quien elige el tema—. V3 añadió vocabulario en
+ * otros tres sitios: la barra del catálogo, las composiciones de los bloques del
+ * CMS y las señales de readiness. Un texto de rubro en cualquiera de ellos
+ * volvería a atar la suite a un sector, y no lo habría visto nadie.
+ *
+ * Así que aquí se mira el diccionario COMPLETO, en los dos idiomas, con una sola
+ * excepción declarada y justificada.
+ */
+describe('nada de lo que la plataforma escribe nombra un rubro', () => {
+  /**
+   * La única excepción, y por qué existe.
+   *
+   * `pim.brands.*` habla de las MARCAS que vende el comercio, y ahí «moda» o
+   * «farmacéutica» pueden aparecer como ejemplo de lo que el comercio escribe en
+   * su propio catálogo. Si algún día ese texto dejara de ser un ejemplo y se
+   * convirtiera en una afirmación de la plataforma, esta lista es el sitio donde
+   * se vería que alguien lo permitió.
+   */
+  const EXCEPCIONES: readonly string[] = []
+
+  it.each(['es', 'en'] as const)('el diccionario %s, entero', (idioma) => {
+    /**
+     * `MESSAGES` y no `es`, y esto es la mitad del valor de la prueba.
+     *
+     * El diccionario español está PARTIDO —`messages.es.ts` para la vitrina y
+     * `messages.es.backoffice.ts` para el panel—, así que auditar `es` dejaba
+     * fuera media suite. Y ahí es justo donde estaba lo que esta prueba
+     * encontró al escribirse: dos ejemplos del borrador de cotización con IA
+     * que nombraban una farmacia y sus productos, y que veía todo comercio de
+     * cualquier rubro.
+     */
+    const diccionario = MESSAGES[idioma] as Record<string, string>
+
+    const culpables = Object.entries(diccionario)
+      .filter(([clave]) => !EXCEPCIONES.some((prefijo) => clave.startsWith(prefijo)))
+      .filter(([, texto]) => typeof texto === 'string' && nombraRubro(texto))
+      .map(([clave, texto]) => `${clave}: ${texto}`)
+
+    expect(culpables).toEqual([])
+  })
+
+  it('las claves que V3 añadió están cubiertas por la auditoría', () => {
+    /**
+     * Esto no busca rubros: comprueba que los sitios NUEVOS existen y por tanto
+     * entran en la comprobación de arriba. Sin esto, renombrar un grupo de
+     * claves dejaría la auditoría pasando sobre un diccionario que ya no tiene
+     * esas entradas — verde por vacío, que es la peor clase de verde.
+     */
+    const diccionario = es as Record<string, string>
+    const familias = [
+      'store.catalog.filters',
+      'content.blocks.layout.products.grid',
+      'content.blocks.layout.categories.photo-grid',
+      'settings.design.presentation.variant',
+      'settings.readiness.description',
+      'store.product.detailsSection',
+    ]
+
+    const ausentes = familias.filter((clave) => !(clave in diccionario))
+    expect(ausentes).toEqual([])
   })
 })

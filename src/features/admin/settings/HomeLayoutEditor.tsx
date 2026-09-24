@@ -1,6 +1,7 @@
 import ArrowDownwardRoundedIcon from '@mui/icons-material/ArrowDownwardRounded'
 import ArrowUpwardRoundedIcon from '@mui/icons-material/ArrowUpwardRounded'
 import DragIndicatorRoundedIcon from '@mui/icons-material/DragIndicatorRounded'
+import TuneRoundedIcon from '@mui/icons-material/TuneRounded'
 import { Box, Button, IconButton, Stack, Switch, TextField, Typography } from '@mui/material'
 import { useRef, useState } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
@@ -13,7 +14,15 @@ import {
   SECTIONS_WITH_MAX_ITEMS,
   normalizeHomeLayout,
 } from '@/features/storefront/theme/presets'
-import type { HomeSectionConfig, HomeSectionId } from '@/features/storefront/theme/types'
+import { sanitizeSectionPresentation } from '@/features/storefront/theme/presentation'
+import { versionDe } from '@/features/storefront/theme/normalize'
+import type {
+  HomeSectionConfig,
+  HomeSectionId,
+  StorefrontStyle,
+  ThemePreset,
+} from '@/features/storefront/theme/types'
+import { SectionPresentationPopover } from './SectionPresentationPopover'
 import type { StoreFormValues } from './types'
 
 /**
@@ -95,9 +104,21 @@ const SIN_IMPLEMENTAR: ReadonlySet<HomeSectionId> = new Set<HomeSectionId>(['new
 export function HomeLayoutEditor({
   form,
   busy = false,
+  preset,
+  style,
 }: {
   form: UseFormReturn<StoreFormValues>
   busy?: boolean
+  /**
+   * El tema y el estilo EFECTIVOS (V3 · P12).
+   *
+   * Los necesita el panel de presentación por sección, no para pintar la lista:
+   * lo que `auto` significa hoy depende del tema y de dos de sus claves, y el
+   * desplegable tiene que poder escribir «Usar Fila» en vez de «Automático».
+   * Pasan desde arriba porque ahí es donde ya están resueltos.
+   */
+  preset: ThemePreset
+  style: StorefrontStyle
 }) {
   const { t } = useI18n()
   const guardado = form.watch('home_layout')
@@ -116,8 +137,58 @@ export function HomeLayoutEditor({
   const activas = secciones.filter((s) => !SIN_IMPLEMENTAR.has(s.id))
   const pendientes = secciones.filter((s) => SIN_IMPLEMENTAR.has(s.id))
 
+  /**
+   * Guarda el orden, con la VERSIÓN que le corresponde (V3 · P12).
+   *
+   * Estaba escrita a mano como `1`, y desde P06 el contrato tiene una segunda
+   * versión: una lista con presentaciones guardada como V1 es una lista que
+   * dice de sí misma que no las lleva —y el validador de la base la rechaza—.
+   * `versionDe` es la misma función que usa el motor al leer: lo que decide la
+   * versión es lo que la lista contiene, no quien la escribe.
+   */
   function guardar(siguiente: readonly HomeSectionConfig[]) {
-    form.setValue('home_layout', { version: 1, sections: siguiente }, { shouldDirty: true })
+    form.setValue(
+      'home_layout',
+      { version: versionDe(siguiente), sections: siguiente },
+      { shouldDirty: true },
+    )
+  }
+
+  /**
+   * Cambia una clave de la presentación de una sección, o la devuelve al tema.
+   *
+   * Pasa por `sanitizeSectionPresentation`, que es la réplica de la regla de la
+   * base: si el valor no vale para esa sección —o si lo que queda son los
+   * valores por defecto— no se guarda nada. Así la lista no se llena de
+   * `{surface: 'plain'}`, que es ruido con aspecto de decisión.
+   */
+  function presentar(id: HomeSectionId, clave: 'variant' | 'surface' | 'width', valor: string) {
+    guardar(
+      secciones.map((s) => {
+        if (s.id !== id) return s
+        const actual = s.presentation ?? {}
+        const propuesta = { ...actual, [clave]: valor === '' ? undefined : valor }
+        const limpia = sanitizeSectionPresentation(id, propuesta)
+        // Sin nada que guardar, la clave desaparece: es distinto de guardar sus
+        // valores por defecto, porque así la sección sigue al tema el día que el
+        // tema cambie de opinión.
+        return limpia ? { ...s, presentation: limpia } : sinPresentacion(s)
+      }),
+    )
+  }
+
+  /** La misma sección sin su presentación. */
+  function sinPresentacion(s: HomeSectionConfig): HomeSectionConfig {
+    return s.maxItems === undefined
+      ? { id: s.id, enabled: s.enabled }
+      : { id: s.id, enabled: s.enabled, maxItems: s.maxItems }
+  }
+
+  /** Borra la presentación entera de una sección. */
+  function despersonalizar(id: HomeSectionId) {
+    guardar(
+      secciones.map((s) => (s.id === id ? sinPresentacion(s) : s)),
+    )
   }
 
   /**
@@ -187,9 +258,13 @@ export function HomeLayoutEditor({
       <ListaOrdenable
         secciones={activas}
         busy={busy}
+        preset={preset}
+        style={style}
         onReordenar={reordenar}
         onEncender={encender}
         onLimitar={limitar}
+        onPresentar={presentar}
+        onDespersonalizar={despersonalizar}
       />
 
       {pendientes.length > 0 && (
@@ -256,19 +331,29 @@ export function HomeLayoutEditor({
 function ListaOrdenable({
   secciones,
   busy,
+  preset,
+  style,
   onReordenar,
   onEncender,
   onLimitar,
+  onPresentar,
+  onDespersonalizar,
 }: {
   secciones: readonly HomeSectionConfig[]
   busy: boolean
+  preset: ThemePreset
+  style: StorefrontStyle
   onReordenar: (desde: number, hasta: number) => void
   onEncender: (id: HomeSectionId, enabled: boolean) => void
   onLimitar: (id: HomeSectionId, valor: string) => void
+  onPresentar: (id: HomeSectionId, clave: 'variant' | 'surface' | 'width', valor: string) => void
+  onDespersonalizar: (id: HomeSectionId) => void
 }) {
   const { t } = useI18n()
   const origen = useRef<number | null>(null)
   const [encima, setEncima] = useState<number | null>(null)
+  /** Qué fila tiene el panel abierto, y desde qué botón. */
+  const [afinando, setAfinando] = useState<{ id: HomeSectionId; anchor: HTMLElement } | null>(null)
 
   function soltar(destino: number) {
     const desde = origen.current
@@ -363,6 +448,32 @@ function ListaOrdenable({
             )}
 
             <Stack direction="row" sx={{ gap: 0.25 }}>
+              {/**
+               * Cómo se enseña esta sección (V3 · P12).
+               *
+               * En un panel que se abre, no en tres desplegables en la fila:
+               * trece filas con seis controles cada una son 78 controles en la
+               * columna estrecha del taller, y la lista deja de poder recorrerse
+               * de un vistazo.
+               *
+               * El botón dice a qué sección pertenece —como las flechas— y marca
+               * si esa sección lleva algo personalizado, que es la respuesta a
+               * «¿qué le he tocado yo a esto?» sin abrir nada.
+               */}
+              <IconButton
+                type="button"
+                size="small"
+                disabled={busy}
+                data-presentation-open={seccion.id}
+                data-presentation-custom={seccion.presentation ? 'true' : undefined}
+                aria-label={`${t('settings.design.presentation.open')}: ${nombre}`}
+                onClick={(evento) =>
+                  setAfinando({ id: seccion.id, anchor: evento.currentTarget })
+                }
+                sx={{ color: seccion.presentation ? 'var(--accent-deep)' : undefined }}
+              >
+                <TuneRoundedIcon fontSize="small" />
+              </IconButton>
               <IconButton
                 type="button"
                 size="small"
@@ -385,6 +496,27 @@ function ListaOrdenable({
           </Stack>
         )
       })}
+
+      {/* Uno solo para toda la lista: trece popovers montados a la vez serían
+          trece diálogos en el árbol para enseñar como máximo uno. */}
+      {afinando && (
+        <SectionPresentationPopover
+          open
+          anchorEl={afinando.anchor}
+          onClose={() => setAfinando(null)}
+          sectionId={afinando.id}
+          sectionName={t(NOMBRE[afinando.id])}
+          preset={preset}
+          style={style}
+          presentation={secciones.find((s) => s.id === afinando.id)?.presentation}
+          busy={busy}
+          onChange={(clave, valor) => onPresentar(afinando.id, clave, valor)}
+          onClear={() => {
+            onDespersonalizar(afinando.id)
+            setAfinando(null)
+          }}
+        />
+      )}
     </Stack>
   )
 }

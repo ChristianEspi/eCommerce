@@ -192,7 +192,7 @@ describe('precio comercial en la rejilla', () => {
     const { add } = pintar({ context: CONTEXTO, quote: () => ({ lines: [linea(GEL, '16.00')] }) })
     const gel = await waitFor(() => tarjeta('Alcohol en gel'))
     await within(gel).findByText('Tu precio comercial')
-    await user.click(within(gel).getByRole('button', { name: 'Agregar al carrito' }))
+    await user.click(within(gel).getByRole('button', { name: /^Agregar al carrito/ }))
     expect(add).toHaveBeenCalledWith(GEL, 1, null)
   })
 })

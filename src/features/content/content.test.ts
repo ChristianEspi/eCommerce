@@ -1,8 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ALL_BLOCK_LAYOUTS,
+  BANNER_LAYOUTS,
+  CATEGORY_COLLECTION_LAYOUTS,
   CONTENT_BLOCK_TYPES,
+  CONTENT_SETTING_KEYS,
+  MEDIA_LAYOUTS,
+  PRODUCT_COLLECTION_LAYOUTS,
   blockAcceptsItems,
+  blockChoosesLayout,
   blockFieldRules,
+  blockLayoutDefault,
+  blockLayoutFamily,
+  blockLayoutOf,
+  blockLayoutOptions,
   blockShapeIsComplete,
   isSafeHref,
   isSafeRichText,
@@ -11,6 +22,9 @@ import {
   contentSettingsSchema,
   type RichTextDocument,
 } from '@/domain/content'
+// El diccionario COMPLETO de los dos idiomas: `messages` trae el español y
+// carga el inglés aparte, y aquí hace falta comprobar los dos a la vez.
+import { MESSAGES } from '@/shared/i18n/messages.all'
 import {
   clearUnusedBlockFields,
   parseExpansions,
@@ -369,5 +383,131 @@ describe('sinónimos', () => {
 
   it('descarta lo demasiado corto: un término de una letra no es un sinónimo', () => {
     expect(parseExpansions('a, ok, b')).toEqual(['ok'])
+  })
+})
+
+/**
+ * Storefront V3 · P08 · Las composiciones de un bloque.
+ *
+ * Tres propiedades, y las tres son la misma preocupación: que el editor, la
+ * vitrina y la base digan lo mismo.
+ *
+ *  1. **El vocabulario es cerrado y viaja en `settings.layout`**, que ya estaba
+ *     en la lista blanca desde el CMS original. Por eso esta fase no lleva
+ *     migración: la clave existía y lo que se añade son valores.
+ *  2. **El defecto de cada tipo es su composición de HOY**, así que una página
+ *     publicada antes de esta fase se ve igual después.
+ *  3. **Cada valor tiene etiqueta en los dos idiomas.** Es lo que evita que el
+ *     comercio lea `photo-grid` en un desplegable.
+ */
+describe('las composiciones de un bloque', () => {
+  it('la lista completa es exactamente la unión de las familias', () => {
+    // Un valor que estuviera en una familia y no en la lista completa no se
+    // podría guardar; uno que estuviera solo en la lista completa sería un
+    // valor que nadie ofrece y nadie pinta.
+    const familias = [
+      ...MEDIA_LAYOUTS,
+      ...PRODUCT_COLLECTION_LAYOUTS,
+      ...CATEGORY_COLLECTION_LAYOUTS,
+      ...BANNER_LAYOUTS,
+    ]
+    expect([...ALL_BLOCK_LAYOUTS].sort()).toEqual([...new Set(familias)].sort())
+  })
+
+  it('`layout` ya estaba en el vocabulario de `settings`: esta fase no toca la base', () => {
+    expect(CONTENT_SETTING_KEYS).toContain('layout')
+    expect(contentSettingsSchema.safeParse({ layout: 'spotlight' }).success).toBe(true)
+  })
+
+  it.each([
+    ['product_collection', 'grid'],
+    ['carousel', 'rail'],
+    ['category_collection', 'tiles'],
+    ['banner', 'contained'],
+    ['slider', 'carousel'],
+  ] as const)('un %s sin nada guardado se enseña como %s', (type, esperado) => {
+    expect(blockLayoutOf(type, {})).toBe(esperado)
+  })
+
+  it('lo guardado manda si es de su familia', () => {
+    expect(blockLayoutOf('product_collection', { layout: 'spotlight' })).toBe('spotlight')
+    expect(blockLayoutOf('category_collection', { layout: 'photo-grid' })).toBe('photo-grid')
+    expect(blockLayoutOf('banner', { layout: 'bleed' })).toBe('bleed')
+  })
+
+  it.each([
+    ['banner', 'spotlight'],
+    ['product_collection', 'bleed'],
+    ['category_collection', 'rail'],
+    ['slider', 'mosaic'],
+  ] as const)('un %s con «%s» guardado cae a la suya: la vitrina no se queda en blanco', (type, ajeno) => {
+    expect(blockLayoutOf(type, { layout: ajeno })).toBe(blockLayoutDefault(type))
+  })
+
+  it('los tipos que no eligen composición no ofrecen ninguna', () => {
+    // Y no por olvido: la composición de una campaña la decide el muro que las
+    // agrupa, que es quien sabe cuántas hay.
+    expect(blockLayoutOptions('hero')).toBeNull()
+    expect(blockLayoutOptions('rich_text')).toBeNull()
+    expect(blockLayoutOptions('campaign')).toBeNull()
+    expect(blockChoosesLayout('campaign')).toBe(false)
+  })
+
+  it('el editor rechaza una composición que no es de ese tipo', () => {
+    // El desplegable no puede llegar a ofrecerla —sale de la misma tabla—, así
+    // que esto solo salta si la llamada no viene del formulario.
+    const issues = validateBlockForm(
+      form({ block_type: 'banner', title: 'Aviso', layout: 'spotlight' }),
+    )
+    expect(issues.some((issue) => issue.field === 'layout')).toBe(true)
+
+    expect(
+      validateBlockForm(form({ block_type: 'banner', title: 'Aviso', layout: 'bleed' })).some(
+        (issue) => issue.field === 'layout',
+      ),
+    ).toBe(false)
+  })
+
+  it('cambiar de tipo devuelve la composición a la del tipo nuevo', () => {
+    // Sin esto, pasar un banner a sangre a colección de productos dejaría
+    // `bleed` guardado en un bloque que no sabe qué es eso: el formulario no lo
+    // enseñaría y la validación lo rechazaría al guardar sin nada que señalar.
+    const limpio = clearUnusedBlockFields(
+      form({ block_type: 'product_collection', layout: 'bleed' }),
+    )
+    expect(limpio.layout).toBe('grid')
+
+    // Y una que sí vale se conserva: cambiar de tipo no es perder lo elegido.
+    expect(
+      clearUnusedBlockFields(form({ block_type: 'product_collection', layout: 'spotlight' })).layout,
+    ).toBe('spotlight')
+  })
+
+  it('cada composición tiene etiqueta en español y en inglés', () => {
+    const familias: readonly [string, readonly string[]][] = [
+      ['media', MEDIA_LAYOUTS],
+      ['products', PRODUCT_COLLECTION_LAYOUTS],
+      ['categories', CATEGORY_COLLECTION_LAYOUTS],
+      ['banner', BANNER_LAYOUTS],
+    ]
+
+    const faltan: string[] = []
+    for (const [familia, valores] of familias) {
+      for (const valor of valores) {
+        const key = `content.blocks.layout.${familia}.${valor}`
+        if (!(key in MESSAGES.es)) faltan.push(`es:${key}`)
+        if (!(key in MESSAGES.en)) faltan.push(`en:${key}`)
+      }
+    }
+    expect(faltan).toEqual([])
+  })
+
+  it('y la familia de cada tipo es la que nombra sus etiquetas', () => {
+    expect(blockLayoutFamily('product_collection')).toBe('products')
+    expect(blockLayoutFamily('carousel')).toBe('products')
+    expect(blockLayoutFamily('category_collection')).toBe('categories')
+    expect(blockLayoutFamily('banner')).toBe('banner')
+    expect(blockLayoutFamily('slider')).toBe('media')
+    expect(blockLayoutFamily('hero')).toBeNull()
   })
 })
