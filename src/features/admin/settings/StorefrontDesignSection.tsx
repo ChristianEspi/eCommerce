@@ -12,6 +12,7 @@ import { THEME_PRESETS } from '@/features/storefront/theme/presets'
 import { AdvancedStyleSettings } from './AdvancedStyleSettings'
 import { themeColumnsReady } from './api'
 import { HomeLayoutEditor } from './HomeLayoutEditor'
+import { StoreReadiness } from './StoreReadiness'
 import { StorefrontPreview } from './StorefrontPreview'
 import { ThemeMiniPreview } from './ThemeMiniPreview'
 import type { StoreFormValues } from './types'
@@ -105,9 +106,21 @@ const HEREDAR = ''
 export function StorefrontDesignSection({
   form,
   busy = false,
+  storeId = null,
+  storeSlug = null,
 }: {
   form: UseFormReturn<StoreFormValues>
   busy?: boolean
+  /**
+   * La tienda, para el panel de calidad visual (Storefront V2 · P13).
+   *
+   * Opcionales porque esta sección se monta también sin tienda activa —una
+   * cuenta recién creada— y entonces no hay nada que medir. Sin ellos el panel
+   * no se pinta: un panel de calidad con siete líneas a cero no informa de
+   * nada, asusta.
+   */
+  storeId?: string | null
+  storeSlug?: string | null
 }) {
   const { t } = useI18n()
   const preset = form.watch('theme_preset')
@@ -266,6 +279,20 @@ export function StorefrontDesignSection({
         />
 
         <HomeLayoutEditor form={form} busy={busy} />
+
+        {storeId && storeSlug && (
+          <StoreReadiness
+            storeId={storeId}
+            storeSlug={storeSlug}
+            store={{
+              logo_url: form.watch('logo_url'),
+              banner_url: form.watch('banner_url'),
+              support_email: form.watch('support_email'),
+              contact_phone: form.watch('contact_phone'),
+              contact_address: form.watch('contact_address'),
+            }}
+          />
+        )}
       </Stack>
 
       {/**

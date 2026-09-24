@@ -903,7 +903,12 @@ export function SettingsPage() {
                           color, nombre—; el diseño es cómo se presenta lo que
                           vendes. Mezclarlas obliga a bajar por un color para
                           llegar al orden de la portada. */}
-                      <StorefrontDesignSection form={form} busy={busy} />
+                      <StorefrontDesignSection
+                        form={form}
+                        busy={busy}
+                        storeId={storeId}
+                        storeSlug={activeStore?.slug ?? null}
+                      />
                     </CardContent>
                   </Card>
                 )}

@@ -219,6 +219,21 @@ export function StorefrontPreview({
       </Typography>
 
       {/**
+       * El rótulo de ejemplo, una sola vez y arriba (Storefront V2 · P13).
+       *
+       * Va aquí y no repetido en cada tarjeta por dos motivos: repetirlo trece
+       * veces convertiría la vista previa en una pantalla de advertencias, y
+       * puesto una vez sobre el lienzo entero cubre todo lo que hay dentro.
+       *
+       * Y va SIEMPRE, no solo cuando algo falta: el contenido de la vista previa
+       * nunca sale del catálogo, así que un rótulo condicional sería más
+       * confuso que uno fijo.
+       */}
+      <Typography data-testid="preview-demo-note" sx={{ fontSize: TS.label, color: 'var(--muted)' }}>
+        {t('settings.design.preview.demo')}
+      </Typography>
+
+      {/**
        * El lienzo.
        *
        * El marco se desplaza si no cabe y no se ha pedido ajustar, en vez de
@@ -375,17 +390,15 @@ function MarcoDeVistaPrevia({
               {t('settings.design.preview.empty')}
             </Typography>
           ) : (
-            encendidas.map((seccion) =>
-              seccion.id === 'hero' ? (
-                <PreviewHero key={seccion.id} storeName={storeName} />
-              ) : (
-                <PreviewSection
-                  key={seccion.id}
-                  titulo={t(NOMBRE_SECCION[seccion.id])}
-                  productos={CON_PRODUCTOS.has(seccion.id)}
-                />
-              ),
-            )
+            encendidas.map((seccion) => (
+              <SeccionDeEjemplo
+                key={seccion.id}
+                id={seccion.id}
+                titulo={t(NOMBRE_SECCION[seccion.id])}
+                tema={tema}
+                storeName={storeName}
+              />
+            ))
           )}
         </Box>
       </Box>
@@ -448,8 +461,17 @@ function factorDeAjuste(
   return Math.min(1, Math.max(0.25, (disponible - 16) / necesario))
 }
 
-/** La barra. Su altura sale del marco, como en la tienda de su ancho. */
+/**
+ * La barra, con lo que de verdad lleva la de la tienda.
+ *
+ * Hasta P13 eran tres rectángulos grises, y eso es lo que hacía que la vista
+ * previa se leyera como una pantalla a medio cargar: un esqueleto es
+ * exactamente eso, rectángulos grises donde luego habrá cosas. El alto sigue
+ * saliendo del marco.
+ */
 function PreviewHeader({ storeName }: { storeName: string }) {
+  const { t } = useI18n()
+
   return (
     <Box
       className="sf-header"
@@ -462,65 +484,157 @@ function PreviewHeader({ storeName }: { storeName: string }) {
         borderBottom: '1px solid var(--sf-line)',
       }}
     >
-      <Typography sx={{ fontWeight: 800, fontSize: 15 }}>{storeName}</Typography>
+      <Typography sx={{ fontWeight: 800, fontSize: 15, whiteSpace: 'nowrap' }}>
+        {storeName}
+      </Typography>
       <Box
         sx={{
           flex: 1,
-          height: 26,
-          mx: 2,
+          minWidth: 0,
+          mx: 1.5,
+          px: 1.25,
+          height: 'var(--sf-search-h)',
+          display: 'flex',
+          alignItems: 'center',
           borderRadius: 'var(--sf-pill)',
+          border: '1px solid var(--sf-line)',
           bgcolor: 'var(--sf-media-bg)',
-        }}
-      />
-      <Box
-        sx={{ width: 26, height: 26, borderRadius: 'var(--sf-pill)', bgcolor: 'var(--sf-media-bg)' }}
-      />
-    </Box>
-  )
-}
-
-/** La portada. Su alto y el cuerpo del titular salen del tema y del marco. */
-function PreviewHero({ storeName }: { storeName: string }) {
-  return (
-    <Box
-      sx={{
-        minHeight: 'var(--sfp-hero-min)',
-        borderRadius: 'var(--sf-radius)',
-        background: 'var(--hero-grad)',
-        display: 'flex',
-        alignItems: 'flex-end',
-        p: 'var(--sfp-hero-pad)',
-      }}
-    >
-      <Typography
-        sx={{
-          fontSize: 'var(--sfp-hero-title)',
-          fontWeight: 800,
-          letterSpacing: '-0.03em',
-          lineHeight: 1.05,
-          color: '#FFFFFF',
+          fontSize: 12,
+          color: 'var(--muted)',
+          overflow: 'hidden',
+          whiteSpace: 'nowrap',
         }}
       >
-        {storeName}
+        {t('settings.design.preview.search')}
+      </Box>
+      <Typography sx={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>
+        {t('settings.design.preview.cart')}
       </Typography>
     </Box>
   )
 }
 
 /**
- * Una banda. Las que enseñan producto pintan una rejilla con las columnas y el
- * aire que le tocan AL MARCO — que es lo que hace visible la diferencia entre
- * un catálogo denso en escritorio y el mismo catálogo en un teléfono.
+ * La portada, con las DOS composiciones del contrato (Storefront V2 · P13).
+ *
+ * `heroVariant` elige entre dos árboles distintos en la tienda —una portada que
+ * enseña un producto rebajado y una que enseña el lema del comercio— y hasta
+ * P13 la vista previa pintaba la misma caja con degradado para los dos. Una
+ * opción del formulario que no cambia nada en la vista previa es una opción que
+ * el comercio no puede evaluar.
  */
-function PreviewSection({ titulo, productos }: { titulo: string; productos: boolean }) {
+function PreviewHero({ tema, storeName }: { tema: ResolvedStoreTheme; storeName: string }) {
+  const { t } = useI18n()
+  const lema = tema.style.heroVariant === 'statement'
+
   return (
-    <Stack sx={{ gap: 1 }}>
-      <Typography
-        sx={{ fontSize: 'var(--sfp-heading)', fontWeight: 800, letterSpacing: '-0.025em' }}
-      >
-        {titulo}
-      </Typography>
-      {productos ? (
+    <Box
+      data-preview-hero={tema.style.heroVariant}
+      sx={{
+        minHeight: 'var(--sfp-hero-min)',
+        borderRadius: 'var(--sf-radius)',
+        background: 'var(--hero-grad)',
+        display: 'grid',
+        gridTemplateColumns: lema ? '1fr' : 'minmax(0, 1.4fr) minmax(0, 1fr)',
+        gap: 2,
+        alignItems: lema ? 'center' : 'end',
+        justifyItems: lema ? 'center' : 'stretch',
+        textAlign: lema ? 'center' : 'left',
+        p: 'var(--sfp-hero-pad)',
+      }}
+    >
+      <Box sx={{ minWidth: 0 }}>
+        <Typography
+          sx={{
+            fontSize: 'var(--sfp-hero-title)',
+            fontWeight: 800,
+            letterSpacing: '-0.03em',
+            lineHeight: 1.05,
+            color: '#FFFFFF',
+          }}
+        >
+          {storeName}
+        </Typography>
+        <Typography sx={{ fontSize: 13, color: '#FFFFFF', opacity: 0.85, mt: 0.5 }}>
+          {t('settings.design.preview.heroSubtitle')}
+        </Typography>
+      </Box>
+
+      {/* La portada de producto enseña PRODUCTO: es media razón de la variante,
+          y sin la tarjeta al lado las dos se ven igual. */}
+      {!lema && (
+        <Box
+          sx={{
+            display: 'grid',
+            gap: 0.5,
+            p: 1,
+            borderRadius: 'var(--sf-radius-sm)',
+            bgcolor: 'var(--card)',
+            boxShadow: 'var(--sf-shadow)',
+          }}
+        >
+          <Box
+            sx={{
+              aspectRatio: 'var(--sf-image-ratio)',
+              borderRadius: 'var(--sf-radius-sm)',
+              bgcolor: 'var(--sf-media-bg)',
+            }}
+          />
+          <Typography sx={{ fontSize: 11, fontWeight: 700 }}>
+            {t('settings.design.preview.demoProduct').replace('{n}', '1')}
+          </Typography>
+        </Box>
+      )}
+    </Box>
+  )
+}
+
+/**
+ * Una sección de la portada, con contenido de EJEMPLO (Storefront V2 · P13).
+ *
+ * ## Por qué dejó de ser un rectángulo gris
+ *
+ * Porque un rectángulo gris es exactamente lo que pinta una pantalla mientras
+ * carga. La vista previa se leía como un esqueleto —y más de una vez se
+ * preguntó si estaba rota— cuando en realidad estaba terminada: lo que enseñaba
+ * era su contenido definitivo.
+ *
+ * Ahora cada sección pinta lo que pinta la de verdad, con textos de ejemplo
+ * DETERMINISTAS y rotulados. No se usan productos del catálogo: esta pantalla
+ * enseña la DISPOSICIÓN, y traerse el catálogo para dibujar seis tarjetas sería
+ * pagar una consulta por cada tecla del formulario.
+ *
+ * Los textos son neutros a propósito. Ni un nombre de producto, ni una familia,
+ * ni un precio que pudiera parecerse al de nadie: «Producto de ejemplo 1» no se
+ * confunde con el catálogo de una tienda de verdad.
+ */
+function SeccionDeEjemplo({
+  id,
+  titulo,
+  tema,
+  storeName,
+}: {
+  id: HomeSectionId
+  titulo: string
+  tema: ResolvedStoreTheme
+  storeName: string
+}) {
+  const { t } = useI18n()
+
+  if (id === 'hero') return <PreviewHero tema={tema} storeName={storeName} />
+
+  if (id === 'services') return <FranjaDeServicios />
+
+  if (id === 'categories') {
+    return <PuertasDeEjemplo titulo={titulo} variante={tema.style.categoryVariant} />
+  }
+
+  if (id === 'brands' || id === 'trust') return <MarcasDeEjemplo titulo={titulo} />
+
+  if (CON_PRODUCTOS.has(id)) {
+    return (
+      <Stack sx={{ gap: 1 }}>
+        <TituloDeBanda titulo={titulo} />
         <Box
           data-testid="preview-grid"
           sx={{
@@ -530,19 +644,208 @@ function PreviewSection({ titulo, productos }: { titulo: string; productos: bool
           }}
         >
           {Array.from({ length: 6 }, (_, i) => (
-            <PreviewCard key={i} />
+            <PreviewCard key={i} numero={i + 1} variante={tema.style.productCardVariant} />
           ))}
         </Box>
-      ) : (
-        <Box sx={{ height: 56, borderRadius: 'var(--sf-radius-sm)', bgcolor: 'var(--sf-media-bg)' }} />
-      )}
+      </Stack>
+    )
+  }
+
+  // Lo que queda —contenido del CMS, promociones, datos del negocio— es una
+  // banda de texto: eso es lo que pintan en la tienda, y no una rejilla.
+  return (
+    <Stack sx={{ gap: 1 }}>
+      <TituloDeBanda titulo={titulo} />
+      <Stack
+        sx={{
+          gap: 0.75,
+          p: 1.5,
+          borderRadius: 'var(--sf-radius)',
+          bgcolor: 'color-mix(in srgb, var(--accent) 6%, var(--card))',
+        }}
+      >
+        <Box sx={{ height: 8, width: '45%', borderRadius: 4, bgcolor: 'var(--sf-media-bg)' }} />
+        <Box sx={{ height: 8, width: '70%', borderRadius: 4, bgcolor: 'var(--sf-media-bg)' }} />
+        <Typography sx={{ fontSize: 11, color: 'var(--muted)' }}>
+          {t('settings.design.preview.demoBlock')}
+        </Typography>
+      </Stack>
     </Stack>
   )
 }
 
-function PreviewCard() {
+function TituloDeBanda({ titulo }: { titulo: string }) {
+  return (
+    <Typography sx={{ fontSize: 'var(--sfp-heading)', fontWeight: 800, letterSpacing: '-0.025em' }}>
+      {titulo}
+    </Typography>
+  )
+}
+
+/** La franja de propuestas de valor: cuatro apoyos cortos, como en la tienda. */
+function FranjaDeServicios() {
+  const { t } = useI18n()
+
+  return (
+    <Box
+      sx={{
+        display: 'grid',
+        gap: 1,
+        gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+        p: 1.25,
+        borderRadius: 'var(--sf-radius)',
+        bgcolor: 'color-mix(in srgb, var(--accent) 6%, var(--card))',
+      }}
+    >
+      {[1, 2, 3, 4].map((n) => (
+        <Stack key={n} direction="row" sx={{ gap: 0.75, alignItems: 'center', minWidth: 0 }}>
+          <Box
+            sx={{
+              width: 20,
+              height: 20,
+              flexShrink: 0,
+              borderRadius: '50%',
+              bgcolor: 'var(--accent-soft)',
+            }}
+          />
+          <Typography sx={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)' }}>
+            {t('settings.design.preview.demoService').replace('{n}', String(n))}
+          </Typography>
+        </Stack>
+      ))}
+    </Box>
+  )
+}
+
+/**
+ * Las familias, con las DOS variantes del contrato.
+ *
+ * `categoryVariant` elige entre puertas con foto y una fila de píldoras, que en
+ * la tienda son dos composiciones distintas. Pintarlas igual aquí dejaba la
+ * opción sin forma de evaluarse.
+ */
+function PuertasDeEjemplo({ titulo, variante }: { titulo: string; variante: string }) {
+  const { t } = useI18n()
+  const pildoras = variante === 'pills'
+
+  return (
+    <Stack sx={{ gap: 1 }}>
+      <TituloDeBanda titulo={titulo} />
+      <Box
+        data-preview-categories={variante}
+        sx={{ display: 'flex', gap: 1, flexWrap: pildoras ? 'wrap' : 'nowrap' }}
+      >
+        {[1, 2, 3, 4].map((n) =>
+          pildoras ? (
+            <Typography
+              key={n}
+              sx={{
+                fontSize: 11,
+                fontWeight: 700,
+                px: 1.25,
+                py: 0.5,
+                borderRadius: 'var(--sf-pill)',
+                border: '1px solid var(--sf-line)',
+                color: 'var(--muted)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {t('settings.design.preview.demoCategory').replace('{n}', String(n))}
+            </Typography>
+          ) : (
+            <Stack
+              key={n}
+              sx={{
+                flex: 1,
+                minWidth: 0,
+                gap: 0.5,
+                p: 0.75,
+                borderRadius: 'var(--sf-radius-sm)',
+                // Los mismos tintes de orientación que usa la vitrina para sus
+                // puertas: sin ellos, cuatro cajas grises no enseñan nada.
+                bgcolor: `var(--sf-tint-${n}-bg)`,
+                border: '1px solid var(--sf-line)',
+              }}
+            >
+              <Box
+                sx={{
+                  height: 28,
+                  borderRadius: 'var(--sf-radius-sm)',
+                  bgcolor: 'var(--sf-media-bg)',
+                }}
+              />
+              <Typography sx={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)' }}>
+                {t('settings.design.preview.demoCategory').replace('{n}', String(n))}
+              </Typography>
+            </Stack>
+          ),
+        )}
+      </Box>
+    </Stack>
+  )
+}
+
+/** Las marcas: monogramas, como los pinta la vitrina cuando no hay logotipo. */
+function MarcasDeEjemplo({ titulo }: { titulo: string }) {
+  const { t } = useI18n()
+
+  return (
+    <Stack sx={{ gap: 1 }}>
+      <TituloDeBanda titulo={titulo} />
+      <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap' }}>
+        {['A', 'B', 'C', 'D', 'E'].map((letra) => (
+          <Stack
+            key={letra}
+            direction="row"
+            sx={{
+              gap: 0.75,
+              alignItems: 'center',
+              px: 1,
+              py: 0.5,
+              borderRadius: 'var(--sf-pill)',
+              border: '1px solid var(--sf-line)',
+            }}
+          >
+            <Box
+              sx={{
+                width: 18,
+                height: 18,
+                display: 'grid',
+                placeItems: 'center',
+                borderRadius: '50%',
+                bgcolor: 'var(--accent-soft)',
+                color: 'var(--accent-deep)',
+                fontSize: 10,
+                fontWeight: 800,
+              }}
+            >
+              {letra}
+            </Box>
+            <Typography sx={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)' }}>
+              {t('settings.design.preview.demoBrand').replace('{n}', letra)}
+            </Typography>
+          </Stack>
+        ))}
+      </Stack>
+    </Stack>
+  )
+}
+
+/**
+ * Una tarjeta de producto de ejemplo, con su variante.
+ *
+ * `comfortable` y `compact` no son dos rellenos distintos: la cómoda enseña el
+ * apoyo bajo el nombre y respira, y la compacta va directa al nombre y al
+ * precio. El relleno sale de `--sfp-card-pad`, que el marco resuelve por su
+ * ancho, así que la misma tarjeta se aprieta sola en el teléfono.
+ */
+function PreviewCard({ numero, variante }: { numero: number; variante: string }) {
+  const { t } = useI18n()
+  const comoda = variante === 'comfortable'
+
   return (
     <Stack
+      data-preview-card={variante}
       sx={{
         gap: 'var(--sf-card-gap)',
         p: 'var(--sfp-card-pad)',
@@ -550,6 +853,7 @@ function PreviewCard() {
         border: '1px solid var(--sf-line)',
         boxShadow: 'var(--sf-shadow)',
         bgcolor: 'var(--card)',
+        minWidth: 0,
       }}
     >
       <Box
@@ -559,15 +863,26 @@ function PreviewCard() {
           bgcolor: 'var(--sf-media-bg)',
         }}
       />
-      <Box sx={{ height: 'var(--sf-card-title)', borderRadius: 4, bgcolor: 'var(--sf-media-bg)' }} />
-      <Box
+      <Typography
         sx={{
-          height: 'var(--sf-card-price)',
-          width: '55%',
-          borderRadius: 4,
-          bgcolor: 'var(--sf-media-bg)',
+          fontSize: 11,
+          fontWeight: 700,
+          lineHeight: 1.25,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
         }}
-      />
+      >
+        {t('settings.design.preview.demoProduct').replace('{n}', String(numero))}
+      </Typography>
+      {comoda && (
+        <Typography sx={{ fontSize: 10, color: 'var(--muted)' }}>
+          {t('settings.design.preview.demoProductSupport')}
+        </Typography>
+      )}
+      <Typography sx={{ fontSize: 12, fontWeight: 800, color: 'var(--accent-deep)' }}>
+        {t('settings.design.preview.demoPrice')}
+      </Typography>
     </Stack>
   )
 }

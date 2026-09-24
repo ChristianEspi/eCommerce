@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { renderWithProviders } from '@/test/render'
@@ -40,6 +40,16 @@ function pintar(estilo: Partial<StorefrontStyle> = {}, layout: HomeLayout = DEFA
 }
 
 /** El marco de un dispositivo, por su ancho lógico. */
+/** El orden por defecto con las familias encendidas, que vienen apagadas. */
+function layoutConCategorias(): HomeLayout {
+  return {
+    version: 1,
+    sections: DEFAULT_HOME_LAYOUT.sections.map((s) =>
+      s.id === 'categories' ? { ...s, enabled: true } : s,
+    ),
+  }
+}
+
 const marco = (viewport: string) =>
   screen.getAllByTestId('preview-frame').find((m) => m.dataset.viewport === viewport)
 
@@ -259,5 +269,131 @@ describe('la vista previa no toca nada', () => {
 
     expect(within(frame).queryAllByRole('link')).toHaveLength(0)
     expect(within(frame).queryAllByRole('button')).toHaveLength(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Fidelidad: la vista previa deja de parecer un esqueleto (P13)
+// ---------------------------------------------------------------------------
+
+/**
+ * Un rectángulo gris es exactamente lo que pinta una pantalla mientras carga.
+ *
+ * La vista previa se leía como un esqueleto —y más de una vez se preguntó si
+ * estaba rota— cuando en realidad estaba terminada: lo que enseñaba era su
+ * contenido definitivo. Barra, portada, familias, marcas y tarjetas eran cinco
+ * tonos del mismo gris.
+ */
+describe('el contenido de ejemplo', () => {
+  it('la barra enseña lo que lleva la de la tienda', () => {
+    pintar()
+    const frame = marco('desktop') as HTMLElement
+
+    // El nombre sale dos veces, como en la tienda: en la barra y en la portada.
+    expect(within(frame).getAllByText('Botica del Centro').length).toBeGreaterThanOrEqual(2)
+    expect(within(frame).getByText('Buscar en la tienda')).toBeInTheDocument()
+    expect(within(frame).getByText('Carrito')).toBeInTheDocument()
+  })
+
+  it('las tarjetas tienen nombre y precio, no dos barras grises', () => {
+    pintar()
+    const frame = marco('desktop') as HTMLElement
+
+    expect(within(frame).getAllByText(/Producto de ejemplo/).length).toBeGreaterThan(0)
+    expect(within(frame).getAllByText('00,00').length).toBeGreaterThan(0)
+  })
+
+  it('está rotulado como ejemplo, una vez y para todo el lienzo', () => {
+    // Repetirlo en cada tarjeta convertiría la vista previa en una pantalla de
+    // advertencias; puesto una vez sobre el lienzo cubre todo lo que hay dentro.
+    pintar()
+
+    const nota = screen.getByTestId('preview-demo-note')
+    expect(nota.textContent).toContain('Contenido de ejemplo')
+    expect(nota.textContent).toContain('no salen de tu catálogo')
+    expect(screen.getAllByTestId('preview-demo-note')).toHaveLength(1)
+  })
+
+  it('el contenido es determinista: dos renders dan lo mismo', () => {
+    // Nombres o precios al azar harían que la vista previa cambiara sola entre
+    // dos pulsaciones del formulario, y eso se lee como un fallo.
+    pintar()
+    const primero = (marco('desktop') as HTMLElement).textContent
+
+    cleanup()
+    pintar()
+    expect((marco('desktop') as HTMLElement).textContent).toBe(primero)
+  })
+
+  it('no sale ni un dato del catálogo real', () => {
+    // La vista previa es una función del formulario a píxeles: no consulta nada,
+    // así que no puede enseñar un producto de nadie.
+    pintar()
+    const frame = marco('desktop') as HTMLElement
+
+    expect(frame.textContent).not.toContain('undefined')
+    expect(frame.textContent).not.toContain('NaN')
+  })
+})
+
+/**
+ * Las variantes del contrato, de verdad distintas.
+ *
+ * Una opción del formulario que no cambia nada en la vista previa es una opción
+ * que el comercio no puede evaluar: elige a ciegas, mira la tienda y vuelve a
+ * cambiarla. Hasta P13 `heroVariant` y `categoryVariant` pintaban lo mismo aquí.
+ */
+describe('cada variante se ve', () => {
+  it('las dos portadas son dos composiciones, no dos grises', () => {
+    pintar({ heroVariant: 'product' })
+    const producto = document.querySelector('[data-preview-hero]')
+    expect(producto).toHaveAttribute('data-preview-hero', 'product')
+    // La portada de producto enseña PRODUCTO: sin la tarjeta al lado, las dos
+    // variantes se verían iguales.
+    expect(within(producto as HTMLElement).getByText(/Producto de ejemplo 1/)).toBeInTheDocument()
+
+    cleanup()
+    pintar({ heroVariant: 'statement' })
+    const lema = document.querySelector('[data-preview-hero]')
+    expect(lema).toHaveAttribute('data-preview-hero', 'statement')
+    expect(within(lema as HTMLElement).queryByText(/Producto de ejemplo 1/)).not.toBeInTheDocument()
+  })
+
+  it('las familias son puertas o píldoras, según el contrato', () => {
+    const conCategorias = layoutConCategorias()
+
+    pintar({ categoryVariant: 'tiles' }, conCategorias)
+    expect(document.querySelector('[data-preview-categories]')).toHaveAttribute(
+      'data-preview-categories',
+      'tiles',
+    )
+
+    cleanup()
+    pintar({ categoryVariant: 'pills' }, conCategorias)
+    expect(document.querySelector('[data-preview-categories]')).toHaveAttribute(
+      'data-preview-categories',
+      'pills',
+    )
+  })
+
+  it('la tarjeta cómoda enseña el apoyo y la compacta no', () => {
+    // No son dos rellenos distintos: la cómoda respira y enseña el apoyo bajo el
+    // nombre; la compacta va directa al nombre y al precio.
+    pintar({ productCardVariant: 'comfortable' })
+    expect(screen.getAllByText('Marca · presentación').length).toBeGreaterThan(0)
+    expect(document.querySelector('[data-preview-card]')).toHaveAttribute(
+      'data-preview-card',
+      'comfortable',
+    )
+
+    cleanup()
+    pintar({ productCardVariant: 'compact' })
+    expect(screen.queryByText('Marca · presentación')).not.toBeInTheDocument()
+  })
+
+  it('las marcas se pintan con monograma, como en la tienda sin logotipo', () => {
+    pintar()
+
+    expect(screen.getAllByText(/Marca A/).length).toBeGreaterThan(0)
   })
 })

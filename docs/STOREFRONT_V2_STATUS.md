@@ -1491,7 +1491,7 @@ encoger.
 
 # P12 · Selector visual de temas y editor de portada compacto
 
-**Commit:** `<pendiente>` · **Ciclos correctivos:** 1 de 3
+**Commit:** `3b0af38` · **Ciclos correctivos:** 1 de 3
 
 ## El problema
 
@@ -1579,6 +1579,128 @@ que aparece meses después como «yo no moví eso».
 | `npm run typecheck` | **PASS** |
 | `npm run lint` | **PASS** |
 | `npm run test` | **PASS** — 297 ficheros, 5883 tests |
+| `npm run build` | **PASS** |
+
+`PHASE_RESULT: PASS`
+
+---
+
+# P13 · Vista previa fiel y calidad visual de la tienda
+
+**Commit:** `<pendiente>` · **Ciclos correctivos:** 2 de 3
+
+## Los dos problemas
+
+**1 · La vista previa parecía estar cargando.** Barra, portada, familias, marcas
+y tarjetas eran cinco tonos del mismo gris, y un rectángulo gris es exactamente
+lo que pinta una pantalla mientras carga. Se leía como un esqueleto —más de una
+vez se preguntó si estaba rota— cuando en realidad estaba terminada: lo que
+enseñaba era su contenido definitivo.
+
+Peor: `heroVariant` y `categoryVariant` pintaban **lo mismo** en sus dos valores.
+Una opción del formulario que no cambia nada en la vista previa es una opción que
+el comercio no puede evaluar — elige a ciegas, abre la tienda y vuelve a
+cambiarla.
+
+**2 · Una tienda puede tener la portada perfecta y verse pobre.** El motivo casi
+nunca es la configuración: son treinta productos publicados sin foto, las
+familias sin imagen y el logotipo sin subir. Eso no se ve desde esta pantalla, se
+ve abriendo la tienda y bajando — y el comercio, que ya sabe qué vende, no la
+mira con los ojos de quien llega por primera vez.
+
+## Lo que se hizo
+
+### Contenido de ejemplo, determinista y rotulado
+
+Cada sección pinta ahora lo que pinta la de verdad:
+
+| Sección | Antes | Ahora |
+|---|---|---|
+| Barra | tres rectángulos | nombre de la tienda, caja de búsqueda con su texto y carrito |
+| Portada | caja con degradado | `product` enseña producto con tarjeta al lado; `statement` es el lema centrado |
+| Familias | franja gris de 56 px | puertas con tinte de orientación **o** fila de píldoras, según el contrato |
+| Marcas y confianza | franja gris | monogramas, como los pinta la vitrina sin logotipo |
+| Servicios | franja gris | cuatro apoyos con su icono |
+| Tarjetas | tres barras grises | foto, nombre, apoyo (solo en la cómoda) y precio |
+| CMS · promociones · negocio | franja gris | banda tintada con su rótulo |
+
+Los textos son **neutros y deterministas**: «Producto de ejemplo 1», «Familia 2»,
+`00,00`. Ni un nombre que pueda confundirse con el catálogo de nadie, ni un
+precio inventado, y nada al azar — un contenido que cambia solo entre dos
+pulsaciones del formulario se lee como un fallo.
+
+El rótulo «Contenido de ejemplo: los textos y los precios no salen de tu
+catálogo» va **una vez** sobre el lienzo, no en cada tarjeta: repetirlo trece
+veces convertiría la vista previa en una pantalla de advertencias. Y va siempre,
+no solo cuando falta algo: el contenido nunca sale del catálogo, así que un
+rótulo condicional confundiría más que uno fijo.
+
+No se consulta nada. La vista previa sigue siendo una función del formulario a
+píxeles: cero peticiones, cero permisos nuevos, cero efectos sobre la tienda.
+
+### «Cómo se ve tu tienda»
+
+Siete señales con **su cuenta real**, no una nota:
+
+```
+Logotipo de la tienda            Completo
+Imagen de portada                Por mejorar
+Forma de contacto                Completo
+Fotos de los productos           Por mejorar   18 de 24
+Fotos de las familias            Completo       6 de 6
+Logotipos de las marcas          Por mejorar    2 de 9
+Páginas publicadas               Completo
+                                        5 de 7 al día
+```
+
+Las reglas del panel, que son lo que impide que se convierta en un examen:
+
+- **Sin nota de 0 a 100.** Una nota es una opinión con aspecto de medida: nadie
+  sabe qué pesa cada cosa ni por qué la foto de una marca vale tres puntos y no
+  siete. El resumen es una cuenta que se puede recontar mirando la lista, y hay
+  una prueba que lo fija.
+- **Lo que no tiene nada que medir está al día.** Una tienda sin marcas no tiene
+  marcas sin logotipo; marcarla en rojo sería pedirle que invente marcas para
+  aprobar.
+- **Nada es obligatorio.** Cada línea dice la CONSECUENCIA —«un producto
+  publicado sin foto se ve como un recuadro gris en el catálogo»—, nunca
+  «debes».
+- **No bloquea.** No impide publicar, no avisa al guardar y no sale en rojo.
+- **Datos reales, con el cliente ANÓNIMO.** El mismo de un comprador, así que lo
+  que mide es lo que se ve desde la calle: un producto en borrador no cuenta
+  porque nadie lo ve. Y el panel no puede enseñar de más — no tiene con qué.
+
+Las cuentas de producto van con `count: 'exact'` y `head: true`: dos cuentas del
+servidor en vez de traerse un catálogo de veinte mil referencias al navegador
+para contarlo aquí.
+
+## Ciclos correctivos
+
+1. Una prueba mía calculaba mal el resumen —contaba «páginas: 0» como al día
+   cuando es la única cuenta con un mínimo de uno—. Corregida la aritmética de
+   la prueba, no la regla, y añadido qué señales quedan por mejorar para que el
+   fallo vuelva a ser legible si cambia.
+2. Otra prohibía la palabra «obligatorio» en todo el panel, y la cabecera la usa
+   precisamente para decir que **nada** lo es. La prohibición pasa a aplicarse a
+   las líneas de señal, que es donde tendría sentido colarse un imperativo. Y el
+   nombre de la tienda sale dos veces en la vista previa —barra y portada, como
+   en la tienda real—, así que esa aserción pasa a contar apariciones.
+
+## Tests
+
+| Archivo | Casos |
+|---|---|
+| `settings/readiness.test.ts` | **Nuevo**, 9. El logotipo es sí o no y los espacios no cuentan; con un canal de contacto basta; las cuentas de foto; **una tienda sin nada que medir está al día**; las páginas no tienen número mínimo; son siete señales con cuentas enteras y `done ≤ total`; y el resumen se puede recalcular contando — si alguien mete una ponderación, deja de cuadrar. |
+| `settings/store-readiness.test.tsx` | **Nuevo**, 13. Las cuentas salen de la base; solo las familias **raíz**; marcas con logotipo; páginas publicadas; **no cuenta lo de otra tienda**; una tienda sin nada pinta las siete líneas sin un solo error; cada línea dice la consecuencia y ninguna dice «obligatorio»; el panel dice que no bloquea nada; el resumen es «5 de 7» y **no aparece ningún `/100`, porcentaje ni «puntos»**; el estado va en texto y no solo en color. |
+| `settings/preview-responsive.test.tsx` | 18 → **27**. La barra enseña nombre, buscador y carrito; las tarjetas tienen nombre y precio; el rótulo de ejemplo va una vez y para todo el lienzo; el contenido es determinista entre renders; no sale `undefined` ni `NaN`; las dos portadas son dos composiciones (y la de producto **enseña producto**); las familias son puertas o píldoras según el contrato; la tarjeta cómoda enseña el apoyo y la compacta no; las marcas van con monograma. |
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 299 ficheros, 5914 tests |
 | `npm run build` | **PASS** |
 
 `PHASE_RESULT: PASS`

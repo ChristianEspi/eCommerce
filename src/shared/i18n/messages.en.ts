@@ -275,6 +275,43 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'settings.design.preview.actual': 'Actual size',
     'settings.design.preview.size': '{device} · {w} px',
     'settings.design.preview.scaled': '{device} · {w} px at {pct}%',
+    // P13 · Sample content for the preview: neutral and labeled.
+    'settings.design.preview.demo': 'Sample content: these texts and prices do not come from your catalog.',
+    'settings.design.preview.search': 'Search the store',
+    'settings.design.preview.cart': 'Cart',
+    'settings.design.preview.heroSubtitle': 'Your cover line goes here.',
+    'settings.design.preview.demoProduct': 'Sample product {n}',
+    'settings.design.preview.demoProductSupport': 'Brand · presentation',
+    'settings.design.preview.demoPrice': '00.00',
+    'settings.design.preview.demoCategory': 'Family {n}',
+    'settings.design.preview.demoBrand': 'Brand {n}',
+    'settings.design.preview.demoService': 'Service {n}',
+    'settings.design.preview.demoBlock': 'Your published content shows up here.',
+    // P13 · «How your store looks»: informative, never blocking.
+    'settings.readiness.title': 'How your store looks',
+    'settings.readiness.help':
+      'A store can have a well ordered home page and still look poor. This blocks nothing and is not required: these are things that change what a first-time visitor sees.',
+    'settings.readiness.summary': '{n} of {total} up to date',
+    'settings.readiness.done': 'Complete',
+    'settings.readiness.todo': 'Could be better',
+    'settings.readiness.count': '{n} of {total}',
+    'settings.readiness.logo': 'Store logo',
+    'settings.readiness.logoWhy': 'Without it, the header and footer show the name initials.',
+    'settings.readiness.hero': 'Cover image',
+    'settings.readiness.heroWhy': 'Without it, the cover is painted with your color gradient.',
+    'settings.readiness.contact': 'A way to get in touch',
+    'settings.readiness.contactWhy':
+      'An email, a phone or an address is what paints the footer and the business section.',
+    'settings.readiness.productImages': 'Photos on published products',
+    'settings.readiness.productImagesWhy':
+      'A published product with no photo shows up as a gray box in the catalog.',
+    'settings.readiness.categoryImages': 'Photos on families',
+    'settings.readiness.categoryImagesWhy':
+      'Families with a photo are painted as doors; the rest use their color and icon.',
+    'settings.readiness.brandLogos': 'Brand logos',
+    'settings.readiness.brandLogosWhy': 'Brands with no logo are painted with their monogram.',
+    'settings.readiness.pages': 'Published pages',
+    'settings.readiness.pagesWhy': 'Pages you mark for the menu are linked from the store footer.',
     'settings.design.unavailable':
       'Storefront design will be available once the latest database update is applied. In the meantime your store looks exactly as it did and the rest of the settings work as usual.',
     'admin.settings.appearance.mode': 'Mode',

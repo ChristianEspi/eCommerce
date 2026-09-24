@@ -240,6 +240,46 @@ export const es = {
     // vista previa en «algo pequeño» en vez de en 1280 px al 62 %.
     'settings.design.preview.size': '{device} · {w} px',
     'settings.design.preview.scaled': '{device} · {w} px al {pct} %',
+    // P13 · Contenido de ejemplo de la vista previa. Neutro y rotulado: ni un
+    // nombre de producto, ni una familia, ni un precio que pueda confundirse
+    // con el catálogo de nadie.
+    'settings.design.preview.demo': 'Contenido de ejemplo: los textos y los precios no salen de tu catálogo.',
+    'settings.design.preview.search': 'Buscar en la tienda',
+    'settings.design.preview.cart': 'Carrito',
+    'settings.design.preview.heroSubtitle': 'Aquí va la frase de tu portada.',
+    'settings.design.preview.demoProduct': 'Producto de ejemplo {n}',
+    'settings.design.preview.demoProductSupport': 'Marca · presentación',
+    'settings.design.preview.demoPrice': '00,00',
+    'settings.design.preview.demoCategory': 'Familia {n}',
+    'settings.design.preview.demoBrand': 'Marca {n}',
+    'settings.design.preview.demoService': 'Servicio {n}',
+    'settings.design.preview.demoBlock': 'Tu contenido publicado aparece aquí.',
+    // P13 · «Cómo se ve tu tienda»: informativo, nunca bloqueante.
+    'settings.readiness.title': 'Cómo se ve tu tienda',
+    'settings.readiness.help':
+      'Una tienda puede tener la portada bien ordenada y verse pobre. Esto no bloquea nada ni es obligatorio: son cosas que cambian lo que ve quien llega por primera vez.',
+    'settings.readiness.summary': '{n} de {total} al día',
+    'settings.readiness.done': 'Completo',
+    'settings.readiness.todo': 'Por mejorar',
+    'settings.readiness.count': '{n} de {total}',
+    'settings.readiness.logo': 'Logotipo de la tienda',
+    'settings.readiness.logoWhy': 'Sin él, la cabecera y el pie enseñan las iniciales del nombre.',
+    'settings.readiness.hero': 'Imagen de portada',
+    'settings.readiness.heroWhy': 'Sin ella, la portada se pinta con el degradado de tu color.',
+    'settings.readiness.contact': 'Forma de contacto',
+    'settings.readiness.contactWhy':
+      'Con un correo, un teléfono o una dirección se pintan el pie y la sección de datos del negocio.',
+    'settings.readiness.productImages': 'Fotos de los productos publicados',
+    'settings.readiness.productImagesWhy':
+      'Un producto publicado sin foto se ve como un recuadro gris en el catálogo.',
+    'settings.readiness.categoryImages': 'Fotos de las familias',
+    'settings.readiness.categoryImagesWhy':
+      'Las familias con foto se pintan como puertas; las que no, con su color y su icono.',
+    'settings.readiness.brandLogos': 'Logotipos de las marcas',
+    'settings.readiness.brandLogosWhy': 'Las marcas sin logotipo se pintan con su monograma.',
+    'settings.readiness.pages': 'Páginas publicadas',
+    'settings.readiness.pagesWhy':
+      'Las páginas que marcas para el menú se enlazan desde el pie de la tienda.',
     'settings.design.unavailable':
       'El diseño de tienda estará disponible en cuanto se aplique la última actualización de la base de datos. Mientras tanto tu tienda se ve como siempre y el resto de la configuración funciona con normalidad.',
     'store.home.title': 'Catálogo',
