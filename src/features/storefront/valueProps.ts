@@ -79,7 +79,7 @@ export type ValuePropIconKey = (typeof VALUE_PROP_ICON_KEYS)[number]
 /**
  * Los topes, en un solo sitio.
  *
- * Replican los CHECK de la migración `20260923100000` uno a uno. La validación
+ * Replican los CHECK de la migración `20260923140000` uno a uno. La validación
  * que MANDA sigue siendo la de Postgres; esto existe para que el formulario
  * avise antes de pulsar Guardar en vez de después.
  */

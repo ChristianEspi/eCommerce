@@ -128,7 +128,7 @@ export type StoreSettings = z.infer<typeof storeSettingsSchema>
 /**
  * Las propuestas de valor tal y como las declara el FORMULARIO.
  *
- * Replica el CHECK de la migración `20260923100000` clave por clave —incluido
+ * Replica el CHECK de la migración `20260923140000` clave por clave —incluido
  * el `strict`, que es la mitad del contrato: una clave que no está en la lista
  * pasaría la validación del formulario y moriría en la base con un error
  * genérico—. Y el título es obligatorio aquí aunque el saneador lo tolere
@@ -260,7 +260,7 @@ export const storeFormSchema = z.object({
   /**
    * Propuestas de valor. CONTENIDO del comercio, no tematización y no marca
    * blanca: se guardan siempre para owner/admin, igual que el teléfono de
-   * contacto. La raya la pone la migración `20260923100000` y la impone la
+   * contacto. La raya la pone la migración `20260923140000` y la impone la
    * policy, no esta pantalla.
    */
   value_props: valuePropsField,

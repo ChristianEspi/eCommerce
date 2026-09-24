@@ -23,7 +23,7 @@ export { STORE_ASSETS_BUCKET }
  *
  * Quien autoriza es `ebim.can_write_company_object(name)`, que saca la
  * organización del primer segmento y la sociedad del tercero y comprueba el rol
- * contra la membresía de esa sociedad (migración `20260923110000`). El literal
+ * contra la membresía de esa sociedad (migración `20260923150000`). El literal
  * `company` del segundo segmento es lo que separa las dos familias de rutas del
  * mismo bucket: con él, `ebim.storage_store` devuelve NULL y las policies de
  * tienda no autorizan nada.

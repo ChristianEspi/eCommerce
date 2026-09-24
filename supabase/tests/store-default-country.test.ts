@@ -122,7 +122,7 @@ describe('lo que se publica y lo que no', () => {
    * una línea es la decisión explícita de publicarla.
    *
    * Historia de las ampliaciones: `default_country` (`20260913120000`) y
-   * `value_props` (`20260923100000`, propuestas de valor de la portada).
+   * `value_props` (`20260923140000`, propuestas de valor de la portada).
    */
   it('la vista conserva sus columnas y solo suma lo que se declara aquí', async () => {
     const columnas = await svc<{ column_name: string }>(

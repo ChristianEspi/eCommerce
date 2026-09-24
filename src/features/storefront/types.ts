@@ -114,7 +114,7 @@ export const publicStoreSchema = z.object({
    * Storefront V2 · P01 · Las propuestas de valor de la tienda, CRUDAS.
    *
    * `z.unknown()` por el mismo motivo que las tres de arriba: es una respuesta
-   * que puede venir de una base anterior a la migración `20260923100000` —y
+   * que puede venir de una base anterior a la migración `20260923140000` —y
    * entonces no trae la columna— o traer una entrada escrita a mano. Validarlo
    * aquí haría fallar el `parse` de TODA la tienda por una franja de cuatro
    * frases. Quien decide qué se pinta es `resolveValueProps`, y ahí lo
