@@ -1623,6 +1623,38 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'settings.name': 'Trade name',
     'settings.nameHelp': 'This is the name shoppers see on your storefront.',
     'settings.description': 'Description',
+    // Storefront V3 · P01 · Three roles where there used to be one.
+    'settings.storeDescription': 'Store description',
+    'settings.storeDescriptionHelp':
+      'A stable summary of the business. Used in the footer, the business section and as a search-engine fallback. It does not expire with campaigns (up to 360 characters).',
+    'settings.heroKicker': 'Cover kicker',
+    'settings.heroKickerHelp':
+      'Optional short line above the headline. It lets the cover stop repeating the store name (up to 80).',
+    'settings.heroSubtitle': 'Cover message',
+    'settings.heroSubtitleHelp':
+      'The line under the cover headline. It can change with every campaign without touching the store description (up to 240).',
+    // Header and announcements (Brand tab).
+    'settings.identity.title': 'Header and announcements',
+    'settings.identity.help':
+      'What shows at the top of your store: your brand, the theme switch and the announcement bar.',
+    'settings.identity.lockup': 'Header identity',
+    'settings.identity.lockupHelp':
+      'If your logo already contains the name, pick logo only so it does not show twice. With no logo, the name is used.',
+    'settings.identity.lockup.logoName': 'Logo and name',
+    'settings.identity.lockup.logo': 'Logo only',
+    'settings.identity.lockup.name': 'Name only',
+    'settings.identity.themeToggle': 'Light/dark switch in the store',
+    'settings.identity.themeToggleHelp':
+      'Off, your store follows each visitor device preference without offering a button that competes with the cart.',
+    'settings.identity.announcements': 'Announcement bar',
+    'settings.identity.announcementsHelp':
+      'Up to two short messages above the header. You write them: the platform adds none.',
+    'settings.identity.announcementsEmpty': 'No announcements: the bar is not painted.',
+    'settings.identity.announcementText': 'Announcement {n}',
+    'settings.identity.announcementAdd': 'Add announcement',
+    'settings.identity.announcementRemove': 'Remove announcement',
+    'settings.error.kicker': 'Use 80 characters at most.',
+    'settings.error.announcement': 'Write between 1 and 80 characters.',
     'settings.descriptionHelp': 'A short line under the store name (up to 240 characters).',
     'settings.contact': 'Contact',
     'settings.contactEmail': 'Contact email',

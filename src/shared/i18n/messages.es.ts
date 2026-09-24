@@ -1319,6 +1319,40 @@ export const es = {
     'settings.name': 'Nombre comercial',
     'settings.nameHelp': 'Es el nombre que ve el comprador en la vitrina.',
     'settings.description': 'Descripción',
+    // Storefront V3 · P01 · Tres roles donde antes había uno. `settings.description`
+    // se conserva porque lo usan otras pantallas; lo que cambia es que la tarjeta
+    // de identidad ya no mete la bajada del hero en el pie de la tienda.
+    'settings.storeDescription': 'Descripción de la tienda',
+    'settings.storeDescriptionHelp':
+      'Resumen estable del negocio. Se usa en el pie, en los datos del negocio y como reserva para buscadores. No caduca con las campañas (hasta 360 caracteres).',
+    'settings.heroKicker': 'Línea superior de la portada',
+    'settings.heroKickerHelp':
+      'Texto corto encima del titular, opcional. Sirve para que la portada no repita el nombre de la tienda (hasta 80).',
+    'settings.heroSubtitle': 'Mensaje de la portada',
+    'settings.heroSubtitleHelp':
+      'La bajada del titular de la portada. Puede cambiar con cada campaña sin tocar la descripción de la tienda (hasta 240).',
+    // Cabecera y avisos (pestaña Marca).
+    'settings.identity.title': 'Cabecera y avisos',
+    'settings.identity.help':
+      'Qué se ve en la parte de arriba de tu tienda: tu marca, el selector de tema y la barra de avisos.',
+    'settings.identity.lockup': 'Identidad en la cabecera',
+    'settings.identity.lockupHelp':
+      'Si tu logotipo ya lleva el nombre dentro, elige solo logotipo para no verlo dos veces. Sin logotipo se enseña el nombre.',
+    'settings.identity.lockup.logoName': 'Logotipo y nombre',
+    'settings.identity.lockup.logo': 'Solo logotipo',
+    'settings.identity.lockup.name': 'Solo nombre',
+    'settings.identity.themeToggle': 'Selector claro/oscuro en la tienda',
+    'settings.identity.themeToggleHelp':
+      'Apagado, tu tienda respeta la preferencia del dispositivo de quien la visita, sin ofrecer un botón que compita con el carrito.',
+    'settings.identity.announcements': 'Barra de avisos',
+    'settings.identity.announcementsHelp':
+      'Hasta dos mensajes cortos sobre la cabecera. Los escribes tú: la plataforma no añade ninguno.',
+    'settings.identity.announcementsEmpty': 'Sin avisos: la barra no se pinta.',
+    'settings.identity.announcementText': 'Aviso {n}',
+    'settings.identity.announcementAdd': 'Añadir aviso',
+    'settings.identity.announcementRemove': 'Quitar aviso',
+    'settings.error.kicker': 'Usa como máximo 80 caracteres.',
+    'settings.error.announcement': 'Escribe un texto de 1 a 80 caracteres.',
     'settings.descriptionHelp':
       'Una frase corta bajo el nombre de la tienda (hasta 240 caracteres).',
     'settings.contact': 'Contacto',

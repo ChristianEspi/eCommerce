@@ -7,6 +7,7 @@ import type { ComponentType, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { TS } from '@/theme/tokens'
+import { resolveStoreDescription } from '../identity'
 
 /**
  * La sección `business-info` de la portada: quién es este comercio y cómo se
@@ -59,6 +60,12 @@ export function StoreBusinessInfo({
   store: {
     readonly name: string
     readonly business_display_name?: string | null
+    /**
+     * Los dos, porque `resolveStoreDescription` necesita el respaldo: una
+     * tienda anterior a V3 tiene su resumen en `hero_subtitle` y no puede
+     * perderlo el día del despliegue.
+     */
+    readonly store_description?: string | null
     readonly hero_subtitle?: string | null
     readonly support_email?: string | null
     readonly contact_phone?: string | null
@@ -71,7 +78,7 @@ export function StoreBusinessInfo({
   const { t } = useI18n()
 
   const nombre = store.business_display_name?.trim() || store.name
-  const descripcion = store.hero_subtitle?.trim() ?? ''
+  const descripcion = resolveStoreDescription(store)
   const correo = store.support_email?.trim() ?? ''
   const telefono = store.contact_phone?.trim() ?? ''
   const direccion = store.contact_address?.trim() ?? ''

@@ -132,6 +132,24 @@ const THEME_COLUMNS = [
   'home_layout',
   // Storefront V2 · P01. Contenido de portada, no marca blanca.
   'value_props',
+  /**
+   * Storefront V3 · P01 · Identidad con roles semánticos.
+   *
+   * Entran en ESTE grupo y no en la lista general por lo mismo que las cuatro
+   * de arriba: hasta que su migración esté aplicada, pedirlas tumba la consulta
+   * entera con un 42703 y deja sin abrir toda la pantalla de Configuración.
+   *
+   * Y entran en el MISMO grupo, no en uno nuevo, porque el 42703 no dice qué
+   * columna falta: con dos grupos habría que adivinar cuál falló o pagar una
+   * consulta de sondeo por grupo en cada apertura. La consecuencia se asume —
+   * mientras falte cualquiera de las nueve, los controles que dependen de ellas
+   * quedan apagados— y es preferible a ofrecer campos que no se van a guardar.
+   */
+  'store_description',
+  'hero_kicker',
+  'brand_lockup',
+  'show_theme_toggle',
+  'announcement_messages',
 ] as const
 
 const SETTINGS_SELECT = [...SETTINGS_COLUMNS, ...THEME_COLUMNS].join(', ')
@@ -274,6 +292,21 @@ export async function saveStoreSettings(input: SaveSettingsInput): Promise<void>
           // no se rellena aquí — la vitrina cae a lo que la plataforma puede
           // afirmar de cualquier tienda. Ver `storefront/valueProps.ts`.
           value_props: values.value_props,
+          /**
+           * Storefront V3 · P01 · Identidad con roles semánticos.
+           *
+           * Van en el mismo bloque condicionado por el esquema, no porque sean
+           * tema, sino porque comparten el grupo de columnas que una base sin
+           * la migración aplicada no tiene: enviarlas ahí devolvería 400 y se
+           * perdería de paso el teléfono que la persona acababa de escribir.
+           *
+           * Y son CONTENIDO del comercio, no marca blanca: no exigen addon.
+           */
+          store_description: orNull(values.store_description),
+          hero_kicker: orNull(values.hero_kicker),
+          brand_lockup: values.brand_lockup,
+          show_theme_toggle: values.show_theme_toggle,
+          announcement_messages: values.announcement_messages,
         }),
     // PREMIUM. Igual que `white_label` desde P02: sin la capacidad el campo NO
     // se envía, en vez de enviarse vacío. Guardar el teléfono de contacto no

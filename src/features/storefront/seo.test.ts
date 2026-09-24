@@ -41,6 +41,12 @@ const store: PublicStore = {
   banner_url: 'https://cdn.example.com/casa-verde/banner.jpg',
   hero_title: 'Muebles de roble',
   hero_subtitle: 'Hechos a mano en Lima',
+  // Identidad V3 (P01): esta tienda todavía no la configuró, que es el estado
+  // de cualquier tienda el día del despliegue.
+  store_description: null,
+  hero_kicker: null,
+  brand_lockup: 'logo_name',
+  show_theme_toggle: false,
   contact_phone: '+51 999 888 777',
   contact_address: 'Av. Siempre Viva 742',
   favicon_url: null,
