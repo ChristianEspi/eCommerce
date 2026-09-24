@@ -10,6 +10,7 @@ import { StoreFeaturedHero } from '../components/StoreFeaturedHero'
 import { StoreHero } from '../components/StoreHero'
 import { StoreBusinessInfo } from '../components/StoreBusinessInfo'
 import { StoreValueProps } from '../components/StoreValueProps'
+import type { ResolvedPresentation } from '../theme/presentation'
 import type { HomeSectionData, HomeSectionRegistry } from './types'
 
 /**
@@ -129,6 +130,25 @@ function primeraFotoDeFamilia(data: HomeSectionData): string | null {
     if (url && url.trim() !== '') return url
   }
   return null
+}
+
+/**
+ * El reparto que pide la portada, en el vocabulario de la fila (V3 · P06).
+ *
+ * La presentación llega ya resuelta, así que aquí no hay `auto`: lo único que se
+ * comprueba es que el valor sea uno de los tres que la fila entiende. Si llegara
+ * otro —una fila configurada con la variante de otra familia de sección—, la
+ * fila decide por cantidad, que es su comportamiento de siempre.
+ *
+ * Está en una función y no repetido tres veces porque es el único punto donde se
+ * cruzan los dos vocabularios, y tres copias del mismo cruce es tres sitios
+ * donde se puede olvidar uno.
+ */
+function repartoDeFila(
+  presentation: ResolvedPresentation | undefined,
+): 'rail' | 'grid' | 'spotlight' | undefined {
+  const valor = presentation?.variant
+  return valor === 'rail' || valor === 'grid' || valor === 'spotlight' ? valor : undefined
 }
 
 /** Aplica el tope de la tienda, si lo hay. Sin tope, la lista entera. */
@@ -270,7 +290,7 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
    * Vale igual para cualquier rubro: lo que cambia es el catálogo del
    * comercio, no el código. Sin familias, no se pinta.
    */
-  categories: (data, maxItems) => {
+  categories: (data, maxItems, presentation) => {
     const familias = conTope(data.categorias, maxItems)
     if (familias.length === 0) return null
 
@@ -284,7 +304,16 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
      *    sin empujar el catálogo fuera de la primera pantalla. Es lo que pide
      *    `catalog`, que hasta P04 lo declaraba y no lo conseguía.
      */
-    const pills = data.theme.style.categoryVariant === 'pills'
+    /**
+     * Cómo se enseñan las familias: lo que pida la SECCIÓN, y si no dice nada,
+     * lo que declare el tema (Storefront V3 · P06).
+     *
+     * La presentación llega ya resuelta, así que aquí no hay `auto` que decidir:
+     * `resolveSectionPresentation` puso el valor del tema donde la sección no
+     * dijo nada. El mosaico llega en P07, con su componente.
+     */
+    const comoSeEnsenan = presentation?.variant ?? data.theme.style.categoryVariant
+    const pills = comoSeEnsenan === 'pills'
 
     // Las puertas llegan por `lazy`, sin fallback: lo que hay debajo no se
     // mueve de sitio —la sección ya tiene su título— y un esqueleto de cuatro
@@ -333,7 +362,7 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
    * deja ver dónde acaba una sección y empieza la siguiente, sin meter una
    * línea divisoria en cada hueco.
    */
-  'new-arrivals': (data, maxItems) => (
+  'new-arrivals': (data, maxItems, presentation) => (
     <ProductRow
       tone="tinted"
       title={data.t('store.row.new')}
@@ -348,6 +377,7 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
       onQuickView={data.onQuickView}
       favorites={data.favorites}
       onToggleFavorite={data.onToggleFavorite}
+      presentation={repartoDeFila(presentation)}
     />
   ),
 
@@ -374,7 +404,7 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
    * sección dos veces con productos distintos no es más tienda, es una portada
    * que se contradice.
    */
-  'best-sellers': (data, maxItems) => {
+  'best-sellers': (data, maxItems, presentation) => {
     if (data.cmsTraeProductos) return null
     const real = data.masVendidoEsReal
 
@@ -394,6 +424,7 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
         onQuickView={data.onQuickView}
         favorites={data.favorites}
         onToggleFavorite={data.onToggleFavorite}
+        presentation={repartoDeFila(presentation)}
       />
     )
   },
@@ -406,7 +437,7 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
    * son dos argumentos distintos —«está de oferta» y «esto es lo nuestro»— y
    * hay comercios que quieren contarlos por separado.
    */
-  featured: (data, maxItems) => (
+  featured: (data, maxItems, presentation) => (
     <ProductRow
       // «Productos destacados» y no «Lo más vendido»: esta fila es una muestra
       // del catálogo publicado y nunca fue otra cosa. Compartía los textos con
@@ -424,6 +455,7 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
       onQuickView={data.onQuickView}
       favorites={data.favorites}
       onToggleFavorite={data.onToggleFavorite}
+      presentation={repartoDeFila(presentation)}
     />
   ),
 

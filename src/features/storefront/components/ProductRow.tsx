@@ -71,6 +71,7 @@ export function ProductRow({
   onQuickView,
   favorites,
   onToggleFavorite,
+  presentation,
 }: {
   title: string
   /**
@@ -104,6 +105,21 @@ export function ProductRow({
   onQuickView?: (slug: string) => void
   favorites?: ReadonlySet<string>
   onToggleFavorite?: (productId: string) => void
+  /**
+   * El reparto que pide la portada (Storefront V3 · P06).
+   *
+   * Sin él la fila decide por CANTIDAD, que es lo que hacía y sigue siendo lo
+   * correcto por defecto: rejilla con pocos, carrusel con muchos. Con él, el
+   * comercio —o su tema— pide un ritmo:
+   *
+   *  · `rail` — lo de siempre: la cantidad decide.
+   *  · `grid` — rejilla siempre, aunque haya veinte. Enseña todo de una vez, que
+   *    es lo que quiere una tienda de conversión: el carrusel esconde la mitad
+   *    del surtido detrás de un gesto.
+   *  · `spotlight` — tres piezas grandes y la puerta al catálogo. Pocas cosas
+   *    bien enseñadas, que es el ritmo de una portada editorial.
+   */
+  presentation?: 'rail' | 'grid' | 'spotlight'
 }) {
   const { t } = useI18n()
   // Una cotización por fila, no por tarjeta: la fila que gira repite tarjetas
@@ -126,9 +142,21 @@ export function ProductRow({
 
   if (!loading && products.length === 0) return null
 
-  const cuantos = products.length
-  const pocos = !loading && cuantos > 0 && cuantos <= POCOS
-  const rejilla = !loading && cuantos > 0 && cuantos <= TOPE_REJILLA
+  /**
+   * El reparto: lo que pide la portada, o la cantidad si no pide nada.
+   *
+   * `spotlight` recorta a tres: es lo que significa —pocas piezas, grandes— y
+   * pintar ocho «destacadas» no destaca ninguna. El recorte se hace aquí y no
+   * en el tope de la sección porque el tope es del comercio («enseña 12») y esto
+   * es del ritmo («enséñalas en grande»).
+   */
+  const impuesto = presentation && presentation !== 'rail' ? presentation : null
+  const visibles = impuesto === 'spotlight' ? products.slice(0, POCOS) : products
+
+  const cuantos = visibles.length
+  const pocos = !loading && cuantos > 0 && (impuesto === 'spotlight' || cuantos <= POCOS)
+  const rejilla =
+    !loading && cuantos > 0 && (impuesto === 'grid' || pocos || cuantos <= TOPE_REJILLA)
 
   const tarjeta = (product: PublicProduct, anuncio: boolean) => (
     <ProductCard
@@ -214,7 +242,7 @@ export function ProductRow({
             gridAutoRows: '1fr',
           }}
         >
-          {products.map((product) => (
+          {visibles.map((product) => (
             <Box key={product.product_id} sx={{ display: 'flex' }}>
               {/* Tarjeta COMPLETA —con estado y botón de comprar— cuando hay
                   sitio: con tres productos en fila no se está ojeando un
@@ -227,7 +255,7 @@ export function ProductRow({
         </Box>
       ) : (
         <LoopingRow
-          items={products}
+          items={visibles}
           keyOf={(product) => product.product_id}
           // Storefront V3 · P05 · El ancho lo pone la PRESENTACIÓN del tema.
           itemWidth={ROW_SLOT_WIDTH[presentacion]}

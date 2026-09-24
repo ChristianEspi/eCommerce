@@ -357,11 +357,132 @@ describe('F · un orden de Home válido', () => {
   })
 })
 
+describe('G2 · Home Layout V2: la presentación de cada sección', () => {
+  it('V1 sigue siendo válido: ninguna tienda existente deja de validar', async () => {
+    // Es la mitad del trato de esta fase. La otra mitad —que V1 se RESUELVE
+    // igual que antes— se comprueba en las pruebas del normalizador.
+    const filas = await guardar(
+      'home_layout',
+      JSON.stringify({ version: 1, sections: [{ id: 'hero', enabled: true }] }),
+    )
+    expect(filas).toHaveLength(1)
+  })
+
+  it('acepta V2 con presentación completa', async () => {
+    const filas = await guardar(
+      'home_layout',
+      JSON.stringify({
+        version: 2,
+        sections: [
+          {
+            id: 'new-arrivals',
+            enabled: true,
+            maxItems: 12,
+            presentation: { variant: 'rail', surface: 'soft', width: 'bleed' },
+          },
+        ],
+      }),
+    )
+    expect(filas).toHaveLength(1)
+  })
+
+  it('acepta V2 con presentación PARCIAL: lo que falta es auto', async () => {
+    const filas = await guardar(
+      'home_layout',
+      JSON.stringify({
+        version: 2,
+        sections: [{ id: 'categories', enabled: true, presentation: { variant: 'mosaic' } }],
+      }),
+    )
+    expect(filas).toHaveLength(1)
+  })
+
+  it('acepta una sección SIN presentación dentro de un layout V2', async () => {
+    const filas = await guardar(
+      'home_layout',
+      JSON.stringify({
+        version: 2,
+        sections: [
+          { id: 'hero', enabled: true },
+          { id: 'brands', enabled: true, presentation: { variant: 'logos' } },
+        ],
+      }),
+    )
+    expect(filas).toHaveLength(1)
+  })
+
+  /**
+   * Lo que se rechaza, y el motivo de cada caso.
+   *
+   * Los interesantes no son los de inyección —esos no llegan ni a un filtro,
+   * porque la clave no está nombrada— sino los de SIGNIFICADO: una variante de
+   * producto en el hero no es peligrosa, es que no quiere decir nada. Aceptarla
+   * sería un contrato que promete un ritmo que nadie sabe pintar.
+   */
+  const PRESENTACION_FUERA: Array<[string, unknown]> = [
+    [
+      'una variante de producto en el hero',
+      { id: 'hero', enabled: true, presentation: { variant: 'spotlight' } },
+    ],
+    [
+      'una variante de marcas en una fila de producto',
+      { id: 'featured', enabled: true, presentation: { variant: 'logos' } },
+    ],
+    [
+      'una variante de producto en las familias',
+      { id: 'categories', enabled: true, presentation: { variant: 'rail' } },
+    ],
+    [
+      'una variante inventada',
+      { id: 'featured', enabled: true, presentation: { variant: 'carrusel-3d' } },
+    ],
+    [
+      'contraste donde taparía las fotos de las familias',
+      { id: 'categories', enabled: true, presentation: { surface: 'contrast' } },
+    ],
+    [
+      'una superficie inventada',
+      { id: 'offers', enabled: true, presentation: { surface: 'neon' } },
+    ],
+    [
+      'un ancho inventado',
+      { id: 'offers', enabled: true, presentation: { width: 'fullscreen' } },
+    ],
+    [
+      'CSS colado en la presentación',
+      { id: 'offers', enabled: true, presentation: { css: '.x{display:none}' } },
+    ],
+    [
+      'una URL de fondo',
+      { id: 'offers', enabled: true, presentation: { backgroundUrl: 'https://evil.test/x.png' } },
+    ],
+    [
+      'un número de columnas',
+      { id: 'featured', enabled: true, presentation: { columns: 11 } },
+    ],
+    [
+      'una presentación que no es objeto',
+      { id: 'featured', enabled: true, presentation: 'rail' },
+    ],
+    [
+      'un valor que no es texto',
+      { id: 'featured', enabled: true, presentation: { variant: 3 } },
+    ],
+  ]
+
+  it.each(PRESENTACION_FUERA)('rechaza %s', async (_caso, seccion) => {
+    await rechazado('home_layout', JSON.stringify({ version: 2, sections: [seccion] }))
+  })
+})
+
 describe('G · un orden de Home inválido', () => {
   const FUERA: Array<[string, unknown]> = [
     ['una sección que no existe', { version: 1, sections: [{ id: 'banner-ads', enabled: true }] }],
     ['una sección con nombre de rubro', { version: 1, sections: [{ id: 'pharmacy', enabled: true }] }],
-    ['una versión futura', { version: 2, sections: [] }],
+    // V2 es válida desde V3 · P06 —añade la presentación por sección—, así que
+    // la «futura» pasa a ser la 3. Aceptar una versión desconocida sería
+    // prometer que se sabe leerla.
+    ['una versión futura', { version: 3, sections: [] }],
     ['una versión que no es número', { version: '1', sections: [] }],
     ['sin versión', { sections: [] }],
     ['sin secciones', { version: 1 }],

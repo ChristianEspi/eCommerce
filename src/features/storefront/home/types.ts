@@ -3,6 +3,7 @@ import type { MessageKey } from '@/shared/i18n/messages'
 import type { BrandRow } from '../components/BrandRow'
 import type { CategoryDoorGrid, ContentBlocks } from '../components/ContentBlocks'
 import type { PromoCarousel } from '../components/PromoCarousel'
+import type { ResolvedPresentation } from '../theme/presentation'
 import type { ResolvedStoreTheme } from '../theme/resolve'
 import type { HomeSectionId } from '../theme/types'
 import type { PublicProduct, PublicStore } from '../types'
@@ -179,6 +180,14 @@ export type HomeSectionRenderer = (
   data: HomeSectionData,
   /** El tope que la tienda configuró, si esta sección admite uno. */
   maxItems?: number,
+  /**
+   * Cómo se enseña esta sección (Storefront V3 · P06).
+   *
+   * Llega RESUELTA —sin `auto` y sin huecos— desde el compositor, que la calcula
+   * una vez con lo guardado y el tema. Una sección que no la use la ignora; el
+   * marco (superficie y ancho) lo pone el compositor de todas formas.
+   */
+  presentation?: ResolvedPresentation,
 ) => ReactNode
 
 export type HomeSectionRegistry = Readonly<Record<HomeSectionId, HomeSectionRenderer>>

@@ -8,6 +8,7 @@ import {
   normalizeHomeLayout,
   normalizeStorefrontStyle,
   normalizeThemePreset,
+  sanitizeHomeLayout,
 } from './presets'
 
 /**
@@ -299,5 +300,96 @@ describe('maxItems', () => {
       })
       expect(layout.sections.find((s) => s.id === 'offers')).not.toHaveProperty('maxItems')
     }
+  })
+})
+
+/**
+ * Home Layout V2: la presentación por sección (Storefront V3 · P06).
+ *
+ * ## Lo que estas pruebas protegen
+ *
+ * Que una fila guardada en V1 **se resuelva exactamente igual que antes**. Es la
+ * mitad del trato de la fase: la base acepta las dos versiones, y el
+ * normalizador tiene que leer la vieja sin cambiarla de significado. Si V1
+ * empezara a resolverse distinto, aplicar V3 cambiaría la portada de cada tienda
+ * que existe hoy — y ninguna lo pidió.
+ *
+ * Y que la versión describa el CONTENIDO y no la fecha del despliegue: una
+ * tienda que solo ordenó sus secciones sigue siendo V1.
+ */
+describe('el orden de la Home acepta V1 y V2', () => {
+  it('una configuración V1 se lee igual que siempre', () => {
+    const guardado = { version: 1, sections: [{ id: 'offers', enabled: false, maxItems: 8 }] }
+    const layout = normalizeHomeLayout(guardado)
+
+    const ofertas = layout.sections.find((s) => s.id === 'offers')
+    expect(ofertas).toEqual({ id: 'offers', enabled: false, maxItems: 8 })
+    // Y sin presentación: la ausencia significa `auto`, que es lo que resuelve
+    // el compositor con el tema.
+    expect(ofertas?.presentation).toBeUndefined()
+  })
+
+  it('lo que se GUARDA de una configuración V1 sigue declarando V1', () => {
+    // La versión describe el contenido. Escribir `2` en la fila de una tienda
+    // que no usa presentaciones haría creer que usa algo que no usa.
+    const guardado = { version: 1, sections: [{ id: 'hero', enabled: true }] }
+    expect(sanitizeHomeLayout(guardado).version).toBe(1)
+  })
+
+  it('en cuanto hay una presentación, lo guardado declara V2', () => {
+    const guardado = {
+      version: 1,
+      sections: [{ id: 'featured', enabled: true, presentation: { variant: 'grid' } }],
+    }
+    const saneado = sanitizeHomeLayout(guardado)
+
+    expect(saneado.version).toBe(2)
+    expect(saneado.sections[0]?.presentation).toEqual({ variant: 'grid' })
+  })
+
+  it('una presentación que no encaja con su sección no se guarda', () => {
+    // `logos` es de marcas: en una fila de producto no significa nada.
+    const saneado = sanitizeHomeLayout({
+      version: 2,
+      sections: [{ id: 'featured', enabled: true, presentation: { variant: 'logos' } }],
+    })
+
+    expect(saneado.sections[0]?.presentation).toBeUndefined()
+    // Y al no quedar ninguna presentación, vuelve a declararse V1.
+    expect(saneado.version).toBe(1)
+  })
+
+  it('las secciones SIN tope también pueden tener presentación', () => {
+    // El ritmo de las familias o de las marcas no depende de cuántos elementos
+    // enseñan, así que el saneador no puede atarlo al tope.
+    const saneado = sanitizeHomeLayout({
+      version: 2,
+      sections: [{ id: 'categories', enabled: true, presentation: { variant: 'mosaic' } }],
+    })
+
+    expect(saneado.sections[0]).toEqual({
+      id: 'categories',
+      enabled: true,
+      presentation: { variant: 'mosaic' },
+    })
+  })
+
+  it('el CSS colado en una presentación no sobrevive al saneador', () => {
+    const saneado = sanitizeHomeLayout({
+      version: 2,
+      sections: [
+        {
+          id: 'offers',
+          enabled: true,
+          presentation: { css: '.x{display:none}', variant: 'band', surface: 'soft' },
+        },
+      ],
+    })
+
+    // El CSS no sobrevive; la variante y la superficie sí, porque las eligió el
+    // comercio. `band` se guarda aunque hoy coincida con lo que su tema
+    // resolvería: una elección explícita tiene que seguir en pie el día que el
+    // tema cambie de opinión.
+    expect(saneado.sections[0]?.presentation).toEqual({ variant: 'band', surface: 'soft' })
   })
 })

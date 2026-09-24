@@ -218,15 +218,53 @@ export const HOME_SECTION_IDS = [
 ] as const
 export type HomeSectionId = (typeof HOME_SECTION_IDS)[number]
 
+/**
+ * Lo que una sección guarda sobre su presentación (Storefront V3 · P06).
+ *
+ * Se declara aquí —y no en `presentation.ts`— porque `HomeSectionConfig` lo
+ * necesita y `presentation.ts` importa de este archivo: al revés serían dos
+ * módulos importándose entre sí.
+ *
+ * Los tres campos son opcionales y cada uno tiene su lista cerrada POR SECCIÓN,
+ * que es lo que `presentation.ts` resuelve. `variant` es `string` aquí porque
+ * su lista depende del `id`; el tipado fino lo da el saneador.
+ */
+export interface SectionPresentation {
+  readonly variant?: string
+  readonly surface?: 'plain' | 'soft' | 'contrast'
+  readonly width?: 'contained' | 'bleed'
+}
+
 export interface HomeSectionConfig {
   readonly id: HomeSectionId
   readonly enabled: boolean
   /** Solo en las secciones que pintan una colección. Ver `SECTIONS_WITH_MAX_ITEMS`. */
   readonly maxItems?: number
+  /**
+   * Cómo se enseña esta sección (Storefront V3 · P06).
+   *
+   * Opcional, y su ausencia significa `auto`: «lo que mi tema considere correcto
+   * aquí». Por eso ninguna tienda existente cambia de portada al aplicar V3 —
+   * todas tienen exactamente esto: nada.
+   *
+   * Las opciones válidas dependen de la SECCIÓN, no son un juego común: una
+   * presentación de producto en el hero no se rechaza porque sea peligrosa, se
+   * rechaza porque no significa nada. Ver `theme/presentation.ts`.
+   */
+  readonly presentation?: SectionPresentation
 }
 
 export interface HomeLayout {
-  /** Una sola versión por ahora. Existe para poder migrar sin adivinar. */
-  readonly version: 1
+  /**
+   * La versión del contrato de composición.
+   *
+   * `1` es orden y encendido; `2` añade la presentación por sección. Las dos se
+   * leen —una fila guardada en V1 sigue siendo válida y se resuelve igual que
+   * antes— y el editor guarda `2` en cuanto alguien toca una presentación.
+   *
+   * Existe justamente para esto: poder crecer sin adivinar qué significa una
+   * fila antigua.
+   */
+  readonly version: 1 | 2
   readonly sections: readonly HomeSectionConfig[]
 }

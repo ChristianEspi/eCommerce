@@ -556,7 +556,7 @@ sí gana en esta fase es la variante `statement`, que era la que no competía.
 
 # P05 · Tarjetas y filas que respetan el tema
 
-**Commit:** `<pendiente>` · **Ciclos correctivos:** 3 de 3
+**Commit:** `ff4cf50` · **Ciclos correctivos:** 3 de 3
 
 ## El problema
 
@@ -651,5 +651,132 @@ de 150 px, que es donde un nombre de producto deja de entrar en dos líneas.
 | `npm run test` | **PASS** — 306 ficheros, 6073 tests |
 | `npm run build` | **PASS** |
 | `npm run bundle:report` | **PASS** — portada 401,5 kB (techo 405) |
+
+`PHASE_RESULT: PASS`
+
+---
+
+# P06 · Home Layout V2: merchandising y full bleed
+
+**Commit:** `<pendiente>` · **Ciclos correctivos:** 3 de 3
+
+## El problema
+
+La portada se componía como «título + fila de tarjetas», repetido. El orden se
+podía cambiar y las secciones apagar, pero el ritmo era siempre el mismo: seis
+bandas idénticas una debajo de otra. Para un catálogo denso eso es correcto
+—lo que se quiere es recorrer—; para una tienda de marca es una lista, no una
+portada.
+
+## Lo que se hizo
+
+### El contrato crece: `presentation` por sección
+
+```json
+{"id": "new-arrivals", "enabled": true, "maxItems": 12,
+ "presentation": {"variant": "rail", "surface": "soft", "width": "bleed"}}
+```
+
+Tres campos, todos opcionales, **y las listas dependen de la sección**:
+
+| familia | variantes | superficies |
+|---|---|---|
+| producto (`new-arrivals`, `best-sellers`, `featured`) | `auto · rail · grid · spotlight` | plain · soft · contrast |
+| familias (`categories`) | `auto · tiles · pills · mosaic` | plain · soft |
+| marcas (`brands`, `trust`) | `auto · cards · logos` | plain · soft |
+| ofertas (`offers`, `promotions`) | `auto · band · split` | plain · soft · contrast |
+| hero · cms · servicios · negocio | *(ninguna: ya la traen)* | plain (hero/cms) |
+
+Una variante de producto en el hero **no se rechaza porque sea peligrosa**: se
+rechaza porque no significa nada. Y no hay CSS, ni HTML, ni URL de fondo, ni
+número de columnas — un maquetador libre convierte cada tienda en un caso único,
+y a partir de ahí ninguna mejora de la vitrina llega a nadie sin romperle la
+portada a alguien.
+
+### `auto`, y por qué ninguna tienda cambia de portada
+
+`auto` es el defecto y significa «lo que mi tema considere correcto aquí». Es lo
+que tienen guardado **todas** las tiendas que existen, así que la compatibilidad
+depende de una cosa: que `auto` de Universal resuelva lo que la portada pintaba
+ayer. Lo hace, y hay una prueba dedicada.
+
+| tema | producto | ofertas a sangre |
+|---|---|---|
+| Universal | `rail` *(lo de siempre)* | no |
+| Retail | `grid` — enseña el surtido de una vez | no |
+| Premium | `spotlight` — pocas piezas, grandes | **sí** |
+| Catalog | `rail` — la primera pantalla es catálogo | no |
+
+Se lee del **tema**, nunca del rubro: si una farmacia elige Premium, su portada
+será editorial, y estará bien porque lo eligió.
+
+Y `auto` **no resuelve nada que nadie pinte todavía**. El muro de logotipos
+(`logos`) y la banda partida (`split`) son de P07: las listas cerradas ya los
+aceptan, pero `auto` sigue dando `cards` y `band` hasta que sus componentes
+existan. Es exactamente el fallo que `heroVariant` tuvo en V2 durante tres fases
+—declarado y sin consumidor— y hay una prueba que lo impide.
+
+### `StoreSectionFrame`: el full bleed, escrito una vez
+
+Sacar una sección a sangre dentro de un contenedor centrado se hace con
+`margin-inline: calc(50% - 50vw)`, que es fácil de escribir y fácil de escribir
+mal: con `100vw` aparece una barra horizontal en cuanto hay barra vertical,
+porque `vw` incluye su ancho. Repetido en seis secciones, es cuestión de tiempo
+que una lo tenga mal y la tienda entera se arrastre de lado.
+
+Aquí está una vez, con `overflow-x: clip` como red —y `clip` y no `hidden`,
+porque `hidden` convierte la caja en contenedor de desplazamiento y **rompe** la
+cabecera pegajosa y los anclas—. El marco no se pinta cuando no hace falta:
+superficie plana y ancho contenido son los defectos de casi todas las secciones,
+y trece envoltorios vacíos son trece nodos de más.
+
+Las superficies son mezclas con **su** acento (`color-mix`), nunca colores
+nuevos: el color sigue siendo 100 % del comercio.
+
+### La versión describe el contenido
+
+`sanitizeHomeLayout` declara `2` solo si alguna sección lleva presentación. Una
+tienda que únicamente ordenó sus secciones sigue siendo V1: escribir `2` en su
+fila haría creer que usa algo que no usa.
+
+### Migración `20260924100000_home_layout_v2.sql`
+
+`ebim.section_presentation_is_valid(text, jsonb)` —nueva, valida **por `id`**— y
+reemplazo de las dos funciones de V2. Las dos versiones pasan el CHECK, la 3 no:
+aceptar una versión desconocida sería prometer que se sabe leerla. **No se
+actualiza ninguna fila.**
+
+## Ciclos correctivos
+
+1. El linter cazó el `useStorefrontTheme()` de la fila después de su retorno
+   temprano (heredado de P05, corregido aquí).
+2. `storefront-theme.test.ts` rechazaba `version: 2` como «versión futura», que
+   era correcto hasta esta fase. Ahora la futura es la 3, y se añadió un bloque
+   con lo que V2 acepta y doce casos de lo que rechaza.
+3. Mi propia prueba «`auto` no resuelve nada que nadie pinte» cazó que **Catalog
+   seguía resolviendo `logos`** — solo había corregido Premium. Y una expectativa
+   mía sobre el saneador estaba mal: `band` se conserva aunque hoy coincida con
+   lo que el tema resolvería, porque una elección explícita tiene que seguir en
+   pie el día que el tema cambie de opinión.
+
+## Tests
+
+| Archivo | Casos |
+|---|---|
+| `theme/presentation.test.ts` | **Nuevo**, 19. Lo guardado manda y lo que no encaja se descarta; el hero no elige variante; familias y marcas no admiten contraste; ni CSS, ni URL, ni columnas. `auto`: **Universal resuelve exactamente lo de antes**, Premium estrena ritmo, Retail y Catalog sus prioridades, las familias siguen al contrato del tema, `spotlight` no se combina con tarjetas densas y **ningún tema resuelve una variante que nadie pinta**. Saneador: no guarda defectos, guarda lo que se apartó, descarta lo que no encaja. Y ninguna regla nombra un rubro. |
+| `components/section-frame.test.tsx` | **Nuevo**, 8. El marco solo existe cuando hace falta; **usa `50vw` y no `100vw`**; devuelve el contenido a su ancho; recorta con `clip` y no con `hidden`; las superficies son mezclas del acento y el contraste pesa más que el tinte. |
+| `theme/theme.test.ts` | +6. V1 se lee igual que siempre y sigue declarando V1; con presentación pasa a V2; lo que no encaja no se guarda; las secciones sin tope también pueden tener presentación; el CSS colado no sobrevive. |
+| `supabase/tests/storefront-theme.test.ts` | 104 → **120**. V1 sigue válido, V2 con presentación completa y parcial, secciones sin presentación dentro de V2, y doce rechazos —variantes cruzadas de familia, contraste donde taparía fotos, anchos inventados, CSS, URL, columnas, tipos—. |
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 308 ficheros, 6122 tests |
+| `npm run build` | **PASS** |
+| `npm run test:db` | **PASS** — 137 ficheros, 3653 tests |
+| `npm run bundle:report` | **PASS** — portada 402,6 kB (techo 405) |
 
 `PHASE_RESULT: PASS`
