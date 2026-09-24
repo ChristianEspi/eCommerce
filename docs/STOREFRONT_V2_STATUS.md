@@ -5,6 +5,7 @@ Ejecución del pack `EBIM_ECOMMERCE_STOREFRONT_V2` (P00–P14) en este repositor
 - **Inicio:** 2026-09-23 (hora local de la máquina del operador)
 - **Rama de trabajo:** `feat/storefront-v2-design-workspace` (creada desde `dev`)
 - **HEAD inicial (P00):** `cd7a82d1715dd346169572d99749434969119835`
+- **HEAD final (P14):** `711341d` — 15 commits, uno por fase
 - **PUSH:** NO · **DEPLOY:** NO · **MIGRACIONES REMOTAS:** NO
 
 ## Trabajo ajeno protegido
@@ -1709,7 +1710,7 @@ para contarlo aquí.
 
 # P14 · Hardening final
 
-**Commit:** `<pendiente>` · **Ciclos correctivos:** 3 de 3
+**Commit:** `711341d` · **Ciclos correctivos:** 3 de 3
 
 ## La auditoría del diff completo
 
