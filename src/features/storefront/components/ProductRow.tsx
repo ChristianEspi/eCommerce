@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { TS } from '@/theme/tokens'
 import { useCatalogCommercialPrices } from '../commerce/catalogPrices'
+import { useStorefrontTheme } from '../theme/useStorefrontTheme'
+import { ROW_SLOT_GAP, ROW_SLOT_WIDTH } from './rowSlots'
 import type { PublicProduct } from '../types'
 import { ProductCard } from './ProductCard'
 import { LoopingRow } from './LoopingRow'
@@ -50,6 +52,7 @@ import { SectionHeading } from './SectionHeading'
 
 /** A partir de aquí la rejilla ya no cabe y la fila gira. */
 const TOPE_REJILLA = 6
+
 
 /** Hasta aquí las tarjetas crecen y se acompañan de la puerta al catálogo. */
 const POCOS = 3
@@ -106,15 +109,30 @@ export function ProductRow({
   // Una cotización por fila, no por tarjeta: la fila que gira repite tarjetas
   // pero no productos (N03).
   const commercial = useCatalogCommercialPrices(storeSlug, products)
+  /**
+   * La presentación que pide el tema, para el ancho de los huecos.
+   *
+   * La fila no decide cómo es una tarjeta —eso es del contrato— pero sí cuánto
+   * sitio le da. Y ese sitio dejó de ser un número universal en V3 · P05: 168 px
+   * es un ancho de catálogo denso, y aplicarlo a las cuatro personalidades era
+   * la razón por la que Premium se veía como Catalog en cuanto una fila pasaba
+   * de seis productos.
+   *
+   * Va ANTES del retorno temprano, con los otros dos hooks: el orden de los
+   * hooks no puede depender de si la fila tiene productos.
+   */
+  const { style } = useStorefrontTheme()
+  const presentacion = style.productCardVariant
+
   if (!loading && products.length === 0) return null
 
   const cuantos = products.length
   const pocos = !loading && cuantos > 0 && cuantos <= POCOS
   const rejilla = !loading && cuantos > 0 && cuantos <= TOPE_REJILLA
 
-  const tarjeta = (product: PublicProduct, compact: boolean) => (
+  const tarjeta = (product: PublicProduct, anuncio: boolean) => (
     <ProductCard
-      compact={compact}
+      reduced={anuncio}
       product={product}
       storeSlug={storeSlug}
       commercialPrice={commercial.get(product.product_id) ?? null}
@@ -176,7 +194,7 @@ export function ProductRow({
            va sin haber llegado. La fila arranca cuando hay algo que enseñar. */
         <ScrollRow ariaLabel={title} gap={1.5}>
           {Array.from({ length: 6 }, (_, i) => (
-            <Box key={i} sx={{ width: 168, flexShrink: 0 }}>
+            <Box key={i} sx={{ width: ROW_SLOT_WIDTH[presentacion], flexShrink: 0 }}>
               <Skeleton variant="rounded" height={220} sx={{ borderRadius: 'var(--sf-radius)' }} />
             </Box>
           ))}
@@ -211,10 +229,16 @@ export function ProductRow({
         <LoopingRow
           items={products}
           keyOf={(product) => product.product_id}
-          itemWidth={168}
-          gap={1.5}
+          // Storefront V3 · P05 · El ancho lo pone la PRESENTACIÓN del tema.
+          itemWidth={ROW_SLOT_WIDTH[presentacion]}
+          gap={ROW_SLOT_GAP[presentacion]}
           ariaLabel={title}
           render={(product) => (
+            // `true` = es un ANUNCIO, no un mostrador: se quitan el botón de
+            // comprar y la pastilla de estado, que es lo que se decide dentro de
+            // la ficha. Lo que NO se quita es la densidad del tema: hasta V3
+            // este mismo booleano forzaba tarjetas de catálogo denso, así que
+            // Premium acababa con miniaturas en su portada editorial.
             <Box sx={{ display: 'flex', width: '100%' }}>{tarjeta(product, true)}</Box>
           )}
         />

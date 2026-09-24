@@ -370,7 +370,7 @@ function FeaturedCarousel({
         {actuales.map((product) => (
           <ProductCard
             key={product.product_id}
-            compact
+            reduced
             product={product}
             storeSlug={storeSlug}
             commercialPrice={commercial.get(product.product_id) ?? null}

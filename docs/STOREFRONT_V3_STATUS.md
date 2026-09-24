@@ -461,7 +461,7 @@ suyo en Apariencia.
 
 # P04 · La portada editorial: respaldos reales y sin copy inventado
 
-**Commit:** `<pendiente>` · **Ciclos correctivos:** 2 de 3
+**Commit:** `e485446` · **Ciclos correctivos:** 2 de 3
 
 ## Los dos problemas
 
@@ -549,5 +549,107 @@ sí gana en esta fase es la variante `statement`, que era la que no competía.
 | `npm run test` | **PASS** — 305 ficheros, 6052 tests |
 | `npm run build` | **PASS** |
 | `npm run bundle:report` | **PASS** — portada 401,3 kB (techo 405) |
+
+`PHASE_RESULT: PASS`
+
+---
+
+# P05 · Tarjetas y filas que respetan el tema
+
+**Commit:** `<pendiente>` · **Ciclos correctivos:** 3 de 3
+
+## El problema
+
+La fila de la portada usaba **`itemWidth={168}` para todas las tiendas** y
+forzaba la tarjeta reducida en cuanto había más de seis productos. 168 px es el
+ancho de una tarjeta de catálogo denso: en Catalog está bien, y en Premium
+convertía una portada editorial en una tira de miniaturas.
+
+El tema declaraba una personalidad y la fila la deshacía **en cuanto la tienda
+tenía catálogo**, que es siempre. Era además el fallo más difícil de ver
+revisando código: cada pieza por separado parecía correcta.
+
+Y detrás había una confusión de nombres. `ProductCard` tenía una prop `compact`
+que significaba «esta tarjeta es un anuncio de una fila, no un mostrador»,
+mientras que `productCardVariant: 'compact'` del contrato significa «densidad
+alta». Dos ejes distintos con el mismo nombre: la fila pasaba `compact={true}` y
+la tarjeta entendía «densa».
+
+## Lo que se hizo
+
+### Dos ejes, dos nombres
+
+| eje | quién decide | prop |
+|---|---|---|
+| presentación (cómoda · densa · editorial) | el **tema** | `variant`, leída del contexto |
+| ¿es un anuncio o un mostrador? | la **fila** | `reduced` |
+
+`reduced` quita lo que se decide *dentro* de la ficha —botón de comprar,
+pastilla de estado— y **no toca la densidad**. Sigue habiendo **una** tarjeta
+funcional: enlace, favorito, vista rápida, precio público y comercial,
+compare-at, disponibilidad, variantes y añadir al carrito. No cuatro componentes
+de negocio.
+
+La presentación se lee del contexto del tema con la prop como excepción —para la
+vista previa y las pruebas—, así que la rejilla, las filas y el cajón del
+asistente coinciden sin que nadie tenga que acordarse de pasarla. Y no hay ni un
+`if (theme === 'premium')` en la tarjeta: hay tres presentaciones nombradas.
+
+### `editorial`: la tarjeta que desaparece
+
+Sin borde y sin sombra permanente, sin fondo de tarjeta y sin relleno: queda la
+fotografía sobre el fondo de la página con el texto debajo. El relieve aparece
+solo al apuntar o al enfocar, que es cuando hace falta saber qué tarjeta está
+activa. **Es la diferencia que se ve en una captura sin inspeccionar nada.**
+
+### `rowSlots.ts`: los anchos como datos
+
+```
+compact      156 / 172 / 184     (xs / sm / md)
+comfortable  176 / 208 / 236
+editorial    232 / 272 / 304
+```
+
+En su propio módulo porque son datos del sistema de diseño —los consumen la fila
+y su esqueleto de carga, y en P13 los consumirá la vista previa— y porque
+exportar una constante desde un archivo de componentes rompe la recarga en
+caliente (lo dijo el linter, y tiene razón).
+
+En el teléfono los tres miden **menos** que en escritorio y ninguno llega al
+ancho de la pantalla: ese recorte es lo que deja ver un trozo de la siguiente
+tarjeta, y ese trozo es la única señal de que la fila se arrastra. Ninguno baja
+de 150 px, que es donde un nombre de producto deja de entrar en dos líneas.
+
+## Ciclos correctivos
+
+1. El linter cazó un `useStorefrontTheme()` **después** del retorno temprano de
+   la fila: el orden de los hooks no puede depender de si hay productos. Movido
+   arriba, con los otros dos.
+2. Tres supuestos míos equivocados en las pruebas nuevas: la fila necesita
+   `CartProvider` —vive en el layout de la vitrina—, hay más de un enlace al
+   catálogo en una fila corta (el «ver todo» y la puerta), y **la vista rápida no
+   es un botón**: es lo que hace el clic en la tarjeta conservando el `href`. La
+   última se reescribió como una prueba de comportamiento —se pulsa la tarjeta y
+   se espera la llamada—, que es mejor de lo que había escrito.
+3. El ancho del hueco no se puede comprobar con `getComputedStyle` —llega como
+   objeto responsive y en un entorno sin maquetación lo calculado no distingue
+   uno de otro—, así que se comprueba la **tabla**: tres anchos distintos,
+   ordenados, y ninguno vuelve al 168 universal.
+
+## Tests
+
+| Archivo | Casos |
+|---|---|
+| `components/card-rows-v3.test.tsx` | **Nuevo**, 21. **Con 7+ productos Premium NO cae en tarjetas densas** y Catalog sigue denso; los tres anchos son distintos, ordenados y ninguno es 168; en el teléfono todos encogen sin bajar de 150. La reducción es de la fila: sin botón de comprar en el carrusel, tarjetas completas con 4-6, y la presentación del tema manda también en la rejilla corta. Filas cortas: 1, 2 y 3 reparten y ofrecen el catálogo; 4 y 6 son rejilla; 7 pasa a carrusel; sin productos no hay fila. Y las tres presentaciones conservan enlace, precio, favorito, botón de compra **y** la vista rápida al pulsar. |
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 306 ficheros, 6073 tests |
+| `npm run build` | **PASS** |
+| `npm run bundle:report` | **PASS** — portada 401,5 kB (techo 405) |
 
 `PHASE_RESULT: PASS`
