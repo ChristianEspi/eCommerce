@@ -133,6 +133,16 @@ export function StorefrontDesignSection({
   const estilo = form.watch('storefront_style')
 
   /**
+   * El estilo EFECTIVO: lo que el tema dice, con lo pisado encima (V3 · P12).
+   *
+   * El formulario guarda solo lo que el comercio apartó del tema —eso es lo que
+   * permite que mejorar un tema llegue a quien no lo tocó—, así que para
+   * resolver lo que `auto` significa hoy hace falta la mezcla. Es la misma que
+   * hace el motor al leer la fila.
+   */
+  const estiloEfectivo = { ...THEME_PRESETS[preset], ...estilo }
+
+  /**
    * La base puede ir por detrás del código.
    *
    * Entre que se publica esta pantalla y se aplica su migración hay una ventana
@@ -284,7 +294,10 @@ export function StorefrontDesignSection({
           onReset={() => form.setValue('storefront_style', {}, { shouldDirty: true })}
         />
 
-        <HomeLayoutEditor form={form} busy={busy} />
+        {/* El tema efectivo baja al editor: el panel de presentación por
+            sección necesita saber qué significa `auto` hoy para poder
+            escribirlo en el desplegable (V3 · P12). */}
+        <HomeLayoutEditor form={form} busy={busy} preset={preset} style={estiloEfectivo} />
 
         {storeId && storeSlug && (
           <StoreReadiness

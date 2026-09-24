@@ -14,6 +14,7 @@ import {
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { R, TS } from '@/theme/tokens'
+import { ETIQUETA_VALOR, HEREDAR } from './styleLabels'
 import { THEME_PRESETS } from '@/features/storefront/theme/presets'
 import {
   CATEGORY_VARIANTS,
@@ -64,30 +65,6 @@ import {
  * presentada, no una decisión nueva.
  */
 
-const HEREDAR = ''
-
-/** Cada valor de cada lista tiene su texto. Se nombran todos, sin plantillas. */
-const ETIQUETA_VALOR: Record<string, MessageKey> = {
-  standard: 'settings.design.value.standard',
-  compact: 'settings.design.value.compact',
-  product: 'settings.design.value.product',
-  statement: 'settings.design.value.statement',
-  comfortable: 'settings.design.value.comfortable',
-  tiles: 'settings.design.value.tiles',
-  pills: 'settings.design.value.pills',
-  lg: 'settings.design.value.lg',
-  xl: 'settings.design.value.xl',
-  square: 'settings.design.value.square',
-  portrait: 'settings.design.value.portrait',
-  landscape: 'settings.design.value.landscape',
-  spacious: 'settings.design.value.spacious',
-  // Storefront V3 · P02
-  brand: 'settings.design.value.brand',
-  editorial: 'settings.design.value.editorial',
-  mosaic: 'settings.design.value.mosaic',
-  cover: 'settings.design.value.cover',
-  contain: 'settings.design.value.contain',
-}
 
 interface Ajuste {
   readonly clave: keyof StorefrontStyle
@@ -112,6 +89,18 @@ const GRUPOS = [
   {
     id: 'structure',
     titulo: 'settings.design.style.group.structure',
+    /**
+     * Storefront V3 · P12 · El lockup, el interruptor de tema y la barra de
+     * avisos NO se repiten aquí.
+     *
+     * El encargo de la fase los pedía en este grupo, y ponerlos sería tener la
+     * misma propiedad editable en dos pestañas: el día que las dos no
+     * coincidan, ninguna de las dos es la verdad. Viven en **Marca**, junto al
+     * logotipo —que es justo lo que el lockup decide enseñar o no— y esta nota
+     * lleva allí con un enlace, que resuelve el problema real: que no se
+     * encuentren.
+     */
+    nota: { texto: 'settings.design.style.group.brandElsewhere', href: '#branding' },
     ajustes: [
       { clave: 'headerVariant', valores: HEADER_VARIANTS, etiqueta: 'settings.design.field.header' },
       { clave: 'heroVariant', valores: HERO_VARIANTS, etiqueta: 'settings.design.field.hero' },
@@ -162,6 +151,8 @@ const GRUPOS = [
   id: string
   titulo: MessageKey
   ajustes: readonly Ajuste[]
+  /** Un aviso con enlace, para lo que se configura en otra pestaña. */
+  nota?: { texto: MessageKey; href: string }
 }>
 
 /** Las claves del contrato, para contar sin repetir la lista. */
@@ -272,6 +263,14 @@ export function AdvancedStyleSettings({
                 </Stack>
               </AccordionSummary>
               <AccordionDetails>
+                {'nota' in grupo && grupo.nota ? (
+                  <Typography sx={{ fontSize: TS.label, color: 'var(--muted)', mb: 1.5 }}>
+                    {t(grupo.nota.texto)}{' '}
+                    <Box component="a" href={grupo.nota.href} sx={{ color: 'var(--accent-deep)', fontWeight: 700 }}>
+                      {t('settings.design.style.group.brandLink')}
+                    </Box>
+                  </Typography>
+                ) : null}
                 <Box
                   sx={{
                     display: 'grid',

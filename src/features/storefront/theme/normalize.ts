@@ -280,7 +280,7 @@ export function sanitizeHomeLayout(valor: unknown, porDefecto: HomeLayout): Home
  * secciones sigue siendo V1, y escribir `2` en su fila haría creer que usa algo
  * que no usa. La versión describe el CONTENIDO, no la fecha del despliegue.
  */
-function versionDe(sections: readonly HomeSectionConfig[]): 1 | 2 {
+export function versionDe(sections: readonly HomeSectionConfig[]): 1 | 2 {
   return sections.some((s) => s.presentation !== undefined) ? 2 : 1
 }
 

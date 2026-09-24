@@ -1623,3 +1623,155 @@ convertiría el aviso de peso en un dato histórico y no solo en una decisión d
 momento de subir. Queda fuera a propósito, con el motivo escrito arriba.
 
 `PHASE_RESULT: PASS`
+
+---
+
+# P12 · El taller de Diseño controla V3
+
+`ESTADO: PASS`
+
+## Lo que ya estaba, y por eso esta fase es corta
+
+Tres de los cinco puntos del encargo estaban resueltos desde fases anteriores, y
+comprobarlo antes de escribir código es la mitad del trabajo:
+
+1. **Las miniaturas de tema ya se dibujan con la DEFINICIÓN del preset**
+   (`ThemeMiniPreview` lee `THEME_PRESETS`), no con capturas: desde P02 conocen
+   la cabecera `brand`, el mosaico de familias, las columnas y el aire de cada
+   uno. Cambiar un preset cambia su miniatura.
+2. **Los ajustes finos ya van agrupados y plegados** en Estructura, Producto y
+   Espaciado, con el contador de lo pisado por grupo, «Quitar personalización» y
+   —esto es lo que pedía el encargo— **el valor efectivo escrito**: «Usar tema:
+   Editorial», no un desplegable vacío. Las ocho claves del contrato V3 están
+   ahí desde P02.
+3. **La pantalla ya es config a la izquierda y vista previa pegajosa a la
+   derecha**, con Focus y Comparar, desde V2 · P13.
+
+## Lo que faltaba: la presentación por sección
+
+El contrato de P06 permitía que cada sección de la portada eligiera composición,
+fondo y ancho. La base lo validaba, la vitrina lo pintaba… y **no había forma de
+configurarlo**: un contrato sin pantalla es un contrato que solo usa quien
+escribe SQL a mano.
+
+### Un panel que se abre, no tres desplegables en la fila
+
+`SectionPresentationPopover`. La lista de la portada son trece filas, y cada
+fila ya lleva interruptor, nombre, tope de productos y dos flechas. Añadirle
+tres desplegables la convierte en un formulario de seis controles repetido trece
+veces: **78 controles** en la columna estrecha del taller, y la lista deja de
+poder recorrerse de un vistazo, que es para lo que existe.
+
+El botón de cada fila dice a qué sección pertenece —«Cómo se enseña: Ofertas»,
+como ya hacían las flechas— y **marca la sección que lleva algo
+personalizado**, que es la respuesta a «¿qué le he tocado yo a esto?» sin abrir
+nada.
+
+### Lo que hace que esto no sea un maquetador
+
+**Solo se ofrece lo que esa sección admite.** Las opciones salen de
+`SECTION_PRESENTATION_RULES`, la misma tabla que valida la base y que lee la
+vitrina: una banda de familias con fondo de contraste taparía las fotos de las
+propias familias, así que ahí no se ofrece. Y una sección que no elige
+composición —el hero, el contenido del CMS— **no enseña ese desplegable**, en
+lugar de enseñarlo vacío.
+
+**Lo heredado dice lo que hereda.** Se resuelve con el mismo
+`resolveSectionPresentation` de la vitrina: «Usar tema: Fila que se desplaza».
+
+**Se guarda lo mínimo.** Todo pasa por `sanitizeSectionPresentation`, la réplica
+de la regla de la base: los valores por defecto no se guardan, así que la lista
+no se llena de `{surface: 'plain'}` —ruido con aspecto de decisión— y la sección
+sigue al tema el día que el tema cambie de opinión.
+
+### El fallo que esto destapó
+
+`HomeLayoutEditor` guardaba `{ version: 1, ... }` **escrito a mano**. Desde P06
+el contrato tiene una segunda versión, y una lista con presentaciones guardada
+como V1 dice de sí misma que no las lleva: el validador de la base la habría
+rechazado. Ahora la versión la decide `versionDe`, la misma función que usa el
+motor al leer — lo que decide la versión es lo que la lista **contiene**, no
+quien la escribe. Y al quitar la última personalización, la lista vuelve a
+declararse V1: no se sube la versión «porque ahora estamos en V3».
+
+## Diferencia con lo que pedía el prompt
+
+**El lockup, el interruptor de tema y la barra de avisos NO se repiten en el
+taller.** El encargo los pedía en el grupo «Cabecera y marca» de Diseño, y
+ponerlos ahí sería tener la misma propiedad editable en dos pestañas: el día que
+las dos no coincidan, ninguna de las dos es la verdad. Es exactamente lo que el
+propio encargo prohíbe dos líneas más abajo («evitar que Marca y Diseño editen la
+misma propiedad en dos sitios sin fuente única»).
+
+Viven en **Marca**, junto al logotipo —que es justo lo que el lockup decide
+enseñar o no—, y el grupo de Estructura lleva ahora una línea con enlace que
+lleva allí. Eso resuelve el problema real, que no era la duplicación: era que no
+se encontraban.
+
+## Readiness, con salida
+
+Cada señal por mejorar ofrece **a dónde ir a arreglarla**: el logotipo, la
+portada y la descripción a la pestaña Marca (`#branding`, que `SectionTabs`
+atiende por `hashchange`); el contacto a General; las fotos, los logotipos de
+marca y las páginas a sus pantallas. Solo en las que están por mejorar: un
+enlace de «arréglalo» al lado de algo que ya está al día es una invitación a
+tocar lo que funciona.
+
+## Archivos principales
+
+| Archivo | Qué cambia |
+|---|---|
+| `settings/SectionPresentationPopover.tsx` | **Nuevo.** Composición, fondo y ancho de UNA sección, con las opciones de su tabla y el valor efectivo escrito. |
+| `settings/styleLabels.ts` | **Nuevo.** El vocabulario del contrato en palabras, compartido por las dos pantallas —y fuera de un archivo de componentes, que es lo que pedía el linter. |
+| `settings/HomeLayoutEditor.tsx` | El botón por fila, el panel, `presentar`/`despersonalizar` y la **versión calculada** al guardar. |
+| `settings/AdvancedStyleSettings.tsx` | La nota con enlace a Marca; las etiquetas salen a su módulo. |
+| `settings/StoreReadiness.tsx` | «Ir a configurarlo» por señal pendiente. |
+| `settings/StorefrontDesignSection.tsx` | El estilo **efectivo** (tema + lo pisado) baja al editor. |
+| `storefront/theme/normalize.ts` | `versionDe` exportada: la usa el editor. |
+
+**Migraciones: ninguna.** El contrato de presentación y su validador son de P06.
+
+## Ciclos correctivos
+
+1. El idioma de «borrar una clave» (`const { presentation: _fuera, ...resto }`)
+   choca con el linter. Sustituido por una función que reconstruye la sección
+   sin esa clave, que además es más fácil de leer.
+2. Exportar constantes desde un archivo de componentes rompe la recarga rápida
+   en desarrollo (aviso de `react-refresh`). Las etiquetas salieron a su propio
+   módulo, que es lo que el aviso recomienda y lo que evita que dos pantallas se
+   importen entre sí para leer un diccionario.
+3. Tres aserciones mías: el valor visible de un `Select` de MUI con valor vacío
+   **no se pinta** —se comprueba en la opción, como ya hacían las pruebas de los
+   ajustes finos—; el grupo de Estructura viene plegado y hay que abrirlo; y el
+   panel de readiness no se monta sin tienda, así que el anfitrión de las
+   pruebas aprendió a montarlo.
+4. Y una premisa mía estaba mal: quería comprobar el enlace de «fotos de
+   producto», pero **sin catálogo esa señal está al día** —una señal que no
+   tiene nada que medir no está en rojo— y por eso no ofrece enlace. Se
+   comprueba con la de páginas, que sí es cero, y se añade la comprobación de
+   que la otra **no** ofrece nada.
+
+## Tests
+
+| Archivo | Casos |
+|---|---|
+| `settings/storefront-design.test.tsx` | 58 → **70**. La fila no lleva los desplegables: se abren en un panel; solo se ofrecen las composiciones de esa sección; la que no elige no enseña el desplegable pero sí el ancho; lo heredado dice lo que hereda; elegir guarda y **sube la lista a versión 2**; volver a lo heredado borra la clave y la devuelve a **versión 1**; «Quitar personalización» limpia la sección; el botón marca lo personalizado; las flechas siguen ahí. Más: el taller no repite el lockup y lleva a Marca; readiness ofrece «Ir a configurarlo» y la señal que vive en otra pantalla lleva a su ruta. |
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 312 ficheros, 6265 tests |
+| `npm run build` | **PASS** |
+| `npm run bundle:report` | **PASS** — backoffice 425,7 kB (techo 430) · portada 398,1 kB |
+
+## Pendiente real
+
+El backoffice queda a **4,3 kB** de su techo. La pantalla de configuración es la
+más pesada del panel y ya arrastra el editor de texto enriquecido por otro lado;
+si P13 o P14 necesitan margen ahí, el candidato es la vista previa del taller
+por `lazy` —solo se pinta en escritorio y es la mitad de la pantalla.
+
+`PHASE_RESULT: PASS`

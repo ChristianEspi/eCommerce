@@ -59,6 +59,28 @@ const PORQUE: Record<ReadinessSignal['id'], MessageKey> = {
   pages: 'settings.readiness.pagesWhy',
 }
 
+/**
+ * A dónde se va a arreglar cada señal (Storefront V3 · P12).
+ *
+ * Un panel que dice «faltan 18 fotos de producto» y no lleva a ningún sitio
+ * obliga a recordar en qué pantalla se sube una foto. Los `#hash` son pestañas
+ * de esta misma página —`SectionTabs` escucha el cambio de hash— y las rutas
+ * son las pantallas donde vive el dato.
+ *
+ * `hero` y `description` van a Marca, que es donde están la imagen de portada
+ * y el resumen de la tienda; `contact` a General.
+ */
+const DONDE: Record<ReadinessSignal['id'], string> = {
+  logo: '#branding',
+  hero: '#branding',
+  description: '#branding',
+  contact: '#general',
+  'product-images': '/app/products',
+  'category-images': '/app/categories',
+  'brand-logos': '/app/pim',
+  pages: '/app/content',
+}
+
 /** Las que cuentan cosas enseñan «hechas de totales»; las de sí o no, no. */
 const CUENTA: ReadonlySet<ReadinessSignal['id']> = new Set<ReadinessSignal['id']>([
   'product-images',
@@ -177,6 +199,39 @@ export function StoreReadiness({
                 <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>
                   {t(PORQUE[señal.id])}
                 </Typography>
+                {/**
+                 * Y a dónde se va a arreglarlo (V3 · P12).
+                 *
+                 * Solo en las que están por mejorar: un enlace de «arréglalo»
+                 * al lado de algo que ya está al día es una invitación a tocar
+                 * lo que funciona.
+                 *
+                 * Un `<a>` de verdad, no un botón con `navigate`: la mitad son
+                 * pestañas de esta misma página —`#branding`— y la otra mitad
+                 * otras pantallas, y las dos cosas se abren igual, se copian
+                 * igual y se abren en otra ventana igual.
+                 */}
+                {!listo && (
+                  <Box
+                    component="a"
+                    href={DONDE[señal.id]}
+                    data-readiness-link={señal.id}
+                    sx={{
+                      display: 'inline-block',
+                      mt: 0.25,
+                      fontSize: TS.label,
+                      fontWeight: 800,
+                      color: 'var(--accent-deep)',
+                      textDecoration: 'none',
+                      '&:hover': { textDecoration: 'underline' },
+                    }}
+                  >
+                    {t('settings.readiness.goTo')}
+                    <Box component="span" aria-hidden sx={{ ml: 0.25 }}>
+                      →
+                    </Box>
+                  </Box>
+                )}
               </Box>
             </Stack>
           )
