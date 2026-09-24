@@ -782,3 +782,122 @@ Ciclos correctivos usados: **2 de 3**.
    añadió una espera explícita en vez de relajar la aserción.
 
 `PHASE_RESULT: PASS`
+
+---
+
+# P05 — Storefront Shell V2
+
+**HEAD inicial:** `18ea862` · **Sin migración.** Esta fase no toca la base, ni la autenticación, ni
+el carrito, ni el precio, ni el checkout: solo marco visual.
+
+## 1. El ancho: la tienda usaba 1200 px en un monitor de 1920
+
+`Container maxWidth="lg"` son 1200 px y `xl` son 1536. Son los de una herramienta de trabajo, y en
+la vitrina se notaban: en 1920 la tienda dejaba **360 px de desierto a cada lado** y el catálogo se
+veía en una columna estrecha entre dos márgenes.
+
+Ahora el ancho lo pone el tema: `--sf-content-w` = **1320 px** en `lg` y **1680 px** en `xl`. Los
+cuatro contenedores de la vitrina —cabecera, barra de familias, contenido y pie— leen la misma
+variable.
+
+**Y esto no convierte el texto en líneas infinitas**, que es el riesgo evidente: el ancho del
+CONTENEDOR y la medida del TEXTO son cosas distintas y aquí solo se toca la primera. El titular de la
+portada sigue topado a 680 px, su bajada a 560, la descripción del pie a 368, y una rejilla de
+tarjetas gana columnas en vez de ensanchar las que tiene. Crece cuánto CABE, no cuánto mide una línea.
+
+### Un bug de ancho que estaba escrito a mano
+
+`StoreCategoryNav` tenía `Container maxWidth="lg"` **fijo**. En `catalog` —que usa `xl`— la barra de
+familias era más estrecha que la cabecera y que el catálogo: tres anchos en la misma pantalla, con
+dos escalones visibles en el borde izquierdo. Ahora usa la misma variable que el resto.
+
+## 2. `headerVariant` deja de ser doce píxeles
+
+Era su único efecto: la altura de la barra, 68 → 56. Se le suman dos medidas más, las dos del tema:
+
+| Variable | `standard` | `compact` |
+|---|---|---|
+| `--sf-header-h-md` | 68 px | 56 px |
+| `--sf-search-h` | 42 px | 34 px |
+| `--sf-nav-pad` | 6 px | 2 px |
+
+Sumado, la primera pantalla de un catálogo grande gana casi treinta píxeles de producto — que es
+exactamente lo que `compact` promete y lo que hasta ahora no entregaba.
+
+La caja de búsqueda además ensancha de 420 a 520 px en escritorio: es la primera herramienta de una
+tienda con catálogo y con 420 px no cabían cinco palabras.
+
+## 3. El ancla ya no queda debajo de la cabecera
+
+La cabecera es pegajosa y la barra de familias va justo debajo. El enlace «Marcas» saltaba a su
+sección y la dejaba medio tapada: había que subir a mano. Estaba resuelto con un `96` escrito a mano
+en `BrandRow`, que dejó de ser cierto en cuanto la barra cambió de alto por variante.
+
+Ahora hay `--sf-anchor-offset`, derivado del alto real (barra + aire de familias ×2 + píldora + 12
+de respiro), y lo usan el ancla del salto de contenido y la sección de marcas.
+
+## 4. Menos «aplicación de gestión», sin tocar el modo claro/oscuro
+
+Dos superficies dejan de ser tarjetas:
+
+- **La franja de propuestas de valor.** Con borde y sombra era la tercera caja en los primeros
+  ochocientos píxeles —portada, franja, banda de ofertas— y las tres pesaban igual. No es contenido
+  que se mire: es información de servicio que se lee de pasada. Pasa a un tinte del acento del
+  comercio, sin borde y sin sombra, y **la tarjeta de producto recupera el único recuadro con peso
+  de la pantalla**.
+- **La barra de contexto B2B.** Tenía fondo de tarjeta y borde, así que competía con las tarjetas de
+  producto de debajo: lo primero que veía un comprador con cuenta de empresa era una caja blanca con
+  texto administrativo. Pasa a banda teñida y baja de altura. Sigue visible y sigue diciendo para
+  quién se compra (`data-commerce-audience` intacto).
+
+**Lo que NO se tocó, y está explicado en `storefront.css`:** `--sf-line`, `--sf-shadow` y
+`--sf-media-bg` se quedan fuera de los bloques de tema. Se redefinen por MODO —hay un bloque para
+oscuro y otro para claro explícito, los dos con más peso—, así que un tema que los pisara solo se
+notaría con el modo del sistema sin elegir, y al tocar el interruptor la tienda cambiaría de canto.
+El MODO manda en color y profundidad; el TEMA, en geometría y escala.
+
+## Archivos
+
+| Archivo | Qué cambia |
+|---|---|
+| `theme/theme-context.ts` | `--sf-content-w`, `--sf-search-h`, `--sf-nav-pad`, `--sf-anchor-offset`. |
+| `StorefrontLayout.tsx` | Cabecera y contenido con el ancho del tema (`maxWidth={false}` + variable) y `scrollMarginTop`. `data-content-width` para poder comprobarlo. |
+| `components/StoreCategoryNav.tsx` | Ancho del tema (era `lg` fijo) y aire por variante. |
+| `components/StoreFooter.tsx` | Ancho del tema. |
+| `components/StoreSearchField.tsx` | 520 px de tope y alto por variante. |
+| `components/BrandRow.tsx` | `scrollMarginTop` del tema. |
+| `components/StoreValueProps.tsx` | Banda teñida en vez de tarjeta. |
+| `commerce/CommerceContextBar.tsx` | Banda teñida en vez de tarjeta, más baja. |
+
+## Validación visual mínima de la fase
+
+Los cuatro temas × escritorio/móvil y la tienda con contexto B2B se ejercitan en
+`theme-parity.test.tsx` (4 temas × 4 casos), `multi-industry.test.tsx` (4 rubros × 4 temas, más 8
+rubros para las familias), `layout-theme.test.tsx`, `storefront-a11y-seo.test.tsx` y
+`commerce-context-bar.test.tsx`. El desbordamiento horizontal a 320 y 360 px está cubierto por
+`e2e/theme-engine.e2e.ts`, **no ejecutable aquí** (ver gates).
+
+## Tests
+
+`theme-contract.test.tsx` sube a 27 casos con tres pruebas nuevas, y las tres comprueban la MEDIDA,
+no la clase de MUI —la clase es un detalle de la librería; la variable es lo que de verdad se
+aplica—:
+
+- los dos anchos llegan como `--sf-content-w` y son distintos, y el pie usa el mismo que el contenido;
+- `compact` recorta buscador y aire de familias respecto a `standard`;
+- el desplazamiento del ancla sigue al alto real de la cabecera y cambia con la variante.
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 291 ficheros, 5759 tests |
+| `npm run build` | **PASS** |
+| Playwright | **NO EJECUTADO** — sin tienda desplegada ni navegadores de Playwright en esta máquina. |
+
+Ciclos correctivos usados: **1 de 3** — al quitar el uso de `style` en la cabecera quedó una variable
+sin leer; se retiró junto con su comentario, que ya no describía lo que hacía el componente.
+
+`PHASE_RESULT: PASS`

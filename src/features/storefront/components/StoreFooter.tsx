@@ -89,9 +89,15 @@ export function StoreFooter({ store, storeSlug }: { store: PublicStore; storeSlu
 
   return (
     <Container
-      maxWidth={style.contentWidth}
+      maxWidth={false}
       component="footer"
-      sx={{ pb: 3, pt: 'var(--sf-section-gap-md)' }}
+      data-content-width={style.contentWidth}
+      sx={{
+        maxWidth: 'var(--sf-content-w)',
+        mx: 'auto',
+        pb: 3,
+        pt: 'var(--sf-section-gap-md)',
+      }}
     >
       <Box
         sx={{

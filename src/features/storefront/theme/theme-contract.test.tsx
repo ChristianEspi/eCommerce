@@ -357,16 +357,67 @@ describe('productCardVariant cambia las medidas de la tarjeta', () => {
 })
 
 describe('contentWidth cambia el ancho del contenedor', () => {
-  it.each(CONTENT_WIDTHS)('%s llega al contenedor principal', async (ancho) => {
+  it.each(CONTENT_WIDTHS)('%s llega como medida real, no como clase de MUI', async (ancho) => {
     cleanup()
-    await pintar({ contentWidth: ancho })
+    const frontera = await pintar({ contentWidth: ancho })
+
+    // Desde P05 el ancho NO lo pone la escala de MUI —1200 px en `lg`, que en
+    // un monitor de 1920 dejaba 360 px de desierto a cada lado— sino el tema.
+    // Se comprueba la variable y no la clase: la clase es un detalle de MUI y
+    // la variable es la medida que de verdad se aplica.
+    expect(variableDe(frontera, '--sf-content-w')).toBe(ancho === 'xl' ? '1680px' : '1320px')
 
     const principal = await screen.findByRole('main')
-    // MUI traduce `maxWidth` a su clase de contenedor: es la forma de ver que
-    // el valor llegó sin medir píxeles en jsdom, que no calcula anchos.
-    expect(principal.className).toContain(
-      ancho === 'xl' ? 'MuiContainer-maxWidthXl' : 'MuiContainer-maxWidthLg',
+    expect(principal.getAttribute('data-content-width')).toBe(ancho)
+  })
+
+  it('los dos anchos son DISTINTOS y el pie usa el mismo', async () => {
+    const anchos = new Set<string>()
+    for (const ancho of CONTENT_WIDTHS) {
+      cleanup()
+      const frontera = await pintar({ contentWidth: ancho })
+      anchos.add(variableDe(frontera, '--sf-content-w'))
+      // El pie, la cabecera, la barra de familias y el contenido comparten
+      // medida: tres anchos distintos en la misma pantalla dejan escalones
+      // visibles en el borde izquierdo, que es lo que pasaba con la barra de
+      // familias antes de P05.
+      expect(screen.getByRole('contentinfo').getAttribute('data-content-width')).toBe(ancho)
+    }
+    expect(anchos.size).toBe(CONTENT_WIDTHS.length)
+  })
+})
+
+describe('headerVariant también cambia la densidad, no solo la altura', () => {
+  it('`compact` recorta el buscador y el aire de las familias', async () => {
+    const estandar = await pintar({ headerVariant: 'standard' })
+    const buscadorEstandar = variableDe(estandar, '--sf-search-h')
+    const navEstandar = variableDe(estandar, '--sf-nav-pad')
+
+    cleanup()
+    const compacta = await pintar({ headerVariant: 'compact' })
+
+    // Hasta P05 lo único que cambiaba entre las dos eran doce píxeles de altura
+    // de barra. Sumando buscador y aire de familias, la primera pantalla de un
+    // catálogo grande gana casi treinta píxeles de producto.
+    expect(variableDe(compacta, '--sf-search-h')).not.toBe(buscadorEstandar)
+    expect(variableDe(compacta, '--sf-nav-pad')).not.toBe(navEstandar)
+    expect(Number.parseInt(variableDe(compacta, '--sf-search-h'), 10)).toBeLessThan(
+      Number.parseInt(buscadorEstandar, 10),
     )
+  })
+
+  it('el desplazamiento del ancla sigue al alto real de la cabecera', async () => {
+    // Estaba escrito a mano como `96` y dejó de ser cierto en cuanto la barra
+    // cambió de alto por variante: el enlace «Marcas» saltaba a la sección y la
+    // dejaba medio tapada debajo de la cabecera pegajosa.
+    const estandar = await pintar({ headerVariant: 'standard' })
+    const offsetEstandar = variableDe(estandar, '--sf-anchor-offset')
+
+    cleanup()
+    const compacta = await pintar({ headerVariant: 'compact' })
+
+    expect(offsetEstandar).not.toBe('')
+    expect(variableDe(compacta, '--sf-anchor-offset')).not.toBe(offsetEstandar)
   })
 })
 

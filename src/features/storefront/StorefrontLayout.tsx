@@ -310,10 +310,20 @@ function StoreMain({ children }: { children: ReactNode }) {
       // `tabIndex={-1}`: sin esto el salto mueve el scroll pero NO el
       // foco, y el siguiente Tab vuelve al principio de la cabecera.
       tabIndex={-1}
-      maxWidth={style.contentWidth}
+      // El ancho lo pone el TEMA, no la escala de MUI: ver `--sf-content-w` en
+      // `theme-context.ts`. `maxWidth={false}` apaga el tope de MUI —1200 px en
+      // `lg`, que en un monitor de 1920 dejaba 360 px de desierto a cada lado—
+      // y deja mandar a la variable. Los gutters del contenedor se conservan.
+      maxWidth={false}
+      data-content-width={style.contentWidth}
       sx={{
         flex: 1,
+        maxWidth: 'var(--sf-content-w)',
+        mx: 'auto',
         py: { xs: 'var(--sf-main-pad)', md: 'var(--sf-main-pad-md)' },
+        // El ancla del salto de contenido no puede quedar debajo de la cabecera
+        // pegajosa.
+        scrollMarginTop: 'var(--sf-anchor-offset)',
         '&:focus': { outline: 'none' },
       }}
     >
@@ -346,10 +356,12 @@ function StoreHeader({ store, storeSlug }: { store: PublicStore; storeSlug: stri
    * Con la consulta de medios se renderiza UNO, en el sitio que le toca.
    */
   const enMovil = useMediaQuery('(max-width:899.95px)')
-  // El tema decide el ANCHO de la barra y su altura; nada de lo que la barra
-  // contiene —buscador, cuenta, carrito, familias— depende de él. Un tema que
-  // quitara uno de esos tres dejaría de ser un tema.
-  const { style } = useStorefrontTheme()
+  // El tema decide el ANCHO de la barra, su altura y el alto de la caja de
+  // búsqueda; nada de lo que la barra CONTIENE —buscador, cuenta, carrito,
+  // familias— depende de él. Un tema que quitara uno de esos tres dejaría de
+  // ser un tema. Desde P05 los tres valores viajan como variables de CSS
+  // (`--sf-content-w`, `--sf-header-h*`, `--sf-search-h`), así que aquí no hace
+  // falta leer el estilo.
 
   return (
     <Box
@@ -366,7 +378,11 @@ function StoreHeader({ store, storeSlug }: { store: PublicStore; storeSlug: stri
         borderBottom: '1px solid var(--sf-line)',
       }}
     >
-      <Container maxWidth={style.contentWidth} disableGutters>
+      <Container
+        maxWidth={false}
+        disableGutters
+        sx={{ maxWidth: 'var(--sf-content-w)', mx: 'auto' }}
+      >
         <Toolbar
           sx={{
             gap: 1.5,

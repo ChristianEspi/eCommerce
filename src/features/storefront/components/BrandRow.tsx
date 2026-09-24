@@ -56,7 +56,10 @@ export function BrandRow({
       aria-label={t('store.brands.title')}
       sx={{
         gap: 1.25,
-        scrollMarginTop: 96,
+        // El alto real de la cabecera pegajosa, del tema. Estaba escrito a mano
+        // como `96` y dejó de ser cierto en cuanto la barra cambió de alto por
+        // variante: el enlace «Marcas» saltaba aquí y dejaba el título tapado.
+        scrollMarginTop: 'var(--sf-anchor-offset, 96px)',
         // La mitad de abajo de la portada se habia quedado en «listas sueltas
         // sobre blanco» mientras la de arriba ya tenia bandas con fondo. Un
         // panel tenido —el mismo tinte flojo que usan las secciones del CMS—

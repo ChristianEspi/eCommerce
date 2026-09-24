@@ -104,9 +104,18 @@ export function StoreValueProps({
         },
         p: { xs: 2, md: 2.25 },
         borderRadius: 'var(--sf-radius)',
-        border: '1px solid var(--sf-line)',
-        bgcolor: 'var(--card)',
-        boxShadow: 'var(--sf-shadow)',
+        // Una BANDA, no una tarjeta (Storefront V2 · P05).
+        //
+        // Con borde y sombra era la tercera caja en los primeros ochocientos
+        // píxeles de la tienda —portada, esta franja y la banda de ofertas— y
+        // las tres pesaban lo mismo. Eso es lo que hace que una vitrina parezca
+        // un panel de administración: todo es un recuadro y nada destaca.
+        //
+        // Aquí la franja no es contenido que se mire, es información de
+        // servicio que se lee de pasada, así que se apoya en un tinte del acento
+        // del comercio y suelta el borde y la sombra. Las tarjetas de producto
+        // recuperan el único recuadro con peso de la pantalla.
+        bgcolor: 'color-mix(in srgb, var(--accent) 6%, var(--card))',
       }}
     >
       {propuestas.map((propuesta, indice) => {

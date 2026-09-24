@@ -1,6 +1,6 @@
 import { createContext } from 'react'
 import type { CSSProperties } from 'react'
-import type { HeaderVariant, ImageRatio, SectionSpacing } from './types'
+import type { ContentWidth, HeaderVariant, ImageRatio, SectionSpacing } from './types'
 import { DEFAULT_STORE_THEME, type ResolvedStoreTheme } from './resolve'
 
 /**
@@ -74,6 +74,53 @@ const PROPORCION: Record<ImageRatio, string> = {
 }
 
 /**
+ * El ancho máximo del contenido, en píxeles (Storefront V2 · P05).
+ *
+ * ## Por qué no se usan los de MUI
+ *
+ * `Container maxWidth="lg"` son 1200 px y `xl` son 1536. Eran los de una
+ * herramienta de trabajo, y en la vitrina se notaban: en un monitor de 1920 la
+ * tienda dejaba 360 px de margen a cada lado, así que el catálogo se veía en
+ * una columna estrecha con dos desiertos al lado. Un eCommerce moderno usa el
+ * ancho que tiene.
+ *
+ * `lg` sube a 1320 y `xl` a 1680, que es lo que cabe cómodo en 1440 y en 1920
+ * dejando aire real. No se sube más: a partir de ahí las filas de producto se
+ * estiran tanto que recorrerlas obliga a mover la cabeza.
+ *
+ * ## Y por qué esto NO convierte el texto en líneas infinitas
+ *
+ * Porque el ancho del CONTENEDOR y la medida del TEXTO son dos cosas distintas,
+ * y aquí solo se toca la primera. Los bloques de texto llevan su propio tope —el
+ * titular de la portada a 680 px, su bajada a 560, la descripción del pie a
+ * 368— y una rejilla de tarjetas gana columnas en vez de ensanchar las que
+ * tiene. Lo que crece es cuánto CABE, no cuánto mide una línea.
+ */
+const ANCHO: Record<ContentWidth, number> = {
+  lg: 1320,
+  xl: 1680,
+}
+
+/**
+ * El alto de la caja de búsqueda y el aire de la barra de familias.
+ *
+ * Es la otra mitad de `headerVariant`, y la que le da sentido de verdad: hasta
+ * P05 lo único que cambiaba entre `standard` y `compact` eran doce píxeles de
+ * altura de la barra. Con esto, `compact` recorta también la caja de búsqueda y
+ * el aire de la fila de familias, y la suma sí se nota: la primera pantalla de
+ * un catálogo de miles de referencias gana casi treinta píxeles de producto.
+ */
+const BUSCADOR: Record<HeaderVariant, number> = {
+  standard: 42,
+  compact: 34,
+}
+
+const AIRE_NAV: Record<HeaderVariant, number> = {
+  standard: 6,
+  compact: 2,
+}
+
+/**
  * Las variables CSS del tema, para colgarlas de la frontera `.sf-scope`.
  *
  * Van como variables y no como props porque así una hoja de estilos puede
@@ -94,6 +141,22 @@ export function themeCssVars(theme: ResolvedStoreTheme): CSSProperties {
     '--sf-main-pad-md': `${margen.md}px`,
     '--sf-header-h': `${barra.xs}px`,
     '--sf-header-h-md': `${barra.md}px`,
+    '--sf-content-w': `${ANCHO[theme.style.contentWidth]}px`,
+    '--sf-search-h': `${BUSCADOR[theme.style.headerVariant]}px`,
+    '--sf-nav-pad': `${AIRE_NAV[theme.style.headerVariant]}px`,
+    /**
+     * Cuánto hay que bajar para que un ancla no quede DEBAJO de la cabecera.
+     *
+     * La cabecera es pegajosa y la barra de familias va justo debajo, así que un
+     * enlace a `#marcas` dejaba la sección medio tapada — se saltaba a ella y
+     * había que subir a mano. Estaba resuelto con un `96` escrito a mano en un
+     * componente, que dejó de ser cierto en cuanto la barra cambió de alto por
+     * tema.
+     *
+     * Sale del alto real de la barra más el de la fila de familias (su aire por
+     * dos, más la píldora de 30 px) y un respiro de 12.
+     */
+    '--sf-anchor-offset': `${barra.md + AIRE_NAV[theme.style.headerVariant] * 2 + 30 + 12}px`,
     '--sf-image-ratio': PROPORCION[theme.style.imageRatio],
     '--sf-grid-xs': String(theme.definition.gridColumns.xs),
     '--sf-grid-sm': String(theme.definition.gridColumns.sm),
