@@ -705,6 +705,10 @@ function validarNodo(esquema: EsquemaIA, valor: unknown, ruta: string, errores: 
  * El esquema que se manda al PROVEEDOR. Las salidas estructuradas no admiten
  * `maxLength`/`maxItems`/`minimum`…: se retiran para la API y se siguen
  * exigiendo en `validarEsquema`. Así hay un único esquema escrito.
+ *
+ * Los límites retirados viajan como TEXTO en la `description`: la API no los
+ * hace cumplir, pero el modelo los lee. Sin esto, un solo campo que se pase
+ * (QAS, 2026-09-23: 9 evidencias con tope 6) descarta la respuesta entera.
  */
 export function esquemaParaProveedor(esquema: EsquemaIA): Record<string, unknown> {
   switch (esquema.type) {
@@ -718,27 +722,46 @@ export function esquemaParaProveedor(esquema: EsquemaIA): Record<string, unknown
         properties,
         required: [...(esquema.required ?? Object.keys(esquema.properties))],
         additionalProperties: false,
-        ...(esquema.description ? { description: esquema.description } : {}),
+        ...descripcion(esquema.description, []),
       }
     }
     case 'array':
       return {
         type: 'array',
         items: esquemaParaProveedor(esquema.items),
-        ...(esquema.description ? { description: esquema.description } : {}),
+        ...descripcion(esquema.description, [
+          esquema.minItems !== undefined ? `Minimo ${esquema.minItems} elementos.` : '',
+          esquema.maxItems !== undefined ? `Maximo ${esquema.maxItems} elementos.` : '',
+        ]),
       }
     case 'string':
       return {
         type: 'string',
         ...(esquema.enum ? { enum: [...esquema.enum] } : {}),
-        ...(esquema.description ? { description: esquema.description } : {}),
+        ...descripcion(esquema.description, [
+          esquema.maxLength !== undefined ? `Maximo ${esquema.maxLength} caracteres.` : '',
+        ]),
+      }
+    case 'number':
+    case 'integer':
+      return {
+        type: esquema.type,
+        ...descripcion(esquema.description, [
+          esquema.minimum !== undefined ? `Valor minimo ${esquema.minimum}.` : '',
+          esquema.maximum !== undefined ? `Valor maximo ${esquema.maximum}.` : '',
+        ]),
       }
     default:
       return {
         type: esquema.type,
-        ...(esquema.description ? { description: esquema.description } : {}),
+        ...descripcion(esquema.description, []),
       }
   }
+}
+
+function descripcion(base: string | undefined, limites: readonly string[]): { description?: string } {
+  const texto = [base ?? '', ...limites].map((t) => t.trim()).filter(Boolean).join(' ')
+  return texto ? { description: texto } : {}
 }
 
 /**

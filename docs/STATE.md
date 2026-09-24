@@ -11,6 +11,26 @@ el recorrido SaaS P00–P17 queda cerrado)
 > (`claude-saas-opus/config/phases.json`), que se identifica siempre como «P0x-SaaS». No son la misma
 > serie: el P12 histórico es el framework de integraciones; el P12-SaaS es fulfillment y devoluciones.
 
+## Rendimiento de la RLS: membresía una vez por consulta (2026-09-23)
+
+En QAS el «Resumen inteligente» respondía `ERROR_INTERNO`: `ai_dashboard_facts` de miquimica (~3 800
+filas de inventario) tardaba ~26 s y el `statement_timeout` de 8 s de `authenticated` la cancelaba
+(57014). Causa: 154 policies con `ebim.can_access(organization_id, company_id)` y 243 con
+`ebim.has_role(organization_id, company_id, ARRAY[...])` se evaluaban FILA A FILA (~1 ms cada una).
+Migración `20260923100000_rls_membership_initplan.sql`: `ebim.member_companies()` /
+`ebim.has_role_companies(roles)` (SECURITY DEFINER, solo sobre el `sub` del token, sin anon) y las 369
+policies reescritas a `organization_id = (select ebim.org_id()) and company_id = any ((select
+ebim.member_companies())::uuid[])` — InitPlan, una evaluación por consulta. `can_access`/`has_role` no
+cambian (siguen siendo el guard de las funciones). Ensayo en QAS con rollback: `ai_dashboard_facts`
+26 s → 0,38 s, `inventory_alerts` 9,8 s → 0,23 s. **Regla nueva:** una policy nueva se escribe con esa
+forma; `supabase/tests/rls-initplan.test.ts` pone rojo cualquier `can_access`/`has_role` por fila.
+
+**Despliegue en QAS (2026-09-23, a pedido del operador):** migración
+`20260923110000_ai_dashboard_recent_orders.sql` aplicada con registro (`db push`; el resto ya estaba);
+18 Edge Functions de IA redesplegadas (`dashboard-insights`, los 14 asistentes, `copilot`,
+`shopping-assistant`, `catalog-copy`) con `aiCore`/`aiInsights` al día; frontend por fast-forward de
+`dev` a `upstream/qas` (`a6c800c..8171b68`). Smoke de QAS `NOT_RUN` (sin `QAS_BASE_URL`).
+
 ## Secuencia de IA (`EBIM_AI_SEQUENCE`, desde 2026-09-21)
 
 Fase 00 (análisis y plan) cerrada sin cambios de código. Arquitectura actual/objetivo en

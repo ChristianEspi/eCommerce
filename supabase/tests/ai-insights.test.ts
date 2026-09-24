@@ -126,6 +126,74 @@ describe('hechosDelDashboard', () => {
   })
 })
 
+describe('pedidos recientes (R1 = el último)', () => {
+  const ID = '33333333-3333-4333-8333-333333333333'
+  const conRecientes = hechosDelDashboard({
+    ...RAW,
+    orders: {
+      ...RAW.orders,
+      attention: [{ id: ID, order_number: 'A-OLD-5', reason: 'unpaid', age_days: 25 }],
+      recent: [
+        {
+          id: ID,
+          order_number: 'EC-43',
+          placed_at: '2026-09-23T17:53:01.123+00:00',
+          status: 'pending',
+          payment_status: 'pending',
+          fulfillment_status: 'unfulfilled',
+          grand_total: '39.86',
+          currency: 'PEN',
+          age_days: 0,
+        },
+        { id: 'no-es-uuid', order_number: 'EC-42', placed_at: 'ayer', status: 'PAGADO', grand_total: '1e3' },
+      ],
+    },
+  })
+
+  it('cada reciente es una entidad de pedido con su estado, sus ejes y sus cifras', () => {
+    expect(conRecientes.entities.R1).toEqual({
+      kind: 'order',
+      label: 'EC-43',
+      detail: 'pending',
+      module: 'orders',
+      id: ID,
+      facets: { payment: 'pending', fulfillment: 'unfulfilled' },
+    })
+    expect(conRecientes.metrics['R1.total']).toEqual({ kind: 'money', value: '39.86', currency: 'PEN' })
+    expect(conRecientes.metrics['R1.placed_at']).toEqual({ kind: 'datetime', value: '2026-09-23T17:53:01.123+00:00' })
+    expect(conRecientes.metrics['R1.age_days']).toEqual({ kind: 'days', value: 0 })
+    expect(conRecientes.entities.O1?.id).toBe(ID)
+  })
+
+  it('lo que no tiene forma se omite: id, fecha, estado y total raros', () => {
+    const r2 = conRecientes.entities.R2
+    expect(r2?.id).toBeUndefined()
+    expect(r2?.detail).toBeNull()
+    expect(conRecientes.metrics['R2.placed_at']).toBeUndefined()
+    expect(conRecientes.metrics['R2.total']).toBeUndefined()
+  })
+
+  it('el id NO llega al modelo; los estados sí, como códigos', () => {
+    const user = datosParaModelo(conRecientes, 'es')
+    expect(user).not.toContain(ID)
+    expect(user).toContain('unfulfilled')
+    expect(SISTEMA_PREGUNTA).toContain('R1 es el ultimo pedido')
+  })
+
+  it('el front recibe el id y los ejes para pintar la tarjeta y abrir el pedido', () => {
+    const ctx = contextoParaFront(conRecientes)
+    expect(ctx.entities.R1).toMatchObject({ id: ID, facets: { payment: 'pending', fulfillment: 'unfulfilled' }, route: '/app/orders' })
+  })
+
+  it('el modelo puede citar al último pedido y sus cifras; revisar lo acepta', () => {
+    const r = revisarRespuesta(
+      { answerable: true, answer: 'Tu último pedido es {{R1}}, por {{R1.total}} ({{R1.placed_at}}).', module: 'orders', evidence: ['R1.total'] },
+      conRecientes,
+    )
+    expect(r.ok).toBe(true)
+  })
+})
+
 describe('prompt', () => {
   it('el sistema es constante y prohíbe cifras y acciones', () => {
     for (const s of [SISTEMA_ANALISTA, SISTEMA_PREGUNTA]) {
