@@ -94,6 +94,8 @@ function datos(overrides: Partial<HomeSectionData> = {}): HomeSectionData {
     promociones: [],
     promoAssets: {},
     categorias: [],
+    // P09 · Las páginas publicadas, que pinta `business-info`.
+    paginas: [],
     brands: [{ code: 'genfar', name: 'Genfar', count: 4 }],
     brandSelected: null,
     hayOfertas: true,
@@ -215,15 +217,45 @@ describe('una sección sin datos se omite sola', () => {
     expect(container.textContent).toBe('')
   })
 
-  it('las secciones declaradas sin componente devuelven nada, no un error', () => {
-    const { container } = pintar(
-      layout([
-        { id: 'business-info', enabled: true },
-        { id: 'newsletter', enabled: true },
-      ]),
-    )
+  it('newsletter sigue declarada sin componente y no rompe la portada', () => {
+    // Y seguirá así mientras no exista dónde guardar la suscripción y el
+    // consentimiento: un formulario que pide un correo y lo tira es peor que
+    // no ofrecerlo.
+    const { container } = pintar(layout([{ id: 'newsletter', enabled: true }]))
 
     expect(container.textContent).toBe('')
+  })
+
+  /**
+   * `business-info` — la sección que se calla (Storefront V2 · P09).
+   *
+   * Hasta P09 devolvía `null` SIEMPRE: estaba en el contrato, salía en el
+   * editor del backoffice y un comercio podía encenderla y arrastrarla de
+   * sitio sin que pasara nada. Ahora pinta, pero solo cuando hay algo cierto
+   * que decir — y eso, desde fuera, se ve igual que no estar implementada.
+   * Estas dos pruebas son las que distinguen una cosa de la otra.
+   */
+  it('business-info encendida sin contacto sigue sin pintar: sería la cabecera repetida', () => {
+    const { container } = pintar(layout([{ id: 'business-info', enabled: true }]))
+
+    expect(container.textContent).toBe('')
+  })
+
+  it('business-info con contacto pinta la sección y sus páginas publicadas', () => {
+    pintar(
+      layout([{ id: 'business-info', enabled: true }]),
+      datos({
+        store: { ...STORE, support_email: 'hola@botica.pe' } as typeof STORE,
+        paginas: [{ slug: 'terminos', title: 'Términos' }],
+      }),
+    )
+
+    expect(screen.getByRole('region', { name: 'Sobre la tienda' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'hola@botica.pe' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Términos/ })).toHaveAttribute(
+      'href',
+      '/s/botica/p/terminos',
+    )
   })
 
   it('categories sin familias no pinta nada: no inventa categorías', () => {

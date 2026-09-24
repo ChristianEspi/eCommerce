@@ -9,6 +9,7 @@ import { PromoCarousel } from '../components/PromoCarousel'
 import { SectionHeading } from '../components/SectionHeading'
 import { StoreFeaturedHero } from '../components/StoreFeaturedHero'
 import { StoreHero } from '../components/StoreHero'
+import { StoreBusinessInfo } from '../components/StoreBusinessInfo'
 import { StoreValueProps } from '../components/StoreValueProps'
 import type { HomeSectionData, HomeSectionRegistry } from './types'
 
@@ -33,10 +34,16 @@ import type { HomeSectionData, HomeSectionRegistry } from './types'
  *
  * ## Las que devuelven `null`
  *
- * `business-info` y `newsletter` están declaradas en el contrato y no tienen
- * componente todavía (`categories` lo tiene desde H07). Devuelven `null` limpiamente en lugar de inventar
- * contenido: una sección de «síguenos» con enlaces que nadie configuró es peor
- * que no tenerla.
+ * `newsletter` está declarada en el contrato y no tiene componente (`categories`
+ * lo tiene desde H07 y `business-info` desde P09). Devuelve `null` limpiamente
+ * en lugar de inventar contenido: un formulario de suscripción que no persiste
+ * nada ni recoge un consentimiento es peor que no tenerlo — pide un correo y lo
+ * tira.
+ *
+ * Y `business-info` devuelve `null` **también**, pero por otro motivo: cuando el
+ * comercio no escribió ni una forma de contacto. Las dos cosas se ven igual
+ * desde fuera y no son lo mismo: una es una sección sin construir y la otra es
+ * una sección que se calla porque no tiene nada cierto que decir.
  */
 
 /** Aplica el tope de la tienda, si lo hay. Sin tope, la lista entera. */
@@ -320,7 +327,16 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
    */
   trust: (data) => <BrandTrustStrip brands={data.brands} storeSlug={data.storeSlug} />,
 
-  // Declaradas en el contrato, sin componente todavía. Ver la cabecera.
-  'business-info': () => null,
+  /**
+   * Quién es este comercio y cómo se le encuentra (Storefront V2 · P09).
+   *
+   * Devuelve `null` sin una sola forma de contacto: ver el componente, que es
+   * donde vive esa decisión y su porqué.
+   */
+  'business-info': (data) => (
+    <StoreBusinessInfo store={data.store} storeSlug={data.storeSlug} pages={data.paginas} />
+  ),
+
+  // Declarada en el contrato, sin componente. Ver la cabecera.
   newsletter: () => null,
 }

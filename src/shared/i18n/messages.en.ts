@@ -331,6 +331,9 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.contact.phone': 'Phone',
     'store.contact.email': 'Email',
     'store.contact.address': 'Address',
+    // P09 · The `business-info` section.
+    'store.business.title': 'About this store',
+    'store.business.pages': 'More information',
     // --- Cart and checkout (P06) -----------------------------------------
     'store.cart.emptyBody': 'Add products from the catalog and they will show up here.',
     'store.cart.each': 'each',

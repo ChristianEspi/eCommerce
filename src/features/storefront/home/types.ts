@@ -124,6 +124,16 @@ export interface HomeSectionData {
    */
   readonly categoryMedia: ComponentProps<typeof ContentBlocks>['categoryMedia']
 
+  /**
+   * Las páginas que el comercio publicó y marcó para el menú (P09).
+   *
+   * Las pinta `business-info`. Salen de la MISMA consulta que ya hace el pie
+   * —misma clave de caché—, así que encender la sección no cuesta una petición
+   * más. Y son las publicadas y vigentes: la función de base no devuelve
+   * borradores ni páginas fuera de su ventana.
+   */
+  readonly paginas: readonly { readonly slug: string; readonly title: string }[]
+
   readonly brands: ComponentProps<typeof BrandRow>['brands']
   readonly brandSelected: string | null
 

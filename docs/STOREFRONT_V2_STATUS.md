@@ -1090,7 +1090,7 @@ Ciclos correctivos usados: **0 de 3**.
 
 # P08 · Rankings y copy alineados con los datos
 
-**Commit:** `<pendiente>` · **Ciclos correctivos:** 2 de 3
+**Commit:** `dffcac9` · **Ciclos correctivos:** 2 de 3
 
 ## El problema
 
@@ -1192,6 +1192,95 @@ había que actualizar a conciencia** —que es justo para lo que existen—:
 | `npm run typecheck` | **PASS** |
 | `npm run lint` | **PASS** |
 | `npm run test` | **PASS** — 294 ficheros, 5807 tests |
+| `npm run build` | **PASS** |
+
+`PHASE_RESULT: PASS`
+
+---
+
+# P09 · Pie e información pública del negocio
+
+**Commit:** `<pendiente>` · **Ciclos correctivos:** 1 de 3
+
+## El problema
+
+`'business-info': () => null`.
+
+La sección estaba declarada en el contrato, aparecía en el editor de portada del
+backoffice con su nombre traducido… y con el interruptor **desactivado**, en la
+lista de «todavía no disponible». Un comercio la veía y no podía hacer nada con
+ella. No pintaba nada porque no había nada que pintar.
+
+Y sí había qué pintar: nombre comercial, correo, teléfono, dirección y páginas
+publicadas llevaban meses en `store_settings` y en el CMS, y el pie ya los usa.
+
+## Lo que se hizo
+
+### `StoreBusinessInfo`, la sección que se calla
+
+Banda tintada con dos columnas: a la izquierda quién es el comercio —nombre,
+descripción y sus páginas publicadas como enlaces—, a la derecha cómo se le
+encuentra —correo, teléfono y dirección, cada uno rotulado—.
+
+**Devuelve `null` cuando no hay ni una forma de contacto.** No es un caso
+defensivo, es la regla: sin correo, teléfono ni dirección, la sección sería el
+nombre y la descripción que el visitante ya leyó en la cabecera, ocupando el
+sitio de algo que sí vende. Las páginas acompañan pero **no la sostienen**: el
+pie ya las lista, y media portada repitiendo el pie no informa de nada nuevo.
+
+Nada se cablea. Ni «Quiénes somos», ni «Envíos y devoluciones», ni un horario,
+ni una red social, ni un método de pago. Las páginas son exactamente las que
+devuelve `store_navigation_for_slug` —publicadas, dentro de su ventana, del
+canal público y marcadas para el menú—, y una con el título en blanco no se
+enlaza: sería un destino invisible.
+
+### Se puede encender
+
+`business-info` sale de `SIN_IMPLEMENTAR` en el editor de portada. Sigue
+**apagada por defecto** en los cuatro temas, que es otra cosa: ahí decide el
+comercio. `newsletter` se queda en la lista, y se queda por un motivo escrito:
+no hay dónde guardar una suscripción ni su consentimiento, y un formulario que
+pide un correo y lo tira es peor que no ofrecerlo.
+
+### Sin una petición más
+
+Las páginas llegan por `useStoreNavigation`, la **misma consulta con la misma
+clave** que ya hace el pie. Encender la sección no añade tráfico: lo comparte.
+
+### El pie
+
+Ya estaba enriquecido desde P05 —identidad, contacto, familias y páginas, cada
+bloque desapareciendo entero si su dato no existe— y su regla anti-invención
+estaba cubierta por pruebas. Lo que faltaba era fijar su **estructura**, que es
+lo que usa quien navega por regiones: un solo `contentinfo`, los cuatro rótulos
+en nivel dos colgando de la página, las dos navegaciones distinguidas por su
+nombre y ni un enlace sin texto o con un destino que no lleva a ninguna parte.
+
+## Ciclo correctivo
+
+1. La tienda de prueba infería sus campos como `null` —todos empezaban en
+   `null`—, así que `Partial<typeof TIENDA>` rechazaba cualquier valor real y
+   `typecheck` cayó en nueve puntos. Resuelto tipando la constante con el tipo
+   **real de la prop** (`ComponentProps<typeof StoreBusinessInfo>['store']`), no
+   añadiendo un `as`: el fixture ahora está atado al componente y se romperá si
+   la prop cambia, que es justo lo que se quiere de un fixture.
+
+## Tests
+
+| Archivo | Casos |
+|---|---|
+| `components/StoreBusinessInfo.test.tsx` | **Nuevo**, 18. Correo pulsable; teléfono marcable con el número saneado y el texto intacto; la dirección no finge ser un enlace; cada canal dice lo que es; el nombre comercial manda; las páginas enlazan a las reales y **nada más** que ellas; sin páginas no hay navegación vacía; una página sin título no se enlaza; tope de cuatro; **sin contacto no se pinta**, tampoco con descripción y páginas; espacios cuentan como vacío; un solo canal no deja los otros dos en blanco; ni horario, ni red social, ni método de pago, ni un enlace fuera del dominio; región con nombre y encabezado de nivel dos; iconos no anunciados. |
+| `home/HomeComposer.test.tsx` | +2. Encendida sin contacto sigue sin pintar —lo que distingue «se calla» de «no está hecha»—; con contacto pinta la sección, el correo y sus páginas. El caso de «secciones sin componente» pasa a ser solo `newsletter`. |
+| `components/StoreFooter.test.tsx` | +4. Un solo `contentinfo`; los rótulos en nivel dos y en orden; ni un enlace vacío, con `href="#"` o fuera del dominio; las dos navegaciones se distinguen por su nombre. |
+| `settings/storefront-design.test.tsx` | +1. «Datos del negocio» ya se puede encender; «Boletín» sigue desactivado. |
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 295 ficheros, 5832 tests |
 | `npm run build` | **PASS** |
 
 `PHASE_RESULT: PASS`

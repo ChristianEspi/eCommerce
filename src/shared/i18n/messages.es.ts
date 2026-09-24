@@ -288,6 +288,10 @@ export const es = {
     'store.contact.phone': 'Teléfono',
     'store.contact.email': 'Correo',
     'store.contact.address': 'Dirección',
+    // P09 · La sección `business-info`. «Sobre la tienda» y no «Sobre
+    // nosotros»: lo escribe la plataforma, y quien habla aquí es el comercio.
+    'store.business.title': 'Sobre la tienda',
+    'store.business.pages': 'Más información',
     // --- Carrito y checkout (P06) ----------------------------------------
     'store.cart.emptyBody': 'Agrega productos del catálogo y aparecerán aquí.',
     'store.cart.each': 'c/u',

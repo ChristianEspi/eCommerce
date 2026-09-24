@@ -111,8 +111,13 @@ export const DEFAULT_THEME_PRESET: ThemePreset = 'universal'
  *  · `featured` va HOY dentro de `offers`: `OffersFeaturedBand` pinta lo
  *    rebajado y lo destacado en la misma banda. Separarlas es una decisión de
  *    P06, no un valor por defecto.
- *  · `business-info` y `newsletter` no tienen componente todavía. Declaradas y
- *    apagadas: cuando existan, se encienden sin tocar el contrato.
+ *  · `business-info` tiene componente desde P09, y sigue apagada: es el
+ *    comercio quien decide si quiere repetir su contacto a media portada, y
+ *    encenderla de oficio añadiría una sección que nadie pidió a todas las
+ *    tiendas que ya existen.
+ *  · `newsletter` no tiene componente: no hay dónde guardar una suscripción ni
+ *    su consentimiento. Declarada y apagada; cuando exista, se enciende sin
+ *    tocar el contrato.
  */
 const SECCIONES_HEREDADAS: readonly HomeSectionConfig[] = [
   { id: 'hero', enabled: true },

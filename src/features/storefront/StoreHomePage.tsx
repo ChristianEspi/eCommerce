@@ -34,6 +34,7 @@ import {
   useSignedThumbnails,
   useStoreContent,
   useStorefront,
+  useStoreNavigation,
   useStorePromotions,
 } from './hooks'
 import { categoryBarItems, categoryTrail, rollUpCategoryCounts } from './categoryTree'
@@ -671,6 +672,16 @@ export function StoreHomePage() {
     [categories.data, categoryMedia],
   )
 
+  /**
+   * Las páginas publicadas, para la sección `business-info` (P09).
+   *
+   * La MISMA consulta que hace el pie, con la misma clave: encender la sección
+   * no añade una petición, la comparte. Y sale de una función de base que solo
+   * devuelve páginas publicadas, dentro de su ventana y del canal público, así
+   * que aquí no hay nada que filtrar.
+   */
+  const navegacion = useStoreNavigation(storeSlug)
+
   const datosPortada: HomeSectionData = {
     store,
     storeSlug,
@@ -710,6 +721,7 @@ export function StoreHomePage() {
     promoAssets: assetsPromos,
     categorias: familias,
     categoryMedia,
+    paginas: navegacion.data ?? [],
     brands: brandOptions,
     brandSelected: brand,
     // Lo mismo que ya sabe la banda de ofertas, sin preguntarlo dos veces.

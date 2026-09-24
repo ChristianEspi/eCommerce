@@ -66,7 +66,16 @@ const NOMBRE: Record<HomeSectionId, MessageKey> = {
 const SIN_IMPLEMENTAR: ReadonlySet<HomeSectionId> = new Set<HomeSectionId>([
   // `categories` salió de esta lista en H07: pinta las familias reales del
   // catálogo como puertas, y el comercio ya puede encenderla.
-  'business-info',
+  //
+  // `business-info` salió en P09. Pinta el nombre del negocio, sus canales de
+  // contacto y sus páginas publicadas, y se calla sola cuando el comercio no
+  // escribió ninguno — que es distinto de no estar implementada, aunque desde
+  // la vitrina se vea igual. Dejarla aquí habría sido tenerla construida y
+  // apagada bajo llave.
+  //
+  // `newsletter` se queda: no hay dónde guardar una suscripción ni su
+  // consentimiento, y un formulario que pide un correo y lo tira es peor que
+  // no ofrecerlo.
   'newsletter',
 ])
 

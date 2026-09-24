@@ -231,6 +231,14 @@ describe('ordenar la portada', () => {
     expect(screen.getByRole('checkbox', { name: 'Mostrar: Categorías' })).toBeEnabled()
   })
 
+  it('los datos del negocio ya se pueden encender (P09)', () => {
+    // Estuvo en el contrato y en esta pantalla desde el principio, apagada y
+    // sin poder encenderse. Ahora pinta contacto, nombre y páginas reales.
+    pintar()
+
+    expect(screen.getByRole('checkbox', { name: 'Mostrar: Datos del negocio' })).toBeEnabled()
+  })
+
   it('una sección sin componente todavía no se puede encender', () => {
     pintar()
 
