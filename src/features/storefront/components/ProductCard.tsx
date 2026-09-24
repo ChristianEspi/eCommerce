@@ -269,7 +269,18 @@ export function ProductCard({
           <IconButton
             size="small"
             aria-pressed={Boolean(favorite)}
-            aria-label={favorite ? t('store.favorite.remove') : t('store.favorite.add')}
+            /**
+             * El nombre del producto va DENTRO del nombre accesible (V3 · P14).
+             *
+             * Una rejilla de veinticuatro tarjetas tenía veinticuatro botones
+             * llamados «Guardar en favoritos»: quien la recorre con un lector de
+             * pantalla oía la misma frase veinticuatro veces sin saber de qué
+             * producto. El nombre del producto es lo único que los distingue.
+             *
+             * En `title` se queda el texto corto: es el aviso al pasar el ratón,
+             * y ahí el producto ya se está viendo.
+             */
+            aria-label={`${favorite ? t('store.favorite.remove') : t('store.favorite.add')}: ${product.name}`}
             title={favorite ? t('store.favorite.remove') : t('store.favorite.add')}
             onClick={() => onToggleFavorite(product.product_id)}
             sx={{
@@ -516,6 +527,10 @@ export function ProductCard({
           boxShadow: 'none',
           '&:hover': { boxShadow: 'none' },
         }}
+        // Igual que el corazón: el texto visible se queda corto —la tarjeta
+        // entera dice de qué producto es— y el nombre accesible lleva el
+        // producto, porque un lector de pantalla anuncia el botón solo.
+        aria-label={`${hasVariants ? t('store.product.chooseOptions') : t('store.product.addToCart')}: ${product.name}`}
       >
         {hasVariants ? t('store.product.chooseOptions') : t('store.product.addToCart')}
       </Button>

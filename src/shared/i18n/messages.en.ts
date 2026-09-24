@@ -1180,7 +1180,7 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'pim.bundle.title': 'Kit components',
     'pim.bundle.new': 'Add component',
     'pim.bundle.empty': 'This kit has no components yet',
-    'pim.bundle.needsKind': 'Switch the product type to “Kit” and save to define its recipe.',
+    'pim.bundle.needsKind': 'Switch the product type to “Kit” and save to define its components.',
     'pim.bundle.saveFirst': 'Save the product and you will be able to define its components here.',
     'pim.bundle.help': 'A kit has no stock of its own: it is derived from its components on sale.',
     'pim.bundle.assemblable': 'Kits that can be assembled right now',
@@ -4717,8 +4717,10 @@ export const en: Readonly<Record<MessageKey, string>> = {
   'aiQuotes.instruction.tooLong': 'Maximum 600 characters.',
   'aiQuotes.instruction.run': 'Interpret with AI',
   'aiQuotes.examples': 'Instruction examples',
-  'aiQuotes.example1': 'Quote Bodega San Juan 20 boxes of paracetamol 500 and 10 ibuprofen, valid 30 days',
-  'aiQuotes.example2': 'Quote for Farmacia Central: 12 cough syrup, deliver to the warehouse',
+  'aiQuotes.example1':
+    'Quote Bodega San Juan 20 boxes of reference A-100 and 10 of B-200, valid 30 days',
+  'aiQuotes.example2':
+    'Quote for Distribuidora Central: 12 units from the last order, deliver to the warehouse',
   'aiQuotes.costHint': 'Each interpretation uses one AI unit. Calculating prices is free.',
   'aiQuotes.interpreting': 'Interpreting the instruction…',
   'aiQuotes.networkError': 'The assistant could not be reached. You can pick the customer and products manually.',

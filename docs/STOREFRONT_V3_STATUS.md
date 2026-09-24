@@ -1942,3 +1942,124 @@ queda sin correr, y lo que falta no es código: es `npx playwright install
 chromium` y un entorno con `.env`.
 
 `PHASE_RESULT: PASS`
+
+---
+
+# P14 · Hardening final
+
+`ESTADO: PASS` · `PLAYWRIGHT: NOT_RUN`
+
+El informe completo está en [`STOREFRONT_V3_FINAL.md`](./STOREFRONT_V3_FINAL.md). Aquí queda lo que
+esta fase **encontró**, que es su razón de ser: una fase de cierre que no encuentra nada es una fase
+que no buscó.
+
+## Tres defectos reales, dos de ellos en producción
+
+### 1 · Copy de farmacia en el borrador de cotización con IA
+
+La auditoría multi-industria miraba `store.*` —lo que ve un comprador— y `settings.design.*`. Se
+amplió al **diccionario completo de los dos idiomas**, y ahí salió lo que ninguna comprobación
+anterior podía ver: **el español está partido en dos archivos** (`messages.es.ts` para la vitrina y
+`messages.es.backoffice.ts` para el panel) y solo se auditaba uno.
+
+Dentro estaban los ejemplos del borrador de cotización con IA:
+
+> «Cotización para **Farmacia** Central: 12 **jarabe para la tos**, entrega en almacén»
+> «Cotiza a Bodega San Juan 20 cajas de **paracetamol** 500 y 10 de **ibuprofeno**»
+
+Copy de producción, en las dos lenguas, que veía **todo** comercio de cualquier rubro. Un comercio
+de muebles leía «paracetamol» en su panel.
+
+Reescritos con referencias genéricas (`A-100`, `B-200`, «unidades del último pedido»), conservando
+la forma de la instrucción —a quién, cuánto, de qué, vigencia, entrega— que es lo que hace útil un
+ejemplo.
+
+### 2 · «Receta» en los kits
+
+`pim.bundle.needsKind` decía «guarda para definir su **receta**». Era la única palabra del
+diccionario que se leía como vocabulario de farmacia, y además **no coincidía con sus vecinas**: las
+otras siete líneas del mismo bloque dicen «componentes». Ahora dice lo mismo que ellas.
+
+### 3 · Veinticuatro botones con el mismo nombre
+
+La comprobación nueva —«ningún par de controles tabulables comparte nombre accesible»— encontró que
+la rejilla del catálogo tenía **veinticuatro botones llamados «Agregar al carrito»** y otros
+veinticuatro «Guardar en favoritos». Quien recorre la rejilla con un lector de pantalla oía la misma
+frase veinticuatro veces sin saber de qué producto.
+
+Ahora el nombre accesible lleva el producto —«Agregar al carrito: Silla de roble»— y el texto
+visible se queda corto, porque la tarjeta ya dice de qué producto es. Veinte consultas de prueba se
+adaptaron al nombre nuevo; **ninguna se debilitó**: siguen exigiendo el mismo texto, ahora por su
+principio.
+
+Es un defecto de V2, no de V3. Lo encontró la auditoría de cierre, que es para lo que existe.
+
+## La regla que se añade: R12
+
+`architecture.test.ts` gana una regla de arquitectura: **ningún archivo de la vitrina escribe
+`100vw` para medir**.
+
+`100vw` incluye el ancho de la barra de desplazamiento vertical, así que una caja de `100vw` mide
+más que el hueco disponible y aparece una barra horizontal **en toda la tienda**. Es un fallo de una
+línea, caro, y la vitrina tiene seis sitios que podrían cometerlo: cada sección a sangre. Desde P06
+el truco vive en un solo sitio y usa `50vw`; esta regla es lo que impide que vuelva a repartirse.
+
+La única excepción está nombrada en la prueba: un `maxWidth` es lo contrario de este fallo —un tope
+de ancho no provoca desbordamiento, lo evita— y lo usa el panel de sugerencias del buscador para no
+salirse en un teléfono.
+
+## Auditoría de seguridad de las tres migraciones V3
+
+Revisadas una por una: **ningún `SECURITY DEFINER`**; los seis validadores son `immutable` con
+`set search_path = ''`, con `revoke execute … from public` y GRANT explícito; escritura de las cinco
+columnas nuevas solo para `authenticated` —`anon` solo lee, y porque la vista pública es
+`security_invoker`—; las policies de tenant intactas; `public_stores` sin `organization_id`,
+`company_id`, `tax_rate`, `config`, estado de dominio ni identidad de correo; y **ninguna migración
+aplicada fue editada**.
+
+## Lo que se revisó y estaba bien
+
+Portada, cabecera, buscador, avisos, catálogo, ficha, vista rápida, favoritos, cajón y página de
+carrito, checkout, entradas de cuenta, bloques del CMS, taller de diseño y vista previa con foco y
+comparación: los 313 ficheros de prueba pasan, incluidos los recorridos completos de compra de
+consumidor, comercio y empresa.
+
+Accesibilidad ya cubierta y verde: un solo `h1` por página con todo encendido, skip link, `<main>`
+enfocable fuera del tabulador, buscador como landmark, cajón con foco atrapado y `Escape`,
+acordeones con `aria-expanded`, columna de filtros como `complementary` con nombre,
+`prefers-reduced-motion` respetado y contraste con `accent-deep` para texto.
+
+## El presupuesto, contra la línea base de P00
+
+| Recorrido | P00 | P14 | Techo |
+|---|---|---|---|
+| vitrina · portada | 398,8 | **398,8** | 405 |
+| vitrina · ficha | 377,1 | **391,2** | 400 |
+| vitrina · checkout | 397,8 | **403,2** | 430 |
+| backoffice · panel | 422,8 | **425,7** | 430 |
+
+**La portada termina exactamente donde empezó**, con catorce fases encima. Los tres aumentos están
+explicados en el informe final, uno por uno.
+
+## Tests
+
+| Archivo | Casos |
+|---|---|
+| `storefront/multi-industry.test.ts` | 11 → **14**. El diccionario COMPLETO de los dos idiomas, con lista de excepciones **vacía**; y una prueba de que las claves que V3 añadió existen, para que la auditoría no pase por estar vacía. |
+| `storefront/storefront-ui.test.tsx` | 70 → **74**. Un solo `h1` en portada, catálogo y ficha; la columna de filtros como región con nombre; **ningún par de controles tabulables con el mismo nombre**; y el detalle con `aria-expanded`. |
+| `architecture.test.ts` | +2. La regla R12 y su excepción nombrada. |
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 313 ficheros, 6289 tests |
+| `npm run build` | **PASS** |
+| `npm run bundle:report` | **PASS** — los cuatro dentro del techo |
+| `npm run scan:secrets` | **PASS** |
+| `npm run test:db` | **PASS** — 137 ficheros, 3653 tests |
+| Playwright | **NOT_RUN** — sin binario de navegador; causa y comandos en el informe final |
+
+`PHASE_RESULT: PASS`

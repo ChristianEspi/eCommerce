@@ -93,7 +93,7 @@ describe('la sección de exploración', () => {
     // La regla que da sentido a la sección: aquí no hay resultados que puedan
     // confundirse con los del filtro.
     pintar()
-    expect(within(seccion()).queryByRole('button', { name: 'Agregar al carrito' })).not.toBeInTheDocument()
+    expect(within(seccion()).queryByRole('button', { name: /^Agregar al carrito/ })).not.toBeInTheDocument()
     expect(seccion().querySelector('a[href*="/product/"]')).toBeNull()
   })
 

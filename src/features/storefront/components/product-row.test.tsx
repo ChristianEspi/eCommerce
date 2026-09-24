@@ -78,7 +78,7 @@ describe('la fila se adapta a cuántos productos hay', () => {
     expect(seccion).toHaveAttribute('data-row-count', String(n))
     // Las tarjetas son las COMPLETAS —con estado y botón— porque hay sitio: con
     // tres en fila no se está ojeando un escaparate, se está mirando lo que hay.
-    expect(within(seccion).getAllByRole('button', { name: 'Agregar al carrito' })).toHaveLength(n)
+    expect(within(seccion).getAllByRole('button', { name: /^Agregar al carrito/ })).toHaveLength(n)
     // Y la celda que cierra la fila, para que no quede medio ancho en blanco.
     expect(within(seccion).getByText('Recorre el catálogo')).toBeInTheDocument()
   })

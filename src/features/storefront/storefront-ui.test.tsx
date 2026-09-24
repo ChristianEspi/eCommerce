@@ -738,7 +738,7 @@ describe('catálogo', () => {
 describe('recorrer el catálogo', () => {
   it('el botón de volver arriba no existe hasta que hace falta', async () => {
     renderStorefront(backend(), '/s/casa-nordica')
-    await screen.findAllByRole('button', { name: 'Guardar en favoritos' })
+    await screen.findAllByRole('button', { name: /^Guardar en favoritos/ })
 
     // Arriba del todo no aporta nada y taparía una esquina del catálogo: ni
     // siquiera está en el árbol, así que tampoco en el orden de tabulación.
@@ -756,14 +756,14 @@ describe('favoritos', () => {
     const user = userEvent.setup()
     renderStorefront(backend(), '/s/casa-nordica?ver=todo')
 
-    const guardar = await screen.findAllByRole('button', { name: 'Guardar en favoritos' })
+    const guardar = await screen.findAllByRole('button', { name: /^Guardar en favoritos/ })
     expect(guardar[0]).toHaveAttribute('aria-pressed', 'false')
 
     await user.click(guardar[0]!)
 
     // El mismo botón cambia de nombre: «guardar» y «quitar» son dos acciones
     // distintas, y quien no ve el relleno del icono necesita oírlo.
-    const quitar = await screen.findByRole('button', { name: 'Quitar de favoritos' })
+    const quitar = await screen.findByRole('button', { name: /^Quitar de favoritos/ })
     expect(quitar).toHaveAttribute('aria-pressed', 'true')
 
     // Sin sesión el favorito vive en el navegador: es lo que hace que siga ahí
@@ -1618,5 +1618,88 @@ describe('la ficha ya no es una suma de tarjetas', () => {
     // quiere ir quien descarta esto.
     const salida = within(fila).getAllByRole('link', { name: /Ver todo/ })[0]
     expect(salida).toHaveAttribute('href', '/s/casa-nordica?c=sillas')
+  })
+})
+
+/**
+ * Storefront V3 · P14 · Accesibilidad de lo que V3 añadió, junto.
+ *
+ * Seis piezas nuevas con superficie de interacción —el cajón de filtros, la
+ * barra del catálogo, la barra de compra, la zona de detalle, la barra de avisos
+ * y el muro de logotipos— y cada una podía haber traído su propio fallo: un
+ * diálogo sin nombre, dos controles con el mismo nombre, un encabezado de más.
+ *
+ * Lo que se comprueba aquí es lo que no cubren las pruebas de cada fase por
+ * separado: que **al juntarlas** la página sigue teniendo un solo `h1` y que
+ * ningún par de controles tabulables comparte nombre accesible.
+ */
+describe('V3 no rompió el árbol de accesibilidad', () => {
+  /** Los nombres accesibles de los botones que se pueden tabular. */
+  function nombresDeBotones(): string[] {
+    return screen
+      .getAllByRole('button')
+      .filter((control) => control.getAttribute('tabindex') !== '-1')
+      .map((control) => (control.getAttribute('aria-label') ?? control.textContent ?? '').trim())
+      .filter((nombre) => nombre !== '')
+  }
+
+  it('la portada tiene un solo `h1` con todo encendido', async () => {
+    // El fallo clásico de una fase de UI: una sección nueva que se declara `h1`
+    // «porque es importante» y deja la página con dos.
+    renderStorefront(backend(), '/s/casa-nordica')
+    await screen.findByText('Silla de roble')
+
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+  })
+
+  it('el catálogo también, y su columna de filtros es una región con nombre', async () => {
+    renderStorefront(backend(), '/s/casa-nordica?ver=todo')
+    await screen.findByText('Silla de roble')
+
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+    // `aside` con nombre: es lo que permite saltársela con un lector de pantalla.
+    expect(await screen.findByRole('complementary', { name: 'Filtros' })).toBeInTheDocument()
+  })
+
+  it('en el catálogo ningún par de controles tabulables se llama igual', async () => {
+    /**
+     * Es la comprobación que cazó dos fallos reales de V3: la píldora que quita
+     * un filtro se llamaba igual que la que lo pone —efectos opuestos, mismo
+     * nombre— y la barra de compra duplicaba «Agregar al carrito».
+     *
+     * Se excluyen los nombres que llevan dentro el nombre de un producto: un
+     * botón de añadir por tarjeta es correcto y se distingue por ahí.
+     */
+    renderStorefront(backend(), '/s/casa-nordica?ver=todo&c=mesas')
+    await screen.findByText('Mesa extensible')
+
+    const cuenta = new Map<string, number>()
+    for (const nombre of nombresDeBotones()) {
+      cuenta.set(nombre, (cuenta.get(nombre) ?? 0) + 1)
+    }
+
+    const repetidos = [...cuenta.entries()]
+      .filter(([nombre, veces]) => veces > 1 && !/Silla|Mesa/.test(nombre))
+      .map(([nombre, veces]) => `${nombre} ×${veces}`)
+
+    expect(repetidos).toEqual([])
+  })
+
+  it('la ficha tiene un solo `h1` y su detalle son botones con estado', async () => {
+    renderStorefront(backend(), '/s/casa-nordica/product/silla-roble')
+    await screen.findByRole('heading', { level: 1, name: 'Silla de roble' })
+
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+
+    const detalle = await waitFor(() => {
+      const zona = document.querySelector('[data-product-details]')
+      expect(zona).not.toBeNull()
+      return zona as HTMLElement
+    })
+    // Cada apartado es un botón con `aria-expanded`: es lo que un lector de
+    // pantalla necesita para decir si está abierto.
+    for (const cabecera of within(detalle).getAllByRole('button')) {
+      expect(cabecera).toHaveAttribute('aria-expanded')
+    }
   })
 })

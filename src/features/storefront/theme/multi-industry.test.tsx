@@ -265,7 +265,7 @@ describe.each(ESCENARIOS)('$rubro con el tema $tema', (e) => {
     const user = userEvent.setup()
     await abrir(e, '/s/tienda?ver=todo')
 
-    const comprar = (await screen.findAllByRole('button', { name: 'Agregar al carrito' }))[0]
+    const comprar = (await screen.findAllByRole('button', { name: /^Agregar al carrito/ }))[0]
     expect(comprar).toBeEnabled()
     if (comprar) await user.click(comprar)
   })

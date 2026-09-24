@@ -288,7 +288,7 @@ describe('cuándo se abre el carrito de servidor', () => {
     // Se ancla en la ficha ya pintada: eso prueba que el provider montó y que
     // sus efectos corrieron. Sin la espera, el test pasaría por llegar antes de
     // la llamada en vez de por que no la haya.
-    expect(await screen.findByRole('button', { name: 'Agregar al carrito' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /^Agregar al carrito/ })).toBeInTheDocument()
 
     expect(llamadas()).toBe(0)
   })
@@ -298,7 +298,7 @@ describe('cuándo se abre el carrito de servidor', () => {
     const { fake, llamadas } = backendContando()
     renderStorefront(fake, '/s/casa-nordica/product/silla-roble')
 
-    await user.click(await screen.findByRole('button', { name: 'Agregar al carrito' }))
+    await user.click(await screen.findByRole('button', { name: /^Agregar al carrito/ }))
 
     await waitFor(() => expect(llamadas()).toBe(1))
   })
@@ -345,7 +345,7 @@ describe('de la ficha al carrito', () => {
     ]
     renderStorefront(fake, '/s/casa-nordica/product/silla-roble')
 
-    await user.click(await screen.findByRole('button', { name: 'Agregar al carrito' }))
+    await user.click(await screen.findByRole('button', { name: /^Agregar al carrito/ }))
 
     expect(await screen.findByText('No quedan tantas unidades. Prueba con menos.')).toBeInTheDocument()
     // Y no entra: el carrito sigue vacío.
@@ -367,7 +367,7 @@ describe('de la ficha al carrito', () => {
     }
     renderStorefront(fake, '/s/casa-nordica/product/silla-roble')
 
-    await user.click(await screen.findByRole('button', { name: 'Agregar al carrito' }))
+    await user.click(await screen.findByRole('button', { name: /^Agregar al carrito/ }))
 
     expect(await screen.findByText('Añadido al carrito')).toBeInTheDocument()
   })
@@ -376,7 +376,7 @@ describe('de la ficha al carrito', () => {
     const user = userEvent.setup()
     renderStorefront(backend(), '/s/casa-nordica/product/silla-roble')
 
-    await user.click(await screen.findByRole('button', { name: 'Agregar al carrito' }))
+    await user.click(await screen.findByRole('button', { name: /^Agregar al carrito/ }))
 
     expect(await screen.findByText('Añadido al carrito')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: /^Carrito$/ })).not.toBeInTheDocument()
@@ -395,7 +395,7 @@ describe('de la ficha al carrito', () => {
     // El bloque de compra es un `group` con nombre, así que se acota ahí.
     const buyBox = await screen.findByRole('group', { name: 'Comprar' })
     await user.click(within(buyBox).getByRole('button', { name: 'Sumar una unidad' }))
-    await user.click(within(buyBox).getByRole('button', { name: 'Agregar al carrito' }))
+    await user.click(within(buyBox).getByRole('button', { name: /^Agregar al carrito/ }))
 
     await waitFor(() => {
       const guardado = localStorage.getItem(`ebim.ecommerce.cart.v1:${STORE}`)
