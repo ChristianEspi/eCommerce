@@ -50,12 +50,30 @@ export function OffersFeaturedBand({
   const { t } = useI18n()
   if (offers.length === 0 && featured.length === 0) return null
 
+  /**
+   * Storefront V2 · P06 · Dos columnas SOLO si hay dos cosas que poner.
+   *
+   * La banda repartía siempre 5fr para lo rebajado y 7fr para lo destacado. Con
+   * las dos mitades llenas está bien; con una sola —una tienda que empieza, o
+   * un comercio que separó lo destacado a su propia fila— la mitad vacía se
+   * quedaba reservada y la banda salía con un 40 % o un 58 % de blanco al lado
+   * de su contenido.
+   *
+   * No es un caso raro: es el estado normal de una tienda con pocos productos,
+   * que es justo cuando peor sienta.
+   */
+  const ambas = offers.length > 0 && featured.length > 0
+
   return (
     <Box
+      data-offers-band={ambas ? 'both' : offers.length > 0 ? 'offers' : 'featured'}
       sx={{
         display: 'grid',
         gap: { xs: 2.5, md: 3 },
-        gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 5fr) minmax(0, 7fr)' },
+        gridTemplateColumns: {
+          xs: '1fr',
+          md: ambas ? 'minmax(0, 5fr) minmax(0, 7fr)' : '1fr',
+        },
         alignItems: 'start',
       }}
     >
@@ -91,7 +109,13 @@ export function OffersFeaturedBand({
             sx={{
               display: 'grid',
               gap: 1.25,
-              gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(3, minmax(0, 1fr))' },
+              // Tantas columnas como ofertas haya, hasta tres. Con una sola, un
+              // `repeat(3)` fijo dejaba dos huecos a su derecha — y con la
+              // banda ya en una columna, esos huecos ocupaban media pantalla.
+              gridTemplateColumns: {
+                xs: offers.length === 1 ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+                sm: `repeat(${Math.min(offers.length, 3)}, minmax(0, 1fr))`,
+              },
             }}
           >
             {offers.slice(0, 3).map((product) => (

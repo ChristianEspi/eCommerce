@@ -211,8 +211,18 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
     />
   ),
 
+  /**
+   * Novedades, sobre un tinte (P06).
+   *
+   * El tinte no es adorno: la portada encadenaba título-tarjetas,
+   * título-tarjetas, título-tarjetas, y cuatro filas idénticas seguidas se
+   * recorren como una lista sin fin. Alternar el fondo entre filas es lo que
+   * deja ver dónde acaba una sección y empieza la siguiente, sin meter una
+   * línea divisoria en cada hueco.
+   */
   'new-arrivals': (data, maxItems) => (
     <ProductRow
+      tone="tinted"
       title={data.t('store.row.new')}
       eyebrow={data.t('store.row.newEyebrow')}
       subtitle={data.t('store.row.newSubtitle')}

@@ -2347,6 +2347,11 @@ export const es = {
     'store.categories.shopBy': 'Compra por categoría',
     'store.categories.seeWhole': 'Ver toda la familia',
     'store.row.seeAll': 'Ver todo',
+    // La celda que cierra una fila corta (Storefront V2 · P06). No afirma que
+    // haya más productos —en una tienda con dos sería falso—: invita a recorrer
+    // el catálogo, que es lo único que promete y lo único que hace.
+    'store.row.exploreTitle': 'Recorre el catálogo',
+    'store.row.exploreBody': 'Busca, filtra y ordena todo lo publicado.',
     'store.catalog.back': 'Volver a la portada',
     'store.catalog.all': 'Todo el catálogo',
     'store.catalog.resultsFor': 'Resultados para',

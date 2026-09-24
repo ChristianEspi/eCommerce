@@ -226,6 +226,25 @@ export function StoreHomePage() {
       ),
     [ofertasPages.data, store.store_id],
   )
+
+  /**
+   * Storefront V2 · P06 · Lo rebajado CON FOTO va primero.
+   *
+   * La portada de producto es media pantalla de imagen. Con un rebajado sin
+   * foto abría con un marcador gris del tamaño de la cubierta —lo peor que
+   * puede enseñar una tienda en su primera pantalla— mientras el siguiente
+   * rebajado, que sí tenía foto, esperaba su turno en la banda de ofertas.
+   *
+   * No se DESCARTA nada ni se cambia qué está rebajado: solo se ordena. El
+   * orden es estable —los que tienen foto conservan el suyo entre ellos, y los
+   * que no, el suyo— así que una tienda sin ninguna foto ve exactamente lo que
+   * veía, y la banda de ofertas sigue recibiendo a todos.
+   */
+  const ofertasPorMedia = useMemo(() => {
+    const conFoto = ofertas.filter((producto) => Boolean(producto.primary_image_path))
+    const sinFoto = ofertas.filter((producto) => !producto.primary_image_path)
+    return [...conFoto, ...sinFoto]
+  }, [ofertas])
   const rebajadosThumbs = useSignedThumbnails(ofertas.map((p) => p.primary_image_path))
   const prefetchProduct = usePrefetchProduct(store.store_id)
 
@@ -296,7 +315,7 @@ export function StoreHomePage() {
       return elegidos
     }
 
-    const rebajados = ofertas
+    const rebajados = ofertasPorMedia
     return {
       hero: tomar(rebajados, heroReserva),
       ofertas: tomar(rebajados, 3),
@@ -304,7 +323,7 @@ export function StoreHomePage() {
       novedades: tomar(novedades, 12),
       masVendido: tomar(products, 12),
     }
-  }, [ofertas, products, novedades, heroReserva])
+  }, [ofertasPorMedia, products, novedades, heroReserva])
 
 
   /**

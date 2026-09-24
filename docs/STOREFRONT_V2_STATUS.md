@@ -901,3 +901,101 @@ Ciclos correctivos usados: **1 de 3** — al quitar el uso de `style` en la cabe
 sin leer; se retiró junto con su comentario, que ya no describía lo que hacía el componente.
 
 `PHASE_RESULT: PASS`
+
+---
+
+# P06 — Home Merchandising V2
+
+**HEAD inicial:** `4ce721b` · **Sin migración.**
+
+## El problema, con números
+
+La fila de productos pintaba siempre lo mismo: un carrusel de tarjetas de 168 px. Con veinte
+productos está bien. Con **uno**, la portada enseñaba una tarjeta pequeña pegada al margen izquierdo
+y **mil doscientos píxeles de blanco** a su derecha, debajo de un título que prometía una sección.
+
+Eso no se lee como «esta tienda tiene una oferta»: se lee como una tienda rota. Y le pasa a toda
+tienda que empieza, que es justo cuando peor sienta.
+
+## Las tres composiciones de la fila
+
+La regla es una sola: **la fila ocupa su ancho con lo que de verdad tiene**. Nunca se rellena con
+productos repetidos, inventados ni traídos de otra sección — eso sería mentir sobre el catálogo.
+
+| Productos | Composición | Por qué |
+|---|---|---|
+| 0 | no se pinta | una sección vacía es peor que una sección menos |
+| 1–3 | rejilla de `n + 1` columnas, con tarjetas **grandes** y **completas** | las columnas se reparten entre lo que hay más una puerta al catálogo; la fila queda cuadrada |
+| 4–6 | rejilla de `n` columnas | ya llenan la fila |
+| 7+ | carrusel | una rejilla se partiría en filas desiguales —seis arriba, una abajo— |
+
+Con 1–3 las tarjetas son las **completas** (estado y botón de comprar), no la versión reducida: con
+tres productos en fila no se está ojeando un escaparate, se está mirando lo que hay.
+
+### La celda que cierra la fila corta
+
+Un enlace de altura completa, con trazo discontinuo, que dice «Recorre el catálogo · Busca, filtra y
+ordena todo lo publicado». **No afirma que haya más productos** —en una tienda con dos sería falso—
+ni inventa recomendaciones: promete lo único que hace, llevar al catálogo. Hay una prueba que
+comprueba que la fila no contiene «hay más», «más productos» ni «otros N».
+
+## La banda de ofertas reservaba media pantalla vacía
+
+`OffersFeaturedBand` repartía siempre 5fr para lo rebajado y 7fr para lo destacado. Con las dos
+mitades llenas está bien; con una sola —una tienda que empieza, o un comercio que separó lo destacado
+a su propia fila— la mitad vacía **se quedaba reservada**: 40 % o 58 % de blanco al lado del
+contenido. Ahora la banda usa una columna cuando solo hay una cosa que poner
+(`data-offers-band="both" | "offers" | "featured"`).
+
+Y su rejilla interna era `repeat(3)` fija: con una sola oferta dejaba dos huecos. Ahora son tantas
+columnas como ofertas haya, hasta tres.
+
+## La portada abre con una foto, no con un marcador gris
+
+La portada de producto es media pantalla de imagen. Con un rebajado **sin foto** abría con un
+rectángulo gris del tamaño de la cubierta —lo peor que puede enseñar una tienda en su primera
+pantalla— mientras el siguiente rebajado, que sí tenía foto, esperaba su turno en la banda.
+
+Ahora lo rebajado con foto va primero. **No se descarta nada ni se cambia qué está rebajado: solo se
+ordena**, y el orden es estable, así que una tienda sin ninguna foto ve exactamente lo que veía y la
+banda de ofertas sigue recibiendo a todos.
+
+Con esto, la cadena de reserva de la cubierta queda completa: cubierta del CMS → banner de la tienda
+→ producto rebajado **con buena media** → composición editorial con el lema → degradado del acento.
+
+## Ritmo: cuatro filas iguales se leen como una lista sin fin
+
+La portada encadenaba título-tarjetas, título-tarjetas, título-tarjetas. `ProductRow` gana un
+`tone`: `plain` (el de siempre) o `tinted`, que la apoya en un tinte muy bajo del acento. Lo usa
+`new-arrivals`, así que la portada alterna fondo entre secciones y se ve dónde acaba una y empieza la
+siguiente, sin meter una línea divisoria en cada hueco. **Quien decide el ritmo es el registro de
+secciones**, que es el único que sabe qué va antes y después.
+
+## Lo que NO cambió, a propósito
+
+- **La deduplicación.** El reparto que impide que el mismo producto salga en cuatro sitios sigue
+  donde estaba, y hay pruebas nuevas de que con uno o dos productos se pinta cada uno **una vez**.
+- **El CMS como fuente editorial.** Nada de lo anterior sustituye un bloque del comercio: si el CMS
+  trae cubierta, no se pinta ninguna de las dos portadas, como antes.
+- **Los umbrales son de diseño, no dogma.** 3 y 6 salen del ancho real de una tarjeta contra los
+  1320 px del contenedor de P05.
+
+## Tests
+
+`components/product-row.test.tsx`, **nuevo**, 15 casos: 0 no pinta; 1, 2 y 3 dan `spotlight` con
+tarjetas completas y puerta al catálogo; 4, 5 y 6 dan `grid` sin puerta; 7+ da `carousel`; cargando no
+finge rejilla; la puerta enlaza y no afirma cantidades; el tono cambia el fondo; y **con uno se pinta
+uno, no tres copias**.
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 292 ficheros, 5774 tests |
+| `npm run build` | **PASS** |
+
+Ciclos correctivos usados: **0 de 3**.
+
+`PHASE_RESULT: PASS`
