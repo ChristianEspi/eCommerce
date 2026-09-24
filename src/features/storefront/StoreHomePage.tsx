@@ -229,43 +229,6 @@ export function StoreHomePage() {
   const rebajadosThumbs = useSignedThumbnails(ofertas.map((p) => p.primary_image_path))
   const prefetchProduct = usePrefetchProduct(store.store_id)
 
-  /**
-   * Ningún producto sale dos veces en la portada.
-   *
-   * Cinco secciones tiran de tres consultas —lo rebajado, lo reciente y la
-   * primera página del catálogo—, y en una tienda pequeña las tres devuelven
-   * casi lo mismo: el mismo frasco aparecía en el hero, en «Ofertas de la
-   * semana», en «Productos destacados» y en «Novedades». Eso no se lee como
-   * cuatro secciones, se lee como una tienda con cuatro productos.
-   *
-   * Se reparten por ORDEN DE PRIORIDAD, que es el orden en que se leen: el
-   * hero coge primero, y cada sección siguiente se queda con lo que nadie ha
-   * usado. Si a una no le queda nada, desaparece — mejor una sección menos que
-   * una sección que repite.
-   */
-  const secciones = useMemo(() => {
-    const usados = new Set<string>()
-    const tomar = (lista: readonly PublicProduct[], cuantos: number) => {
-      const elegidos: PublicProduct[] = []
-      for (const producto of lista) {
-        if (elegidos.length >= cuantos) break
-        if (usados.has(producto.product_id)) continue
-        usados.add(producto.product_id)
-        elegidos.push(producto)
-      }
-      return elegidos
-    }
-
-    const rebajados = ofertas
-    return {
-      hero: tomar(rebajados, 4),
-      ofertas: tomar(rebajados, 3),
-      destacados: tomar(products, 12),
-      novedades: tomar(novedades, 12),
-      masVendido: tomar(products, 12),
-    }
-  }, [ofertas, products, novedades])
-
   const blocks = content.data?.cms ? (content.data.blocks ?? []) : []
   const hasCmsHero = blocks.some((block) => block.type === 'hero')
   /**
@@ -284,6 +247,65 @@ export function StoreHomePage() {
     (block) => block.type === 'hero' || (block.type === 'slider' && block.items.length > 0),
   )
   const cmsTraeProductos = blocks.some((block) => block.items.length > 0)
+
+  /**
+   * Ningún producto sale dos veces en la portada.
+   *
+   * Cinco secciones tiran de tres consultas —lo rebajado, lo reciente y la
+   * primera página del catálogo—, y en una tienda pequeña las tres devuelven
+   * casi lo mismo: el mismo frasco aparecía en el hero, en «Ofertas de la
+   * semana», en «Productos destacados» y en «Novedades». Eso no se lee como
+   * cuatro secciones, se lee como una tienda con cuatro productos.
+   *
+   * Se reparten por ORDEN DE PRIORIDAD, que es el orden en que se leen: el
+   * hero coge primero, y cada sección siguiente se queda con lo que nadie ha
+   * usado. Si a una no le queda nada, desaparece — mejor una sección menos que
+   * una sección que repite.
+   */
+  /**
+   * Cuántos productos se reserva la portada, y por qué puede ser CERO (P04).
+   *
+   * El reparto de abajo da por usado lo que el hero coge, para que el mismo
+   * producto no salga en cuatro sitios. Eso era correcto mientras la portada
+   * pintara siempre la de producto.
+   *
+   * Desde P04 hay dos composiciones: con `heroVariant: 'statement'` la portada
+   * es editorial y NO pinta producto, y si el CMS trae su propia cubierta no se
+   * pinta ninguna de las dos. En esos casos, reservar cuatro productos los
+   * apartaba de la banda de ofertas sin enseñarlos en ninguna parte — el
+   * producto rebajado desaparecía de la portada entera. Lo cazó la prueba de
+   * paridad de temas, que exige que el precio y el descuento sean los mismos en
+   * los cuatro.
+   *
+   * La decisión vive AQUÍ y no en el registro de secciones porque es la página
+   * quien tiene las listas completas: el registro recibe el reparto ya hecho.
+   */
+  const heroReserva =
+    tema.style.heroVariant === 'statement' || cmsTraePortada ? 0 : 4
+
+  const secciones = useMemo(() => {
+    const usados = new Set<string>()
+    const tomar = (lista: readonly PublicProduct[], cuantos: number) => {
+      const elegidos: PublicProduct[] = []
+      for (const producto of lista) {
+        if (elegidos.length >= cuantos) break
+        if (usados.has(producto.product_id)) continue
+        usados.add(producto.product_id)
+        elegidos.push(producto)
+      }
+      return elegidos
+    }
+
+    const rebajados = ofertas
+    return {
+      hero: tomar(rebajados, heroReserva),
+      ofertas: tomar(rebajados, 3),
+      destacados: tomar(products, 12),
+      novedades: tomar(novedades, 12),
+      masVendido: tomar(products, 12),
+    }
+  }, [ofertas, products, novedades, heroReserva])
+
 
   /**
    * El carrusel no repite lo que el comercio ya puso a mano.
@@ -585,6 +607,11 @@ export function StoreHomePage() {
   const datosPortada: HomeSectionData = {
     store,
     storeSlug,
+    // P04 · El tema resuelto. Dos controles del contrato eligen COMPOSICIÓN
+    // —`heroVariant` y `categoryVariant`— y eso no se puede resolver con una
+    // variable de CSS: son árboles de React distintos y quien decide qué se
+    // pinta es el registro de secciones.
+    theme: tema,
     t,
     hero: secciones.hero,
     ofertas: secciones.ofertas,
@@ -606,6 +633,8 @@ export function StoreHomePage() {
     categoryMedia,
     brands: brandOptions,
     brandSelected: brand,
+    // Lo mismo que ya sabe la banda de ofertas, sin preguntarlo dos veces.
+    hayOfertas: ofertas.length > 0,
     favorites: favorites.ids,
     cargandoNovedades: novedadesPages.isPending,
     cargandoCatalogo: results.isPending,

@@ -2302,6 +2302,9 @@ export const es = {
     'store.content.campaignWall': 'Ofertas de la semana',
     'store.hero.featured': 'Ofertas destacadas',
     'store.hero.buyNow': 'Comprar ahora',
+    // Las dos puertas de la portada editorial (Storefront V2 · P04).
+    'store.hero.browseCatalog': 'Ver el catálogo',
+    'store.hero.seeOffers': 'Ver lo rebajado',
     'store.promos.title': 'Ofertas vigentes',
     'store.promos.prev': 'Oferta anterior',
     'store.promos.next': 'Oferta siguiente',

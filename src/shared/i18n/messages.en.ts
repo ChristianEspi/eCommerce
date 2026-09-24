@@ -3065,6 +3065,8 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.content.campaignWall': 'This week deals',
     'store.hero.featured': 'Featured deals',
     'store.hero.buyNow': 'Buy now',
+    'store.hero.browseCatalog': 'Browse the catalogue',
+    'store.hero.seeOffers': 'See what is on sale',
     'store.promos.title': 'Live deals',
     'store.promos.prev': 'Previous deal',
     'store.promos.next': 'Next deal',

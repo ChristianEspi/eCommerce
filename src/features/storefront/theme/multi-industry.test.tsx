@@ -507,7 +507,11 @@ describe('las puertas de categoría con fotografía', () => {
     return screen.findByRole('region', { name: 'Compra por categoría' })
   }
 
-  it.each(['universal', 'retail', 'premium', 'catalog'])(
+  /**
+   * Los tres temas que piden AZULEJOS. `catalog` no está aquí y no es un olvido:
+   * desde P04 pide píldoras, y ahí la foto no cabe. Ver la prueba siguiente.
+   */
+  it.each(['universal', 'retail', 'premium'])(
     'en el tema %s la que tiene foto la enseña y la que no cae al tinte',
     async (tema) => {
       cleanup()
@@ -523,6 +527,32 @@ describe('las puertas de categoría con fotografía', () => {
       )
     },
   )
+
+  /**
+   * La otra mitad del contrato `categoryVariant`, cerrado en P04.
+   *
+   * `catalog` es el tema de quien tiene miles de referencias: sus familias son
+   * NAVEGACIÓN densa, no puertas. Una píldora de 36 px de alto no puede enseñar
+   * una fotografía —saldría una franja de tres píxeles— y forzarla sería el
+   * clásico «la opción existe pero no se nota». Aquí se fija que el tema cambia
+   * la COMPOSICIÓN y que, aun así, las dos familias siguen llegando a su
+   * catálogo filtrado.
+   */
+  it('en el tema catalog las familias son píldoras, y siguen llevando a su catálogo', async () => {
+    cleanup()
+    const seccion = await portadaConCategorias('catalog')
+
+    expect(seccion.querySelectorAll('[data-category-pill]').length).toBe(2)
+    expect(seccion.querySelector('[data-category-door]')).toBeNull()
+    expect(within(seccion).getByRole('link', { name: /Abrigos/ })).toHaveAttribute(
+      'href',
+      '/s/tienda?c=abrigos',
+    )
+    expect(within(seccion).getByRole('link', { name: /Camisas/ })).toHaveAttribute(
+      'href',
+      '/s/tienda?c=camisas',
+    )
+  })
 
   it('las dos siguen llevando al catálogo filtrado por su familia', async () => {
     const seccion = await portadaConCategorias('universal')

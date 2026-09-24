@@ -2,6 +2,7 @@ import { screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '@/test/render'
 import { CartProvider } from '../cart/CartProvider'
+import { DEFAULT_STORE_THEME } from '../theme/resolve'
 import { DEFAULT_HOME_LAYOUT } from '../theme/presets'
 import type { HomeLayout } from '../theme/types'
 import type { PublicProduct, PublicStore } from '../types'
@@ -64,6 +65,13 @@ function datos(overrides: Partial<HomeSectionData> = {}): HomeSectionData {
   return {
     store: STORE,
     storeSlug: 'botica',
+    /**
+     * El tema por defecto (`universal`), que es el que ve una tienda que nunca
+     * eligió nada. Desde P04 el registro lo necesita: `heroVariant` y
+     * `categoryVariant` eligen entre composiciones distintas, y sin tema no hay
+     * de dónde leerlas. Cada prueba que quiera otra composición lo pisa.
+     */
+    theme: DEFAULT_STORE_THEME,
     t: ((key: string) => key) as HomeSectionData['t'],
     hero: [producto('Jarabe Hero', 'p-hero')],
     ofertas: [producto('Crema Oferta', 'p-oferta')],
@@ -84,6 +92,7 @@ function datos(overrides: Partial<HomeSectionData> = {}): HomeSectionData {
     categorias: [],
     brands: [{ code: 'genfar', name: 'Genfar', count: 4 }],
     brandSelected: null,
+    hayOfertas: true,
     favorites: new Set<string>(),
     cargandoNovedades: false,
     cargandoCatalogo: false,

@@ -3,6 +3,7 @@ import type { MessageKey } from '@/shared/i18n/messages'
 import type { BrandRow } from '../components/BrandRow'
 import type { CategoryDoorGrid, ContentBlocks } from '../components/ContentBlocks'
 import type { PromoCarousel } from '../components/PromoCarousel'
+import type { ResolvedStoreTheme } from '../theme/resolve'
 import type { HomeSectionId } from '../theme/types'
 import type { PublicProduct, PublicStore } from '../types'
 
@@ -29,6 +30,27 @@ import type { PublicProduct, PublicStore } from '../types'
 export interface HomeSectionData {
   readonly store: PublicStore
   readonly storeSlug: string
+
+  /**
+   * El tema YA resuelto (Storefront V2 · P04).
+   *
+   * ## Por qué el registro necesita el tema y hasta P04 no lo tenía
+   *
+   * Porque dos controles del contrato eligen COMPOSICIÓN, no medidas:
+   * `heroVariant` decide entre dos portadas distintas y `categoryVariant` entre
+   * dos formas de enseñar las familias. Eso no se puede resolver con una
+   * variable de CSS —son árboles de React diferentes— y quien decide qué se
+   * pinta en la portada es este registro.
+   *
+   * Hasta P04 no llegaba, y la consecuencia era concreta: un tema podía
+   * declarar `heroVariant: 'statement'` y la portada seguía pintando la de
+   * producto. El contrato tenía dos opciones y una sola salida.
+   *
+   * Llega RESUELTO, no crudo: el preset, lo que la tienda pisó encima y los
+   * valores por defecto ya están aplicados, así que aquí no se decide qué hacer
+   * con lo que falta. Eso se resolvió una vez, en `resolveStoreTheme`.
+   */
+  readonly theme: ResolvedStoreTheme
   /**
    * La traducción, pasada como dato y no leída con un hook.
    *
@@ -89,6 +111,16 @@ export interface HomeSectionData {
 
   readonly brands: ComponentProps<typeof BrandRow>['brands']
   readonly brandSelected: string | null
+
+  /**
+   * ¿Hay algo rebajado ahora mismo?
+   *
+   * Lo sabe la página, que ya lo consultó para su banda de ofertas. La portada
+   * editorial lo usa para decidir si enseña su puerta a las ofertas, y NO lo
+   * vuelve a preguntar: una segunda consulta para pintar un botón es una
+   * petición por visita.
+   */
+  readonly hayOfertas: boolean
 
   readonly favorites: ReadonlySet<string>
   readonly cargandoNovedades: boolean

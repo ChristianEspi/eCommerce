@@ -6,6 +6,7 @@ import { TS } from '@/theme/tokens'
 import { iconoDe } from '../categoryIcon'
 import { tintFor } from '../tint'
 import { LoopingRow } from './LoopingRow'
+import { ScrollRow } from './ScrollRow'
 
 /**
  * Las puertas de categoría de la vitrina.
@@ -35,6 +36,28 @@ import { LoopingRow } from './LoopingRow'
  *
  * Ninguna de las dos mira el rubro del comercio. Lo que decide es si esa
  * categoría tiene foto, y eso lo decide quien vende.
+ */
+
+/**
+ * Las dos formas de enseñar las familias en la portada (contrato `categoryVariant`).
+ *
+ * ## Por qué son dos y no una con opciones
+ *
+ * Porque resuelven necesidades opuestas y eso se ve en la composición, no en el
+ * relleno:
+ *
+ *  · **`tiles`** son PUERTAS: azulejos altos con foto o tinte, icono y flecha.
+ *    Ocupan pantalla a cambio de decir a dónde llevan. Es lo que quiere una
+ *    tienda con ocho familias que se recorren mirando.
+ *  · **`pills`** son NAVEGACIÓN: una línea de píldoras compactas con su icono.
+ *    Caben treinta sin empujar el catálogo fuera de la primera pantalla, que es
+ *    exactamente lo que necesita quien tiene miles de referencias y sabe lo que
+ *    busca — el caso del tema `catalog`.
+ *
+ * Hasta P04 el contrato declaraba las dos y la portada pintaba SIEMPRE azulejos:
+ * `categoryVariant` no tenía consumidor. Las píldoras existían, pero solo en la
+ * vista de catálogo y como FILTRO, que es otra cosa —se encienden y se apagan—.
+ * Estas llevan a otro sitio, así que son enlaces.
  */
 
 /** Lo mínimo que una puerta necesita de una categoría, venga del CMS o del catálogo. */
@@ -118,6 +141,99 @@ export function CategoryDoorGrid({
         />
       )}
     </>
+  )
+}
+
+/**
+ * Las familias como PÍLDORAS: densas, en una línea, y enlaces.
+ *
+ * ## En qué se diferencia de la barra del catálogo
+ *
+ * En lo que hacen. La barra (`CategoryBar`) son `Chip` con `aria-pressed`: un
+ * filtro que se enciende y se apaga sobre la lista que ya se está mirando.
+ * Estas son `<a>`: llevan al catálogo filtrado por esa familia. Confundirlos
+ * tiene consecuencias de accesibilidad —un lector anuncia «botón, pulsado» o
+ * «enlace», y son dos promesas distintas— y de navegación: del enlace se vuelve
+ * con el botón de atrás.
+ *
+ * ## Y por qué llevan icono
+ *
+ * Porque una línea de treinta píldoras de texto gris no se recorre: todas pesan
+ * lo mismo. Con el icono de la familia delante, cada una se distingue por su
+ * silueta antes de leerla, que es la única forma de que una fila densa sirva
+ * para algo.
+ */
+export function CategoryPills({
+  categories,
+  storeSlug,
+  ariaLabel,
+}: {
+  categories: readonly CategoryDoorItem[]
+  storeSlug: string
+  ariaLabel?: string
+}) {
+  if (categories.length === 0) return null
+
+  return (
+    <ScrollRow component="nav" ariaLabel={ariaLabel} gap={1}>
+      {categories.map((category) => {
+        const tinte = tintFor(category.name)
+        const Icono = iconoDe(category.name)
+        return (
+          <Box
+            key={category.category_id}
+            component={Link}
+            to={`/s/${storeSlug}?c=${encodeURIComponent(category.slug)}`}
+            data-category-pill="true"
+            sx={{
+              flexShrink: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 0.875,
+              // Alto de píldora: la misma medida que la barra del catálogo, para
+              // que las dos filas se lean como la misma familia de controles.
+              height: 36,
+              pl: 0.75,
+              pr: 1.5,
+              borderRadius: 'var(--sf-pill)',
+              textDecoration: 'none',
+              border: `1px solid ${tinte.line}`,
+              bgcolor: tinte.bg,
+              color: tinte.fg,
+              transition: 'border-color .15s ease, transform .15s ease',
+              '@media (hover: hover)': {
+                '&:hover': { borderColor: tinte.fg, transform: 'translateY(-1px)' },
+              },
+              '@media (prefers-reduced-motion: reduce)': {
+                transition: 'none',
+                '&:hover': { transform: 'none' },
+              },
+            }}
+          >
+            <Box
+              aria-hidden
+              sx={{
+                width: 26,
+                height: 26,
+                display: 'grid',
+                placeItems: 'center',
+                borderRadius: '50%',
+                bgcolor: 'var(--card)',
+                color: tinte.fg,
+              }}
+            >
+              <Icono sx={{ fontSize: 16 }} />
+            </Box>
+            <Typography
+              component="span"
+              sx={{ fontSize: 13.5, fontWeight: 700, whiteSpace: 'nowrap' }}
+            >
+              {category.name}
+            </Typography>
+          </Box>
+        )
+      })}
+    </ScrollRow>
   )
 }
 

@@ -1,7 +1,8 @@
 import { BrandRow } from '../components/BrandRow'
 import { BrandTrustStrip } from '../components/BrandTrustStrip'
 import { Stack } from '@mui/material'
-import { CategoryDoorGrid, ContentBlocks } from '../components/ContentBlocks'
+import { CategoryDoorGrid, CategoryPills } from '../components/CategoryDoors'
+import { ContentBlocks } from '../components/ContentBlocks'
 import { OffersFeaturedBand } from '../components/OffersFeaturedBand'
 import { ProductRow } from '../components/ProductRow'
 import { PromoCarousel } from '../components/PromoCarousel'
@@ -45,25 +46,51 @@ function conTope<T>(lista: readonly T[], maxItems: number | undefined): readonly
 
 export const HOME_SECTIONS: HomeSectionRegistry = {
   /**
-   * La portada abre con una oferta CONCRETA si el catálogo tiene alguna; con el
-   * lema del comercio si no. Un degradado con una frase se ve bonito y no
-   * vende: no dice qué se compra ni a qué precio.
+   * La portada, en la composición que el comercio eligió (P04).
    *
-   * Y si el CMS trae su propia cubierta, no se pinta ninguna de las dos: dos
-   * portadas apiladas no son una portada más completa.
+   * ## Las dos salidas, y por qué el tema decide
+   *
+   * `heroVariant` es el control del contrato que elige entre dos portadas
+   * distintas de verdad:
+   *
+   *  · **`product`** abre con una oferta CONCRETA —foto, precio antes, precio
+   *    ahora—. Un degradado con una frase se ve bonito y no vende: no dice qué
+   *    se compra ni a qué precio.
+   *  · **`statement`** abre con la MARCA: imagen a sangre o el degradado del
+   *    acento, el lema a cuerpo grande y dos puertas. Es lo que quiere quien
+   *    vende por contemplación y no por rebaja — el caso de `premium`.
+   *
+   * Hasta P04 esto no se leía: la portada pintaba la de producto si había algo
+   * rebajado y el lema si no, así que `premium` declaraba `statement` y no lo
+   * usaba nunca. Ese era el control huérfano que esta fase cierra.
+   *
+   * ## `product` es una PREFERENCIA, no una orden
+   *
+   * Sin nada rebajado no hay portada de producto que pintar, así que cae a la
+   * editorial. La regla al revés no hace falta: la editorial se pinta siempre —
+   * el lema y el nombre de la tienda existen desde que la tienda existe.
+   *
+   * ## Y si el CMS trae su propia cubierta, no se pinta ninguna
+   *
+   * Dos portadas apiladas no son una portada más completa.
    */
   hero: (data: HomeSectionData, maxItems) => {
+    const editorial = data.cmsTraePortada ? null : (
+      <StoreHero store={data.store} storeSlug={data.storeSlug} hasOffers={data.hayOfertas} />
+    )
+
+    if (data.theme.style.heroVariant === 'statement') return editorial
+
     const productos = conTope(data.hero, maxItems)
-    if (productos.length > 0) {
-      return (
-        <StoreFeaturedHero
-          products={productos}
-          storeSlug={data.storeSlug}
-          thumbnails={data.thumbsOfertas}
-        />
-      )
-    }
-    return data.cmsTraePortada ? null : <StoreHero store={data.store} />
+    if (productos.length === 0) return editorial
+
+    return (
+      <StoreFeaturedHero
+        products={productos}
+        storeSlug={data.storeSlug}
+        thumbnails={data.thumbsOfertas}
+      />
+    )
   },
 
   /**
@@ -138,14 +165,35 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
   categories: (data, maxItems) => {
     const familias = conTope(data.categorias, maxItems)
     if (familias.length === 0) return null
+
+    /**
+     * P04 · `categoryVariant` elige entre dos composiciones, no entre dos
+     * rellenos:
+     *
+     *  · `tiles` son PUERTAS —azulejos altos con foto o tinte, icono y flecha—.
+     *    Ocupan pantalla a cambio de decir a dónde llevan.
+     *  · `pills` son NAVEGACIÓN densa: una línea que aguanta treinta familias
+     *    sin empujar el catálogo fuera de la primera pantalla. Es lo que pide
+     *    `catalog`, que hasta P04 lo declaraba y no lo conseguía.
+     */
+    const pills = data.theme.style.categoryVariant === 'pills'
+
     return (
       <Stack component="section" aria-label={data.t('store.categories.shopBy')} sx={{ gap: 1.5 }}>
         <SectionHeading title={data.t('store.categories.shopBy')} />
-        <CategoryDoorGrid
-          categories={familias}
-          storeSlug={data.storeSlug}
-          ariaLabel={data.t('store.categories.shopBy')}
-        />
+        {pills ? (
+          <CategoryPills
+            categories={familias}
+            storeSlug={data.storeSlug}
+            ariaLabel={data.t('store.categories.shopBy')}
+          />
+        ) : (
+          <CategoryDoorGrid
+            categories={familias}
+            storeSlug={data.storeSlug}
+            ariaLabel={data.t('store.categories.shopBy')}
+          />
+        )}
       </Stack>
     )
   },

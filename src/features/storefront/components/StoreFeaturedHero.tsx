@@ -86,6 +86,9 @@ export function StoreFeaturedHero({
       component="section"
       aria-roledescription="carousel"
       aria-label={t('store.hero.featured')}
+      // La otra mitad del contrato de `heroVariant`: esta es la composición
+      // orientada a producto. Ver `StoreHero` para la editorial.
+      data-hero-variant="product"
       onMouseEnter={() => setParado(true)}
       onMouseLeave={() => setParado(false)}
       onFocusCapture={() => setParado(true)}

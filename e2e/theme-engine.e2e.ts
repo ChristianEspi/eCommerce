@@ -37,6 +37,28 @@ test.describe('el tema de la tienda', () => {
     expect(vigilante.errores).toEqual([])
   })
 
+  /**
+   * Storefront V2 · P04 · La portada declara QUÉ composición pintó.
+   *
+   * Hasta P04, `heroVariant` no tenía consumidor: la portada elegía sola entre
+   * la de producto y la editorial según hubiera rebajas, y el tema no entraba
+   * en la decisión. Ahora la elige el contrato, y esto comprueba en un navegador
+   * de verdad que la decisión llega al DOM.
+   *
+   * No se fija CUÁL de las dos: eso depende del tema que tenga puesta la tienda
+   * de demostración y del catálogo del día. Lo que se fija es que sea una de las
+   * dos y que exista — si el atributo faltara, el control habría vuelto a
+   * quedarse sin salida y ninguna prueba de unidad lo notaría, porque allí el
+   * proveedor se monta a mano.
+   */
+  test('la portada declara su composición', async ({ page }) => {
+    await page.goto(TIENDA)
+    await esperarCatalogo(page)
+
+    const hero = page.locator('[data-hero-variant]').first()
+    await expect(hero).toHaveAttribute('data-hero-variant', /product|statement/)
+  })
+
   test('la vitrina no se desplaza en horizontal a 320 px', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 720 })
     await page.goto(TIENDA)

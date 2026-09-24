@@ -661,3 +661,124 @@ Ciclos correctivos usados: **3 de 3**, todos por causa raíz.
    verificados con una búsqueda de `https:///` en todo `src/`.
 
 `PHASE_RESULT: PASS`
+
+---
+
+# P04 — Cierre real del Theme Engine
+
+**HEAD inicial:** `878232b` · **Sin migración:** esta fase no toca la base. El contrato ya estaba en
+`store_settings` desde `20260910220000`; lo que faltaba era que la vitrina lo leyera.
+
+## Auditoría de consumidores (verificada, no supuesta)
+
+| Clave | Consumidor ANTES de P04 | Veredicto |
+|---|---|---|
+| `headerVariant` | `themeCssVars` (alto de barra) + `data-store-header` + CSS | efecto real |
+| `heroVariant` | presets, schema, normalize, types y el `<select>` del editor | **HUÉRFANO** |
+| `productCardVariant` | `data-store-cards` + 7 variables de CSS | efecto real |
+| `categoryVariant` | contrato + editor | **HUÉRFANO** |
+| `contentWidth` | `StorefrontLayout` (×2) y `StoreFooter` | efecto real |
+| `imageRatio` | `--sf-image-ratio` → `ProductMedia` | efecto real |
+| `sectionSpacing` | `--sf-section-gap`, `--sf-main-pad`, `data-store-spacing` | efecto real |
+
+Dos casillas del formulario no cambiaban nada: se podía elegir `statement` y la portada seguía
+pintando la de producto; se podía elegir `pills` y las familias seguían saliendo como azulejos.
+**`premium` declaraba `statement` desde P01 y nunca lo usó. `catalog` declaraba `pills` igual.**
+
+## Por qué estos dos no se podían resolver con CSS
+
+Los otros cinco son MEDIDAS: un alto, un ancho, una proporción, un aire. Viajan como variable o como
+atributo y la hoja de estilos hace el resto — que es lo que evita cuatro copias del storefront.
+
+`heroVariant` y `categoryVariant` no son medidas: eligen **árboles de React distintos**. Una portada
+de producto tiene carrusel, precio, tachado y botón de comprar; una editorial tiene una imagen a
+sangre, un lema y dos enlaces. No hay `--variable` que convierta una en otra. Por eso lo que hacía
+falta era que el **registro de secciones** —quien decide qué se pinta— recibiera el tema.
+
+## Lo que se hizo
+
+### 1. El tema llega al registro
+
+`HomeSectionData` gana `theme: ResolvedStoreTheme` (resuelto, no crudo: preset + lo pisado + defaults
+ya aplicados) y `hayOfertas: boolean` (lo que la página ya sabía por su banda de ofertas — no se
+vuelve a consultar).
+
+### 2. `heroVariant`, con dos composiciones de verdad
+
+- **`product`** → `StoreFeaturedHero`, con `data-hero-variant="product"`.
+- **`statement`** → `StoreHero`, con `data-hero-variant="statement"`, **ascendido de reserva a
+  portada elegible** y mejorado: ahora lleva dos puertas —«Ver el catálogo» y, solo si hay algo
+  rebajado, «Ver lo rebajado»—. Antes era un cartel del que no se salía: había que bajar hasta la
+  primera fila para entrar al catálogo.
+- **Sin precios en la editorial**, y el contrato de la fase lo pide con esas palabras. El precio se
+  resuelve con lista, canal, promociones y condiciones de la sesión; calcularlo en dos componentes
+  es cómo se llega a una portada que anuncia un importe que el carrito no respeta. El enlace a
+  ofertas es un enlace: lleva al catálogo filtrado y allí manda el resolvedor de siempre.
+- `product` sigue siendo una **preferencia, no una orden**: sin nada rebajado cae a la editorial.
+
+### 3. `categoryVariant`, con dos composiciones de verdad
+
+- **`tiles`** → `CategoryDoorGrid` (los azulejos de P03, con foto o tinte).
+- **`pills`** → `CategoryPills`, nuevo: una línea densa de píldoras con su icono, que aguanta treinta
+  familias sin empujar el catálogo fuera de la primera pantalla. Es lo que necesita `catalog`.
+- **Son ENLACES, no filtros.** La barra del catálogo (`CategoryBar`) son `Chip` con `aria-pressed`:
+  un filtro que se enciende y se apaga sobre la lista que ya se mira. Estas llevan a otro sitio, así
+  que son `<a>` — un lector anuncia «enlace» y del enlace se vuelve con el botón de atrás.
+- Llevan icono porque una línea de treinta píldoras de texto gris no se recorre: todas pesan igual.
+
+### 4. Un acoplamiento real que la conexión destapó
+
+El reparto de productos de la portada da por usado lo que el hero coge, para que el mismo producto no
+salga en cuatro sitios. Correcto mientras la portada pintara siempre producto.
+
+Con `statement` —que no pinta producto— la reserva **apartaba cuatro productos sin enseñarlos en
+ninguna parte**: en una tienda con un solo rebajado, ese producto desaparecía de la portada entera.
+Lo cazó `theme-parity.test.tsx`, que exige que el precio y el descuento sean los mismos en los cuatro
+temas.
+
+Arreglado en la causa: `heroReserva` es 0 cuando la portada no va a pintar producto (variante
+editorial **o** cubierta del CMS). La decisión vive en la página porque es quien tiene las listas
+completas; el registro recibe el reparto ya hecho. Hay una prueba dedicada.
+
+## Archivos
+
+| Archivo | Qué cambia |
+|---|---|
+| `home/types.ts` | `theme` y `hayOfertas` en `HomeSectionData`. |
+| `home/SectionRegistry.tsx` | `hero` y `categories` leen el tema y eligen composición. |
+| `StoreHomePage.tsx` | Pasa el tema, `hayOfertas`, y calcula `heroReserva`. El bloque derivado del CMS sube por encima del reparto porque el reparto ahora depende de él. |
+| `components/StoreHero.tsx` | Portada editorial de verdad: `data-hero-variant="statement"`, puertas al catálogo y a las ofertas. |
+| `components/StoreFeaturedHero.tsx` | `data-hero-variant="product"`. |
+| `components/CategoryDoors.tsx` | `CategoryPills` nuevo, junto a las puertas. |
+| `e2e/theme-engine.e2e.ts` | Una prueba más: la portada declara su composición en un navegador real. |
+| i18n ES/EN | `store.hero.browseCatalog`, `store.hero.seeOffers`. |
+
+## Tests
+
+| Archivo | Casos |
+|---|---|
+| `theme/theme-contract.test.tsx` | **Nuevo**, 24. Un caso por VALOR de las siete claves, montando `universal` y pisando **solo** el que se prueba —si se cambiara el preset, cualquiera de las siete podría ser la responsable del cambio observado—. Incluye: `statement` sin precios, sus dos puertas, `product` cayendo a editorial sin rebajas, el producto que no desaparece, píldoras vs azulejos, los dos como enlaces, altura de barra por variante, ancho del contenedor, `--sf-image-ratio` por proporción, tres aires **distintos**, `premium` obedeciendo `statement`, `catalog` obedeciendo `pills`, y una guarda que falla si el contrato gana una opción sin caso. |
+| `theme/multi-industry.test.tsx` | El caso de `catalog` pasa a esperar píldoras — y ese cambio **es** la prueba de que el control funciona. |
+| `home/HomeComposer.test.tsx` | La base de datos de prueba gana `theme` y `hayOfertas`. |
+| `theme/theme-parity.test.tsx` | Sin cambios — y es el que cazó el acoplamiento del reparto. |
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 291 ficheros, 5756 tests |
+| `npm run build` | **PASS** |
+| Playwright (`e2e/theme-engine.e2e.ts`) | **NO EJECUTADO** — exige una tienda desplegada y navegadores de Playwright; no hay ninguna de las dos en esta máquina. La prueba nueva queda escrita y se marca como pendiente de ejecución, sin darla por verde. |
+
+Ciclos correctivos usados: **2 de 3**.
+
+1. **El reparto reservaba productos para un hero que no los pinta.** Causa raíz arriba; lo cazó la
+   paridad de temas.
+2. **Tres fixtures y una espera.** `HomeComposer` necesitaba el tema; el caso de `catalog` en
+   multi-industria esperaba azulejos; y las aserciones del hero miraban el DOM antes de que la
+   portada terminara de cargar —la portada no se pinta a medias, enseña un esqueleto— así que se
+   añadió una espera explícita en vez de relajar la aserción.
+
+`PHASE_RESULT: PASS`
