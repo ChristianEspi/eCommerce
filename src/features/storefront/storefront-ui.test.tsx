@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router-dom'
 import { renderWithProviders } from '@/test/render'
 import { createFakeSupabase, makeSession, type FakeSupabase } from '@/test/supabaseMock'
@@ -847,12 +847,29 @@ describe('ficha de producto', () => {
     expect(within(viewer).getByText('Imagen 2 de 2')).toBeInTheDocument()
   })
 
-  it('sin descripción lo dice, en vez de dejar un hueco', async () => {
+  it('sin descripción no ofrece el apartado, y el detalle sigue teniendo qué decir', async () => {
+    /**
+     * Cambio deliberado en V3 · P10.
+     *
+     * Antes la descripción era una tarjeta a lo ancho que siempre estaba, así
+     * que sin texto había que escribir «todavía no tiene descripción» para que
+     * no quedara una caja vacía. Ahora el detalle es un acordeón: un apartado
+     * que se abre para decir que no hay nada es peor que no ofrecerlo, y la
+     * zona no queda hueca porque los datos del producto siguen ahí.
+     *
+     * La frase no desaparece del producto: la vista rápida —que sí tiene un
+     * sitio fijo para el texto— la sigue usando.
+     */
     renderStorefront(backend(), '/s/casa-nordica/product/silla-lino')
 
-    expect(
-      await screen.findByText('Este producto todavía no tiene descripción.'),
-    ).toBeInTheDocument()
+    const detalle = await waitFor(() => {
+      const zona = document.querySelector('[data-product-details]')
+      expect(zona).not.toBeNull()
+      return zona as HTMLElement
+    })
+    expect(detalle.querySelector('[data-detail-panel="description"]')).toBeNull()
+    expect(detalle.querySelector('[data-detail-panel="sheet"]')).not.toBeNull()
+    expect(screen.queryByText('Este producto todavía no tiene descripción.')).not.toBeInTheDocument()
   })
 
   /**
@@ -1421,5 +1438,185 @@ describe('el catálogo de escritorio sigue haciendo lo mismo', () => {
       return encontrada as HTMLElement
     })
     expect(salida.querySelectorAll('[data-card-variant]')).toHaveLength(0)
+  })
+})
+
+/**
+ * Storefront V3 · P10 · La ficha comercial.
+ *
+ * ## Qué defiende este bloque
+ *
+ * **Que la barra de compra del teléfono diga lo MISMO que la columna.** No
+ * calcula nada: recibe el precio ya resuelto —con acuerdo comercial si lo hay—
+ * y usa el mismo camino al carrito. Dos caminos con dos reglas es cómo se acaba
+ * cobrando otro precio del que se enseñó.
+ *
+ * **Que no exista donde no debe.** En escritorio no se renderiza —no se
+ * esconde: no se renderiza, para que un lector de pantalla no anuncie dos
+ * botones de «añadir» donde hay uno— y con el producto agotado tampoco.
+ *
+ * **Que el detalle no invente apartados.** Solo se ofrece lo que existe, y no
+ * hay ni una palabra sobre envíos, plazos o devoluciones: la plataforma no
+ * conoce esas políticas.
+ *
+ * **Que la ficha deje de ser una suma de tarjetas.** La galería y la columna de
+ * compra ya no van en `Card` con borde y sombra.
+ */
+describe('la ficha en el teléfono', () => {
+  /** Hace creer al navegador simulado que la pantalla es de teléfono. */
+  function pantallaDeTelefono() {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn((query: string) => ({
+        // Lo que pregunta la barra es `(max-width:899.95px)`; cualquier otra
+        // consulta —«menos movimiento», por ejemplo— sigue diciendo que no.
+        matches: query.includes('max-width'),
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        onchange: null,
+        dispatchEvent: vi.fn(),
+      })),
+    )
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('la barra de compra enseña el precio y lleva al carrito', async () => {
+    pantallaDeTelefono()
+    const user = userEvent.setup()
+    renderStorefront(backend(), '/s/casa-nordica/product/silla-roble')
+
+    const barra = await waitFor(() => {
+      const encontrada = document.querySelector('[data-purchase-bar]')
+      expect(encontrada).not.toBeNull()
+      return encontrada as HTMLElement
+    })
+
+    /**
+     * El mismo precio que la columna de arriba, no uno recalculado.
+     *
+     * Se normalizan los espacios: el formateador de moneda separa el símbolo
+     * del número con un espacio duro (U+00A0), que no es el que se escribe en
+     * una prueba.
+     */
+    const precioEnLaBarra = (barra.textContent ?? '').replace(/\u00a0/g, ' ')
+    expect(precioEnLaBarra).toContain('S/ 389.00')
+
+    await user.click(within(barra).getByRole('button', { name: /Agregar al carrito/ }))
+    expect(await screen.findByText('Añadido al carrito')).toBeInTheDocument()
+  })
+
+  it('en escritorio la barra no se renderiza, no solo se esconde', async () => {
+    // `display: none` quita el elemento de la pantalla, no del documento: un
+    // lector de pantalla anunciaría dos botones de «añadir» donde hay uno.
+    renderStorefront(backend(), '/s/casa-nordica/product/silla-roble')
+    await screen.findByRole('heading', { level: 1, name: 'Silla de roble' })
+
+    expect(document.querySelector('[data-purchase-bar]')).toBeNull()
+    expect(screen.getAllByRole('button', { name: /Agregar al carrito/ })).toHaveLength(1)
+  })
+
+  it('con el producto agotado no hay barra: un botón apagado ahí no ofrece nada', async () => {
+    pantallaDeTelefono()
+    renderStorefront(backend(), '/s/casa-nordica/product/silla-lino')
+    await screen.findByRole('heading', { level: 1, name: 'Silla de lino' })
+
+    // «Sin stock» sale dos veces —la etiqueta de la columna y la fila de la
+    // ficha de datos— y las dos son correctas: una es el estado y la otra el
+    // dato. Lo que se comprueba aquí es que NO haya barra.
+    expect((await screen.findAllByText('Sin stock')).length).toBeGreaterThan(0)
+    expect(document.querySelector('[data-purchase-bar]')).toBeNull()
+  })
+})
+
+describe('el detalle de la ficha', () => {
+  it('ofrece la descripción y los datos, y la primera viene abierta', async () => {
+    renderStorefront(backend(), '/s/casa-nordica/product/silla-roble')
+
+    const detalle = await waitFor(() => {
+      const zona = document.querySelector('[data-product-details]')
+      expect(zona).not.toBeNull()
+      return zona as HTMLElement
+    })
+
+    // Dos apartados: descripción y datos.
+    expect(detalle).toHaveAttribute('data-product-details', '2')
+    // Y la descripción abierta: un acordeón todo cerrado esconde que hay algo
+    // dentro.
+    const cabeceras = within(detalle).getAllByRole('button')
+    expect(cabeceras[0]).toHaveAttribute('aria-expanded', 'true')
+    expect(within(detalle).getByText(/Roble macizo/)).toBeInTheDocument()
+  })
+
+  it('se abre y se cierra con el teclado, porque es un botón de verdad', async () => {
+    const user = userEvent.setup()
+    renderStorefront(backend(), '/s/casa-nordica/product/silla-roble')
+
+    const detalle = await waitFor(() => {
+      const zona = document.querySelector('[data-product-details]')
+      expect(zona).not.toBeNull()
+      return zona as HTMLElement
+    })
+
+    const datos = within(detalle).getByRole('button', { name: 'Datos del producto' })
+    expect(datos).toHaveAttribute('aria-expanded', 'false')
+
+    datos.focus()
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(datos).toHaveAttribute('aria-expanded', 'true'))
+  })
+
+  it('no inventa envíos, plazos ni devoluciones', async () => {
+    renderStorefront(backend(), '/s/casa-nordica/product/silla-roble')
+
+    const detalle = await waitFor(() => {
+      const zona = document.querySelector('[data-product-details]')
+      expect(zona).not.toBeNull()
+      return zona as HTMLElement
+    })
+
+    const texto = (detalle.textContent ?? '').toLowerCase()
+    for (const inventado of ['devoluc', 'reembols', 'garantía de', 'días hábiles', 'envío gratis']) {
+      expect(texto).not.toContain(inventado)
+    }
+  })
+})
+
+describe('la ficha ya no es una suma de tarjetas', () => {
+  it('la galería y la columna de compra no llevan borde ni sombra de tarjeta', async () => {
+    renderStorefront(backend(), '/s/casa-nordica/product/silla-roble')
+    await screen.findByRole('heading', { level: 1, name: 'Silla de roble' })
+
+    const galeria = document.querySelector('[data-pdp-gallery]') as HTMLElement
+    const compra = document.querySelector('[data-pdp-purchase]') as HTMLElement
+    expect(galeria).not.toBeNull()
+    expect(compra).not.toBeNull()
+
+    for (const caja of [galeria, compra]) {
+      const estilo = getComputedStyle(caja)
+      expect(estilo.boxShadow === '' || estilo.boxShadow === 'none').toBe(true)
+    }
+  })
+
+  it('las sugerencias son filas de producto, no rejillas de catálogo', async () => {
+    // Tres rejillas seguidas al pie de una ficha son doce tarjetas compitiendo
+    // con el producto que se está mirando.
+    renderStorefront(backend(), '/s/casa-nordica/product/silla-roble')
+    await screen.findByRole('heading', { level: 1, name: 'Silla de roble' })
+
+    const fila = await waitFor(() => {
+      const encontrada = document.querySelector('[data-row-layout]')
+      expect(encontrada).not.toBeNull()
+      return encontrada as HTMLElement
+    })
+    // Y su salida lleva al catálogo de la familia del producto, que es a donde
+    // quiere ir quien descarta esto.
+    const salida = within(fila).getAllByRole('link', { name: /Ver todo/ })[0]
+    expect(salida).toHaveAttribute('href', '/s/casa-nordica?c=sillas')
   })
 })

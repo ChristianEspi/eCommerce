@@ -351,6 +351,8 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.catalog.clear': 'Clear filters',
     // V3 · P09 · The catalog toolbar on the phone.
     'store.catalog.filters': 'Filters',
+    // V3 · P10 · The product detail zone and the mobile purchase bar.
+    'store.product.detailsSection': 'Product detail',
     'store.catalog.filtersActive': 'active',
     'store.catalog.removeFilter': 'Remove',
     'store.catalog.showResults': 'Show results',

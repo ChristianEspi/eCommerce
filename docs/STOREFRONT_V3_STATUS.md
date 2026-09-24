@@ -1293,3 +1293,156 @@ cajón, marco del panel— porque jsdom no tiene ancho de ventana. Lo que falta 
 la captura real, y es exactamente el trabajo de esa fase.
 
 `PHASE_RESULT: PASS`
+
+---
+
+# P10 · La ficha de producto, comercial
+
+`ESTADO: PASS`
+
+## Lo que había, y por qué se leía como backoffice
+
+La ficha funcionaba y tenía **cinco tarjetas** con borde y sombra: la galería en
+una, la columna de compra en otra, la ficha de datos en una tercera, la
+descripción en una cuarta y las opiniones en la quinta. Cada grupo en su
+recuadro. Eso es exactamente la forma de un panel de administración, y lo que
+une una foto con su precio no es que las dos tengan marco: es que están a la
+misma altura y comparten el aire.
+
+En el teléfono había además un problema de orden: el botón de comprar queda en
+el primer tercio, y quien baja a leer la descripción —lo que hace justo quien
+está decidiendo— pierde de vista el precio y el botón a la vez.
+
+## Lo que se hizo
+
+### Se van las tarjetas
+
+La galería y la columna de compra pasan a ser cajas sin borde, sin sombra y sin
+fondo. La galería conserva su propio hueco con fondo para la imagen, que es lo
+que evita el salto al cargar, pero deja de dibujar un recuadro alrededor del
+producto.
+
+### El detalle, plegado y debajo (`StoreProductDetails`)
+
+La descripción y la ficha de datos bajan a una zona de acordeones, con el
+primero abierto. Acordeón y no pestañas: en un teléfono, unas pestañas de
+contenido largo obligan a volver arriba para cambiar, y con tres o cuatro
+rótulos no caben sin desplazamiento horizontal. (En el backoffice manda la regla
+contraria —pestañas centradas— porque allí las pantallas son anchas y densas;
+aquí el lector va con una mano.)
+
+`AccordionSummary` de MUI ya es un botón con `aria-expanded` y su panel
+asociado, así que teclado y lectores de pantalla funcionan sin añadir nada.
+
+**Un apartado sin contenido no existe**, y los apartados los construye la
+página, no el componente: solo ella sabe qué dato hay de verdad. No hay ni un
+apartado de envíos, plazos o devoluciones, porque la plataforma no conoce esas
+políticas y escribirlas sería inventarlas. Hay un test que busca esas palabras y
+falla si aparecen.
+
+### La barra de compra del teléfono (`StoreProductPurchaseBar`)
+
+Precio y botón, pegados abajo, con el área segura del sistema en el relleno
+—sin ella, en un iPhone el botón queda debajo de la barra de gestos—.
+
+**Vive dentro de `AddToCart`, y esa es la decisión que importa.** El precio de la
+variante elegida, la cantidad, si se puede comprar y el propio `agregar` ya
+estaban en ese componente: sacar la barra a la página habría obligado a subir
+ese estado y a tener **dos caminos** hacia el carrito. Dos caminos con dos reglas
+es cómo se acaba cobrando un precio distinto del que se enseñó. El precio de
+partida —con acuerdo comercial, o el «desde» de las variantes— lo calcula la
+página **una vez** y lo reciben los dos sitios.
+
+Tres comportamientos:
+
+- **Sin stock no hay barra.** Una barra pegada abajo con un botón apagado ocupa
+  sitio para no ofrecer nada.
+- **Con variantes sin elegir, la barra lleva a elegirlas** («Elegir opciones»):
+  desplaza al grupo de compra y **deja el foco dentro**. Apagar el botón sin
+  decir por qué habría sido lo fácil.
+- **Elegida y agotada**, el botón se apaga: ahí no hay nada que añadir ni nada
+  que elegir.
+
+### Las sugerencias, con la fila V3
+
+Las tres filas de cross-sell usaban `ProductGrid`, la del catálogo: cuatro
+tarjetas a lo ancho con el mismo peso que los resultados de una búsqueda, tres
+veces seguidas al pie de la ficha. Ahora usan `ProductRow`, que se desplaza de
+lado y —esto es lo que resuelve la parte «Theme» de la fase— **toma su tarjeta y
+su ancho de hueco del tema**: en Premium son piezas editoriales y en Catalog
+compactas, sin una sola rama por tema en esta página.
+
+Su «ver todo» lleva al catálogo filtrado por la familia del producto, que es a
+donde quiere ir quien descarta esto y busca otro parecido. Sin familia, al
+catálogo entero — y nunca a una lista de «recomendados», que no existe como
+consulta.
+
+## Cambio de comportamiento deliberado
+
+**Sin descripción ya no se escribe «este producto todavía no tiene
+descripción».** Con la tarjeta fija hacía falta para que no quedara una caja
+vacía; con el acordeón, un apartado que se abre para decir que no hay nada es
+peor que no ofrecerlo, y la zona no queda hueca porque los datos del producto
+siguen ahí. La frase no desaparece del producto: la vista rápida —que sí tiene
+un sitio fijo para el texto— la sigue usando. El test que la defendía está
+invertido, con el porqué escrito dentro.
+
+## Lo que NO se tocó, y es la mitad del valor
+
+Precio, acuerdos comerciales B2B, stock, variantes, cantidad, favoritos,
+carrito, analítica (`add_to_cart`), SEO y datos estructurados: ni una regla. La
+barra reutiliza `useAddToCart`, que es el mismo camino de siempre, y el hecho de
+analítica se emite en un solo sitio para los dos botones. El lote entero de
+pruebas de precio B2B, stock y variantes pasa sin cambios.
+
+## Ciclos correctivos
+
+1. La barra duplicaba en el DOM el precio y el botón «Agregar al carrito», y
+   diez pruebas existentes empezaron a encontrar dos. No era un problema de las
+   pruebas: `display: none` quita el elemento de la pantalla **pero no del
+   documento**, así que un lector de pantalla habría anunciado dos botones donde
+   hay uno. La cabecera de la vitrina ya había resuelto esto para su buscador con
+   una consulta de medios en JavaScript, y la barra sigue el mismo camino: en
+   escritorio **no se renderiza**. Las diez pruebas volvieron a verde sin
+   tocarlas.
+2. `variant_label` no existe en el contrato de variante —es `name`—, y el
+   `formatMoney` separa el símbolo del número con un espacio duro (U+00A0), que
+   no es el que se escribe en una prueba.
+
+## Archivos principales
+
+| Archivo | Qué cambia |
+|---|---|
+| `components/StoreProductDetails.tsx` | **Nuevo.** El acordeón del detalle; no sabe qué apartados hay. |
+| `components/StoreProductPurchaseBar.tsx` | **Nuevo.** Precio y CTA pegados abajo, solo en el teléfono y solo si hay algo que hacer. |
+| `StoreProductPage.tsx` | Sin tarjetas en galería y compra; el detalle abajo; el precio calculado una vez; `AddToCart` pinta la barra y comparte su manejador; las sugerencias con `ProductRow` y su salida al catálogo; hueco al pie para la barra. |
+| `shared/i18n/messages.{es,en}.ts` | `store.product.detailsSection`. (`chooseOptions` ya existía.) |
+
+**Migraciones: ninguna.**
+
+## Tests
+
+| Archivo | Casos |
+|---|---|
+| `storefront-ui.test.tsx` | 62 → **70**. Teléfono: la barra dice el mismo precio y lleva al carrito; en escritorio **no se renderiza** y hay un solo botón de añadir; sin stock no hay barra. Detalle: dos apartados con el primero abierto, se abre con el teclado, y no nombra envíos, plazos ni devoluciones. Estructura: galería y compra sin sombra de tarjeta; las sugerencias son filas y su salida lleva al catálogo de la familia. Más el test invertido de «sin descripción». |
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 310 ficheros, 6224 tests |
+| `npm run build` | **PASS** |
+| `npm run bundle:report` | **PASS** — ficha **390,1 kB** (techo 400) · portada 397,5 kB (techo 405) |
+| `npm run scan:secrets` | **PASS** |
+
+## Pendiente real
+
+La ficha sube de 380,7 a 390,1 kB: el acordeón de MUI y la fila de producto
+cuestan. Quedan 10 kB de margen, suficientes para P11 —que es calidad de imagen
+y readiness, no peso de página— pero si P13 necesita más, el candidato natural es
+la zona de detalle por `lazy`: está debajo del pliegue y no forma parte de la
+decisión de compra.
+
+`PHASE_RESULT: PASS`

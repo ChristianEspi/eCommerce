@@ -313,6 +313,8 @@ export const es = {
     // V3 · P09 · La barra del catálogo en el teléfono. «Filtros» a secas y no
     // «Seleccionar filtros»: es un botón, y el título del panel ya lo explica.
     'store.catalog.filters': 'Filtros',
+    // V3 · P10 · La zona de detalle de la ficha y la barra de compra del móvil.
+    'store.product.detailsSection': 'Detalle del producto',
     'store.catalog.filtersActive': 'activos',
     'store.catalog.removeFilter': 'Quitar',
     'store.catalog.showResults': 'Ver resultados',
