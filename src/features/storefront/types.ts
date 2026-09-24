@@ -167,6 +167,21 @@ export const publicCategorySchema = z.object({
   slug: z.string().min(1),
   name: z.string().min(1),
   position: z.number().int(),
+  /**
+   * Storefront V2 · P03 · Foto opcional de la categoría.
+   *
+   * `assetRef` es el MISMO filtro que el logo de la tienda: una `https://`
+   * externa o una ruta del bucket privado, y nada más. Sin él, un `javascript:`
+   * guardado en la columna acabaría en el `src` de un `<img>` del dominio de la
+   * tienda. Lo que no pasa el filtro cae a `null` y la puerta se pinta con su
+   * tinte y su icono, que es lo que hacía antes de esta fase.
+   *
+   * `default(null)` en los dos: una respuesta de una base anterior a la
+   * migración no trae las columnas, y eso se lee como la categoría sin foto que
+   * era — ninguna pantalla comprueba `undefined`.
+   */
+  image_url: assetRef.default(null),
+  image_alt: z.string().nullable().catch(null).default(null),
 })
 export type PublicCategory = z.infer<typeof publicCategorySchema>
 

@@ -130,6 +130,15 @@ export function storefrontClient(): SupabaseClient {
 const STORE_SELECT = '*'
 
 const CATEGORY_SELECT = 'category_id, store_id, parent_id, slug, name, position'
+/**
+ * Storefront V2 · P03 · La foto, pedida aparte para poder caer a la lista base.
+ *
+ * PostgREST responde 400/`42703` cuando una columna no existe y la consulta
+ * ENTERA se cae: una vitrina contra una base sin la migración se quedaría sin
+ * categorías —ni barra de familias, ni puertas, ni filtro— por una foto
+ * opcional. Mismo criterio que `fetchPublicVariants` con la migración de ejes.
+ */
+const CATEGORY_SELECT_CON_FOTO = `${CATEGORY_SELECT}, image_url, image_alt`
 
 const BRAND_SELECT = 'brand_id, store_id, code, name, logo_url'
 
@@ -292,15 +301,20 @@ export async function fetchPublicBrands(storeId: string | null): Promise<PublicB
 export async function fetchPublicCategories(storeId: string | null): Promise<PublicCategory[]> {
   if (!storeId) return []
 
-  const { data, error } = await storefront()
-    .from(PUBLIC_CATEGORIES_VIEW)
-    .select(CATEGORY_SELECT)
-    .eq('store_id', storeId)
-    .order('position')
-    .order('name')
+  const leer = (select: string) =>
+    storefront()
+      .from(PUBLIC_CATEGORIES_VIEW)
+      .select(select)
+      .eq('store_id', storeId)
+      .order('position')
+      .order('name')
 
-  if (error) throw new StorefrontError(error)
-  return publicCategorySchema.array().parse(data ?? [])
+  const conFoto = await leer(CATEGORY_SELECT_CON_FOTO)
+  if (!conFoto.error) return publicCategorySchema.array().parse(conFoto.data ?? [])
+
+  const base = await leer(CATEGORY_SELECT)
+  if (base.error) throw new StorefrontError(base.error)
+  return publicCategorySchema.array().parse(base.data ?? [])
 }
 
 /**

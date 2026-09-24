@@ -108,7 +108,10 @@ const ESCENARIOS: readonly Escenario[] = [
 
 function backend(
   e: Escenario,
-  extra: { store?: Record<string, unknown>; categorias?: Array<{ slug: string; name: string }> } = {},
+  extra: {
+    store?: Record<string, unknown>
+    categorias?: Array<{ slug: string; name: string; image_url?: string; image_alt?: string }>
+  } = {},
 ): FakeSupabase {
   const producto = {
     product_id: 'cccc1111-1111-4111-8111-111111111111',
@@ -159,6 +162,10 @@ function backend(
             slug: c.slug,
             name: c.name,
             position: i + 1,
+            // P03 · La foto es OPCIONAL: solo la trae quien la declara en el
+            // escenario. El resto pinta tinte e icono, como antes de la fase.
+            image_url: c.image_url ?? null,
+            image_alt: c.image_alt ?? null,
           }))
         : [
             {
@@ -475,5 +482,76 @@ describe('el cierre de la portada tampoco afirma nada que no sepa', () => {
     expect(screen.queryByText('Productos originales')).not.toBeInTheDocument()
     expect(screen.queryByText(/registro sanitario/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/Distribuidor autorizado/i)).not.toBeInTheDocument()
+  })
+})
+
+/**
+ * Storefront V2 · P03 · La foto de una categoría llega a la portada.
+ *
+ * Es la prueba de que la mejora es de DATOS y no de rubro: el mismo código pinta
+ * una puerta con fotografía cuando la categoría la tiene y una puerta de tinte
+ * con icono cuando no, en cualquiera de los cuatro temas.
+ */
+describe('las puertas de categoría con fotografía', () => {
+  const CON_FOTO = [
+    { slug: 'abrigos', name: 'Abrigos', image_url: 'https://cdn.ejemplo.com/abrigos.webp' },
+    { slug: 'camisas', name: 'Camisas' },
+  ]
+
+  async function portadaConCategorias(tema: string) {
+    const base = ESCENARIOS[0] as Escenario
+    await abrir({ ...base, tema }, '/s/tienda', {
+      store: { home_layout: { version: 1, sections: [{ id: 'categories', enabled: true }] } },
+      categorias: CON_FOTO,
+    })
+    return screen.findByRole('region', { name: 'Compra por categoría' })
+  }
+
+  it.each(['universal', 'retail', 'premium', 'catalog'])(
+    'en el tema %s la que tiene foto la enseña y la que no cae al tinte',
+    async (tema) => {
+      cleanup()
+      const seccion = await portadaConCategorias(tema)
+
+      const conFoto = within(seccion).getAllByRole('link', { name: /Abrigos/ })[0]
+      const sinFoto = within(seccion).getAllByRole('link', { name: /Camisas/ })[0]
+
+      expect(conFoto).toHaveAttribute('data-category-door', 'photo')
+      expect(sinFoto).toHaveAttribute('data-category-door', 'tint')
+      expect(conFoto?.querySelector('img')?.getAttribute('src')).toBe(
+        'https://cdn.ejemplo.com/abrigos.webp',
+      )
+    },
+  )
+
+  it('las dos siguen llevando al catálogo filtrado por su familia', async () => {
+    const seccion = await portadaConCategorias('universal')
+
+    expect(within(seccion).getAllByRole('link', { name: /Abrigos/ })[0]).toHaveAttribute(
+      'href',
+      '/s/tienda?c=abrigos',
+    )
+    expect(within(seccion).getAllByRole('link', { name: /Camisas/ })[0]).toHaveAttribute(
+      'href',
+      '/s/tienda?c=camisas',
+    )
+  })
+
+  it('una tienda sin ninguna foto pinta la sección igual que antes de P03', async () => {
+    const base = ESCENARIOS[1] as Escenario
+    await abrir(base, '/s/tienda', {
+      store: { home_layout: { version: 1, sections: [{ id: 'categories', enabled: true }] } },
+      categorias: [
+        { slug: 'zapatillas', name: 'Zapatillas' },
+        { slug: 'botas', name: 'Botas' },
+      ],
+    })
+
+    const seccion = await screen.findByRole('region', { name: 'Compra por categoría' })
+    expect(seccion.querySelector('img')).toBeNull()
+    expect(within(seccion).getAllByRole('link', { name: /Zapatillas/ })[0]).toHaveAttribute(
+      'data-category-door',
+      'tint',
+    )
   })
 })

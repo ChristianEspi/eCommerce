@@ -100,6 +100,9 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
       assets={data.assets}
       images={data.images}
       currency={data.store.currency}
+      // P03 · Las mismas fotos que las puertas de la portada: un bloque de
+      // categorías del CMS no se puede ver peor que la sección equivalente.
+      categoryMedia={data.categoryMedia}
       leadingHeading={data.hasCmsHero}
     />
   ),

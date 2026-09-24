@@ -157,6 +157,16 @@ export const categorySchema = z.object({
   name: z.string(),
   position: z.number().int(),
   is_active: z.boolean(),
+  /**
+   * Storefront V2 · P03 · Foto opcional de la categoría y su texto alternativo.
+   *
+   * `catch(null).default(null)`: una base anterior a la migración
+   * `20260923120000` no trae estas columnas, y una respuesta sin ellas se lee
+   * como la categoría sin foto que era. La ausencia de imagen NO invalida la
+   * categoría — es el caso normal y la vitrina cae a tinte + icono.
+   */
+  image_url: z.string().nullable().catch(null).default(null),
+  image_alt: z.string().nullable().catch(null).default(null),
 })
 export type Category = z.infer<typeof categorySchema>
 
@@ -284,6 +294,24 @@ export const categoryFormSchema = z.object({
    * el objeto —un formulario, una prueba— no tiene por qué declarar la ausencia.
    */
   parent_id: z.string().default(''),
+  /**
+   * La RUTA de la foto, no una URL firmada: una firma caduca en una hora y
+   * dejaría la portada sin fotos al día siguiente. Lo que llega aquí siempre
+   * viene de `buildCategoryImagePath`, nunca escrito a mano; la FORMA la valida
+   * `ebim.is_category_image_ref` contra las columnas de tenant de la fila.
+   */
+  image_url: z.string().max(1024).nullable().default(null),
+  /**
+   * Texto ALTERNATIVO, no pie de foto: describe la imagen para quien no la ve.
+   * Cadena vacía = sin alt, y entonces la vitrina pinta la imagen como
+   * decorativa y el nombre de la categoría hace de nombre accesible. Guardar
+   * el nombre aquí haría que un lector dijera «Abrigos, Abrigos».
+   */
+  image_alt: z
+    .string()
+    .trim()
+    .max(160, errorKey('catalog.error.imageAlt'))
+    .default(''),
 })
 export type CategoryFormValues = z.infer<typeof categoryFormSchema>
 
@@ -324,6 +352,8 @@ export function categoryToForm(category: Category | null): CategoryFormValues {
     slug: category?.slug ?? '',
     is_active: category?.is_active ?? true,
     parent_id: category?.parent_id ?? '',
+    image_url: category?.image_url ?? null,
+    image_alt: category?.image_alt ?? '',
   }
 }
 

@@ -536,13 +536,50 @@ export function StoreHomePage() {
    * comercio les dio. Salen de la MISMA consulta que la barra de la cabecera
    * (`usePublicCategories` comparte clave), así que no cuestan una petición.
    */
+  /**
+   * Storefront V2 · P03 · Las fotos de las categorías, firmadas en UN lote.
+   *
+   * Todas las de la tienda y no solo las raíces: las mismas fotos las necesitan
+   * las puertas de la portada Y los bloques `category_collection` del CMS, que
+   * pueden apuntar a cualquier nivel del árbol. Un solo lote sirve a los dos y
+   * la clave de la consulta no cambia por el orden en que llegaron.
+   */
+  const fotosDeCategoria = useMemo(
+    () => (categories.data ?? []).map((category) => category.image_url),
+    [categories.data],
+  )
+  const fotosFirmadas = useSignedStoreAssets(fotosDeCategoria)
+
+  /** La foto de cada categoría por id, para lo que pinta el CMS. */
+  const categoryMedia = useMemo(() => {
+    const mapa: Record<string, { imageUrl: string | null; imageAlt: string | null }> = {}
+    for (const category of categories.data ?? []) {
+      if (!category.image_url) continue
+      mapa[category.category_id] = {
+        // Una `https://` externa se pinta tal cual; una ruta, ya firmada. Si la
+        // firma aún no ha llegado, `null` y la puerta cae a su tinte: mejor el
+        // respaldo que un hueco que se rellena a medio segundo.
+        imageUrl:
+          fotosFirmadas[category.image_url] ??
+          (/^https:\/\//i.test(category.image_url) ? category.image_url : null),
+        imageAlt: category.image_alt,
+      }
+    }
+    return mapa
+  }, [categories.data, fotosFirmadas])
+
   const familias = useMemo(
     () =>
       (categories.data ?? [])
         .filter((category) => category.parent_id === null)
         .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name))
-        .map((category) => ({ category_id: category.category_id, name: category.name, slug: category.slug })),
-    [categories.data],
+        .map((category) => ({
+          category_id: category.category_id,
+          name: category.name,
+          slug: category.slug,
+          ...(categoryMedia[category.category_id] ?? {}),
+        })),
+    [categories.data, categoryMedia],
   )
 
   const datosPortada: HomeSectionData = {
@@ -566,6 +603,7 @@ export function StoreHomePage() {
     promociones: promosVigentes,
     promoAssets: assetsPromos,
     categorias: familias,
+    categoryMedia,
     brands: brandOptions,
     brandSelected: brand,
     favorites: favorites.ids,

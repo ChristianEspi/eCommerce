@@ -2257,6 +2257,22 @@ export const es = {
     'settings.emailReplyTo': 'Correo de respuesta',
     'settings.emailReplyToHelp': 'A dónde llegan las respuestas de tus compradores.',
     // --- Propuestas de valor (Storefront V2 · P01) -----------------------
+    // --- Foto de categoría (Storefront V2 · P03) -------------------------
+    'catalog.categories.image': 'Fotografía',
+    'catalog.categories.image.help':
+      'Opcional. Se ve en las puertas de categoría de tu portada. JPG, PNG, WebP o AVIF, hasta 2 MB. Sin foto se usa el color y el icono de la categoría.',
+    'catalog.categories.image.upload': 'Subir fotografía',
+    'catalog.categories.image.replace': 'Cambiar fotografía',
+    'catalog.categories.image.remove': 'Quitar fotografía',
+    'catalog.categories.image.alt': 'Texto alternativo',
+    'catalog.categories.image.altHelp':
+      'Qué se ve en la foto, para quien no puede verla. Si lo dejas vacío se usa el nombre de la categoría.',
+    'catalog.categories.image.errorType': 'Ese formato no se admite. Usa JPG, PNG, WebP o AVIF.',
+    'catalog.categories.image.errorSize':
+      'La imagen pesa más de 2 MB. Guárdala optimizada y vuelve a subirla.',
+    'catalog.categories.image.unavailable':
+      'Las fotos de categoría estarán disponibles en cuanto se aplique la última actualización de la base de datos. El resto de la categoría se guarda con normalidad.',
+    'catalog.error.imageAlt': 'El texto alternativo admite hasta 160 caracteres.',
     'settings.valueProps.title': 'Propuestas de valor',
     'settings.valueProps.help':
       'Hasta cuatro promesas cortas, en la franja bajo la portada. Escríbelas tú: son afirmaciones sobre tu negocio y solo se ven en esta tienda.',

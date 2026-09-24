@@ -76,6 +76,17 @@ export interface HomeSectionData {
    */
   readonly categorias: ComponentProps<typeof CategoryDoorGrid>['categories']
 
+  /**
+   * Storefront V2 · P03 · La foto de cada categoría, por id y ya firmada.
+   *
+   * Va aparte de `categorias` porque los bloques `category_collection` del CMS
+   * pueden apuntar a cualquier nivel del árbol, no solo a las raíces que pinta
+   * la sección `categories`. El resolvedor del CMS devuelve de cada categoría
+   * lo justo para una puerta —id, slug y nombre—, así que la foto se cruza aquí
+   * con la lista que la vitrina ya tiene cargada: cero peticiones nuevas.
+   */
+  readonly categoryMedia: ComponentProps<typeof ContentBlocks>['categoryMedia']
+
   readonly brands: ComponentProps<typeof BrandRow>['brands']
   readonly brandSelected: string | null
 

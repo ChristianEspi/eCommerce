@@ -514,3 +514,150 @@ Ciclos correctivos usados: **3 de 3**, y los tres por causa raíz, no por sínto
    reemplazo como función; el fichero se reescribió.
 
 `PHASE_RESULT: PASS`
+
+---
+
+# P03 — Fotografía opcional en las categorías
+
+**HEAD inicial:** `77cf3cd` · **Migración nueva:**
+`supabase/migrations/20260923120000_category_media.sql`
+
+## Verificación del supuesto
+
+`public.categories` no tenía ninguna columna de imagen y `public_categories` exponía
+`category_id, store_id, parent_id, slug, name, position`. `CategoryDoorItem` era
+`{ category_id, name, slug }` y la puerta se componía con `tintFor(name)` + icono derivado del
+nombre. Confirmado antes de tocar nada.
+
+## La regla que gobierna la fase
+
+**La ausencia de imagen NO invalida la categoría.** Todo lo anterior sigue funcionando igual: sin
+`image_url` la puerta se pinta con su tinte y su icono, que es lo que hacía —y lo correcto para un
+catálogo de envases o de repuestos, donde la foto de la categoría no añade nada y mantenerla es
+trabajo que nadie hará—. Nadie tiene que subir nada.
+
+Con foto, la puerta **es** la foto: a sangre, `cover`, con degradado vertical que garantiza el
+contraste del texto encima. Es lo que pide una tienda visual. Ninguno de los dos caminos mira el
+rubro: lo que decide es si esa categoría tiene foto, y eso lo decide quien vende.
+
+## Base de datos
+
+- `ebim.is_category_image_ref(text, uuid, uuid)` + `categories_image_ref`: `https://` externa o ruta
+  `{organization_id}/{store_id}/categories/…` de la **propia tienda**, validada contra las columnas
+  de la fila. Rechaza `http://`, `javascript:`, `data:`, travesía de directorios, la carpeta
+  `branding/` y el prefijo de otra tienda.
+- `categories_image_len` (4..1024) y `categories_image_alt_len` (1..160 tras recortar, sin
+  caracteres de control: un salto de línea en un alt lo lee un lector como frase partida y vacía de
+  sentido el tope).
+- `grant select (image_url, image_alt) on public.categories to anon`. Nada más: `categories` ya daba
+  GRANT de tabla a `authenticated`, así que la escritura la sigue decidiendo
+  `categories_update_catalog`.
+
+### Una categoría SÍ es de una tienda (al contrario que una marca)
+
+`public.categories` tiene `store_id` y su FK compuesta obliga a que la madre sea de la misma tienda.
+Así que la ruta usa el prefijo de siempre y la autoriza `ebim.can_write_store_object`, que ya
+existía: **esta fase no añade ni una policy de Storage**. Lo único nuevo es la carpeta
+`categories/`, que el CHECK exige para que se pueda mirar el bucket y distinguir una foto de
+categoría del logo de la tienda.
+
+### El error que la ampliación de la vista casi introdujo
+
+`public_categories` se escribió primero como `drop view` + `create view … where is_active`, copiando
+su forma ORIGINAL. Aplica, la vista existe… y deshace en silencio la corrección de
+`20260901130000`: desde entonces la vista es un **CTE recursivo** que solo enseña las categorías con
+todo su camino activo, porque «una hija activa de una madre desactivada seguía saliendo en la
+vitrina, y además como si fuera raíz».
+
+Lo cazó `supabase/tests/category-tree.test.ts` al primer intento. Corregido a `create or replace`
+sobre el cuerpo recursivo con las dos columnas **al final** —la única forma en que Postgres admite
+reemplazar una vista existente, y además conserva los GRANT—. Queda además una prueba nueva en
+`category-media.test.ts` que fija la herencia junto a la foto, porque es ahí donde se va a volver a
+tocar.
+
+## Frontend
+
+| Archivo | Qué cambia |
+|---|---|
+| `catalog/api/categoryMedia.ts` | **Nuevo.** `MAX_CATEGORY_IMAGE_BYTES` (2 MB), validador, `buildCategoryImagePath`, subida y firma en lote. Sin SVG. |
+| `catalog/CategoryImageField.tsx` | **Nuevo.** Hueco apaisado 16/9 —la proporción de la puerta real— con `cover`: se ve el recorte antes de guardar. El alt aparece **con** la foto y se va con ella. Sin foto se ve el icono real de la categoría, no un rectángulo gris. |
+| `catalog/CategoryDrawer.tsx` | Monta el campo después del nombre (el icono de respaldo se deriva del nombre). |
+| `catalog/api/categories.ts` | Sondeo de esquema propio (`categoryMediaReady`): las dos columnas se piden aparte y hay a dónde caer, porque PostgREST tumba la consulta entera con `42703` y la pantalla de categorías no puede morir por una foto opcional. El alt vacío se guarda **NULL**. |
+| `catalog/types.ts` | `categorySchema` + `image_url`/`image_alt` (`catch(null)`), `categoryFormSchema` + los dos campos, `categoryToForm`. |
+| `catalog/useCategories.ts` | `useCategoryImageUrls` (un lote) y `useUploadCategoryImage`. |
+| `storefront/components/CategoryDoors.tsx` | **Nuevo.** `CategoryDoorGrid` y `CategoryDoor` salen de `ContentBlocks.tsx` (1376 líneas) a su propio archivo: las usan el CMS, la portada y —desde P13— la vista previa, y ninguna necesita el resolvedor de bloques. `ContentBlocks` las reexporta. `data-category-door="photo" \| "tint"` hace la diferencia verificable. |
+| `storefront/components/ContentBlocks.tsx` | Prop `categoryMedia` opcional; el bloque `category_collection` cruza sus items por `category_id`. **Cero peticiones nuevas y sin tocar la función SQL del CMS**: la vitrina ya tiene las categorías cargadas (`usePublicCategories`, la misma consulta que la barra de familias). |
+| `storefront/api.ts` | `fetchPublicCategories` pide la foto y cae a la lista base si la columna no existe — una vitrina contra una base sin la migración no puede quedarse sin categorías por una foto opcional. |
+| `storefront/types.ts` | `publicCategorySchema` + `image_url` por `assetRef` (el mismo filtro que el logo de la tienda) e `image_alt`. |
+| `StoreHomePage.tsx` | Firma **todas** las fotos de la tienda en un lote y construye `categoryMedia` por id: sirve a la sección `categories` y a los bloques del CMS a la vez. |
+| `shared/ui/categoryIcon.tsx` | **Nuevo** (movido desde la vitrina, que lo reexporta). Ver abajo. |
+| i18n ES/EN | 11 claves `catalog.categories.image.*` + `catalog.error.imageAlt`. |
+
+### La tabla de iconos era de farmacia, y eso se arregló
+
+Al mover el resolvedor a `shared` quedó a la vista: tenía **14 entradas y 10 eran de farmacia**
+(`medicamento`, `dermo`, `cardio`, `oftalm`…). No es una condición por rubro —nadie pregunta a qué se
+dedica el comercio— pero el efecto se notaba: una botica tenía icono para cada familia y una
+zapatería no tenía ninguno, así que sus puertas se veían todas iguales.
+
+Ahora son 27 entradas que cubren calzado y moda, hogar, alimentación, ferretería, tecnología,
+deporte, juguetes, mascotas, papelería, automoción y belleza, **además** de las de salud, que siguen
+siendo tan legítimas como el resto: quitarlas sería el mismo error del revés. El orden importa y está
+documentado (lo específico antes que lo genérico; «cuidado» y «limpieza» al final porque caben en
+medio catálogo).
+
+## Un fallo preexistente que apareció en este tramo, y su causa
+
+A las 19:13 hora local, `supabase/tests/ai-credit-payments-fulfillment-facts.test.ts` empezó a
+fallar con `expected 5 to be 4` en `days_late`. **No es de esta fase**: esa prueba toca
+`fulfillments` y `ai_fulfillment_facts`, y este pack no las roza. Es un fallo de RELOJ:
+
+- el fixture sembraba `promised_to` con `current_date` — la fecha de la **sesión**;
+- `ebim.ai_fulfillment_facts` calcula con `(now() at time zone 'utc')::date`.
+
+En una máquina a UTC-5 las dos fechas coinciden media jornada y discrepan la otra: pasadas las 19:00
+locales, el fixture sembraba «prometida hace 4 días» y la función leía 5. La suite fallaba sola por
+la hora del día.
+
+Arreglado en la causa —**el fixture ahora mide con el mismo reloj que la función**— y solo en esa
+siembra. El primer intento cambió las cinco siembras del archivo a UTC y rompió las de cobranza:
+`ai_collections_facts` y las de pagos sí calculan con `current_date`, así que las suyas se quedan
+como estaban, con la razón anotada en el código.
+
+**Hallazgo para el operador, sin tocar:** dos funciones hermanas usan bases de fecha distintas
+(`ai_fulfillment_facts` en UTC, `ai_collections_facts` en fecha de sesión). Es una inconsistencia
+real del producto; unificarla cambia qué documentos cuentan como vencidos y no se decide en este
+pack.
+
+## Tests
+
+| Archivo | Casos |
+|---|---|
+| `supabase/tests/category-media.test.ts` | **Nuevo**, 35. Sin foto todo sigue igual (incluido un `insert` que no menciona las columnas), referencia (9 rechazos nombrados, entre ellos la carpeta `branding/`), alt (vacío, espacios, desbordado, saltos de línea), aislamiento, lector sin escritura, `anon` sin UPDATE, columnas exactas de la vista, `security_invoker`, tienda suspendida, **herencia del árbol con foto**, y Storage con la carpeta nueva. |
+| `src/features/catalog/category-media.test.tsx` | **Nuevo**, 17. Ruta de tienda en `categories/`, extensión del MIME, validador completo, `categoryToForm`, cajón sin foto (sin campo de alt), con foto (`cover` + alt), subida, alt NULL vs recortado, tope de 160, quitar la foto suelta el alt, y guardar sin tocar la foto. |
+| `src/features/storefront/components/category-doors.test.tsx` | **Nuevo**, 10. `data-category-door` photo/tint, `cover` + `lazy`, alt ausente → decorativa (`alt=""` + `aria-hidden`), alt presente, alt de espacios, **foto rota → vuelve al tinte**, mezcla de puertas y umbral de la rejilla. |
+| `src/features/storefront/theme/multi-industry.test.tsx` | **Ampliado** a 53. La foto llega a la portada en los **cuatro temas**, las dos puertas siguen enlazando a su familia, y una tienda sin ninguna foto se ve igual que antes de P03. |
+| `supabase/tests/category-tree.test.ts` | Sin cambios — y es el que cazó el error de la vista. |
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** (0 avisos) |
+| `npm run test` | **PASS** — 290 ficheros, 5732 tests |
+| `npm run build` | **PASS** |
+| DB (PGlite, migraciones reales) | **PASS** — 35 casos nuevos |
+
+Ciclos correctivos usados: **3 de 3**, todos por causa raíz.
+
+1. **La vista recreada perdía la herencia del árbol.** Cazado por `category-tree.test.ts`.
+   Corregido a `create or replace` sobre el cuerpo recursivo.
+2. **El reloj del fixture de entregas.** Diagnóstico arriba; el primer arreglo fue demasiado amplio
+   y se acotó a la única siembra que lo necesitaba.
+3. **Dos fallos de utillaje.** Un `import` colado entre imports al insertar una constante, y un
+   literal de expresión regular que perdió sus barras invertidas al pasar por un heredoc del shell
+   (`/^https:\/\//i` quedó como `/^https:///i`, error de sintaxis). Los dos corregidos en el sitio y
+   verificados con una búsqueda de `https:///` en todo `src/`.
+
+`PHASE_RESULT: PASS`

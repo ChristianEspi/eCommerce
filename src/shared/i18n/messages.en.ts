@@ -3019,6 +3019,21 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'settings.font.mono': 'Monospace',
     'settings.emailFromName': 'Email sender name',
     'settings.emailFromNameHelp': 'What buyers will see in your emails.',
+    'catalog.categories.image': 'Photo',
+    'catalog.categories.image.help':
+      'Optional. It shows on the category doors of your shop front. JPG, PNG, WebP or AVIF, up to 2 MB. With no photo the category colour and icon are used.',
+    'catalog.categories.image.upload': 'Upload photo',
+    'catalog.categories.image.replace': 'Replace photo',
+    'catalog.categories.image.remove': 'Remove photo',
+    'catalog.categories.image.alt': 'Alternative text',
+    'catalog.categories.image.altHelp':
+      'What the photo shows, for anyone who cannot see it. Left empty, the category name is used.',
+    'catalog.categories.image.errorType': 'That format is not accepted. Use JPG, PNG, WebP or AVIF.',
+    'catalog.categories.image.errorSize':
+      'The image is over 2 MB. Save it optimised and upload it again.',
+    'catalog.categories.image.unavailable':
+      'Category photos will be available as soon as the latest database update is applied. Everything else in the category saves as usual.',
+    'catalog.error.imageAlt': 'Alternative text accepts up to 160 characters.',
     'settings.valueProps.title': 'Value propositions',
     'settings.valueProps.help':
       'Up to four short promises, in the strip under the shop front. Write them yourself: they are claims about your business and they only show in this store.',
