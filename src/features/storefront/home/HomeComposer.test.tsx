@@ -534,3 +534,58 @@ describe('marcas y reconocimiento no se pintan dos veces', () => {
     expect(document.querySelector('[data-brand-trust]')).not.toBeNull()
   })
 })
+
+/**
+ * Storefront V3 · P08 · La banda de rebajados, partida.
+ *
+ * `split` estaba en el contrato desde P06 y no lo pintaba nadie. Se pinta aquí,
+ * y sigue siendo una elección del comercio: ningún tema lo resuelve, porque
+ * cuesta alto de página.
+ */
+describe('lo rebajado puede llevar su mensaje al lado', () => {
+  it('sin pedir nada es la banda de siempre', () => {
+    pintar(layout([{ id: 'offers', enabled: true }]))
+
+    expect(document.querySelector('[data-offers-presentation]')).toHaveAttribute(
+      'data-offers-presentation',
+      'band',
+    )
+    expect(document.querySelector('[data-split-band]')).toBeNull()
+  })
+
+  it('pedida partida, el titular y su enlace se van a su columna', () => {
+    pintar(
+      layout([
+        {
+          id: 'offers',
+          enabled: true,
+          presentation: { variant: 'split', surface: 'plain', width: 'contained' },
+        },
+      ]),
+    )
+
+    expect(document.querySelector('[data-offers-presentation]')).toHaveAttribute(
+      'data-offers-presentation',
+      'split',
+    )
+    const mensaje = document.querySelector('[data-split-part="copy"]')
+    expect(mensaje).not.toBeNull()
+    // Y las ofertas siguen siendo las mismas: cambia el reparto, no la lista.
+    expect(screen.getAllByText('Crema Oferta').length).toBeGreaterThan(0)
+  })
+
+  it('partida o no, el enlace lleva al catálogo filtrado por lo rebajado', () => {
+    // Soltar al visitante en el catálogo entero es hacerle perder justo la
+    // oferta que estaba mirando.
+    for (const presentation of [undefined, { variant: 'split', surface: 'plain', width: 'contained' } as const]) {
+      cleanup()
+      pintar(layout([{ id: 'offers', enabled: true, ...(presentation ? { presentation } : {}) }]))
+      // Por su destino y no por su texto: la banda traduce con su propio
+      // diccionario, no con la `t` de identidad del compositor.
+      const enlaces = Array.from(document.querySelectorAll('a[href]'))
+      expect(
+        enlaces.some((enlace) => enlace.getAttribute('href') === '/s/botica?ver=todo&oferta=1'),
+      ).toBe(true)
+    }
+  })
+})

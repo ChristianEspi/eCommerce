@@ -148,11 +148,13 @@ describe('`auto` resuelve por tema, nunca por rubro', () => {
      * La regla que evita repetir el fallo de `heroVariant` en V2: estuvo tres
      * fases declarado y sin consumidor.
      *
-     * El muro de logotipos entra en la lista en P07, cuando `BrandLogoWall`
-     * existe de verdad: hasta esa fase `auto` no podía resolverlo, aunque la
-     * lista cerrada ya lo aceptara. La banda partida (`split`) sigue fuera —es
-     * de P08— y por eso ningún tema la resuelve todavía; un contrato que dice
-     * que algo cambia y no cambia nada es peor que no tenerlo.
+     * El muro de logotipos entra en la lista en P07 y la banda partida en P08,
+     * cada uno cuando su componente existe de verdad: hasta entonces `auto` no
+     * podía resolverlos, aunque la lista cerrada ya los aceptara. Un contrato
+     * que dice que algo cambia y no cambia nada es peor que no tenerlo.
+     *
+     * Que estén pintadas no quiere decir que algún tema las resuelva: `split`
+     * cuesta alto de página y sigue siendo una elección del comercio.
      */
     const pintadas = [
       'rail',
@@ -161,6 +163,7 @@ describe('`auto` resuelve por tema, nunca por rubro', () => {
       'cards',
       'logos',
       'band',
+      'split',
       'tiles',
       'pills',
       'mosaic',

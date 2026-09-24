@@ -1,13 +1,16 @@
 import { z } from 'zod'
 import {
+  ALL_BLOCK_LAYOUTS,
   CONTENT_BLOCK_TYPES,
   CONTENT_PAGE_KINDS,
   CONTENT_STATUSES,
-  MEDIA_LAYOUTS,
   blockFieldRules,
+  blockLayoutDefault,
+  blockLayoutIsValid,
   isSafeHref,
   looksLikeMarkup,
   richTextSchema,
+  type BlockLayout,
   type ContentBlockType,
   type RichTextDocument,
 } from '@/domain/content'
@@ -196,12 +199,22 @@ export const blockFormSchema = z.object({
    */
   descendants: z.boolean().default(false),
   /**
-   * P18 · Carrusel o mosaico, para los bloques de imágenes.
+   * Cómo se enseña el bloque. Va en `settings` como `columns` y `descendants`:
+   * es presentación, no contenido, y la lista de items es la misma en todas.
    *
-   * Va en `settings` como `columns` y `descendants`: es presentación, no
-   * contenido, y la lista de diapositivas es la misma en las dos.
+   * ## Por qué el enum es la lista ENTERA y no la del tipo elegido
+   *
+   * Porque un esquema de Zod valida un campo mirando ese campo, y «vale para
+   * este tipo de bloque» es una relación ENTRE dos campos: `spotlight` es
+   * correcto en una colección de productos y absurdo en un banner. Aquí se
+   * cierra el vocabulario —nada que no esté en la lista entra— y el encaje con
+   * el tipo lo comprueba `validateBlockForm`, que es donde viven las demás
+   * reglas entre campos.
+   *
+   * Storefront V3 · P08 amplía la lista; hasta entonces solo eran las dos de
+   * los carruseles de imágenes.
    */
-  layout: z.enum(MEDIA_LAYOUTS).default('carousel'),
+  layout: z.enum(ALL_BLOCK_LAYOUTS).default('carousel'),
 })
 export type BlockFormValues = z.infer<typeof blockFormSchema>
 
@@ -274,6 +287,12 @@ export function validateBlockForm(values: BlockFormValues): ValidationIssue[] {
   if (values.publish_to && values.publish_to <= values.publish_from) {
     issues.push({ field: 'publish_to', key: 'content.error.window' })
   }
+  // Una composición que no es de este tipo de bloque (V3 · P08). El desplegable
+  // sale de la misma tabla que esta comprobación, así que esto solo salta si la
+  // llamada no viene del formulario.
+  if (!blockLayoutIsValid(values.block_type, values.layout)) {
+    issues.push({ field: 'layout', key: 'content.error.notForThisType' })
+  }
 
   return issues
 }
@@ -298,7 +317,24 @@ export function clearUnusedBlockFields(values: BlockFormValues): BlockFormValues
     cta_href: rules.cta === 'unused' ? '' : values.cta_href,
     promotion_id: rules.promotion === 'unused' ? null : values.promotion_id,
     category_id: rules.category === 'unused' ? null : values.category_id,
+    /**
+     * Y la composición vuelve a la del tipo nuevo (V3 · P08).
+     *
+     * Sin esto, pasar un banner a sangre a colección de productos dejaría
+     * `bleed` guardado en un bloque que no sabe qué es eso: el desplegable no lo
+     * ofrecería, el formulario no lo enseñaría y la validación lo rechazaría al
+     * guardar sin nada que señalar. Es el mismo problema que el cuerpo escondido
+     * de un hero que pasa a carrusel, resuelto en el mismo sitio.
+     */
+    layout: composicionDelTipo(values.block_type, values.layout),
   }
+}
+
+/** La composición si vale para el tipo; si no, la que ese tipo trae de serie. */
+function composicionDelTipo(type: ContentBlockType, layout: BlockLayout): BlockLayout {
+  if (blockLayoutIsValid(type, layout)) return layout
+  // Un tipo que no elige composición se queda con lo que traía: nadie lo lee.
+  return blockLayoutDefault(type) ?? layout
 }
 
 /** Un texto vacío se guarda como NULL: los CHECK de longitud no admiten `''`. */

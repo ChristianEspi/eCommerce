@@ -244,8 +244,17 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
    */
   services: (data) => <StoreValueProps store={data.store} />,
 
-  offers: (data, maxItems) => (
+  offers: (data, maxItems, presentation) => (
     <OffersFeaturedBand
+      /**
+       * `band` o `split` (V3 · P08).
+       *
+       * La banda es el defecto de los cuatro temas —cabe todo en una franja— y
+       * `split` es una elección del comercio: le da a lo rebajado el ancho
+       * entero con su mensaje al lado. Es lo que quiere quien vive de la
+       * promoción, y cuesta alto de página, así que no lo resuelve ningún tema.
+       */
+      presentacion={presentation?.variant === 'split' ? 'split' : 'band'}
       offers={conTope(data.ofertas, maxItems)}
       // Si lo destacado se pintó como sección propia, la banda se queda solo
       // con las ofertas. Ver `destacadosAparte`.

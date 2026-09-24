@@ -14,6 +14,7 @@ import { useCatalogCommercialPrices } from '../commerce/catalogPrices'
 import { ProductCard } from './ProductCard'
 import { ProductMedia } from './ProductMedia'
 import { SectionHeading } from './SectionHeading'
+import { StoreSplitBand } from './StoreSplitBand'
 
 /**
  * La banda que ocupa el centro de la portada: lo REBAJADO y lo DESTACADO.
@@ -37,6 +38,7 @@ export function OffersFeaturedBand({
   favorites,
   onToggleFavorite,
   onQuickView,
+  presentacion = 'band',
 }: {
   offers: readonly PublicProduct[]
   featured: readonly PublicProduct[]
@@ -46,6 +48,21 @@ export function OffersFeaturedBand({
   favorites?: ReadonlySet<string>
   onToggleFavorite?: (productId: string) => void
   onQuickView?: (slug: string) => void
+  /**
+   * Cómo se reparte la banda (contrato `offers`, pintado en V3 · P08).
+   *
+   * `band` es la de siempre: lo rebajado y lo destacado uno al lado del otro,
+   * 5fr y 7fr. Cabe todo en una franja, y es lo correcto cuando las dos cosas
+   * son listas cortas.
+   *
+   * `split` le da a cada familia el ancho ENTERO y presenta lo rebajado como
+   * mensaje al lado de los productos. La diferencia no es el adorno: en `band`
+   * lo rebajado son tres tarjetas en dos quintos de pantalla —a 1280 px, 200 px
+   * por tarjeta— y en `split` el descuento se lee desde la misma distancia que
+   * el titular. Es lo que quiere quien vive de la promoción; el precio es que la
+   * banda ocupa más alto, y por eso no es el defecto de ningún tema.
+   */
+  presentacion?: 'band' | 'split'
 }) {
   const { t } = useI18n()
   if (offers.length === 0 && featured.length === 0) return null
@@ -63,74 +80,118 @@ export function OffersFeaturedBand({
    * que es justo cuando peor sienta.
    */
   const ambas = offers.length > 0 && featured.length > 0
+  // Partida, las dos familias se apilan: cada una se queda con el ancho entero.
+  const partida = presentacion === 'split'
+
+  /**
+   * «Ver todo» de las OFERTAS lleva al catálogo filtrado por lo rebajado, no al
+   * catálogo entero: soltar al visitante en los 568 productos es hacerle perder
+   * justo la oferta que estaba mirando.
+   *
+   * Sale a una constante porque en `band` va pegado al título —como acción de
+   * la cabecera— y en `split` va debajo del mensaje, que es donde se pulsa
+   * cuando el mensaje ocupa media pantalla. El destino es el mismo en las dos.
+   */
+  const verLoRebajado = (
+    <Box
+      component={Link}
+      to={`/s/${storeSlug}?ver=todo&oferta=1`}
+      sx={{
+        fontSize: TS.label,
+        fontWeight: 800,
+        color: 'var(--accent-deep)',
+        textDecoration: 'none',
+        whiteSpace: 'nowrap',
+        '&:hover': { textDecoration: 'underline' },
+      }}
+    >
+      {t('store.row.seeAll')}
+      <Box component="span" aria-hidden sx={{ ml: 0.5 }}>
+        →
+      </Box>
+    </Box>
+  )
+
+  const tarjetasRebajadas = (
+    <Box
+      sx={{
+        display: 'grid',
+        gap: 1.25,
+        // Tantas columnas como ofertas haya, hasta tres. Con una sola, un
+        // `repeat(3)` fijo dejaba dos huecos a su derecha — y con la banda ya
+        // en una columna, esos huecos ocupaban media pantalla.
+        gridTemplateColumns: {
+          xs: offers.length === 1 ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+          sm: `repeat(${Math.min(offers.length, 3)}, minmax(0, 1fr))`,
+        },
+      }}
+    >
+      {offers.slice(0, 3).map((product) => (
+        <OfferCard
+          key={product.product_id}
+          product={product}
+          storeSlug={storeSlug}
+          imageUrl={
+            product.primary_image_path ? (offersThumbs[product.primary_image_path] ?? null) : null
+          }
+        />
+      ))}
+    </Box>
+  )
+
+  /**
+   * Lo rebajado, en una de sus dos composiciones.
+   *
+   * En `band` es lo de siempre: cabecera con su enlace y las tarjetas debajo.
+   * En `split` el titular y el enlace se van a su propia columna y las tarjetas
+   * a la otra — el mismo primitivo que usa el CMS, así que el reparto y el
+   * apilado en el teléfono están decididos en un solo sitio.
+   */
+  function SeccionRebajados() {
+    const cabecera = (
+      <SectionHeading
+        title={t('store.row.weekDeals')}
+        {...(partida ? {} : { action: verLoRebajado })}
+      />
+    )
+
+    return (
+      <Stack component="section" aria-label={t('store.row.weekDeals')} sx={{ gap: 1.25 }}>
+        {partida ? (
+          <StoreSplitBand
+            copy={
+              <>
+                {cabecera}
+                <Box>{verLoRebajado}</Box>
+              </>
+            }
+            content={tarjetasRebajadas}
+          />
+        ) : (
+          <>
+            {cabecera}
+            {tarjetasRebajadas}
+          </>
+        )}
+      </Stack>
+    )
+  }
 
   return (
     <Box
       data-offers-band={ambas ? 'both' : offers.length > 0 ? 'offers' : 'featured'}
+      data-offers-presentation={presentacion}
       sx={{
         display: 'grid',
         gap: { xs: 2.5, md: 3 },
         gridTemplateColumns: {
           xs: '1fr',
-          md: ambas ? 'minmax(0, 5fr) minmax(0, 7fr)' : '1fr',
+          md: ambas && !partida ? 'minmax(0, 5fr) minmax(0, 7fr)' : '1fr',
         },
         alignItems: 'start',
       }}
     >
-      {offers.length > 0 ? (
-        <Stack component="section" aria-label={t('store.row.weekDeals')} sx={{ gap: 1.25 }}>
-          <SectionHeading
-            title={t('store.row.weekDeals')}
-            action={
-              // «Ver todo» de las OFERTAS lleva al catálogo filtrado por lo
-              // rebajado, no al catálogo entero: soltar al visitante en los 568
-              // productos es hacerle perder justo la oferta que estaba mirando.
-              <Box
-                component={Link}
-                to={`/s/${storeSlug}?ver=todo&oferta=1`}
-                sx={{
-                  fontSize: TS.label,
-                  fontWeight: 800,
-                  color: 'var(--accent-deep)',
-                  textDecoration: 'none',
-                  whiteSpace: 'nowrap',
-                  '&:hover': { textDecoration: 'underline' },
-                }}
-              >
-                {t('store.row.seeAll')}
-                <Box component="span" aria-hidden sx={{ ml: 0.5 }}>
-                  →
-                </Box>
-              </Box>
-            }
-          />
-
-          <Box
-            sx={{
-              display: 'grid',
-              gap: 1.25,
-              // Tantas columnas como ofertas haya, hasta tres. Con una sola, un
-              // `repeat(3)` fijo dejaba dos huecos a su derecha — y con la
-              // banda ya en una columna, esos huecos ocupaban media pantalla.
-              gridTemplateColumns: {
-                xs: offers.length === 1 ? '1fr' : 'repeat(2, minmax(0, 1fr))',
-                sm: `repeat(${Math.min(offers.length, 3)}, minmax(0, 1fr))`,
-              },
-            }}
-          >
-            {offers.slice(0, 3).map((product) => (
-              <OfferCard
-                key={product.product_id}
-                product={product}
-                storeSlug={storeSlug}
-                imageUrl={
-                  product.primary_image_path ? (offersThumbs[product.primary_image_path] ?? null) : null
-                }
-              />
-            ))}
-          </Box>
-        </Stack>
-      ) : null}
+      {offers.length > 0 ? <SeccionRebajados /> : null}
 
       {featured.length > 0 ? (
         <Stack component="section" aria-label={t('store.row.highlighted')} sx={{ gap: 1.25 }}>

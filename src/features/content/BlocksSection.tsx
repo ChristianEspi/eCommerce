@@ -33,9 +33,12 @@ import {
   CONTENT_BLOCK_TYPES,
   blockAcceptsItems,
   blockFieldRules,
-  MEDIA_LAYOUTS,
+  blockChoosesLayout,
+  blockLayoutDefault,
+  blockLayoutFamily,
+  blockLayoutOf,
+  blockLayoutOptions,
   blockUsesMediaItems,
-  mediaLayoutOf,
 } from '@/domain/content'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -112,7 +115,9 @@ function emptyForm(): BlockFormValues {
     segment_id: null,
     columns: 4,
     descendants: false,
-    layout: 'carousel',
+    // La composición del tipo con el que se abre el formulario. Un hero no
+    // elige, así que el valor da igual mientras sea uno de la lista.
+    layout: blockLayoutDefault('hero') ?? 'carousel',
   }
 }
 
@@ -138,7 +143,12 @@ function toForm(row: ContentBlockRow): BlockFormValues {
     segment_id: row.segment_id,
     columns: typeof settings.columns === 'number' ? settings.columns : 4,
     descendants: settings.descendants === true,
-    layout: mediaLayoutOf(settings),
+    // Lo guardado si vale para este tipo, y si no, la composición de siempre de
+    // ese tipo. Un bloque publicado antes de V3 · P08 no tiene `layout`, y eso
+    // no es un bloque a medio configurar: es la mayoría.
+    layout: blockChoosesLayout(row.block_type)
+      ? blockLayoutOf(row.block_type, settings)
+      : (blockLayoutDefault('hero') ?? 'carousel'),
   }
 }
 
@@ -212,6 +222,15 @@ export function BlocksSection({ pageId }: { pageId: string | null }) {
    * —que la base rechaza— y recibir un aviso que decia lo contrario.
    */
   const rules = blockFieldRules(form.block_type)
+  /**
+   * Las composiciones que admite el tipo elegido, o `null` si no elige (V3 · P08).
+   *
+   * Sale de la misma tabla del dominio de la que la vitrina saca lo que pinta:
+   * con dos listas separadas, el desplegable acabaría ofreciendo una
+   * composición que no existe — que es exactamente lo que pasó en V2 con
+   * `heroVariant`.
+   */
+  const opcionesDeComposicion = blockLayoutOptions(form.block_type)
   const issueOf = (field: keyof BlockFormValues): string | null =>
     issues.find((issue) => issue.field === field)?.key ?? null
   /**
@@ -478,38 +497,55 @@ export function BlocksSection({ pageId }: { pageId: string | null }) {
           </TextField>
 
           {blockUsesMediaItems(form.block_type) && (
-            <>
-              <Typography sx={{ color: 'var(--muted)', fontSize: 13 }}>
-                {t('content.blocks.slidesHint')}
-              </Typography>
-              {/* Carrusel o mosaico: la MISMA lista de imágenes con otra
-                  disposición. Cambiarla no obliga a volver a subir nada, por eso
-                  es un ajuste del bloque y no otro tipo de bloque. */}
-              <TextField
-                select
-                label={t('content.blocks.layout')}
-                value={form.layout}
-                helperText={t('content.blocks.layoutHelp')}
-                onChange={(event) =>
-                  setForm({ ...form, layout: event.target.value as BlockFormValues['layout'] })
-                }
-              >
-                {MEDIA_LAYOUTS.map((layout) => (
-                  <MenuItem key={layout} value={layout}>
-                    {t(`content.blocks.layout.${layout}` as MessageKey)}
-                  </MenuItem>
-                ))}
-              </TextField>
-              {form.layout === 'grid' && (
-                <TextField
-                  type="number"
-                  label={t('content.blocks.columns')}
-                  helperText={t('content.blocks.columnsHelp')}
-                  value={form.columns}
-                  onChange={(event) => setForm({ ...form, columns: Number(event.target.value) })}
-                />
-              )}
-            </>
+            <Typography sx={{ color: 'var(--muted)', fontSize: 13 }}>
+              {t('content.blocks.slidesHint')}
+            </Typography>
+          )}
+
+          {/**
+           * Cómo se enseña el bloque (V3 · P08).
+           *
+           * La MISMA lista de items con otra disposición: cambiarla no obliga a
+           * volver a subir ni a elegir nada, por eso es un ajuste del bloque y
+           * no otro tipo de bloque. Las opciones salen de la tabla del dominio,
+           * que es la misma de la que la vitrina saca lo que pinta — así el
+           * desplegable no puede ofrecer algo que no se ve.
+           *
+           * Y la etiqueta se busca por FAMILIA: «mosaico» no quiere decir lo
+           * mismo en un carrusel de imágenes que en una lista de familias, y el
+           * comercio no tiene por qué leer `photo-grid`.
+           */}
+          {opcionesDeComposicion !== null && (
+            <TextField
+              select
+              label={t('content.blocks.layout')}
+              value={form.layout}
+              helperText={t('content.blocks.layoutHelp')}
+              onChange={(event) =>
+                setForm({ ...form, layout: event.target.value as BlockFormValues['layout'] })
+              }
+            >
+              {opcionesDeComposicion.map((layout) => (
+                <MenuItem key={layout} value={layout}>
+                  {t(
+                    `content.blocks.layout.${blockLayoutFamily(form.block_type)}.${layout}` as MessageKey,
+                  )}
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
+
+          {/* Cuántas imágenes por fila, solo en el mosaico de un carrusel de
+              imágenes. Las colecciones tienen su propio campo más abajo, con la
+              regla de su tipo. */}
+          {blockUsesMediaItems(form.block_type) && form.layout === 'grid' && (
+            <TextField
+              type="number"
+              label={t('content.blocks.columns')}
+              helperText={t('content.blocks.columnsHelp')}
+              value={form.columns}
+              onChange={(event) => setForm({ ...form, columns: Number(event.target.value) })}
+            />
           )}
 
           {/* Fase 09: borradores con IA sobre lo que ya está escrito. Aplicar

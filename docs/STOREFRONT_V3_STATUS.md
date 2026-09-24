@@ -952,3 +952,183 @@ comparta módulos con la portada eager — el muro de logotipos ya demostró que
 partir por ahí no ahorra nada.
 
 `PHASE_RESULT: PASS`
+
+---
+
+# P08 · CMS editorial: composiciones cerradas por bloque
+
+`ESTADO: PASS`
+
+## El problema, dicho con precisión
+
+El CMS tenía ocho tipos de bloque y **una** forma de enseñar cada uno. Una
+colección de productos era siempre una rejilla; el tipo `carousel` era la misma
+lista en una franja —y para cambiar de una a otra había que **cambiar el tipo de
+bloque**, que es cambiar el contenido para conseguir otra maquetación—. Una
+colección de familias eran siempre puertas, aunque el comercio hubiera subido
+foto a las ocho. Y un banner era siempre una franja dentro del ancho de la
+página.
+
+Con cuatro bloques seguidos, una portada del CMS se lee como una lista de filas.
+
+## Lo que se añade, y dónde vive
+
+Tres vocabularios **cerrados**, todos en `settings.layout`:
+
+| Familia | Valores | Defecto |
+|---|---|---|
+| Colección de productos (`product_collection`, `carousel`) | `grid` · `rail` · `editorial` · `spotlight` · `split` | `grid` / `rail` |
+| Colección de familias (`category_collection`) | `tiles` · `pills` · `photo-grid` · `mosaic` | `tiles` |
+| Banner (`banner`) | `contained` · `bleed` · `split` | `contained` |
+| Imágenes (`slider`) | `carousel` · `grid` (las de P18) | `carousel` |
+
+**Sin migración, y no por atajo:** `layout` ya estaba en la lista blanca de
+`settings` desde el CMS original (`ebim.content_settings_are_safe`), que admite
+claves de un vocabulario cerrado con valores escalares. Lo que esta fase añade
+son **valores** de una clave que ya existía y ya estaba validada. Hay un test
+que lo dice explícitamente, para que no parezca un descuido.
+
+**El defecto de cada tipo es su composición de hoy.** Una página publicada antes
+de esta fase se ve exactamente igual después: un bloque sin `layout` no es un
+bloque a medio configurar, es la mayoría.
+
+**Una sola tabla, tres lectores.** `BLOCK_LAYOUTS` en `src/domain/content.ts` la
+leen la vitrina (qué pinta), el editor (qué ofrece) y la validación (qué se
+puede guardar). Con tres `switch` separados es cuestión de tiempo que el editor
+ofrezca algo que nadie pinta — que es exactamente lo que pasó en V2 con
+`heroVariant`, declarado tres fases sin consumidor.
+
+## Las composiciones, una por una
+
+**`editorial`** quita la caja, la sombra y el relleno de la tarjeta y deja la
+foto sola, a dos o tres columnas como mucho: seis columnas de «foto grande» son
+seis fotos pequeñas. La línea no se borra, se vuelve **transparente**, porque
+quitarla movería la rejilla un píxel al pasar el ratón.
+
+**`spotlight`** da a la primera pieza el doble de área en las dos direcciones, y
+solo en escritorio. Con menos de tres piezas no destaca nada: una pieza doble y
+una sencilla no es una jerarquía, es un hueco. Es la misma cifra y el mismo
+motivo que el mosaico de familias de P07.
+
+**`split`** es un primitivo nuevo, `StoreSplitBand`, y lo usan **tres** sitios:
+la colección de productos con copy, el banner y la banda de rebajados de la
+portada. Reparto `5fr / 7fr` —el mensaje pide menos sitio que una rejilla—, y en
+el teléfono se apila con el **mensaje primero**, porque el mensaje explica lo que
+viene después. Tres versiones de «dos columnas» es cómo se acaba con tres
+proporciones distintas y una que no se apila bien.
+
+**`photo-grid`** existe porque `tiles` se rinde: pasa a fila desplazable a partir
+de cuatro familias, y eso deja media colección detrás de una flecha. La rejilla
+de fotos crece hacia abajo, que es la dirección en la que una página tiene sitio.
+Tres o cuatro columnas según cuántas haya: con cinco a cuatro columnas queda una
+sola en la segunda fila, y eso se lee como un hueco.
+
+**`bleed`** no trae cálculo propio: usa `StoreSectionFrame` de P06, donde vive el
+único `50vw` de la vitrina. Repetir ese truco por bloque es cómo aparece una
+barra de desplazamiento horizontal en toda la tienda.
+
+**La banda partida de la portada (`offers` · `split`)** cierra una deuda de P06:
+estaba en el contrato, la base la aceptaba y no la pintaba nadie. En `band`, lo
+rebajado son tres tarjetas en dos quintos de pantalla; en `split`, el descuento
+se lee desde la misma distancia que el titular. Cuesta alto de página, así que
+**ningún tema la resuelve**: es una elección del comercio.
+
+## Diferencias con lo que sugería el prompt
+
+1. **`campaign` no recibe las tres disposiciones del banner.** El prompt las
+   pedía para «banner/campaign». Las campañas consecutivas se **agrupan** en un
+   muro (`groupCampaigns`), y un ancho o un reparto por bloque dentro de un grupo
+   pelea con el grupo: la composición de una campaña la decide el muro, que es
+   quien sabe cuántas hay. Está escrito en el propio contrato, junto a la tabla.
+2. **El banner ya era un «split» a medias.** Su composición de siempre pone la
+   imagen al 40 % **al lado** del texto, no detrás. Así que `split` no podía ser
+   «texto al lado de la imagen» —eso ya existía— y es lo que de verdad faltaba:
+   mitad y mitad, con la imagen **sin tope de alto** (hoy 260 px) y más aire en
+   el texto. De franja informativa a pieza de campaña.
+3. **El enum de Zod es la lista ENTERA, no la del tipo.** Un esquema valida un
+   campo mirando ese campo, y «vale para este tipo de bloque» es una relación
+   entre dos campos. El vocabulario se cierra en el esquema y el encaje con el
+   tipo lo comprueba `validateBlockForm`, donde ya viven las demás reglas entre
+   campos. Y cambiar de tipo devuelve la composición a la del tipo nuevo — el
+   mismo problema que el cuerpo escondido de un hero que pasa a carrusel,
+   resuelto en el mismo sitio (`clearUnusedBlockFields`).
+4. **Las etiquetas del editor se buscan por FAMILIA.** «Mosaico» no quiere decir
+   lo mismo en un carrusel de imágenes que en una lista de familias, y el
+   comercio no tiene por qué leer `photo-grid`. Hay un test que comprueba que
+   los doce valores tienen etiqueta en los dos idiomas y que el desplegable no
+   enseña ningún valor técnico.
+
+## La vista previa sale gratis, y es a propósito
+
+`src/features/content/PreviewSection.tsx` importa el **mismo** `ContentBlocks`
+de la vitrina y le pasa los bloques por el mismo parseo (`settings` saneado con
+`contentSettingsSchema`). Así que la previa representa cada composición sin una
+línea nueva. Las pruebas de render de esta fase montan el árbol exactamente como
+lo monta la previa —`assets={{}}`, `images={{}}`— para que eso siga siendo
+cierto.
+
+## Archivos principales
+
+| Archivo | Qué cambia |
+|---|---|
+| `src/domain/content.ts` | Los tres vocabularios, la tabla `BLOCK_LAYOUTS`, `blockLayoutOf/Options/Default/Family`, `blockChoosesLayout`, `blockLayoutIsValid`. `mediaLayoutOf` delega, para no tener dos verdades. |
+| `components/StoreSplitBand.tsx` | **Nuevo.** El primitivo de dos columnas, con el apilado y el reparto decididos una vez. |
+| `components/ContentBlocks.tsx` | Las cinco de producto, las cuatro de familias (con `CategoryPhotoGrid` nuevo), las tres de banner y la variante `editorial` de `CollectionCard`. |
+| `components/OffersFeaturedBand.tsx` | `presentacion: 'band' \| 'split'`, con lo rebajado en su banda partida. |
+| `home/SectionRegistry.tsx` | La sección `offers` ya lee su presentación. |
+| `features/content/types.ts` · `api.ts` · `BlocksSection.tsx` | Esquema del editor, guardado de `layout` en los cinco tipos y un solo desplegable que sale de la tabla. |
+| `shared/i18n/messages.{es,en}.ts` | Doce etiquetas nuevas, por familia. |
+
+**Migraciones: ninguna.** Ver arriba.
+
+## Ciclos correctivos
+
+1. El `blockLayoutOf` genérico y la tabla tipada contra la lista completa no
+   compilaban a la primera: la tabla usaba `readonly string[]` y el esquema
+   necesitaba una tupla de literales. La lista completa pasó a ser una tupla
+   explícita, con un test que la compara con la unión de las cuatro familias —
+   que es lo que impide que se separen.
+2. Mi campo de columnas nuevo duplicaba el que ya existía para las colecciones.
+   Corregido: el del mosaico de imágenes se queda con su condición y las
+   colecciones siguen con el de la regla de su tipo.
+3. Dos aserciones mías apuntaban al texto en vez de a la estructura:
+   `OffersFeaturedBand` traduce con su propio `useI18n`, no con la `t` de
+   identidad del compositor, así que el enlace se comprueba por su **destino**.
+   Y el documento de texto enriquecido es un **array plano** de nodos, no un
+   árbol tipo Tiptap.
+
+## Tests
+
+| Archivo | Casos |
+|---|---|
+| `components/cms-editorial-v3.test.tsx` | **Nuevo**, 33. Las cinco de producto pintan la misma lista en el mismo orden y sin pedir nada por item; `editorial` sin caja; `spotlight` con su pieza doble solo en escritorio y sin destacar con menos de tres; `split` con el mensaje en su columna, sin duplicarlo, apilado en el teléfono. Las cuatro de familias enseñan las tres familias y conservan ruta y filtro; `photo-grid` no se convierte en carrusel; `pills` no son puertas; una familia sin foto no se rellena. Las tres de banner conservan mensaje e imagen; `bleed` usa el marco con su `50vw`; `contained` no envuelve nada; `split` da la mitad y quita el tope. Y lo que no cambia: sin `layout` se ve como antes, un valor inventado cae al defecto y el texto enriquecido sale como texto. |
+| `features/content/content.test.ts` | 60 → **71**. La lista completa es la unión de las familias; `layout` ya estaba en el vocabulario de `settings`; el defecto de los cinco tipos; lo guardado manda si es de su familia y cae si no; los tipos que no eligen no ofrecen nada; el editor rechaza una composición ajena al tipo; cambiar de tipo la devuelve al defecto y conserva la que sí vale; los doce valores tienen etiqueta ES/EN; y la familia de cada tipo. |
+| `features/content/content-ui.test.tsx` | 21 → **24**. Un hero no pregunta disposición; una colección de productos ofrece las cinco con nombres —no con valores—; una de familias ofrece las suyas y **no** enseña `photo-grid`. |
+| `home/HomeComposer.test.tsx` | +3. Sin pedir nada, la banda de siempre; pedida partida, el titular y su enlace en su columna con las mismas ofertas; y el enlace lleva al catálogo filtrado por lo rebajado en las dos. |
+| `theme/presentation.test.ts` | `split` entra en la lista de variantes pintadas; ningún tema la resuelve. |
+
+`architecture.test.ts` ya vigila `dangerouslySetInnerHTML` en todo `src/`: esta
+fase no añade ninguna ruta que interprete HTML y no hacía falta repetir el test.
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 310 ficheros, 6206 tests |
+| `npm run build` | **PASS** |
+| `npm run bundle:report` | **PASS** — portada 403,7 kB (techo 405) |
+| `npm run scan:secrets` | **PASS** — sin hallazgos |
+
+`npm run test:db` no se repite: no hay migración ni cambio de validador de base.
+
+## Pendiente real
+
+El techo de la portada queda a **1,3 kB**. Es el aviso serio para P09: los
+filtros en cajón y la ficha comercial tienen que entrar **por `lazy`**, que es
+además lo que pide la regla 19. Y lo que se mueva a un trozo aparte no puede
+compartir módulos con lo que ya viaja en la portada — el muro de logotipos de
+P07 ya demostró que partir por ahí no ahorra nada.
+
+`PHASE_RESULT: PASS`
