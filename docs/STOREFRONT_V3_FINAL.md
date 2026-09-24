@@ -23,7 +23,7 @@ va el resumen y la evidencia.
 | P11 | PASS | `652d494` | Reducción de imágenes antes de subir, con cinco reglas de seguridad, y readiness V2 con ocho señales que ya no preguntan mal. |
 | P12 | PASS | `a39f0e8` | Presentación por sección desde el taller, con las opciones de su sección y el valor heredado escrito. Destapó la versión escrita a mano. |
 | P13 | PASS | `a83e1cb` | Paridad de la vista previa: tres piezas compartidas de verdad y el resto declarando qué representa. Matriz visual de Playwright escrita. |
-| P14 | PASS | `7dca992` | Auditoría funcional, multi-industria, accesibilidad, responsive y seguridad. Dos defectos reales encontrados y corregidos. |
+| P14 | PASS | `7dca992` | Auditoría funcional, multi-industria, accesibilidad, responsive y seguridad. **Tres** defectos reales encontrados y corregidos, dos de ellos en copy de producción. |
 
 ## Contexto
 
@@ -32,7 +32,7 @@ va el resumen y la evidencia.
 | **Rama** | `feat/storefront-v3-commerce-design-system` |
 | **HEAD inicial (P00)** | `b4dc01e8db8ec0608bb6cab546b2c150ff9a1161` |
 | **HEAD final** | `7dca992` |
-| **Commits** | 15, uno por fase, todos **locales** |
+| **Commits** | 16: uno por fase (15) más la nota del HEAD final. Todos **locales**. |
 | **PUSH** | **NO** |
 | **DEPLOY** | **NO** |
 | **Migraciones remotas** | **NO** |
