@@ -1,6 +1,6 @@
 import { Box, Breadcrumbs, Button, Card, Link as MuiLink, Stack, Typography } from '@mui/material'
 import { visuallyHidden } from '@mui/utils'
-import { Suspense, useEffect, useMemo, useRef } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { lazyPage } from '@/app/lazyPage'
 import type { SearchQuery, SearchSort } from '@/domain'
@@ -13,7 +13,6 @@ import { EmptyState, ErrorState } from '@/shared/ui/states'
 import { TS } from '@/theme/tokens'
 import { BackToTop } from './components/BackToTop'
 import { CategoryBar } from './components/CategoryBar'
-import { ExploreMore } from './components/ExploreMore'
 import { ProductGrid, ProductGridSkeleton } from './components/ProductGrid'
 import { useFavorites } from './useFavorites'
 import { StoreFilterPanel } from './components/StoreFilterPanel'
@@ -22,6 +21,17 @@ import { HomeComposer } from './home/HomeComposer'
 import type { HomeSectionData } from './home/types'
 import { useStorefrontTheme } from './theme/useStorefrontTheme'
 import { StoreSortMenu } from './components/StoreSortMenu'
+
+/**
+ * La salida del catálogo, por `lazy` (Storefront V2 · P14).
+ *
+ * Solo se pinta cuando una búsqueda devuelve cero resultados o muy pocos, que
+ * es la minoría de las visitas. Cargarla siempre era pagar en el primer pintado
+ * de la portada —donde ni siquiera puede aparecer— por una sección de rescate.
+ */
+const ExploreMore = lazy(() =>
+  import('./components/ExploreMore').then((modulo) => ({ default: modulo.ExploreMore })),
+)
 import {
   OFERTAS_QUERY,
   useCatalogPages,
@@ -987,26 +997,30 @@ export function StoreHomePage() {
               El umbral es el mismo que usa la fila de la portada para crecer:
               hasta tres, la pantalla se queda corta. */}
           {results.isSuccess && total > 0 && total <= POCOS_RESULTADOS && (
-            <ExploreMore
-              storeSlug={storeSlug}
-              categories={familias.map((f) => ({ code: f.slug, name: f.name }))}
-              brands={brandOptions}
-              selectedCategory={categorySlug}
-              selectedBrand={brand}
-            />
+            <Suspense fallback={null}>
+              <ExploreMore
+                storeSlug={storeSlug}
+                categories={familias.map((f) => ({ code: f.slug, name: f.name }))}
+                brands={brandOptions}
+                selectedCategory={categorySlug}
+                selectedBrand={brand}
+              />
+            </Suspense>
           )}
 
           {/* Y sin NINGÚN resultado, la misma salida bajo el estado vacío: el
               botón de quitar filtros arregla el caso de quien filtró de más,
               pero no el de quien buscó algo que esta tienda no vende. */}
           {results.isSuccess && total === 0 && (
-            <ExploreMore
-              storeSlug={storeSlug}
-              categories={familias.map((f) => ({ code: f.slug, name: f.name }))}
-              brands={brandOptions}
-              selectedCategory={categorySlug}
-              selectedBrand={brand}
-            />
+            <Suspense fallback={null}>
+              <ExploreMore
+                storeSlug={storeSlug}
+                categories={familias.map((f) => ({ code: f.slug, name: f.name }))}
+                brands={brandOptions}
+                selectedCategory={categorySlug}
+                selectedBrand={brand}
+              />
+            </Suspense>
           )}
         </Box>
       </Stack>

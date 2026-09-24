@@ -1,8 +1,7 @@
+import { Suspense, lazy } from 'react'
 import { BrandRow } from '../components/BrandRow'
 import { BrandTrustStrip } from '../components/BrandTrustStrip'
 import { Stack } from '@mui/material'
-import { CategoryDoorGrid, CategoryPills } from '../components/CategoryDoors'
-import { ContentBlocks } from '../components/ContentBlocks'
 import { OffersFeaturedBand } from '../components/OffersFeaturedBand'
 import { ProductRow } from '../components/ProductRow'
 import { PromoCarousel } from '../components/PromoCarousel'
@@ -12,6 +11,44 @@ import { StoreHero } from '../components/StoreHero'
 import { StoreBusinessInfo } from '../components/StoreBusinessInfo'
 import { StoreValueProps } from '../components/StoreValueProps'
 import type { HomeSectionData, HomeSectionRegistry } from './types'
+
+/**
+ * El contenido del CMS llega por `lazy` (Storefront V2 · P14).
+ *
+ * Son ocho kilobytes gzip —nueve tipos de bloque, su carrusel y su mural de
+ * campañas— que hasta P14 descargaba **toda** tienda, tuviera contenido o no.
+ * La mayoría no lo tiene: el módulo de contenido es un addon, y una tienda sin
+ * él recibe cero bloques.
+ *
+ * Y cuando sí lo tiene, tampoco se pierde nada: los bloques llegan por consulta
+ * y el módulo se descarga mientras esa consulta viaja. Lo que se evita es pagar
+ * el peso en el primer pintado de quien no va a ver ni un bloque.
+ *
+ * Es lo que devolvió el recorrido de la portada por debajo de su techo
+ * (`docs/performance-budget.md`): el rediseño lo había dejado en 417 kB.
+ */
+/**
+ * Las puertas de las familias, también por `lazy` (Storefront V2 · P14).
+ *
+ * La sección `categories` viene **apagada en los cuatro temas**: encenderla es
+ * una decisión del comercio, y hasta P14 su módulo —las puertas, sus tintes y
+ * sus fotos— lo descargaba toda tienda, la tuviera encendida o no.
+ *
+ * Cuando sí está encendida se monta igual, y lo que cuesta es una petición de
+ * cuatro kilobytes que empieza con el primer pintado. La alternativa era
+ * cobrársela a las tiendas que no la usan, que hoy son todas las que no la
+ * tocaron.
+ */
+const CategoryDoorGrid = lazy(() =>
+  import('../components/CategoryDoors').then((modulo) => ({ default: modulo.CategoryDoorGrid })),
+)
+const CategoryPills = lazy(() =>
+  import('../components/CategoryDoors').then((modulo) => ({ default: modulo.CategoryPills })),
+)
+
+const ContentBlocks = lazy(() =>
+  import('../components/ContentBlocks').then((modulo) => ({ default: modulo.ContentBlocks })),
+)
 
 /**
  * Qué pinta cada sección de la portada.
@@ -127,19 +164,28 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
     />
   ),
 
-  cms: (data) => (
-    <ContentBlocks
-      blocks={data.blocks}
-      storeSlug={data.storeSlug}
-      assets={data.assets}
-      images={data.images}
-      currency={data.store.currency}
-      // P03 · Las mismas fotos que las puertas de la portada: un bloque de
-      // categorías del CMS no se puede ver peor que la sección equivalente.
-      categoryMedia={data.categoryMedia}
-      leadingHeading={data.hasCmsHero}
-    />
-  ),
+  cms: (data) => {
+    // Sin bloques no se monta nada, y así una tienda sin contenido tampoco
+    // descarga el módulo. Devolver `null` es lo que el compositor ya espera de
+    // una sección sin nada que pintar.
+    if (data.blocks.length === 0) return null
+
+    return (
+      <Suspense fallback={null}>
+        <ContentBlocks
+          blocks={data.blocks}
+          storeSlug={data.storeSlug}
+          assets={data.assets}
+          images={data.images}
+          currency={data.store.currency}
+          // P03 · Las mismas fotos que las puertas de la portada: un bloque de
+          // categorías del CMS no se puede ver peor que la sección equivalente.
+          categoryMedia={data.categoryMedia}
+          leadingHeading={data.hasCmsHero}
+        />
+      </Suspense>
+    )
+  },
 
   /**
    * Las promociones vigentes salen del motor, no de un cartel escrito a mano:
@@ -185,23 +231,28 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
      */
     const pills = data.theme.style.categoryVariant === 'pills'
 
+    // Las puertas llegan por `lazy`, sin fallback: lo que hay debajo no se
+    // mueve de sitio —la sección ya tiene su título— y un esqueleto de cuatro
+    // azulejos para cuatro kilobytes parpadearía más de lo que informa.
     return (
-      <Stack component="section" aria-label={data.t('store.categories.shopBy')} sx={{ gap: 1.5 }}>
-        <SectionHeading title={data.t('store.categories.shopBy')} />
-        {pills ? (
-          <CategoryPills
-            categories={familias}
-            storeSlug={data.storeSlug}
-            ariaLabel={data.t('store.categories.shopBy')}
-          />
-        ) : (
-          <CategoryDoorGrid
-            categories={familias}
-            storeSlug={data.storeSlug}
-            ariaLabel={data.t('store.categories.shopBy')}
-          />
-        )}
-      </Stack>
+      <Suspense fallback={null}>
+        <Stack component="section" aria-label={data.t('store.categories.shopBy')} sx={{ gap: 1.5 }}>
+          <SectionHeading title={data.t('store.categories.shopBy')} />
+          {pills ? (
+            <CategoryPills
+              categories={familias}
+              storeSlug={data.storeSlug}
+              ariaLabel={data.t('store.categories.shopBy')}
+            />
+          ) : (
+            <CategoryDoorGrid
+              categories={familias}
+              storeSlug={data.storeSlug}
+              ariaLabel={data.t('store.categories.shopBy')}
+            />
+          )}
+        </Stack>
+      </Suspense>
     )
   },
 

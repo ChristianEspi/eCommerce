@@ -1587,7 +1587,7 @@ que aparece meses después como «yo no moví eso».
 
 # P13 · Vista previa fiel y calidad visual de la tienda
 
-**Commit:** `<pendiente>` · **Ciclos correctivos:** 2 de 3
+**Commit:** `6a13083` · **Ciclos correctivos:** 2 de 3
 
 ## Los dos problemas
 
@@ -1702,5 +1702,98 @@ para contarlo aquí.
 | `npm run lint` | **PASS** |
 | `npm run test` | **PASS** — 299 ficheros, 5914 tests |
 | `npm run build` | **PASS** |
+
+`PHASE_RESULT: PASS`
+
+---
+
+# P14 · Hardening final
+
+**Commit:** `<pendiente>` · **Ciclos correctivos:** 3 de 3
+
+## La auditoría del diff completo
+
+`git diff cd7a82d..HEAD` — 102 ficheros, 16 058 líneas añadidas. Lo que se buscó y lo que salió:
+
+| Qué se buscó | Resultado |
+|---|---|
+| Copy de farmacia en valores por defecto | **limpio**. Las coincidencias son comentarios que explican la retirada, más la tabla de iconos, que cubre salud **junto a** otros once sectores |
+| Nombres o slugs de clientes en producción | **ninguno** |
+| `any`, `@ts-ignore`, `@ts-expect-error` nuevos | **ninguno**. Un solo `eslint-disable`, para `no-control-regex` en el saneado de caracteres de control, con el precedente de `domain/href.ts` |
+| `dangerouslySetInnerHTML` / `innerHTML` | **ninguno** |
+| Colores escritos a mano | solo `#FFFFFF` sobre el degradado de la portada, que ya estaba en `dev`: no es el color del tenant, es el contraste sobre su degradado |
+| URL de imagen sin sanear | **ninguna**: logotipos de marca y fotos de categoría pasan por `assetRef`, el mismo filtro del logotipo de la tienda |
+| RLS y grants sospechosos | **ninguno**: grants por columna, policies de escritura contra pertenencia a la sociedad, lectura anónima solo de sociedades con tienda activa |
+| Consultas N+1 nuevas | **ninguna**. Tres consultas nuevas en total, las tres con `enabled` y `staleTime`; el ranking comparte el ciclo del catálogo y las páginas del pie comparten clave con el propio pie |
+| Duplicación de componentes por tema | **ninguna**: las cuatro presentaciones de tarjeta salen de reglas colgadas de la frontera, no de cuatro ramas dentro del componente |
+| Imágenes perezosas y sin salto de maquetación | `loading="lazy"` y `decoding="async"` en todas las nuevas; el logotipo de marca lleva `width`/`height` reales y la foto de categoría va absoluta dentro de una puerta de proporción fija |
+
+Y una prueba nueva que convierte la primera fila de esa tabla en un gate permanente
+(`multi-industry.test.ts`, 11 casos): recorre los **dos diccionarios completos** y falla si un texto
+de vitrina —o de la pantalla de diseño— nombra un rubro; comprueba que una familia de veintiún
+sectores distintos encuentra icono; que ningún rubro concentra la tabla; que lo específico gana a lo
+genérico; y que los cuatro temas se diferencian de verdad entre sí y no declaran restricción de
+sector.
+
+## El gate que se puso rojo: el presupuesto de descarga
+
+`npm run bundle:report` sacó la portada a **417,0 kB** gzip contra un techo de 405. Era una
+regresión real y atribuible a este rediseño —la portada medía 399,5 antes de empezar—, así que se
+corrigió bajando el peso, **sin tocar el techo**:
+
+| Diferido | Ahorro | Por qué no hace falta en el primer pintado |
+|---|---|---|
+| Panel de sugerencias del buscador | ~8,6 kB | solo aparece con dos caracteres escritos, y para entonces hay un rebote de 250 ms y una consulta de catálogo en vuelo: el módulo viaja con ella |
+| Bloques del CMS | ~8,6 kB | el módulo de contenido es un addon; una tienda sin él recibe cero bloques |
+| Cajón del asistente | ~3 kB | estaba montado **siempre**, cerrado; se abre pulsando un botón flotante |
+| Puertas de categoría | ~4,1 kB | la sección viene apagada en los cuatro temas |
+| «También puedes explorar» | ~1 kB | solo se pinta con cero o pocos resultados |
+| `Tooltip` de la tarjeta de producto | ~2,7 kB | decía **exactamente** lo mismo que el `aria-label` que el botón ya lleva; el `title` nativo da el mismo aviso sin arrastrar Popper |
+
+**Resultado: 398,8 kB** — por debajo de los 399,5 que medía antes del rediseño. La vitrina hace más
+cosas y pinta antes.
+
+Dos cosas que **no** se difirieron, a propósito:
+
+- **el carrito**, aunque está montado siempre y cerrado, como estaba el asistente. Abrirlo es la
+  acción central de una tienda y llega justo después de «añadir»: ahorrar tres kilobytes ahí se paga
+  con un retraso en el gesto que cierra la venta;
+- **la caja de búsqueda**, que es el landmark `search` de la cabecera. Lo que se difirió es su lista
+  de sugerencias; la caja, sus atributos de `combobox` y su teclado siguen en el primer pintado,
+  porque es lo que un lector de pantalla anuncia al enfocar la cabecera.
+
+## Ciclos correctivos
+
+1. **Prettier no es del repositorio.** Al formatear un archivo con `npx prettier` lo reescribió
+   entero con comillas dobles y punto y coma. Revertido con `git checkout --` sobre ese único
+   fichero y rehecha la edición a mano.
+2. **Un comentario JSX donde no cabía.** `{/* … */}` dentro de `{cond && ( … )}` no es una posición
+   válida: se convirtió en comentario de línea, que sí lo es.
+3. **Una prueba del compositor pasó a ser asíncrona.** Las puertas de categoría llegan ahora por
+   `lazy`, así que la aserción síncrona dejó de encontrarlas. Se cambió a `findByRole` conservando
+   intacto lo que comprueba —cuáles se pintan, en qué orden y cuántas—.
+
+Y dos fallos míos en las pruebas nuevas, corregidos en las pruebas y no en el código: `\bmoda`
+encuentra «cómoda» —en una expresión regular de JavaScript la «ó» no es carácter de palabra, así que
+hay frontera ahí dentro—, resuelto quitando los acentos antes de comparar; y la lista de secciones
+al día que sale de las siete señales, que había contado mal las páginas.
+
+## Gates finales
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 300 ficheros, 5925 tests |
+| `npm run build` | **PASS** |
+| `npm run scan:secrets` | **PASS** — sin hallazgos |
+| `npm run bundle:report` | **PASS** — los cuatro recorridos dentro del techo |
+| `npm run test:db` | **PASS** — 136 ficheros, 3595 tests contra Postgres real (PGlite) |
+| Playwright (`e2e/`) | **NO EJECUTADO** — sin `.env` ni navegadores de Playwright en esta máquina. No se da por verde |
+
+## Informe final
+
+`docs/STOREFRONT_V2_FINAL_REPORT.md`: síntesis ejecutiva y técnica, migraciones, contratos,
+limitaciones y pendientes reales.
 
 `PHASE_RESULT: PASS`

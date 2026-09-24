@@ -38,7 +38,6 @@ import { initials } from './branding'
 import { StoreCategoryNav } from './components/StoreCategoryNav'
 import { StoreFooter } from './components/StoreFooter'
 import { StoreQuickSearch } from './components/StoreQuickSearch'
-import { AssistantDrawer } from './components/AssistantDrawer'
 import { CartDrawer } from './cart/CartDrawer'
 import { CartProvider } from './cart/CartProvider'
 import { useCart } from './cart/cart-context'
@@ -67,6 +66,22 @@ import '@fontsource/plus-jakarta-sans/latin-500.css'
 import '@fontsource/plus-jakarta-sans/latin-700.css'
 import '@fontsource/plus-jakarta-sans/latin-800.css'
 import './storefront.css'
+
+/**
+ * El asistente, por `lazy` y montado solo cuando se abre (P14).
+ *
+ * Estaba SIEMPRE montado —cerrado, pero montado— así que toda visita a la
+ * tienda descargaba su cajón, su conversación y la tarjeta de producto que
+ * pinta dentro. Es una pantalla que se abre pulsando un botón flotante: quien
+ * no lo pulsa no debería pagarla en el primer pintado.
+ *
+ * `asistenteUsado` existe para que la animación de cierre siga viéndose: una
+ * vez abierto, el cajón se queda montado y se cierra como siempre. Desmontarlo
+ * al cerrar lo haría desaparecer de golpe.
+ */
+const AssistantDrawer = lazy(() =>
+  import('./components/AssistantDrawer').then((modulo) => ({ default: modulo.AssistantDrawer })),
+)
 
 /** Solo se descarga con sesión: ver el comentario donde se monta. */
 const CommerceContextBar = lazy(() =>
@@ -100,6 +115,7 @@ export function StorefrontLayout() {
   // Antes de cualquier retorno temprano: el orden de los hooks no puede
   // depender de si la tienda cargo.
   const [asistenteAbierto, setAsistenteAbierto] = useState(false)
+  const [asistenteUsado, setAsistenteUsado] = useState(false)
   const enCheckout = /\/checkout\/?$/.test(pathname)
   // La sesión no cambia NADA de lo que se ve del catálogo —la vitrina se lee
   // siempre con el cliente anónimo— pero sí decide de quién es el carrito: con
@@ -228,7 +244,10 @@ export function StorefrontLayout() {
       <Fab
         color="primary"
         aria-label={t('store.assistant.open')}
-        onClick={() => setAsistenteAbierto(true)}
+        onClick={() => {
+          setAsistenteUsado(true)
+          setAsistenteAbierto(true)
+        }}
         sx={{
           position: 'fixed',
           right: { xs: 16, md: 24 },
@@ -240,12 +259,16 @@ export function StorefrontLayout() {
       </Fab>
       )}
 
-      <AssistantDrawer
-        open={asistenteAbierto}
-        onClose={() => setAsistenteAbierto(false)}
-        storeSlug={storeSlug as string}
-        storeId={store.store_id}
-      />
+      {asistenteUsado && (
+        <Suspense fallback={null}>
+          <AssistantDrawer
+            open={asistenteAbierto}
+            onClose={() => setAsistenteAbierto(false)}
+            storeSlug={storeSlug as string}
+            storeId={store.store_id}
+          />
+        </Suspense>
+      )}
           </StorefrontSurface>
         </StorefrontThemeProvider>
       </CartProvider>

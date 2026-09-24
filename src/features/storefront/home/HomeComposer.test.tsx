@@ -264,7 +264,7 @@ describe('una sección sin datos se omite sola', () => {
     expect(container.textContent).toBe('')
   })
 
-  it('categories pinta las familias del catálogo como puertas, en su orden y con su tope', () => {
+  it('categories pinta las familias del catálogo como puertas, en su orden y con su tope', async () => {
     const familias = [
       { category_id: 'c1', name: 'Zapatillas', slug: 'zapatillas' },
       { category_id: 'c2', name: 'Botas', slug: 'botas' },
@@ -272,7 +272,11 @@ describe('una sección sin datos se omite sola', () => {
     ]
     pintar(layout([{ id: 'categories', enabled: true, maxItems: 2 }]), datos({ categorias: familias }))
 
-    const seccion = screen.getByRole('region', { name: 'store.categories.shopBy' })
+    // Las puertas llegan por `lazy` desde P14 —la sección viene apagada en los
+    // cuatro temas y su módulo no tiene por qué pesar en la portada de quien no
+    // la enciende—, así que se espera al módulo. Lo que se comprueba no cambia:
+    // cuáles se pintan, en qué orden y cuántas.
+    const seccion = await screen.findByRole('region', { name: 'store.categories.shopBy' })
     const puertas = seccion.querySelectorAll('a')
     expect([...puertas].map((a) => a.getAttribute('href'))).toEqual([
       '/s/botica?c=zapatillas',
