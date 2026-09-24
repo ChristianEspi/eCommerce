@@ -1132,3 +1132,164 @@ compartir módulos con lo que ya viaja en la portada — el muro de logotipos de
 P07 ya demostró que partir por ahí no ahorra nada.
 
 `PHASE_RESULT: PASS`
+
+---
+
+# P09 · Catálogo: barra, cajón de filtros y lectura mobile-first
+
+`ESTADO: PASS`
+
+## El fallo, dicho con precisión
+
+El catálogo repartía filtros y resultados en dos columnas con
+`direction={{ xs: 'column', md: 'row' }}`. En escritorio está bien. En el
+teléfono, «columna» significa **el panel entero encima de los productos**: quien
+buscaba «jarabe» recibía primero dos interruptores, una lista de familias y otra
+de marcas con sus contadores, y los jarabes empezaban pasada la primera
+pantalla.
+
+Y no era solo lo que se veía: con los filtros primero **en el DOM**, llegar al
+primer producto con el tabulador o con un lector de pantalla costaba treinta
+paradas.
+
+## Lo que se hizo
+
+### La barra (`StoreCatalogToolbar`)
+
+Reemplaza la línea de «N resultados + Ordenar» y añade lo que faltaba:
+
+- **«Filtros» con el número de los puestos**, solo hasta escritorio. Un botón
+  que dice «Filtros» no distingue un catálogo entero de uno con tres filtros
+  encima, y esa es justo la duda de quien vuelve atrás y no reconoce la lista.
+  El número va también en el **nombre accesible** («Filtros (3 activos)»),
+  porque un globo con una cifra no lo lee nadie.
+- **Las píldoras de lo puesto, debajo y quitables de una.** Abrir un cajón para
+  desmarcar una casilla son tres gestos para deshacer uno.
+- **Pegada arriba en el teléfono**, bajo la cabecera: en una lista de 568
+  productos, el momento de querer ordenar llega cuando ya se ha bajado.
+
+### El cajón (`StoreFilterDrawer`)
+
+`Drawer` de MUI anclado abajo, con **el mismo `StoreFilterPanel`** dentro: no se
+recorta ni una opción por caber. Lo que aporta MUI y no se escribe a mano es el
+foco —atraparlo mientras está abierto, devolverlo al botón al cerrar, `Escape`,
+y marcar el resto de la página como `aria-hidden`—; escribir eso a mano es cómo
+se acaba con un panel del que no se sale con el teclado.
+
+Los filtros **se aplican al tocarlos**, porque el estado vive en la URL y ya
+funcionaba así: los resultados de detrás cambian mientras se elige. Por eso el
+botón dice **«Ver resultados (N)»** y cierra, que es lo que de verdad hace;
+llamarlo «Aplicar» prometería que sin pulsarlo no pasa nada, y sería mentira.
+
+### La columna de escritorio
+
+Dos cambios, el mismo fallo:
+
+1. `display: none` hasta `md`, con el panel en el cajón por debajo.
+2. **Después de los resultados en el DOM**, con `order: -1` en escritorio para
+   que siga saliendo a la izquierda. La vista no cambia; la lectura sí.
+
+Y deja de parecer un panel de backoffice: `StoreFilterPanel` estrena
+`marco: 'tarjeta' | 'columna' | 'hoja'`. `columna` quita la caja, la sombra y el
+fondo y deja una línea vertical y aire —lo que de verdad separa unos filtros de
+unos resultados—; `hoja` quita también el título y su botón de limpiar, porque
+el cajón ya los lleva y dos botones con el mismo nombre en la misma pantalla no
+se distinguen.
+
+## Lo que YA estaba bien y se conserva (implementación superior al prompt)
+
+1. **La densidad por tema ya venía del contrato.** `ProductGrid` toma columnas y
+   aire de `--sf-grid-*`, que pone el tema: Universal 2/3/4, Retail 2/4/5,
+   Premium 2/2/3 y Catalog 2/4/6. Es exactamente lo que pedía la sección
+   «Theme» de la fase —Premium más visual, Catalog más denso— y ya estaba desde
+   P02, sin una sola rama por tema dentro de la tarjeta. Cubierto por
+   `storefront-design.test.tsx` y `preview-responsive.test.tsx`; no se duplica.
+2. **`ExploreMore` ya estaba separado del conteo.** Sección propia, título
+   propio, línea arriba, debajo de la rejilla y **sin un solo producto**: solo
+   familias y marcas, que son navegación. El prompt pedía mejorarlo; lo que
+   pedía ya lo hacía, así que lo único que se añade es la prueba de que sigue
+   siendo cierto.
+3. **Las facetas ya salían de la búsqueda**, no de una lista fija, con su
+   contador y sin ofrecer lo que da cero. No se tocó.
+
+## El presupuesto, que era el riesgo real de la fase
+
+Al terminar la funcionalidad, la portada quedó en **404,9 kB de 405**: 0,1 kB de
+margen. Lo que lo devuelve a un sitio razonable es una observación simple: la
+barra, el panel de filtros y el menú de orden **no existen en la portada**. Solo
+se pintan con `?ver=todo` o con un filtro, y viajaban en la primera descarga de
+todas las visitas.
+
+Por `lazy`, los tres: **396,0 kB**, nueve kilobytes recuperados. Es la misma
+regla que ya seguían la vista rápida, el cajón y la salida del catálogo: lo que
+aparece por una acción se descarga con la acción.
+
+Efecto medido y aceptado: el recuento llega un instante después de la rejilla
+—los productos no esperan a nada— y una prueba que lo leía en el primer pintado
+ahora lo espera. Está escrito en el propio test.
+
+## Archivos principales
+
+| Archivo | Qué cambia |
+|---|---|
+| `components/StoreCatalogToolbar.tsx` | **Nuevo.** Recuento, aviso de erratas, botón de filtros con contador, menú de orden y píldoras de lo puesto. |
+| `components/StoreFilterDrawer.tsx` | **Nuevo.** El cajón de abajo con su cabecera, su pie y el panel entero dentro. |
+| `components/StoreFilterPanel.tsx` | `marco` con tres valores; dentro del cajón calla su título y su «quitar filtros». |
+| `StoreHomePage.tsx` | La barra y el cajón; los filtros puestos derivados de la URL; `update` estable con `useCallback`; la columna escondida hasta `md` y movida tras los resultados; los tres módulos del catálogo por `lazy`. |
+| `shared/i18n/messages.{es,en}.ts` | `filters`, `filtersActive`, `removeFilter`, `showResults`. |
+
+**Migraciones: ninguna.** Esta fase no toca base.
+
+## Ciclos correctivos
+
+1. Mi primera píldora era un `Chip` con aspa, y su nombre accesible quedaba en
+   «Mesas» — el mismo que la píldora de la barra de familias, que hace lo
+   contrario: una pone el filtro y la otra lo quita. Dos controles con el mismo
+   nombre y efectos opuestos rompieron dos pruebas existentes, y con razón.
+   Ahora es un `<button>` con nombre propio: «Quitar Mesas».
+2. Tres aserciones mías miraban `window.location`: estas pruebas montan un
+   `MemoryRouter`, donde la barra del navegador no se mueve por diseño. Se
+   comprueban por lo que la vitrina enseña, que es lo que de verdad importa.
+3. Y una miraba `getComputedStyle` de un valor por punto de ruptura, que jsdom
+   no resuelve. Se cambió por algo mejor: el **orden del documento**, que es lo
+   que de verdad defiende la fase.
+4. La aserción del cajón abierto no encontraba la píldora porque MUI marca el
+   resto de la página como `aria-hidden` mientras el diálogo está abierto. No
+   era un fallo: era la prueba de que el cajón es un diálogo de verdad. Se
+   comprueba con el cajón cerrado, que además es el flujo real.
+5. Un `npx prettier --write` de emergencia reformateó el archivo entero con
+   comillas dobles y punto y coma —que no es el estilo de este repo— y dejó un
+   diff de 960 líneas. Los cambios se **reaplicaron sobre la versión de HEAD**
+   con parches dirigidos: 218 líneas añadidas, 53 tocadas. La versión
+   reformateada se guardó aparte antes de rehacerlo.
+
+## Tests
+
+| Archivo | Casos |
+|---|---|
+| `storefront-ui.test.tsx` | 52 → **62**. Teléfono: la barra trae Filtros y Ordenar y la columna va después de la barra en el documento; el cajón se abre con el panel entero —los dos interruptores y las facetas— y su salida; se cierra con `Escape`; filtrar desde el cajón llega a la vitrina; «Quitar filtros» limpia y deja el catálogo; las píldoras se quitan de una y se llaman «Quitar X»; el botón dice cuántos hay; sin filtros no hay píldoras. Escritorio: la columna ya no tiene sombra ni caja; el recuento coincide con las tarjetas pintadas y la salida de abajo no lleva ni un producto. |
+
+Las pruebas de densidad por tema y de paridad de la vista previa ya existían
+(`storefront-design.test.tsx`, `preview-responsive.test.tsx`) y siguen verdes.
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 310 ficheros, 6216 tests |
+| `npm run build` | **PASS** |
+| `npm run bundle:report` | **PASS** — portada **396,0 kB** (techo 405) |
+| `npm run scan:secrets` | **PASS** |
+
+`npm run test:db` no se repite: esta fase no toca base.
+
+## Pendiente real
+
+La matriz visual a 390/768/1280 es de P13: aquí las diferencias entre teléfono y
+escritorio se comprueban por estructura —orden del documento, presencia del
+cajón, marco del panel— porque jsdom no tiene ancho de ventana. Lo que falta es
+la captura real, y es exactamente el trabajo de esa fase.
+
+`PHASE_RESULT: PASS`

@@ -349,6 +349,11 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.catalog.noResults': 'No results',
     'store.catalog.noResultsBody': 'Try another word or clear the filters.',
     'store.catalog.clear': 'Clear filters',
+    // V3 · P09 · The catalog toolbar on the phone.
+    'store.catalog.filters': 'Filters',
+    'store.catalog.filtersActive': 'active',
+    'store.catalog.removeFilter': 'Remove',
+    'store.catalog.showResults': 'Show results',
     'store.slider.label': 'What is new',
     'store.slider.prev': 'Previous',
     'store.slider.next': 'Next',

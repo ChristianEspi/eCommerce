@@ -310,6 +310,12 @@ export const es = {
     'store.catalog.noResults': 'Sin resultados',
     'store.catalog.noResultsBody': 'Prueba con otra palabra o quita los filtros.',
     'store.catalog.clear': 'Quitar filtros',
+    // V3 · P09 · La barra del catálogo en el teléfono. «Filtros» a secas y no
+    // «Seleccionar filtros»: es un botón, y el título del panel ya lo explica.
+    'store.catalog.filters': 'Filtros',
+    'store.catalog.filtersActive': 'activos',
+    'store.catalog.removeFilter': 'Quitar',
+    'store.catalog.showResults': 'Ver resultados',
     'store.slider.label': 'Novedades y campañas',
     'store.slider.prev': 'Anterior',
     'store.slider.next': 'Siguiente',

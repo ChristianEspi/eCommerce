@@ -305,6 +305,7 @@ beforeEach(() => {
   holder.client = null
 })
 
+
 describe('resolución del tenant por slug', () => {
   it('resuelve la tienda del slug y pinta su identidad, no la de casa', async () => {
     renderStorefront(backend(), '/s/casa-nordica')
@@ -539,7 +540,10 @@ describe('catálogo', () => {
     renderStorefront(backend(), '/s/casa-nordica?ver=todo')
 
     expect(await screen.findByText('Silla de roble')).toBeInTheDocument()
-    expect(screen.getByText('8 resultados')).toBeInTheDocument()
+    // El recuento se ESPERA desde V3 · P09: la barra del catálogo viaja en su
+    // propio trozo —no existe en la portada— así que llega un instante después
+    // de la rejilla. Los productos no esperan a nada.
+    expect(await screen.findByText('8 resultados')).toBeInTheDocument()
     expect(screen.getByText('-14%')).toBeInTheDocument()
     // Siete disponibles y uno agotado: lo que importa es que el estado se
     // pinte por producto, no cuántos hay en el catálogo de prueba.
@@ -1211,5 +1215,211 @@ describe('vista rápida de un producto con variantes', () => {
       '/s/casa-nordica/product/camiseta',
     )
     expect(within(dialogo).queryByRole('link', { name: /Elegir opciones/ })).not.toBeInTheDocument()
+  })
+})
+
+/**
+ * Storefront V3 · P09 · El catálogo en el teléfono, y el de escritorio intacto.
+ *
+ * ## Qué defiende este bloque
+ *
+ * **Que el teléfono no reciba una columna de filtros antes de los productos.**
+ * Era el fallo concreto: quien buscaba algo veía primero marcas, familias e
+ * interruptores, y los resultados empezaban pasada la primera pantalla.
+ *
+ * **Que no se recorte ninguna opción por caber en un cajón.** El panel que se
+ * abre es el MISMO componente, con los mismos filtros y las mismas facetas.
+ *
+ * **Que el estado siga viviendo en la URL.** Es lo que hace que una búsqueda
+ * filtrada se comparta, que atrás deshaga y que recargar no borre nada. Un
+ * cajón con su propio estado interno rompería las tres cosas.
+ *
+ * **Que el conteo siga siendo el de los resultados.** Ni recomendados, ni
+ * familias, ni marcas de la salida de abajo.
+ */
+describe('el catálogo en el teléfono', () => {
+  /** Espera a que el cajón esté montado y lo devuelve. */
+  async function abrirCajon(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('button', { name: /Filtros/ }))
+    return await waitFor(() => {
+      const encontrado = document.querySelector('[data-filter-drawer]')
+      expect(encontrado).not.toBeNull()
+      return encontrado as HTMLElement
+    })
+  }
+
+  it('la barra ofrece Filtros y Ordenar, y el panel largo no va antes de los productos', async () => {
+    renderStorefront(backend(), '/s/casa-nordica?ver=todo')
+    await screen.findByText('Silla de roble')
+
+    expect(document.querySelector('[data-catalog-toolbar]')).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Filtros' })).toBeInTheDocument()
+
+    // La columna de filtros no se pinta hasta escritorio: en el teléfono iba
+    // ENCIMA de los productos, y eso era media pantalla de interruptores antes
+    // del primer resultado.
+    const columna = document.querySelector('[data-filter-frame="columna"]') as HTMLElement
+    expect(columna).not.toBeNull()
+    // Y la barra —con los productos justo debajo— va ANTES que la columna en
+    // el documento, que es el orden que recorre un lector de pantalla y el que
+    // sigue el tabulador. Con los filtros primero, llegar al primer producto
+    // costaba treinta tabulaciones.
+    const barra = document.querySelector('[data-catalog-toolbar]') as HTMLElement
+    expect(barra.compareDocumentPosition(columna) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('el cajón se abre con el MISMO panel, sin recortar filtros', async () => {
+    const user = userEvent.setup()
+    renderStorefront(backend(), '/s/casa-nordica?ver=todo')
+    await screen.findByText('Silla de roble')
+
+    // Antes de abrirlo no está montado: su módulo llega con el primer clic.
+    expect(document.querySelector('[data-filter-drawer]')).toBeNull()
+
+    const cajon = await abrirCajon(user)
+
+    // El panel entero: los dos interruptores de estado y las listas de facetas.
+    expect(within(cajon).getByText('Solo en oferta')).toBeInTheDocument()
+    expect(within(cajon).getByText('Solo disponibles')).toBeInTheDocument()
+    expect(within(cajon).getByText('Mesas')).toBeInTheDocument()
+    // Y su salida, que dice lo que hace.
+    expect(within(cajon).getByRole('button', { name: /Ver resultados/ })).toBeInTheDocument()
+  })
+
+  it('se cierra con Escape: es un diálogo, no un panel pegado', async () => {
+    const user = userEvent.setup()
+    renderStorefront(backend(), '/s/casa-nordica?ver=todo')
+    await screen.findByText('Silla de roble')
+
+    await abrirCajon(user)
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(document.querySelector('[data-filter-drawer]')).toBeNull())
+  })
+
+  it('filtrar desde el cajón escribe en la URL, como el panel de escritorio', async () => {
+    const user = userEvent.setup()
+    renderStorefront(backend(), '/s/casa-nordica?ver=todo')
+    await screen.findByText('Silla de roble')
+
+    const cajon = await abrirCajon(user)
+    await user.click(within(cajon).getByText('Solo disponibles'))
+
+    /**
+     * El estado vive en la URL —se comparte, atrás lo deshace y recargar no lo
+     * borra— y se comprueba por lo que la vitrina enseña: la píldora de lo
+     * puesto solo existe si el parámetro llegó, porque sale de leer la URL.
+     *
+     * No se mira `window.location`: estas pruebas montan un `MemoryRouter`,
+     * donde la barra del navegador no se mueve por diseño.
+     */
+    /**
+     * Y se comprueba con el cajón CERRADO, que es la otra mitad de que esto
+     * sea un diálogo: mientras está abierto, MUI marca el resto de la página
+     * como `aria-hidden`, así que buscar por rol allí no encuentra nada — y eso
+     * está bien, es lo que hace que un lector de pantalla no lea dos capas a la
+     * vez.
+     *
+     * El estado vive en la URL —se comparte, atrás lo deshace y recargar no lo
+     * borra— y aquí se ve por lo que la vitrina enseña: la píldora de lo puesto
+     * solo existe si el parámetro llegó, porque sale de leer la URL. No se mira
+     * `window.location`: estas pruebas montan un `MemoryRouter`, donde la barra
+     * del navegador no se mueve por diseño.
+     */
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(document.querySelector('[data-filter-drawer]')).toBeNull())
+    expect(
+      await screen.findByRole('button', { name: 'Quitar Solo disponibles' }),
+    ).toBeInTheDocument()
+  })
+
+  it('«Quitar filtros» limpia y deja el catálogo, no la portada', async () => {
+    const user = userEvent.setup()
+    renderStorefront(backend(), '/s/casa-nordica?c=mesas&d=1')
+    await screen.findByText('Mesa extensible')
+
+    const cajon = await abrirCajon(user)
+    // El único «Quitar filtros» es el del pie del cajón: el panel esconde el
+    // suyo ahí dentro, porque dos botones iguales no se distinguen.
+    await user.click(within(cajon).getByRole('button', { name: 'Quitar filtros' }))
+
+    // Sigue siendo el CATÁLOGO —quien pulsa «quitar» quiere verlo todo, no
+    // volver a la portada— y no queda ninguna píldora puesta.
+    expect(await screen.findByText('Silla de roble')).toBeInTheDocument()
+    await waitFor(() => expect(document.querySelector('[data-active-filters]')).toBeNull())
+  })
+
+  it('lo puesto se ve en píldoras que se quitan de una, con nombre propio', async () => {
+    const user = userEvent.setup()
+    renderStorefront(backend(), '/s/casa-nordica?c=mesas')
+    await screen.findByText('Mesa extensible')
+
+    // «Quitar Mesas», no «Mesas»: la píldora de la barra de familias PONE el
+    // filtro y esta lo quita, así que no pueden llamarse igual.
+    const quitar = screen.getByRole('button', { name: 'Quitar Mesas' })
+    expect(document.querySelector('[data-active-filters]')).toHaveAttribute(
+      'data-active-filters',
+      '1',
+    )
+
+    await user.click(quitar)
+    // Quitar la familia devuelve el resto del catálogo.
+    expect(await screen.findByText('Silla de roble')).toBeInTheDocument()
+    await waitFor(() => expect(document.querySelector('[data-active-filters]')).toBeNull())
+  })
+
+  it('el botón de filtros dice cuántos hay puestos', async () => {
+    renderStorefront(backend(), '/s/casa-nordica?c=mesas&d=1&oferta=1')
+    await screen.findByRole('button', { name: /Filtros/ })
+
+    // Tres: familia, disponibilidad y rebajado. El nombre accesible lo dice,
+    // porque un globo con un número no lo lee nadie.
+    expect(screen.getByRole('button', { name: 'Filtros (3 activos)' })).toBeInTheDocument()
+    expect(document.querySelector('[data-catalog-toolbar]')).toHaveAttribute(
+      'data-catalog-toolbar',
+      '3',
+    )
+  })
+
+  it('sin filtros no hay píldoras ni contador', async () => {
+    renderStorefront(backend(), '/s/casa-nordica?ver=todo')
+    await screen.findByText('Silla de roble')
+
+    expect(document.querySelector('[data-active-filters]')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Filtros' })).toBeInTheDocument()
+  })
+})
+
+describe('el catálogo de escritorio sigue haciendo lo mismo', () => {
+  it('la columna de filtros ya no parece una tarjeta de backoffice', async () => {
+    renderStorefront(backend(), '/s/casa-nordica?ver=todo')
+    await screen.findByText('Silla de roble')
+
+    const columna = document.querySelector('[data-filter-frame="columna"]') as HTMLElement
+    const estilo = getComputedStyle(columna)
+    expect(estilo.boxShadow).toBe('none')
+    expect(estilo.borderStyle === '' || estilo.borderStyle === 'none').toBe(true)
+  })
+
+  it('el conteo de resultados no se contamina con la salida de abajo', async () => {
+    // `ExploreMore` pinta familias y marcas cuando el resultado es escaso, y
+    // NUNCA suma al número: son una salida, no resultados.
+    renderStorefront(backend(), '/s/casa-nordica?q=extensible')
+    await screen.findByText('Mesa extensible')
+
+    const barra = document.querySelector('[data-catalog-toolbar]') as HTMLElement
+    expect(barra.textContent).toContain('1 resultado')
+    // Y el número coincide con las tarjetas pintadas, que es la comprobación
+    // que se rompería el día que algo se sumara a la lista.
+    expect(document.querySelectorAll('[data-card-variant]')).toHaveLength(1)
+
+    // La salida existe —un resultado es poco— y no lleva ni un producto: solo
+    // familias y marcas, que son navegación. Nadie puede confundir una puerta a
+    // «Mesas» con un resultado de su búsqueda.
+    const salida = await waitFor(() => {
+      const encontrada = document.querySelector('[data-explore-more]')
+      expect(encontrada).not.toBeNull()
+      return encontrada as HTMLElement
+    })
+    expect(salida.querySelectorAll('[data-card-variant]')).toHaveLength(0)
   })
 })

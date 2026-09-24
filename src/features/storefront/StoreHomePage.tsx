@@ -1,6 +1,6 @@
 import { Box, Breadcrumbs, Button, Card, Link as MuiLink, Stack, Typography } from '@mui/material'
 import { visuallyHidden } from '@mui/utils'
-import { Suspense, lazy, useEffect, useMemo, useRef } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { lazyPage } from '@/app/lazyPage'
 import type { SearchQuery, SearchSort } from '@/domain'
@@ -15,12 +15,10 @@ import { BackToTop } from './components/BackToTop'
 import { CategoryBar } from './components/CategoryBar'
 import { ProductGrid, ProductGridSkeleton } from './components/ProductGrid'
 import { useFavorites } from './useFavorites'
-import { StoreFilterPanel } from './components/StoreFilterPanel'
 import { StoreLandingSkeleton } from './components/StoreLandingSkeleton'
 import { HomeComposer } from './home/HomeComposer'
 import type { HomeSectionData } from './home/types'
 import { useStorefrontTheme } from './theme/useStorefrontTheme'
-import { StoreSortMenu } from './components/StoreSortMenu'
 
 /**
  * La salida del catálogo, por `lazy` (Storefront V2 · P14).
@@ -65,6 +63,41 @@ import { homeMeta } from './seo'
  */
 const ProductQuickView = lazyPage(() =>
   import('./components/ProductQuickView').then((m) => ({ default: m.ProductQuickView })),
+)
+
+/**
+ * La vista de CATÁLOGO, aparte de la portada (Storefront V3 · P09).
+ *
+ * Estos tres —la barra, el panel de filtros y el menú de orden— solo existen
+ * cuando alguien pide «Ver todo» o toca un filtro. En la portada no se pintan
+ * nunca, así que viajaban en la primera descarga de TODAS las visitas para no
+ * aparecer en la mayoría de ellas.
+ *
+ * Es la misma regla que la vista rápida y el cajón: lo que aparece por una
+ * acción se descarga con la acción. El presupuesto de la portada se había
+ * quedado a 0,1 kB del techo, y esto es lo que lo devuelve a un margen con el
+ * que se puede seguir trabajando (396,0 kB de 405).
+ */
+const StoreCatalogToolbar = lazy(() =>
+  import('./components/StoreCatalogToolbar').then((m) => ({ default: m.StoreCatalogToolbar })),
+)
+const StoreFilterPanel = lazy(() =>
+  import('./components/StoreFilterPanel').then((m) => ({ default: m.StoreFilterPanel })),
+)
+const StoreSortMenu = lazy(() =>
+  import('./components/StoreSortMenu').then((m) => ({ default: m.StoreSortMenu })),
+)
+
+/**
+ * Y el cajón de filtros del teléfono, también aparte (Storefront V3 · P09).
+ *
+ * Solo se monta cuando alguien pulsa «Filtros», que en escritorio no existe y
+ * en el teléfono es una minoría de las visitas. Traerlo en la primera descarga
+ * del catálogo sería pagar un diálogo por adelantado por cada visita que no lo
+ * abre.
+ */
+const StoreFilterDrawer = lazy(() =>
+  import('./components/StoreFilterDrawer').then((m) => ({ default: m.StoreFilterDrawer })),
 )
 
 /** Cuántos resultados por página. El «ver más» suma otra tanda. */
@@ -143,14 +176,25 @@ export function StoreHomePage() {
   // consulta paginada, así que otra combinación es otra consulta y empieza en
   // su primera página por construcción.
 
-  function update(key: string, value: string | null) {
-    setParams((prev) => {
-      const next = new URLSearchParams(prev)
-      if (value) next.set(key, value)
-      else next.delete(key)
-      return next
-    })
-  }
+  /**
+   * Pone o quita un parámetro de la URL, que es donde vive el estado.
+   *
+   * `useCallback` desde V3 · P09: la lista de filtros puestos la construye un
+   * `useMemo` que lo llama, y con una función nueva en cada pintado ese memo no
+   * podría declarar honestamente sus dependencias. `setParams` es estable, así
+   * que esto también.
+   */
+  const update = useCallback(
+    (key: string, value: string | null) => {
+      setParams((prev) => {
+        const next = new URLSearchParams(prev)
+        if (value) next.set(key, value)
+        else next.delete(key)
+        return next
+      })
+    },
+    [setParams],
+  )
 
   const content = useStoreContent(storeSlug)
   const { assets, images } = useContentAssets(content.data)
@@ -560,6 +604,69 @@ export function StoreHomePage() {
   }, [listaVista])
 
   const resultCount = new Intl.NumberFormat(locale === 'en' ? 'en-US' : 'es-PE').format(total)
+  const cuentaDeResultados = `${resultCount} ${
+    total === 1 ? t('store.catalog.result') : t('store.catalog.results')
+  }`
+
+  /** ¿Está abierto el cajón de filtros? (V3 · P09) */
+  const [cajonAbierto, setCajonAbierto] = useState(false)
+
+  /**
+   * Lo que hay puesto, con su nombre y con la forma de quitarlo (V3 · P09).
+   *
+   * Sale de la URL, que es donde vive el estado del catálogo, así que la lista
+   * es correcta también al volver atrás o al abrir un enlace compartido. El
+   * nombre es el que el comprador eligió —«Jarabes», «Genfar»— y no el slug: un
+   * chip que dijera `cuidado-personal` sería la implementación asomando.
+   *
+   * El término buscado NO entra: se quita desde el buscador de la cabecera, que
+   * es donde se escribió, y ponerlo aquí ofrecería dos sitios para deshacer lo
+   * mismo.
+   */
+  const filtrosPuestos = useMemo(() => {
+    const puestos: { id: string; label: string; onRemove: () => void }[] = []
+    if (categorySlug) {
+      puestos.push({
+        id: `c:${categorySlug}`,
+        label:
+          trail.at(-1)?.name ??
+          categoryOptions.find((opcion) => opcion.code === categorySlug)?.name ??
+          categorySlug,
+        onRemove: () => update('c', null),
+      })
+    }
+    if (brand) {
+      puestos.push({
+        id: `b:${brand}`,
+        label: brandOptions.find((opcion) => opcion.code === brand)?.name ?? brand,
+        onRemove: () => update('b', null),
+      })
+    }
+    if (availability === 'in-stock') {
+      puestos.push({ id: 'd', label: t('store.filter.inStock'), onRemove: () => update('d', null) })
+    }
+    if (soloOferta) {
+      puestos.push({
+        id: 'oferta',
+        label: t('store.filter.discounted'),
+        onRemove: () => update('oferta', null),
+      })
+    }
+    return puestos
+  }, [
+    categorySlug,
+    brand,
+    availability,
+    soloOferta,
+    trail,
+    categoryOptions,
+    brandOptions,
+    t,
+    update,
+  ])
+
+  /** Quitar los filtros deja el CATÁLOGO, no la portada. */
+  const quitarFiltros = () => setParams(new URLSearchParams({ ver: 'todo' }))
 
   /**
    * Qué se está mirando, dicho con sus palabras.
@@ -812,7 +919,7 @@ export function StoreHomePage() {
           >
             {tituloCatalogo}
           </Typography>
-        </Stack>
+      </Stack>
       ) : null}
 
       {/* La portada, en el orden que el comercio configuró.
@@ -894,49 +1001,64 @@ export function StoreHomePage() {
 
       {cargandoPortada ? null : catalogo ? (
       <Stack direction={{ xs: 'column', md: 'row' }} sx={{ gap: { xs: 2, md: 3 }, alignItems: 'flex-start' }}>
-        <Box sx={{ width: { xs: '100%', md: 280 }, flexShrink: 0 }}>
-          <StoreFilterPanel
-            brands={brandOptions}
-            categories={categoryOptions}
-            selectedBrand={brand}
-            selectedCategory={categorySlug}
-            inStockOnly={availability === 'in-stock'}
-            discountedOnly={soloOferta}
-            onBrand={(code) => update('b', code)}
-            onCategory={(slug) => update('c', slug)}
-            onInStock={(only) => update('d', only ? '1' : null)}
-            onDiscounted={(only) => update('oferta', only ? '1' : null)}
-            // Quitar los filtros deja el CATALOGO, no la portada: quien pulsa
-            // «limpiar» quiere verlo todo, no volver a la primera pantalla.
-            onClear={() => setParams(new URLSearchParams({ ver: 'todo' }))}
-          />
-        </Box>
-
         <Box sx={{ flex: 1, minWidth: 0, width: '100%' }}>
-          {/* Cuántos resultados hay y en qué orden se miran, en la misma línea
-              y encima de la rejilla: son las dos preguntas que se hacen antes
-              de empezar a recorrerla. */}
-          <Stack
-            direction="row"
-            sx={{ gap: 1.5, alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap' }}
-          >
-            <Stack direction="row" sx={{ gap: 1, alignItems: 'baseline', flexWrap: 'wrap' }}>
-              <Typography
-                aria-live="polite"
-                sx={{ fontSize: TS.label, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--muted)' }}
+          {/* Cuántos resultados hay, en qué orden se miran y —en el teléfono—
+              cómo se filtran: las preguntas que se hacen antes de empezar a
+              recorrer la lista, en una sola barra.
+
+              Sin esqueleto mientras llega su módulo: la barra es una línea, y
+              un hueco gris parpadeando encima de la rejilla informa menos que
+              el propio retraso. */}
+          <Suspense fallback={null}>
+            <StoreCatalogToolbar
+              count={cuentaDeResultados}
+              note={
+                /* Un resultado por tolerancia a erratas no es lo mismo que uno
+                   exacto, y decirlo es la diferencia entre ayudar y fingir. */
+                first?.mode === 'fuzzy' ? (
+                  <Typography sx={{ fontSize: TS.label, color: 'var(--amber)', fontWeight: 700 }}>
+                    {t('store.search.fuzzy')}
+                  </Typography>
+                ) : null
+              }
+              sortMenu={<StoreSortMenu value={sort} onChange={(next) => update('sort', next)} />}
+              activeFilters={filtrosPuestos}
+              onOpenFilters={() => setCajonAbierto(true)}
+              onClearFilters={quitarFiltros}
+            />
+          </Suspense>
+
+          {/* El cajón: el MISMO panel, sin recortar nada. Solo se monta cuando
+              se abre, y con él llega su módulo. */}
+          {cajonAbierto ? (
+            <Suspense fallback={null}>
+              <StoreFilterDrawer
+                open
+                onClose={() => setCajonAbierto(false)}
+                resultsLabel={`${t('store.catalog.showResults')} (${resultCount})`}
+                onClear={() => {
+                  quitarFiltros()
+                  setCajonAbierto(false)
+                }}
+                canClear={filtrosPuestos.length > 0}
               >
-                {`${resultCount} ${total === 1 ? t('store.catalog.result') : t('store.catalog.results')}`}
-              </Typography>
-              {/* Un resultado por tolerancia a erratas no es lo mismo que uno
-                  exacto, y decirlo es la diferencia entre ayudar y fingir. */}
-              {first?.mode === 'fuzzy' && (
-                <Typography sx={{ fontSize: TS.label, color: 'var(--amber)', fontWeight: 700 }}>
-                  {t('store.search.fuzzy')}
-                </Typography>
-              )}
-            </Stack>
-            <StoreSortMenu value={sort} onChange={(next) => update('sort', next)} />
-          </Stack>
+                <StoreFilterPanel
+                  marco="hoja"
+                  brands={brandOptions}
+                  categories={categoryOptions}
+                  selectedBrand={brand}
+                  selectedCategory={categorySlug}
+                  inStockOnly={availability === 'in-stock'}
+                  discountedOnly={soloOferta}
+                  onBrand={(code) => update('b', code)}
+                  onCategory={(slug) => update('c', slug)}
+                  onInStock={(only) => update('d', only ? '1' : null)}
+                  onDiscounted={(only) => update('oferta', only ? '1' : null)}
+                  onClear={quitarFiltros}
+                />
+              </StoreFilterDrawer>
+            </Suspense>
+          ) : null}
 
           {results.isPending && <ProductGridSkeleton />}
 
@@ -1038,6 +1160,49 @@ export function StoreHomePage() {
               />
             </Suspense>
           )}
+        </Box>
+
+        {/**
+         * La columna de filtros: SOLO en escritorio, y DESPUÉS de los
+         * resultados en el árbol (Storefront V3 · P09).
+         *
+         * Las dos cosas arreglan el mismo fallo. En el teléfono esta columna iba
+         * ENCIMA de los productos: quien buscaba «jarabe» recibía primero una
+         * lista de marcas y familias con sus interruptores, y los jarabes
+         * empezaban pasada la primera pantalla. Ahí el panel entero —sin
+         * recortar ninguna opción— vive en el cajón que abre la barra.
+         *
+         * Y va después en el DOM porque el orden del documento es el que recorre
+         * un lector de pantalla y el que sigue el tabulador: con los filtros
+         * primero, llegar al primer producto costaba treinta tabulaciones.
+         * `order` lo devuelve a la izquierda en escritorio — la vista no cambia,
+         * la lectura sí.
+         */}
+        <Box
+          sx={{
+            display: { xs: 'none', md: 'block' },
+            width: { md: 280 },
+            flexShrink: 0,
+            order: { md: -1 },
+          }}
+        >
+          <Suspense fallback={null}>
+            <StoreFilterPanel
+              marco="columna"
+              brands={brandOptions}
+              categories={categoryOptions}
+              selectedBrand={brand}
+              selectedCategory={categorySlug}
+              inStockOnly={availability === 'in-stock'}
+              discountedOnly={soloOferta}
+              onBrand={(code) => update('b', code)}
+              onCategory={(slug) => update('c', slug)}
+              onInStock={(only) => update('d', only ? '1' : null)}
+              onDiscounted={(only) => update('oferta', only ? '1' : null)}
+              // Quien pulsa «limpiar» quiere verlo todo, no volver a la portada.
+              onClear={quitarFiltros}
+            />
+          </Suspense>
         </Box>
       </Stack>
       ) : null}

@@ -11,6 +11,7 @@ import {
   Switch,
   Typography,
 } from '@mui/material'
+import { visuallyHidden } from '@mui/utils'
 import { useState, type ReactNode } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { TS } from '@/theme/tokens'
@@ -63,6 +64,7 @@ export function StoreFilterPanel({
   onInStock,
   onDiscounted,
   onClear,
+  marco = 'tarjeta',
 }: {
   brands: readonly FacetOption[]
   categories: readonly FacetOption[]
@@ -84,30 +86,76 @@ export function StoreFilterPanel({
   onInStock: (only: boolean) => void
   onDiscounted: (only: boolean) => void
   onClear: () => void
+  /**
+   * Cómo se enmarca el panel (Storefront V3 · P09).
+   *
+   * `tarjeta` es el de siempre. `columna` le quita la caja: una tarjeta con
+   * sombra al lado de la rejilla se lee como un panel de backoffice pegado a una
+   * tienda, y lo que separa una columna de filtros de los resultados es una
+   * línea fina y aire, no un recuadro flotante. `hoja` es para dentro del cajón
+   * del teléfono, donde el diálogo ya pone el marco, el título y el cierre —
+   * repetirlos ahí sería anunciar dos veces la misma región.
+   */
+  marco?: 'tarjeta' | 'columna' | 'hoja'
 }) {
   const { t } = useI18n()
   const dirty = Boolean(selectedBrand || selectedCategory || inStockOnly || discountedOnly)
+  const enCajon = marco === 'hoja'
+  const conCaja = marco === 'tarjeta'
 
   return (
     <Card
-      component="aside"
-      aria-label={t('store.filter.title')}
+      component={enCajon ? 'div' : 'aside'}
+      // Dentro del cajón el nombre accesible lo pone el diálogo.
+      {...(enCajon ? {} : { 'aria-label': t('store.catalog.filters') })}
+      data-filter-frame={marco}
       sx={{
-        p: 2.25,
-        borderRadius: 'var(--sf-radius)',
-        border: '1px solid var(--sf-line)',
-        boxShadow: 'var(--sf-shadow)',
-        position: { md: 'sticky' },
-        top: { md: 88 },
+        p: conCaja ? 2.25 : 0,
+        ...(conCaja
+          ? {
+              borderRadius: 'var(--sf-radius)',
+              border: '1px solid var(--sf-line)',
+              boxShadow: 'var(--sf-shadow)',
+            }
+          : {
+              borderRadius: 0,
+              border: 'none',
+              boxShadow: 'none',
+              bgcolor: 'transparent',
+            }),
+        // La línea vertical solo en la columna de escritorio: es lo que separa
+        // los filtros de los resultados sin dibujar una caja alrededor.
+        ...(marco === 'columna' ? { pr: { md: 2.5 }, borderRight: { md: '1px solid var(--sf-line)' } } : {}),
+        // Y dentro del cajón no se pega a nada: el cajón ya se desplaza solo.
+        ...(enCajon ? {} : { position: { md: 'sticky' }, top: { md: 88 } }),
       }}
     >
-      <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-        <Typography component="h2" sx={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.01em' }}>
-          {t('store.filter.title')}
+      <Stack
+        direction="row"
+        sx={{
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          mb: 1,
+          // El título sobra dentro del cajón, que ya lo lleva en su cabecera.
+          ...(enCajon ? { display: dirty ? 'flex' : 'none' } : {}),
+        }}
+      >
+        <Typography
+          component="h2"
+          sx={{
+            fontSize: 15,
+            fontWeight: 800,
+            letterSpacing: '-0.01em',
+            ...(enCajon ? visuallyHidden : {}),
+          }}
+        >
+          {t('store.catalog.filters')}
         </Typography>
         {/* Solo cuando hay algo que quitar: un botón que no hace nada enseña a
-            no pulsarlo. */}
-        {dirty && (
+            no pulsarlo. Y nunca dentro del cajón del teléfono, que ya lo lleva
+            en su pie: dos botones con el mismo nombre en la misma pantalla no
+            se distinguen ni con el ratón ni con un lector. */}
+        {dirty && !enCajon && (
           <Button size="small" onClick={onClear} sx={{ textTransform: 'none', fontWeight: 700 }}>
             {t('store.catalog.clear')}
           </Button>
