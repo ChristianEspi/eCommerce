@@ -165,10 +165,11 @@ describe('las cuentas salen de la tienda publicada', () => {
 })
 
 describe('una tienda sin nada se explica, no se rompe', () => {
-  it('se pintan las siete líneas y ninguna es un error', async () => {
+  it('se pintan las ocho líneas y ninguna es un error', async () => {
+    // Ocho desde V3 · P11, con la descripción de la tienda dentro.
     const panel = await pintar()
 
-    expect(within(panel).getAllByRole('listitem')).toHaveLength(7)
+    expect(within(panel).getAllByRole('listitem')).toHaveLength(8)
     expect(within(panel).queryByRole('alert')).not.toBeInTheDocument()
   })
 
@@ -206,14 +207,15 @@ describe('una tienda sin nada se explica, no se rompe', () => {
 })
 
 describe('el resumen es una cuenta, no una nota', () => {
-  it('cuenta cuántas señales están al día, sobre siete', async () => {
+  it('cuenta cuántas señales están al día, sobre ocho', async () => {
     await pintar({}, { logo_url: 'logo.png', support_email: 'hola@botica.pe' })
 
     // Logotipo, contacto y las tres que no tienen nada que medir: cinco de
-    // siete. Quedan la imagen de portada y las páginas. Se puede recontar
+    // ocho. Quedan la portada —sin banner y sin fotos de producto no hay de
+    // dónde sacar imagen—, la descripción y las páginas. Se puede recontar
     // mirando la lista, que es lo que una nota no permite.
     await vi.waitFor(() => {
-      expect(screen.getByText('5 de 7 al día')).toBeInTheDocument()
+      expect(screen.getByText('5 de 8 al día')).toBeInTheDocument()
     })
   })
 

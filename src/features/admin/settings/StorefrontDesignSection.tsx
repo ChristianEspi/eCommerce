@@ -296,6 +296,18 @@ export function StorefrontDesignSection({
               support_email: form.watch('support_email'),
               contact_phone: form.watch('contact_phone'),
               contact_address: form.watch('contact_address'),
+              /**
+               * Identidad V3 (P11): sin estos tres, dos señales preguntarían
+               * mal.
+               *
+               * Con `brand_lockup` en `name`, el logotipo no es un hueco — el
+               * comercio eligió su nombre escrito como marca. Y la descripción
+               * es una señal nueva, con la bajada del hero como respaldo de
+               * compatibilidad para las tiendas anteriores a V3.
+               */
+              brand_lockup: form.watch('brand_lockup'),
+              store_description: form.watch('store_description'),
+              hero_subtitle: form.watch('hero_subtitle'),
             }}
           />
         )}

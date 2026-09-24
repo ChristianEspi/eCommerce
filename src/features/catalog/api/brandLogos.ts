@@ -1,5 +1,6 @@
 import { STORE_ASSETS_BUCKET } from '@/shared/lib/db-schema'
 import { ALLOWED_IMAGE_TYPES } from './images'
+import { optimizeImageFile } from '@/shared/lib/imageOptimizer'
 import { catalogClient } from './client'
 import { CatalogError, catalogErrorFromDb } from './errors'
 
@@ -92,19 +93,24 @@ export async function uploadBrandLogo(input: {
   companyId: string
   file: File
 }): Promise<string> {
-  const validation = validateBrandLogo(input.file)
+  // Se reduce antes de validar (V3 · P11): un logotipo de 3000 px se pinta a
+  // 44 en el muro de marcas, y rechazarlo por peso dejaba a la marca sin
+  // logotipo. WebP conserva la transparencia, que en un logotipo es el dato.
+  const { file } = await optimizeImageFile(input.file, 'logo')
+
+  const validation = validateBrandLogo(file)
   if (!validation.ok) throw new CatalogError(validation.key, 'ARCHIVO_INVALIDO')
 
   const path = buildBrandLogoPath({
     organizationId: input.organizationId,
     companyId: input.companyId,
-    mimeType: input.file.type,
+    mimeType: file.type,
   })
 
   const { error } = await catalogClient()
     .storage.from(STORE_ASSETS_BUCKET)
-    .upload(path, input.file, {
-      contentType: input.file.type,
+    .upload(path, file, {
+      contentType: file.type,
       upsert: false,
       // La ruta lleva un uuid: el contenido de este objeto nunca cambia.
       cacheControl: '604800',

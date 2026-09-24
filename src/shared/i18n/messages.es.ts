@@ -270,9 +270,14 @@ export const es = {
     'settings.readiness.todo': 'Por mejorar',
     'settings.readiness.count': '{n} de {total}',
     'settings.readiness.logo': 'Logotipo de la tienda',
-    'settings.readiness.logoWhy': 'Sin él, la cabecera y el pie enseñan las iniciales del nombre.',
+    'settings.readiness.logoWhy':
+      'Sin él, la cabecera y el pie enseñan tu nombre escrito. Si elegiste el nombre como marca, no hace falta.',
     'settings.readiness.hero': 'Imagen de portada',
-    'settings.readiness.heroWhy': 'Sin ella, la portada se pinta con el degradado de tu color.',
+    'settings.readiness.heroWhy':
+      'Sin ella, la portada abre con la foto de un producto; si tampoco hay fotos, con el degradado de tu color.',
+    'settings.readiness.description': 'Descripción de la tienda',
+    'settings.readiness.descriptionWhy':
+      'Es el resumen que se lee en el pie y el que ve un buscador cuando comparten tu enlace.',
     'settings.readiness.contact': 'Forma de contacto',
     'settings.readiness.contactWhy':
       'Con un correo, un teléfono o una dirección se pintan el pie y la sección de datos del negocio.',

@@ -1,5 +1,6 @@
 import type { MessageKey } from '@/shared/i18n/messages'
 import { PRODUCT_IMAGES_TABLE, productImageSchema, type ProductImage } from '../types'
+import { optimizeImageFile } from '@/shared/lib/imageOptimizer'
 import { catalogClient } from './client'
 import { CatalogError, catalogErrorFromDb } from './errors'
 
@@ -122,7 +123,20 @@ export async function uploadProductImage(input: {
   file: File
   position: number
 }): Promise<ProductImage> {
-  const validation = validateImageFile(input.file)
+  /**
+   * Primero se REDUCE y después se valida (V3 · P11).
+   *
+   * Al revés, una foto de teléfono de 6 MB se rechazaba por tamaño aunque
+   * reducida pesara unos cientos de kilobytes — y el producto se quedaba sin
+   * foto, que es el peor resultado posible. Se valida lo que de verdad se sube.
+   *
+   * El tope es el más alto de la lista porque la galería de la ficha permite
+   * ampliar: recortar a 1200 se notaría justo en el gesto en el que alguien
+   * está decidiendo si compra.
+   */
+  const { file } = await optimizeImageFile(input.file, 'product')
+
+  const validation = validateImageFile(file)
   if (!validation.ok) throw new CatalogError(validation.key, 'ARCHIVO_INVALIDO')
 
   const supabase = catalogClient()
@@ -130,13 +144,13 @@ export async function uploadProductImage(input: {
     organizationId: input.organizationId,
     storeId: input.storeId,
     productId: input.productId,
-    mimeType: input.file.type,
+    mimeType: file.type,
   })
 
   const { error: uploadError } = await supabase.storage
     .from(PRODUCT_IMAGES_BUCKET)
-    .upload(path, input.file, {
-      contentType: input.file.type,
+    .upload(path, file, {
+      contentType: file.type,
       upsert: false,
       // La ruta lleva un uuid: este objeto NUNCA cambia de contenido, así que
       // el navegador puede quedárselo y no volver a pedirlo. Siete días y no

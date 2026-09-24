@@ -1446,3 +1446,180 @@ la zona de detalle por `lazy`: está debajo del pliegue y no forma parte de la
 decisión de compra.
 
 `PHASE_RESULT: PASS`
+
+---
+
+# P11 · Calidad de imagen y readiness V2
+
+`ESTADO: PASS`
+
+## Parte A · Auditoría de los cuatro flujos
+
+Los cuatro —`uploadStoreAsset`, `uploadBrandLogo`, `uploadCategoryImage`,
+`uploadProductImage`— hacían lo mismo y lo hacían bien en lo que toca a
+seguridad: tipo en lista blanca (`jpeg`, `png`, `webp`, `avif`; **nunca SVG**,
+que es código), extensión derivada del MIME y no del nombre, ruta con el tenant
+en los dos primeros segmentos —que es lo que autoriza la policy de Storage y lo
+que exige el CHECK de cada tabla—, nombre con uuid, `upsert: false` y siete días
+de caché.
+
+Lo que faltaba era **el tamaño de lo que se sube**. Una foto de teléfono actual
+son 3000 × 4000 px y entre 4 y 8 MB; la vitrina la pinta a 400 px de ancho. Y el
+tope de subida son 5 MB para producto y 2 MB para branding, así que el flujo real
+del comercio era: elegir la foto, esperar, y leer «archivo demasiado pesado». El
+resultado no era una tienda con fotos grandes: era **una tienda sin fotos**.
+
+## La solución: reducir en el navegador, antes de subir
+
+`src/shared/lib/imageOptimizer.ts`, una utilidad compartida por los cuatro.
+
+**Sin servicio externo**, y es una decisión: el stack no genera derivados y meter
+un servicio de imágenes es infraestructura nueva con su coste, su clave y su
+punto de fallo. El navegador ya trae `createImageBitmap` y `canvas`, que es todo
+lo que hace falta para una sola imagen bien dimensionada. Y como dice el propio
+encargo: **una imagen razonable es mejor que un juego de derivados a medias con
+URLs que se rompen.** No se inventan derivados.
+
+### Los topes, y por qué esos
+
+No son dogma: son el ancho al que de verdad se pinta cada cosa, por dos —para
+pantallas de alta densidad—, redondeado.
+
+| Uso | Lado mayor | Por qué |
+|---|---|---|
+| `logo` | 1200 px | Se pinta a 44 px en el muro de marcas y a ~120 en la cabecera. |
+| `category` | 1800 px | Una puerta de familia ocupa como mucho media pantalla; la pieza principal del mosaico, el doble de área. |
+| `banner` | 2400 px | Es la **única** imagen que se pinta al ancho completo de la ventana. |
+| `product` | 2400 px | La galería de la ficha permite ampliar, y ahí sí se mira el detalle: recortarla a 1200 se notaría justo en el gesto en el que alguien decide si compra. |
+
+Calidad 0,82: el punto donde la diferencia deja de verse a tamaño de pantalla y
+el archivo ya ha bajado casi todo lo que va a bajar. Por debajo de 0,75 aparecen
+bloques en los degradados —el cielo de una foto de exterior, el fondo de un
+estudio.
+
+### Las cinco reglas que lo hacen seguro
+
+1. **Lo que ya cabe no se toca.** Recomprimir lo que estaba bien solo pierde
+   calidad, y además crearía un archivo nuevo en cada guardado.
+2. **Si el resultado sale más grande, se descarta.** Pasa de verdad con imágenes
+   ya optimizadas al máximo. Una «optimización» que engorda el archivo es un
+   fallo silencioso.
+3. **Si algo falla, se sube el original.** Sin `canvas`, sin
+   `createImageBitmap`, con un formato que el decodificador no soporta o con la
+   memoria justa. **Nunca lanza.** Nadie se queda sin subir su foto porque esta
+   utilidad no pudo ayudar.
+4. **La proporción no se toca.** Ni recortes ni rellenos: eso lo decide quien
+   pinta, no quien guarda.
+5. **Nada de SVG ni de lo que no sea un mapa de bits.** Ni se intenta.
+
+### WebP, con condición
+
+Entre un 25 % y un 35 % más pequeño que JPEG a la misma calidad, y **con canal
+alfa**, así que sirve igual para un logotipo transparente que para una foto. Se
+usa solo si el navegador **sabe escribirlo** —se comprueba el tipo del blob que
+devuelve `toBlob`, no la cadena del agente— y solo si el archivo sale más
+pequeño. Un PNG con transparencia nunca acaba en JPEG: perdería el fondo. Y el
+nombre acompaña al tipo, porque un `.png` que contiene WebP es una trampa para el
+siguiente que lo mire.
+
+### El orden importa: primero reducir, después validar
+
+Al revés, la foto de 6 MB se rechazaba aunque reducida pesara doscientos
+kilobytes. Ahora se valida **lo que de verdad se va a subir**, y la ruta se
+construye con el tipo del archivo ya reducido.
+
+## Parte B · Readiness V2
+
+El panel de V2 ya era bueno: siete señales con cuentas reales, sin nota de 0 a
+100, sin bloquear nada y preguntando con el **cliente anónimo** —el mismo de un
+comprador— para medir lo que se ve desde la calle. Nada de eso cambia.
+
+Lo que cambia es que **dos señales preguntaban mal después de V3**, y una señal
+en rojo por algo que no es un hueco enseña a ignorar el panel entero:
+
+1. **El logotipo solo falta si la tienda lo usa.** Desde P01 el comercio elige su
+   lockup; quien eligió `name` quiere su nombre escrito —es una decisión de
+   marca, como media tienda de moda— y pedirle un logotipo era pedirle rellenar
+   un hueco que él mismo cerró.
+2. **La portada sin banner ya no es un hueco si hay fotos de producto.** Desde
+   P04 el hero cae a la foto de un rebajado, a la de una familia o al degradado
+   con el lema. Solo es un hueco cuando no hay **ninguna** imagen de la que
+   tirar.
+
+Y se añade una señal: **la descripción de la tienda** (P01), que es lo que se lee
+en el pie y lo que ve un buscador cuando comparten el enlace. Con la bajada del
+hero como respaldo de compatibilidad —era la descripción publicable antes de V3,
+y es a la que la vitrina sigue cayendo—, para no pedirle a una tienda de V2 que
+escriba algo que ya tenía escrito.
+
+Total: **ocho señales**, mismas reglas.
+
+## Lo que NO se hizo, y por qué
+
+**No se guardan las dimensiones de las imágenes en base.** La lista del encargo
+incluía «imágenes demasiado pequeñas para el uso si se conocen dimensiones», y
+hoy no se conocen: no hay columna donde estén. Añadirla es un modelo nuevo
+—columnas, migración, backfill de lo ya subido y un sitio donde escribirlas— y el
+propio encargo dice «DB solo si realmente se agregó modelo nuevo». La utilidad ya
+**devuelve** ancho y alto, así que el día que se decida guardarlos el dato está
+donde hay que cogerlo.
+
+**No se generan derivados** (`@2x`, `srcset`). Ver arriba: sin generación en el
+storage, inventar URLs de derivados es prometer archivos que no existen.
+
+## Archivos principales
+
+| Archivo | Qué cambia |
+|---|---|
+| `shared/lib/imageOptimizer.ts` | **Nuevo.** `optimizeImageFile`, `readImageSize`, `MAX_SIDE`. Nunca lanza. |
+| `admin/settings/api.ts` | `uploadStoreAsset` reduce antes de validar; `logo` y `banner` con su tope. |
+| `catalog/api/images.ts` · `brandLogos.ts` · `categoryMedia.ts` | Lo mismo, cada uno con el tope de su uso. |
+| `admin/settings/readiness.ts` | Logotipo consciente del lockup, portada consciente de los respaldos, señal de descripción. |
+| `admin/settings/StoreReadiness.tsx` · `StorefrontDesignSection.tsx` | La línea nueva y los tres campos de identidad que las señales necesitan. |
+| `shared/i18n/messages.{es,en}.ts` | La señal nueva, y los «por qué» del logotipo y la portada al día. |
+
+**Migraciones: ninguna.** Ver «Lo que NO se hizo».
+
+## Ciclos correctivos
+
+1. El respaldo de la señal de descripción apuntaba a `hero_title`, que no está
+   en el formulario de diseño. El correcto es `hero_subtitle`, que **era** la
+   descripción publicable en V2 y es a la que cae la vitrina al leerla.
+2. Dos pruebas de fixtura mías: el tamaño de un `File` construido a partir de un
+   blob es el de su contenido real, no el que un doble declare en el blob, así
+   que lo que se comprueba es que lo subido **no es el original**; y la ruta del
+   logotipo de marca lleva `company/` entre los dos identificadores.
+3. Las pruebas de readiness contaban siete señales y ahora son ocho, y una de
+   ellas cambió de resultado a propósito (la portada con fotos de producto). Las
+   dos actualizadas con el porqué dentro.
+
+## Tests
+
+| Archivo | Casos |
+|---|---|
+| `shared/lib/imageOptimizer.test.ts` | **Nuevo**, 17. Lo que cabe no se toca (y justo en el máximo tampoco); se reduce conservando la proporción y el lado mayor cae al tope del uso; prefiere WebP y renombra; **sin WebP, un PNG transparente se queda en PNG y no acaba en JPEG**; si sale más grande se descarta; sin contexto, sin `toBlob`, sin decodificador o con un fallo, se sube el original y **nunca lanza**; SVG, GIF, PDF y sin tipo se suben tal cual; `readImageSize` cierra el bitmap y devuelve `null` donde no puede leer. |
+| `catalog/media-uploads.test.ts` | **Nuevo**, 5. La foto de 6 MB que antes se rechazaba se sube reducida, **una sola vez**, con la extensión real y el tenant intacto en la ruta; una que ya cabe se sube idéntica; sin `canvas` se sube el original; el logotipo y la foto de familia, igual, con sus rutas de siempre. |
+| `admin/settings/readiness.test.ts` | 11 → **16**. Quien eligió su nombre como marca no tiene hueco de logotipo, pero con lockup de logotipo sí; la portada sin banner con fotos de producto está al día y sin ninguna imagen no; la descripción con su respaldo; con todo lleno, las ocho al día. |
+| `admin/settings/store-readiness.test.tsx` | Las cuentas del panel al día (ocho líneas, «5 de 8»). |
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 312 ficheros, 6253 tests |
+| `npm run build` | **PASS** |
+| `npm run bundle:report` | **PASS** — portada 397,6 kB · ficha 390,1 kB · backoffice 425,2 kB |
+| `npm run scan:secrets` | **PASS** |
+
+`npm run test:db` no se repite: no hay migración ni cambio de validador.
+
+## Pendiente real
+
+Guardar ancho y alto de cada imagen subida —con su migración— es lo que
+permitiría avisar de «esta foto es demasiado pequeña para la portada» y lo que
+convertiría el aviso de peso en un dato histórico y no solo en una decisión del
+momento de subir. Queda fuera a propósito, con el motivo escrito arriba.
+
+`PHASE_RESULT: PASS`

@@ -303,9 +303,14 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'settings.readiness.todo': 'Could be better',
     'settings.readiness.count': '{n} of {total}',
     'settings.readiness.logo': 'Store logo',
-    'settings.readiness.logoWhy': 'Without it, the header and footer show the name initials.',
+    'settings.readiness.logoWhy':
+      'Without it, the header and footer show your name in type. If you chose the name as your mark, it is not needed.',
     'settings.readiness.hero': 'Cover image',
-    'settings.readiness.heroWhy': 'Without it, the cover is painted with your color gradient.',
+    'settings.readiness.heroWhy':
+      'Without it, the cover opens with a product photo; with no photos either, with your color gradient.',
+    'settings.readiness.description': 'Store description',
+    'settings.readiness.descriptionWhy':
+      'It is the summary read in the footer and the one a search engine shows when your link is shared.',
     'settings.readiness.contact': 'A way to get in touch',
     'settings.readiness.contactWhy':
       'An email, a phone or an address is what paints the footer and the business section.',
