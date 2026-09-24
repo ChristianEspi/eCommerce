@@ -11,7 +11,7 @@ import { asRole, claimsFor, createTestDatabase, expectFailure, TENANT_A, TENANT_
  * La franja bajo la portada anunciaba «Atención farmacéutica» y «Retiro en
  * tienda» en TODAS las tiendas, escritas en el código. Eran afirmaciones sobre
  * la plantilla y el local del comercio que la plataforma no puede sostener. La
- * migración `20260923100000` devuelve esas afirmaciones a quien puede hacerlas,
+ * migración `20260923140000` devuelve esas afirmaciones a quien puede hacerlas,
  * y esto comprueba las dos mitades del trato:
  *
  *  · el COMERCIO puede escribir su promesa, con su texto, en su tienda;
