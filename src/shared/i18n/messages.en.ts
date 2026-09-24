@@ -196,8 +196,18 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'settings.design.style.title': 'Theme settings',
     'settings.design.style.help':
       'Every setting follows the theme until you change it. Change one only if your store needs something different.',
+    // P10 · Still the fallback for a value with no label of its own; what
+    // normally shows is `inheritValue`, which names what is inherited.
     'settings.design.style.inherit': 'Follow the theme',
-    'settings.design.style.reset': 'Reset to theme defaults',
+    'settings.design.style.inheritValue': 'Use theme: {value}',
+    'settings.design.style.reset': 'Reset to theme',
+    'settings.design.style.count': '{n} of {total} settings customized',
+    'settings.design.style.noneCustom': 'Everything follows the theme.',
+    'settings.design.style.groupCount': '{n} customized in this group',
+    'settings.design.style.group.structure': 'Structure',
+    'settings.design.style.group.product': 'Product',
+    'settings.design.style.group.spacing': 'Spacing and width',
+    'settings.design.workspace.config': 'Design settings',
     'settings.design.field.header': 'Header',
     'settings.design.field.hero': 'Cover',
     'settings.design.field.card': 'Product card',

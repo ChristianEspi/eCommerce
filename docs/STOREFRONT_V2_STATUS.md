@@ -1200,7 +1200,7 @@ había que actualizar a conciencia** —que es justo para lo que existen—:
 
 # P09 · Pie e información pública del negocio
 
-**Commit:** `<pendiente>` · **Ciclos correctivos:** 1 de 3
+**Commit:** `11a35a1` · **Ciclos correctivos:** 1 de 3
 
 ## El problema
 
@@ -1281,6 +1281,105 @@ nombre y ni un enlace sin texto o con un destino que no lleva a ninguna parte.
 | `npm run typecheck` | **PASS** |
 | `npm run lint` | **PASS** |
 | `npm run test` | **PASS** — 295 ficheros, 5832 tests |
+| `npm run build` | **PASS** |
+
+`PHASE_RESULT: PASS`
+
+---
+
+# P10 · «Diseño de tienda» se convierte en un taller
+
+**Commit:** `<pendiente>` · **Ciclos correctivos:** 1 de 3
+
+## El problema
+
+La vista previa estaba **al final**. Se elegía el tema arriba, se bajaba por
+siete desplegables y el editor de secciones, y se llegaba a la vista previa
+varias pantallas después, cuando ya no se veía lo que se había tocado. Cambiar
+el tema y ver el efecto exigía subir, cambiar, bajar, mirar y volver a subir.
+
+Eso no es un problema de estética: configurar una tienda es un lazo de prueba y
+error. Si el lazo no cabe en una pantalla, se rompe — se elige un tema a ciegas y
+no se vuelve.
+
+Y los siete ajustes finos, abiertos y a tres columnas, ocupaban **más pantalla
+que la elección del tema**, que es LA decisión. Todos decían lo mismo: «Heredar
+del tema». Un comercio no podía saber si su tienda tenía las tarjetas cómodas o
+compactas sin abrir la vitrina a mirarlo.
+
+## Lo que se hizo
+
+### Dos columnas, y la tienda siempre a la vista
+
+Configuración a la izquierda —380-420 px, hasta 520 en monitores muy anchos—,
+vista previa a la derecha **fija** (`position: sticky`). Se toca cualquier cosa
+y se ve al lado sin mover la pantalla.
+
+Por debajo de `lg` vuelve a una columna, con la configuración primero y la vista
+previa después: fijarla en 390 px de ancho la dejaría tapando el formulario. El
+orden del documento es ese en las dos disposiciones, y hay una prueba que lo
+fija — es también el orden que oye quien navega con un lector de pantalla.
+
+La altura útil descuenta la cabecera y la **barra de Guardar**, que flota abajo:
+sin ese descuento las últimas secciones de la tienda quedan detrás de dos
+botones. Dentro, la vista previa se desplaza sola.
+
+### El lienzo centra el dispositivo
+
+Antes el marco se pegaba a la izquierda, así que en un monitor ancho el teléfono
+de 390 px dejaba un kilómetro de gris a la derecha y parecía roto. Ahora va
+centrado con `safe center`: cuando el marco **no** cabe, `center` a secas
+recortaría por la izquierda y el principio de la tienda se volvería inalcanzable
+con la barra de desplazamiento; `safe` vuelve a alinear al inicio justo en ese
+caso. Y el marco no encoge (`flex: 0 0 auto`): un escritorio de 1280 px
+comprimido a 600 enseñaría la densidad de otra tienda.
+
+### Los ajustes finos: tres grupos plegados que dicen lo que heredan
+
+| | Antes | Ahora |
+|---|---|---|
+| Disposición | 7 desplegables abiertos, 3 columnas | 3 grupos plegables: Estructura · Producto · Espaciado y ancho |
+| Qué se abre | todo | el grupo que lleva algo pisado, solo |
+| La opción de herencia | «Heredar del tema» | «Usar tema: Normal» — **dice el valor heredado**, leído del preset |
+| Qué he tocado | ningún sitio | «2 de 7 ajustes personalizados» + un contador por grupo |
+| Volver atrás | «Restablecer estilo del tema» | «Restablecer al tema», al lado del contador |
+
+Lo que **no** cambia: el contrato. Siguen siendo las siete claves cerradas de
+`StorefrontStyle` con sus listas cerradas; pisar sigue siendo escribir la clave y
+heredar, borrarla. Ni un campo libre, ni JSON, ni una migración en esta fase.
+
+Y lo que está abierto es de quien mira, **no de la tienda**: abrir un grupo no
+ensucia el formulario. Si lo hiciera, la barra de Guardar avisaría de cambios sin
+guardar por haber abierto un desplegable.
+
+## Ciclo correctivo
+
+1. Cuatro pruebas rojas tras el refactor, las cuatro por consecuencias reales y
+   no por el refactor en sí: los desplegables plegados dejan de ser alcanzables
+   por `role` —`role` ignora lo que está oculto, que es exactamente lo que se
+   quería— y el botón de restablecer cambió de texto. Se actualizaron
+   **conservando lo que comprobaban**: que se parte de todo heredado, que volver
+   a heredar borra la clave en vez de guardar una vacía y que restablecer está
+   apagado cuando no hay nada que restablecer. Ninguna se debilitó; tres de ellas
+   ahora abren su grupo primero, que es lo que hace un comercio.
+
+## Tests
+
+| Archivo | Casos |
+|---|---|
+| `settings/storefront-design.test.tsx` | 33 → **44**. Nuevos: los grupos llegan plegados y el que lleva algo pisado se abre solo; un grupo plegado dice cuántos lleva dentro; el contador y su estado vacío; la opción de herencia dice qué hereda **y cambia con el tema elegido**; dos zonas con nombre; la configuración va antes que la vista previa en el documento; las tres decisiones están en la columna de configuración y la tienda no; abrir y cerrar un grupo no ensucia el formulario; los grupos se abren con el teclado; y un contador de renders que fija que un cambio son unos pocos renders y no cientos — un `form.watch` realimentado cuelga la pestaña. |
+
+Lo que ya estaba y se conserva intacto: la vista previa refleja tema, ajuste y
+orden **sin guardar**, se cambia de tamaño con el teclado, mirarla no ensucia el
+formulario, y cualquier combinación pasa la validación.
+
+## Gates
+
+| Gate | Resultado |
+|---|---|
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** |
+| `npm run test` | **PASS** — 295 ficheros, 5843 tests |
 | `npm run build` | **PASS** |
 
 `PHASE_RESULT: PASS`

@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { useForm } from 'react-hook-form'
@@ -27,7 +27,11 @@ import { storeFormSchema, toForm, type StoreFormValues } from './types'
  */
 
 /** Un formulario real, con el mismo esquema y los mismos valores que la pantalla. */
+/** Cuenta los renders del anfitrión: un `watch` realimentado se ve aquí. */
+let renders = 0
+
 function Anfitrion({ inicial }: { inicial?: Partial<StoreFormValues> }) {
+  renders += 1
   const form = useForm<StoreFormValues>({
     resolver: zodResolver(storeFormSchema),
     defaultValues: { ...toForm('Botica', null), ...inicial },
@@ -40,11 +44,13 @@ function Anfitrion({ inicial }: { inicial?: Partial<StoreFormValues> }) {
       {/* Espejo del estado: lo que se guardaría si alguien pulsara Guardar. */}
       <pre data-testid="valores">{JSON.stringify(form.watch())}</pre>
       <span data-testid="sucio">{String(form.formState.isDirty)}</span>
+      <span data-testid="renders">{renders}</span>
     </>
   )
 }
 
 function pintar(inicial?: Partial<StoreFormValues>) {
+  renders = 0
   renderWithProviders(<Anfitrion inicial={inicial} />, { route: '/app/settings' })
 }
 
@@ -53,6 +59,17 @@ function valores(): StoreFormValues {
 }
 
 const tema = (nombre: string) => screen.getByRole('radio', { name: new RegExp(nombre, 'i') })
+
+/**
+ * Abre un grupo de ajustes finos (Storefront V2 · P10).
+ *
+ * Desde P10 los siete desplegables van plegados en tres grupos: los ajustes
+ * son la excepción, no el caso normal, y siete controles abiertos ocupaban más
+ * pantalla que la elección del tema — que es LA decisión.
+ */
+async function abrirGrupo(user: ReturnType<typeof userEvent.setup>, nombre: string) {
+  await user.click(screen.getByRole('button', { name: new RegExp(nombre, 'i') }))
+}
 
 // ---------------------------------------------------------------------------
 // Elegir tema
@@ -122,17 +139,87 @@ describe('elegir el tema', () => {
 // ---------------------------------------------------------------------------
 
 describe('ajustar el tema', () => {
-  it('todo empieza heredando, sin nada pisado', () => {
+  it('todo empieza heredando, sin nada pisado', async () => {
+    const user = userEvent.setup()
     pintar()
 
     expect(valores().storefront_style).toEqual({})
+
+    // Los siete siguen ahí; lo que cambia en P10 es que hay que abrir su grupo.
+    for (const grupo of ['Estructura', 'Producto', 'Espaciado y ancho']) {
+      await abrirGrupo(user, grupo)
+    }
     expect(screen.getAllByRole('combobox').length).toBeGreaterThanOrEqual(7)
+  })
+
+  /**
+   * Los tres grupos (Storefront V2 · P10).
+   *
+   * Siete desplegables abiertos, todos con el mismo peso y todos diciendo
+   * «Heredar del tema», ocupaban más pantalla que la elección del tema y
+   * ofrecían siete preguntas a quien acababa de responder una.
+   */
+  it('los grupos llegan plegados, pero el que lleva algo pisado se abre solo', () => {
+    pintar({ storefront_style: { contentWidth: 'xl' } })
+
+    // El de espaciado, que es donde vive lo pisado, está abierto.
+    expect(screen.getByRole('button', { name: /Espaciado y ancho/i })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
+    // Los otros dos, no: lo normal no tiene por qué ocupar sitio.
+    expect(screen.getByRole('button', { name: /^Estructura/i })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
+  })
+
+  it('un grupo plegado dice cuántos ajustes lleva dentro', () => {
+    // Si no, esconder es esconder: quien no recuerda qué tocó hace tres meses
+    // tendría que abrir los tres grupos para encontrarlo.
+    pintar({ storefront_style: { heroVariant: 'statement', categoryVariant: 'pills' } })
+
+    expect(screen.getByLabelText('2 personalizados en este grupo')).toBeInTheDocument()
+  })
+
+  it('se cuenta lo personalizado, y sin nada dice que todo lo hereda', () => {
+    pintar({ storefront_style: { contentWidth: 'xl', imageRatio: 'portrait' } })
+    expect(screen.getByText('2 de 7 ajustes personalizados')).toBeInTheDocument()
+
+    cleanup()
+    pintar()
+    expect(screen.getByText('Todo lo hereda del tema.')).toBeInTheDocument()
+  })
+
+  it('la opción de heredar DICE qué se hereda, no solo que hereda', async () => {
+    // «Heredar del tema» a secas obligaba a abrir la vitrina para saber si la
+    // tienda tenía las tarjetas cómodas o compactas. El dato estaba aquí.
+    const user = userEvent.setup()
+    pintar()
+
+    await abrirGrupo(user, 'Espaciado y ancho')
+    await user.click(screen.getByLabelText('Ancho del contenido'))
+
+    // universal hereda `lg`, que en la pantalla se llama «Normal».
+    expect(screen.getByRole('option', { name: 'Usar tema: Normal' })).toBeInTheDocument()
+  })
+
+  it('y lo que dice cambia con el tema elegido', async () => {
+    const user = userEvent.setup()
+    pintar({ theme_preset: 'premium' })
+
+    await abrirGrupo(user, 'Producto')
+    await user.click(screen.getByLabelText('Tarjeta de producto'))
+
+    // premium hereda tarjeta cómoda y proporción vertical; retail, compacta.
+    expect(screen.getByRole('option', { name: 'Usar tema: Cómoda' })).toBeInTheDocument()
   })
 
   it('pisar un ajuste guarda ese y solo ese', async () => {
     const user = userEvent.setup()
     pintar()
 
+    await abrirGrupo(user, 'Espaciado y ancho')
     await user.click(screen.getByLabelText('Ancho del contenido'))
     await user.click(screen.getByRole('option', { name: 'Extra ancho' }))
 
@@ -144,7 +231,7 @@ describe('ajustar el tema', () => {
     pintar({ storefront_style: { contentWidth: 'xl' } })
 
     await user.click(screen.getByLabelText('Ancho del contenido'))
-    await user.click(screen.getByRole('option', { name: 'Heredar del tema' }))
+    await user.click(screen.getByRole('option', { name: 'Usar tema: Normal' }))
 
     expect(valores().storefront_style).toEqual({})
   })
@@ -153,7 +240,7 @@ describe('ajustar el tema', () => {
     const user = userEvent.setup()
     pintar({ storefront_style: { contentWidth: 'xl', imageRatio: 'portrait' } })
 
-    await user.click(screen.getByRole('button', { name: 'Restablecer estilo del tema' }))
+    await user.click(screen.getByRole('button', { name: 'Restablecer al tema' }))
 
     expect(valores().storefront_style).toEqual({})
   })
@@ -161,7 +248,7 @@ describe('ajustar el tema', () => {
   it('restablecer está apagado cuando no hay nada que restablecer', () => {
     pintar()
 
-    expect(screen.getByRole('button', { name: 'Restablecer estilo del tema' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Restablecer al tema' })).toBeDisabled()
   })
 
   it('no hay ni un campo libre donde escribir estilos', () => {
@@ -376,5 +463,96 @@ describe('lo que sale de esta pantalla es válido', () => {
 
     expect(valores().name).toBe('Botica del Centro')
     expect(valores().support_email).toBe('hola@botica.pe')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// El taller (Storefront V2 · P10)
+// ---------------------------------------------------------------------------
+
+/**
+ * «Diseño de tienda» como TALLER, no como formulario.
+ *
+ * Hasta P10 la vista previa estaba al final: se elegía el tema arriba, se bajaba
+ * por siete desplegables y el editor de secciones, y se llegaba a la vista
+ * previa cuando ya no se veía lo que se había tocado. Configurar una tienda es
+ * un lazo de prueba y error, y si el lazo no cabe en una pantalla, se rompe: se
+ * elige un tema a ciegas y no se vuelve.
+ */
+describe('el taller de diseño', () => {
+  it('son dos zonas con nombre: se configura en una y se mira en la otra', () => {
+    pintar()
+
+    expect(screen.getByRole('region', { name: 'Configuración del diseño' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Vista previa' })).toBeInTheDocument()
+  })
+
+  it('la configuración va ANTES que la vista previa en el documento', () => {
+    // En dos columnas eso es «izquierda y derecha»; en una —tableta y
+    // teléfono— es «primero configuro, luego miro», que es el orden en el que
+    // se lee y el que oye quien navega con un lector de pantalla. Fijarlo aquí
+    // es lo que impide que un día la vista previa acabe encima del formulario
+    // en un teléfono, empujando la configuración fuera de la primera pantalla.
+    pintar()
+
+    const taller = screen.getByTestId('design-workspace')
+    const configuracion = screen.getByRole('region', { name: 'Configuración del diseño' })
+    const previa = screen.getByRole('region', { name: 'Vista previa' })
+
+    expect(taller).toContainElement(configuracion)
+    expect(taller).toContainElement(previa)
+    expect(
+      configuracion.compareDocumentPosition(previa) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it('las tres decisiones están en la columna de configuración, y la tienda no', () => {
+    pintar()
+
+    const configuracion = screen.getByRole('region', { name: 'Configuración del diseño' })
+
+    expect(within(configuracion).getByRole('radiogroup')).toBeInTheDocument()
+    expect(within(configuracion).getByText('Ajustes del tema')).toBeInTheDocument()
+    expect(within(configuracion).getByRole('checkbox', { name: 'Mostrar: Marcas' })).toBeInTheDocument()
+    expect(within(configuracion).queryByTestId('preview-frame')).not.toBeInTheDocument()
+  })
+
+  it('abrir y cerrar un grupo no ensucia el formulario', async () => {
+    // Lo que está abierto es de quien mira, no de la tienda. Si esto ensuciara
+    // el formulario, la barra de Guardar avisaría de cambios sin guardar por
+    // haber abierto un desplegable, y al pulsar Guardar no cambiaría nada.
+    const user = userEvent.setup()
+    pintar()
+
+    await abrirGrupo(user, 'Estructura')
+    await abrirGrupo(user, 'Estructura')
+
+    expect(screen.getByTestId('sucio')).toHaveTextContent('false')
+  })
+
+  it('los grupos se abren con el teclado', async () => {
+    const user = userEvent.setup()
+    pintar()
+
+    const grupo = screen.getByRole('button', { name: /^Producto/i })
+    grupo.focus()
+    await user.keyboard('{Enter}')
+
+    expect(grupo).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('mirar la tienda y cambiarla no dispara un bucle de renders', async () => {
+    // El taller lee el formulario con `form.watch`, y un `watch` que escriba
+    // en el formulario al renderizar se realimenta hasta colgar la pestaña.
+    // Un cambio = un puñado de renders, no cientos.
+    const user = userEvent.setup()
+    pintar()
+
+    const antes = Number(screen.getByTestId('renders').textContent)
+    await user.click(tema('premium'))
+    const despues = Number(screen.getByTestId('renders').textContent)
+
+    expect(despues).toBeGreaterThan(antes)
+    expect(despues - antes).toBeLessThan(10)
   })
 })

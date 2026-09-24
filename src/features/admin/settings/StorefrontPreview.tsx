@@ -132,10 +132,35 @@ export function StorefrontPreview({
         {t('settings.design.preview.help')}
       </Typography>
 
-      {/* El marco se desplaza si no cabe, en vez de encoger el contenido: un
-          escritorio de 1280 px comprimido a 600 no enseña la densidad real, que
-          es justo lo que se viene a mirar. */}
-      <Box sx={{ overflowX: 'auto', p: 1, bgcolor: 'var(--neutral-soft)', borderRadius: `${R.lg}px` }}>
+      {/**
+       * El lienzo.
+       *
+       * El marco se desplaza si no cabe, en vez de encoger el contenido: un
+       * escritorio de 1280 px comprimido a 600 no enseña la densidad real, que
+       * es justo lo que se viene a mirar.
+       *
+       * Y va CENTRADO (Storefront V2 · P10). Antes se pegaba a la izquierda, así
+       * que en un monitor ancho el teléfono de 390 px dejaba un kilómetro de
+       * gris a la derecha y parecía que la vista previa estaba rota. Centrado,
+       * el gris se reparte y se lee como lo que es: el marco de un dispositivo.
+       *
+       * `safe center` y no `center` a secas: cuando el marco NO cabe, centrar
+       * recorta por la izquierda y el principio de la tienda se vuelve
+       * inalcanzable con la barra de desplazamiento. `safe` vuelve a alinear al
+       * inicio justo en ese caso. El `center` de fuera es la reserva para quien
+       * no lo entienda.
+       */}
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          '@supports (justify-content: safe center)': { justifyContent: 'safe center' },
+          overflowX: 'auto',
+          p: 1,
+          bgcolor: 'var(--neutral-soft)',
+          borderRadius: `${R.lg}px`,
+        }}
+      >
         <Box
           data-testid="preview-frame"
           data-viewport={marco}
@@ -144,6 +169,10 @@ export function StorefrontPreview({
           style={{ ...themeCssVars(tema), width: ancho }}
           sx={{
             maxWidth: '100%',
+            // Sin encoger: dentro de un contenedor flexible, un marco de 1280 px
+            // se comprimiría a lo que quedara libre y la densidad que se viene a
+            // mirar sería la de otra tienda.
+            flex: '0 0 auto',
             bgcolor: 'var(--card)',
             borderRadius: `${R.md}px`,
             border: '1px solid var(--border)',

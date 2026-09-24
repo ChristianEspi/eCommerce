@@ -159,8 +159,18 @@ export const es = {
     'settings.design.style.title': 'Ajustes del tema',
     'settings.design.style.help':
       'Cada ajuste hereda del tema mientras no lo cambies. Cámbialo solo si tu tienda necesita algo distinto.',
+    // P10 · Se sigue usando de reserva para un valor sin texto propio, pero
+    // lo que se lee normalmente es `inheritValue`, que DICE qué se hereda.
     'settings.design.style.inherit': 'Heredar del tema',
-    'settings.design.style.reset': 'Restablecer estilo del tema',
+    'settings.design.style.inheritValue': 'Usar tema: {value}',
+    'settings.design.style.reset': 'Restablecer al tema',
+    'settings.design.style.count': '{n} de {total} ajustes personalizados',
+    'settings.design.style.noneCustom': 'Todo lo hereda del tema.',
+    'settings.design.style.groupCount': '{n} personalizados en este grupo',
+    'settings.design.style.group.structure': 'Estructura',
+    'settings.design.style.group.product': 'Producto',
+    'settings.design.style.group.spacing': 'Espaciado y ancho',
+    'settings.design.workspace.config': 'Configuración del diseño',
     'settings.design.field.header': 'Cabecera',
     'settings.design.field.hero': 'Portada',
     'settings.design.field.card': 'Tarjeta de producto',
