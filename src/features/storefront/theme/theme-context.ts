@@ -1,6 +1,6 @@
 import { createContext } from 'react'
 import type { CSSProperties } from 'react'
-import type { HeaderVariant, ImageRatio, SectionSpacing } from './types'
+import type { ContentWidth, HeaderVariant, ImageRatio, SectionSpacing } from './types'
 import { DEFAULT_STORE_THEME, type ResolvedStoreTheme } from './resolve'
 
 /**
@@ -64,6 +64,16 @@ const MARGEN: Record<SectionSpacing, { xs: number; md: number }> = {
 const BARRA: Record<HeaderVariant, { xs: number; md: number }> = {
   standard: { xs: 60, md: 68 },
   compact: { xs: 52, md: 56 },
+  /**
+   * `brand` es MÁS alta, no menos (Storefront V3 · P02).
+   *
+   * Es la única de las tres que reparte su contenido en dos filas —la marca
+   * centrada arriba, la navegación debajo—, así que necesita el alto de las dos.
+   * En el teléfono no: ahí la cabecera de marca se comporta como la estándar,
+   * porque dos filas en 390 px de ancho se comen media pantalla antes del primer
+   * producto.
+   */
+  brand: { xs: 60, md: 76 },
 }
 
 /** La proporción de `ProductMedia`, que hoy viene cableada en `1 / 1`. */
@@ -71,6 +81,59 @@ const PROPORCION: Record<ImageRatio, string> = {
   square: '1 / 1',
   portrait: '3 / 4',
   landscape: '4 / 3',
+}
+
+/**
+ * El ancho máximo del contenido, en píxeles (Storefront V2 · P05).
+ *
+ * ## Por qué no se usan los de MUI
+ *
+ * `Container maxWidth="lg"` son 1200 px y `xl` son 1536. Eran los de una
+ * herramienta de trabajo, y en la vitrina se notaban: en un monitor de 1920 la
+ * tienda dejaba 360 px de margen a cada lado, así que el catálogo se veía en
+ * una columna estrecha con dos desiertos al lado. Un eCommerce moderno usa el
+ * ancho que tiene.
+ *
+ * `lg` sube a 1320 y `xl` a 1680, que es lo que cabe cómodo en 1440 y en 1920
+ * dejando aire real. No se sube más: a partir de ahí las filas de producto se
+ * estiran tanto que recorrerlas obliga a mover la cabeza.
+ *
+ * ## Y por qué esto NO convierte el texto en líneas infinitas
+ *
+ * Porque el ancho del CONTENEDOR y la medida del TEXTO son dos cosas distintas,
+ * y aquí solo se toca la primera. Los bloques de texto llevan su propio tope —el
+ * titular de la portada a 680 px, su bajada a 560, la descripción del pie a
+ * 368— y una rejilla de tarjetas gana columnas en vez de ensanchar las que
+ * tiene. Lo que crece es cuánto CABE, no cuánto mide una línea.
+ */
+const ANCHO: Record<ContentWidth, number> = {
+  lg: 1320,
+  xl: 1680,
+}
+
+/**
+ * El alto de la caja de búsqueda y el aire de la barra de familias.
+ *
+ * Es la otra mitad de `headerVariant`, y la que le da sentido de verdad: hasta
+ * P05 lo único que cambiaba entre `standard` y `compact` eran doce píxeles de
+ * altura de la barra. Con esto, `compact` recorta también la caja de búsqueda y
+ * el aire de la fila de familias, y la suma sí se nota: la primera pantalla de
+ * un catálogo de miles de referencias gana casi treinta píxeles de producto.
+ */
+const BUSCADOR: Record<HeaderVariant, number> = {
+  standard: 42,
+  compact: 34,
+  // En la cabecera de marca el buscador no es el protagonista, pero tampoco se
+  // esconde: quien llega sabiendo qué quiere sigue teniendo dónde escribirlo.
+  brand: 40,
+}
+
+const AIRE_NAV: Record<HeaderVariant, number> = {
+  standard: 6,
+  compact: 2,
+  // La fila de familias es parte de la composición de marca, no un añadido
+  // debajo: respira como el resto del tema.
+  brand: 10,
 }
 
 /**
@@ -94,7 +157,37 @@ export function themeCssVars(theme: ResolvedStoreTheme): CSSProperties {
     '--sf-main-pad-md': `${margen.md}px`,
     '--sf-header-h': `${barra.xs}px`,
     '--sf-header-h-md': `${barra.md}px`,
+    '--sf-content-w': `${ANCHO[theme.style.contentWidth]}px`,
+    '--sf-search-h': `${BUSCADOR[theme.style.headerVariant]}px`,
+    '--sf-nav-pad': `${AIRE_NAV[theme.style.headerVariant]}px`,
+    /**
+     * Cuánto hay que bajar para que un ancla no quede DEBAJO de la cabecera.
+     *
+     * La cabecera es pegajosa y la barra de familias va justo debajo, así que un
+     * enlace a `#marcas` dejaba la sección medio tapada — se saltaba a ella y
+     * había que subir a mano. Estaba resuelto con un `96` escrito a mano en un
+     * componente, que dejó de ser cierto en cuanto la barra cambió de alto por
+     * tema.
+     *
+     * Sale del alto real de la barra más el de la fila de familias (su aire por
+     * dos, más la píldora de 30 px) y un respiro de 12.
+     */
+    '--sf-anchor-offset': `${barra.md + AIRE_NAV[theme.style.headerVariant] * 2 + 30 + 12}px`,
     '--sf-image-ratio': PROPORCION[theme.style.imageRatio],
+    /**
+     * Storefront V3 · P02 · Cómo encaja la foto en su marco.
+     *
+     * Va como VARIABLE y no como prop porque `object-fit` es una propiedad de
+     * CSS y esto la alimenta directamente: `object-fit: var(--sf-media-fit)`.
+     * Así la decisión la toma el tema una vez, en la frontera, y ni la tarjeta
+     * ni la galería tienen que preguntar qué tema hay puesto — que es lo que
+     * este contrato existe para evitar.
+     *
+     * Hasta V3 la tarjeta traía `contain` cableado: la decisión correcta para un
+     * catálogo de referencias y la equivocada para una tienda de moda, sin forma
+     * de tener las dos.
+     */
+    '--sf-media-fit': theme.style.productMediaFit,
     '--sf-grid-xs': String(theme.definition.gridColumns.xs),
     '--sf-grid-sm': String(theme.definition.gridColumns.sm),
     '--sf-grid-lg': String(theme.definition.gridColumns.lg),
@@ -114,5 +207,9 @@ export function themeDataAttributes(theme: ResolvedStoreTheme): Record<string, s
     'data-store-header': theme.style.headerVariant,
     'data-store-cards': theme.style.productCardVariant,
     'data-store-spacing': theme.style.sectionSpacing,
+    // Storefront V3 · P02. Los dos salen del contrato, así que son lista
+    // cerrada: un `data-` con texto del tenant acabaría en un selector de CSS.
+    'data-store-cats': theme.style.categoryVariant,
+    'data-store-media': theme.style.productMediaFit,
   }
 }

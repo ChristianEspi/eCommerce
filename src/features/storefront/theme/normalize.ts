@@ -1,3 +1,4 @@
+import { sanitizeSectionPresentation } from './presentation'
 import {
   CATEGORY_VARIANTS,
   CONTENT_WIDTHS,
@@ -6,9 +7,11 @@ import {
   HOME_SECTION_IDS,
   IMAGE_RATIOS,
   PRODUCT_CARD_VARIANTS,
+  PRODUCT_MEDIA_FITS,
   SECTION_SPACINGS,
   THEME_PRESET_IDS,
   type HomeLayout,
+  type SectionPresentation,
   type HomeSectionConfig,
   type HomeSectionId,
   type StorefrontStyle,
@@ -114,6 +117,10 @@ const CLAVES_DE_ESTILO = [
   ['contentWidth', CONTENT_WIDTHS],
   ['imageRatio', IMAGE_RATIOS],
   ['sectionSpacing', SECTION_SPACINGS],
+  // Storefront V3 · P02. Entra en la MISMA tabla que las siete de V2: es lo que
+  // impide el fallo clásico de añadir una opción y que una de las dos funciones
+  // se quede sin enterarse.
+  ['productMediaFit', PRODUCT_MEDIA_FITS],
 ] as const satisfies ReadonlyArray<readonly [keyof StorefrontStyle, readonly string[]]>
 
 /**
@@ -167,6 +174,8 @@ export function normalizeStorefrontStyle(
     contentWidth: base.contentWidth,
     imageRatio: base.imageRatio,
     sectionSpacing: base.sectionSpacing,
+    // Storefront V3 · P02.
+    productMediaFit: base.productMediaFit,
     ...sanitizeStorefrontStyle(valor),
   }
 }
@@ -182,12 +191,29 @@ function seccionNormalizada(
   porDefecto: HomeSectionConfig,
 ): HomeSectionConfig {
   const enabled = typeof crudo.enabled === 'boolean' ? crudo.enabled : porDefecto.enabled
-  if (!SECTIONS_WITH_MAX_ITEMS.has(porDefecto.id)) return { id: porDefecto.id, enabled }
+  /**
+   * La presentación, saneada POR SECCIÓN (Storefront V3 · P06).
+   *
+   * Las opciones válidas dependen del `id`: `spotlight` significa algo en una
+   * fila de producto y nada en el hero. `sanitizeSectionPresentation` descarta
+   * lo que no encaja y devuelve `undefined` si no queda nada — guardar `{}`
+   * sería guardar ruido, y una presentación ausente ya significa `auto`.
+   *
+   * Se sanea SIEMPRE, también en las secciones sin tope: el ritmo de las
+   * familias o de las marcas no depende de cuántos elementos enseñan.
+   */
+  const presentation = sanitizeSectionPresentation(porDefecto.id, crudo.presentation)
+
+  const base: { id: HomeSectionId; enabled: boolean; presentation?: SectionPresentation } = {
+    id: porDefecto.id,
+    enabled,
+  }
+  if (presentation) base.presentation = presentation
+
+  if (!SECTIONS_WITH_MAX_ITEMS.has(porDefecto.id)) return base
 
   const tope = topeValido(crudo.maxItems)
-  return tope === null
-    ? { id: porDefecto.id, enabled }
-    : { id: porDefecto.id, enabled, maxItems: tope }
+  return tope === null ? base : { ...base, maxItems: tope }
 }
 
 /**
@@ -242,7 +268,20 @@ function seccionesReconocidas(valor: unknown, porDefecto: HomeLayout): HomeSecti
  * tienda en el orden de hoy.
  */
 export function sanitizeHomeLayout(valor: unknown, porDefecto: HomeLayout): HomeLayout {
-  return { version: 1, sections: seccionesReconocidas(valor, porDefecto) }
+  const sections = seccionesReconocidas(valor, porDefecto)
+  return { version: versionDe(sections), sections }
+}
+
+/**
+ * Qué versión declara lo guardado (Storefront V3 · P06).
+ *
+ * `2` en cuanto alguna sección lleva presentación; `1` mientras no. No se sube
+ * la versión «porque ahora estamos en V3»: una tienda que solo ordenó sus
+ * secciones sigue siendo V1, y escribir `2` en su fila haría creer que usa algo
+ * que no usa. La versión describe el CONTENIDO, no la fecha del despliegue.
+ */
+export function versionDe(sections: readonly HomeSectionConfig[]): 1 | 2 {
+  return sections.some((s) => s.presentation !== undefined) ? 2 : 1
 }
 
 export function normalizeHomeLayout(
@@ -256,5 +295,5 @@ export function normalizeHomeLayout(
     if (!vistas.has(seccion.id)) salida.push(seccion)
   }
 
-  return { version: 1, sections: salida }
+  return { version: versionDe(salida), sections: salida }
 }

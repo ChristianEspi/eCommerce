@@ -457,7 +457,210 @@ export const MEDIA_LAYOUTS = ['carousel', 'grid'] as const
 export type MediaLayout = (typeof MEDIA_LAYOUTS)[number]
 
 export function mediaLayoutOf(settings: Record<string, unknown>): MediaLayout {
-  return settings.layout === 'grid' ? 'grid' : 'carousel'
+  return blockLayoutOf('slider', settings)
+}
+
+// ---------------------------------------------------------------------------
+// Storefront V3 · P08 · Las composiciones de un bloque del CMS
+// ---------------------------------------------------------------------------
+
+/**
+ * Cómo se enseña una COLECCIÓN DE PRODUCTOS del CMS.
+ *
+ * Los cinco son la misma lista de productos con otra disposición — no otro
+ * contenido, no otra consulta, no otro tipo de bloque:
+ *
+ *  · `grid` reparte a partes iguales. Es lo que quiere una colección que se
+ *    recorre entera («Lo nuevo de temporada», doce piezas).
+ *  · `rail` cabe en una franja y aguanta cuarenta referencias sin empujar el
+ *    resto de la página fuera de la primera pantalla.
+ *  · `editorial` da a cada pieza el doble de foto y le quita la caja: es la
+ *    disposición de una selección corta donde la imagen es el argumento.
+ *  · `spotlight` dice CUÁL manda: la primera ocupa el doble de área y las demás
+ *    la acompañan. Con menos de tres piezas no hay jerarquía que enseñar y se
+ *    comporta como `grid`.
+ *  · `split` pone el mensaje del bloque a un lado y los productos al otro. Es
+ *    lo que pide una colección que viene con una razón escrita («Rebajas de
+ *    fin de temporada · hasta el domingo»), y en el teléfono se apila.
+ */
+export const PRODUCT_COLLECTION_LAYOUTS = [
+  'grid',
+  'rail',
+  'editorial',
+  'spotlight',
+  'split',
+] as const
+export type ProductCollectionLayout = (typeof PRODUCT_COLLECTION_LAYOUTS)[number]
+
+/**
+ * Cómo se enseña una COLECCIÓN DE CATEGORÍAS del CMS.
+ *
+ * `tiles` y `pills` son las dos de siempre —puertas altas y navegación densa—.
+ * Las dos nuevas aprovechan la foto que V2 ya deja subir por categoría:
+ *
+ *  · `photo-grid` es una rejilla de piezas IGUALES que nunca se convierte en
+ *    carrusel. Es lo que quiere quien tiene ocho familias con foto y las quiere
+ *    ver todas a la vez; `tiles` pasa a fila desplazable a partir de cuatro.
+ *  · `mosaic` es la composición editorial: la primera familia manda.
+ *
+ * Ninguna inventa imágenes: la familia sin foto sigue cayendo a su tinte y su
+ * icono, que es lo correcto para un catálogo donde la foto de la familia no
+ * añade nada.
+ */
+export const CATEGORY_COLLECTION_LAYOUTS = ['tiles', 'pills', 'photo-grid', 'mosaic'] as const
+export type CategoryCollectionLayout = (typeof CATEGORY_COLLECTION_LAYOUTS)[number]
+
+/**
+ * Cómo se enseña un BANNER.
+ *
+ * `contained` es el de siempre: la pieza dentro del ancho del contenido.
+ *
+ * `bleed` la lleva al ancho de la ventana. No trae cálculo propio: usa el
+ * marco de sección de P06, que es donde vive el único `50vw` de la vitrina —
+ * repetir el truco por bloque es cómo aparece una barra de desplazamiento
+ * horizontal en toda la tienda.
+ *
+ * `split` deja de poner el texto ENCIMA de la foto y lo pone AL LADO. Es mejor
+ * respuesta cuando la imagen tiene sujeto —una cara, un producto— porque el
+ * velo que garantiza el contraste del texto es justo lo que lo tapa.
+ */
+export const BANNER_LAYOUTS = ['contained', 'bleed', 'split'] as const
+export type BannerLayout = (typeof BANNER_LAYOUTS)[number]
+
+/**
+ * Todos los valores de composición que existen, sin repetir.
+ *
+ * Es lo que el esquema del editor acepta como cadena; que el valor encaje con
+ * el TIPO del bloque se comprueba aparte, con las reglas entre campos, porque es
+ * una relación entre dos campos y no una propiedad de uno.
+ */
+export const ALL_BLOCK_LAYOUTS = [
+  'carousel',
+  'grid',
+  'rail',
+  'editorial',
+  'spotlight',
+  'split',
+  'tiles',
+  'pills',
+  'photo-grid',
+  'mosaic',
+  'contained',
+  'bleed',
+] as const
+export type BlockLayout = (typeof ALL_BLOCK_LAYOUTS)[number]
+
+/**
+ * Qué composiciones admite cada tipo de bloque, y cuál es la suya por defecto.
+ *
+ * ## Por qué una tabla y no un `switch` en cada sitio
+ *
+ * Porque hay tres consumidores —la vitrina que pinta, el editor que ofrece el
+ * desplegable y el esquema que valida lo que se guarda— y con tres `switch`
+ * separados es cuestión de tiempo que el editor ofrezca algo que la vitrina no
+ * pinta. Eso ya pasó en V2 con `heroVariant`.
+ *
+ * ## Y por qué el defecto es lo que ya se veía
+ *
+ * El valor por defecto de cada tipo es **exactamente su composición de hoy**, así
+ * que una página publicada antes de esta fase se ve igual después. Un bloque sin
+ * `layout` guardado no es un bloque a medio configurar: es la mayoría.
+ *
+ * Los tipos que no están en la tabla no eligen composición. `campaign` es el
+ * caso que más cuesta explicar: el prompt de la fase la pedía junto al banner, y
+ * no puede ser, porque las campañas consecutivas se AGRUPAN en un muro
+ * (`groupCampaigns`) y un ancho o un reparto por bloque dentro de un grupo pelea
+ * con el grupo. Su composición la decide el muro, que es quien sabe cuántas hay.
+ */
+const BLOCK_LAYOUTS = {
+  slider: { options: MEDIA_LAYOUTS, fallback: 'carousel' },
+  product_collection: { options: PRODUCT_COLLECTION_LAYOUTS, fallback: 'grid' },
+  // El tipo `carousel` ES la colección en franja: su defecto no puede ser otro.
+  carousel: { options: PRODUCT_COLLECTION_LAYOUTS, fallback: 'rail' },
+  category_collection: { options: CATEGORY_COLLECTION_LAYOUTS, fallback: 'tiles' },
+  banner: { options: BANNER_LAYOUTS, fallback: 'contained' },
+} as const satisfies Partial<
+  Record<ContentBlockType, { options: readonly BlockLayout[]; fallback: BlockLayout }>
+>
+
+/** Los tipos de bloque que eligen composición. */
+export type LayoutedBlockType = keyof typeof BLOCK_LAYOUTS
+
+/** ¿Este tipo de bloque elige cómo se enseña? */
+export function blockChoosesLayout(type: ContentBlockType): type is LayoutedBlockType {
+  return type in BLOCK_LAYOUTS
+}
+
+/** Lo que admite un tipo de bloque, o `null` si no elige composición. */
+export function blockLayoutOptions(type: ContentBlockType): readonly BlockLayout[] | null {
+  return blockChoosesLayout(type) ? BLOCK_LAYOUTS[type].options : null
+}
+
+/**
+ * A qué FAMILIA de composiciones pertenece un tipo de bloque.
+ *
+ * Existe para las etiquetas del editor: «Mosaico» no quiere decir lo mismo en
+ * un carrusel de imágenes que en una colección de categorías, así que el texto
+ * que lee el comercio se busca por familia y no por valor. Y para que no haya
+ * dos tablas, la familia sale de la misma que las opciones.
+ */
+const FAMILIA: Readonly<Record<LayoutedBlockType, string>> = {
+  slider: 'media',
+  product_collection: 'products',
+  carousel: 'products',
+  category_collection: 'categories',
+  banner: 'banner',
+}
+
+export function blockLayoutFamily(type: ContentBlockType): string | null {
+  return blockChoosesLayout(type) ? FAMILIA[type] : null
+}
+
+/**
+ * La composición de serie de un tipo, o `null` si no elige.
+ *
+ * Es **su composición de hoy**, no la primera de la lista: el tipo `carousel`
+ * ofrece las cinco de una colección de productos y la suya es `rail`, porque un
+ * carrusel que se abriera como rejilla cambiaría de cara todas las páginas
+ * publicadas antes de esta fase.
+ */
+export function blockLayoutDefault(type: ContentBlockType): BlockLayout | null {
+  return blockChoosesLayout(type) ? BLOCK_LAYOUTS[type].fallback : null
+}
+
+/**
+ * La composición de un bloque: lo guardado si es de su lista, y si no, la suya.
+ *
+ * Lo desconocido cae al defecto en silencio **a propósito**. Lo que llega aquí
+ * es una cadena de una fila que pudo guardarse con otra versión del código —o a
+ * mano— y la vitrina de un comercio no puede quedarse en blanco por eso. El
+ * sitio donde un valor inventado se rechaza es el esquema del editor, antes de
+ * guardarlo.
+ */
+export function blockLayoutOf<T extends LayoutedBlockType>(
+  type: T,
+  settings: Record<string, unknown>,
+): (typeof BLOCK_LAYOUTS)[T]['options'][number] {
+  type Valor = (typeof BLOCK_LAYOUTS)[T]['options'][number]
+  const { options, fallback } = BLOCK_LAYOUTS[type]
+  const guardado = settings.layout
+  return typeof guardado === 'string' && (options as readonly string[]).includes(guardado)
+    ? (guardado as Valor)
+    : (fallback as Valor)
+}
+
+/**
+ * ¿Vale esta composición para este tipo de bloque?
+ *
+ * Un `spotlight` en un banner o un `bleed` en una colección de productos son
+ * combinaciones que el editor no puede llegar a guardar: el desplegable sale de
+ * la misma tabla, así que esto solo salta si alguien llama a la API por su
+ * cuenta.
+ */
+export function blockLayoutIsValid(type: ContentBlockType, layout: string): boolean {
+  const opciones: readonly string[] | null = blockLayoutOptions(type)
+  // Un tipo que no elige composición no puede tener una mal puesta.
+  return opciones === null || opciones.includes(layout)
 }
 
 export function blockFieldRules(type: ContentBlockType): BlockFieldRules {

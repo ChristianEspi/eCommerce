@@ -23,6 +23,7 @@ export {
   PUBLIC_PRODUCTS_VIEW,
   PUBLIC_PRODUCT_IMAGES_VIEW,
   PUBLIC_PRODUCT_VARIANTS_VIEW,
+  PUBLIC_BRANDS_VIEW,
   PRODUCT_IMAGES_BUCKET,
   STORE_ASSETS_BUCKET,
 } from '@/shared/lib/db-schema'
@@ -110,6 +111,33 @@ export const publicStoreSchema = z.object({
   storefront_style: z.unknown(),
   home_layout: z.unknown(),
   /**
+   * Storefront V2 · P01 · Las propuestas de valor de la tienda, CRUDAS.
+   *
+   * `z.unknown()` por el mismo motivo que las tres de arriba: es una respuesta
+   * que puede venir de una base anterior a la migración `20260923140000` —y
+   * entonces no trae la columna— o traer una entrada escrita a mano. Validarlo
+   * aquí haría fallar el `parse` de TODA la tienda por una franja de cuatro
+   * frases. Quien decide qué se pinta es `resolveValueProps`, y ahí lo
+   * desconocido se descarta entrada a entrada.
+   */
+  value_props: z.unknown(),
+  /**
+   * Storefront V3 · P01 · Identidad con roles semánticos.
+   *
+   * Los escalares llegan tipados con `catch`: un valor imposible cae a lo
+   * seguro en vez de dejar la vitrina en blanco. `announcement_messages` viaja
+   * CRUDO, como `value_props`, porque es una lista que puede venir de una base
+   * anterior a la migración `20260923180000` o escrita a mano, y validarla aquí
+   * haría fallar el `parse` de TODA la tienda por una barra de avisos. Quien
+   * decide qué se pinta es `sanitizeAnnouncements`, que descarta entrada a
+   * entrada.
+   */
+  store_description: z.string().nullable().catch(null).default(null),
+  hero_kicker: z.string().nullable().catch(null).default(null),
+  brand_lockup: z.string().nullable().catch(null).default(null),
+  show_theme_toggle: z.boolean().nullable().catch(false).default(false),
+  announcement_messages: z.unknown(),
+  /**
    * H08 · País por defecto del checkout, derivado de las zonas de entrega de la
    * tienda (migración `20260913120000`). `null` si vende a varios países o no
    * configuró cobertura. `catch(null)` y `default(null)`: una base anterior a la
@@ -124,6 +152,24 @@ export const publicStoreSchema = z.object({
 })
 export type PublicStore = z.infer<typeof publicStoreSchema>
 
+/**
+ * Una marca con producto publicado en esta tienda (Storefront V2 · P02).
+ *
+ * `logo_url` pasa por `assetRef`, el MISMO filtro que el logo de la tienda: una
+ * URL `https://` externa o una ruta del bucket privado, y nada más. El filtro
+ * no es cosmético — sin él, un `javascript:` guardado en la columna acabaría en
+ * el `src` de un `<img>` del dominio de la vitrina—. Lo que no pasa el filtro
+ * cae a `null` y la marca se pinta con su monograma.
+ */
+export const publicBrandSchema = z.object({
+  brand_id: z.string().uuid(),
+  store_id: z.string().uuid(),
+  code: z.string().min(1),
+  name: z.string().min(1),
+  logo_url: assetRef,
+})
+export type PublicBrand = z.infer<typeof publicBrandSchema>
+
 export const publicCategorySchema = z.object({
   category_id: z.string().uuid(),
   store_id: z.string().uuid(),
@@ -137,6 +183,21 @@ export const publicCategorySchema = z.object({
   slug: z.string().min(1),
   name: z.string().min(1),
   position: z.number().int(),
+  /**
+   * Storefront V2 · P03 · Foto opcional de la categoría.
+   *
+   * `assetRef` es el MISMO filtro que el logo de la tienda: una `https://`
+   * externa o una ruta del bucket privado, y nada más. Sin él, un `javascript:`
+   * guardado en la columna acabaría en el `src` de un `<img>` del dominio de la
+   * tienda. Lo que no pasa el filtro cae a `null` y la puerta se pinta con su
+   * tinte y su icono, que es lo que hacía antes de esta fase.
+   *
+   * `default(null)` en los dos: una respuesta de una base anterior a la
+   * migración no trae las columnas, y eso se lee como la categoría sin foto que
+   * era — ninguna pantalla comprueba `undefined`.
+   */
+  image_url: assetRef.default(null),
+  image_alt: z.string().nullable().catch(null).default(null),
 })
 export type PublicCategory = z.infer<typeof publicCategorySchema>
 

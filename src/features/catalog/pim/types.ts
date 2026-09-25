@@ -58,17 +58,45 @@ export const factorText = z
 // Vocabulario de la sociedad
 // ---------------------------------------------------------------------------
 
-export const brandSchema = z.object({
+/**
+ * Una FAMILIA de producto: código, nombre y si está activa.
+ *
+ * Es la base porque es lo mínimo que comparten los catálogos de vocabulario de
+ * la sociedad. Una familia clasifica («Calzado», «Bebidas») y no se enseña al
+ * comprador: no tiene logo, ni lo tendrá, porque no hay dónde pintarlo.
+ */
+export const productFamilySchema = z.object({
   id: z.string().uuid(),
   code: z.string(),
   name: z.string(),
   description: z.string().nullable().default(null),
   is_active: z.boolean(),
 })
-export type Brand = z.infer<typeof brandSchema>
+export type ProductFamily = z.infer<typeof productFamilySchema>
 
-export const productFamilySchema = brandSchema
-export type ProductFamily = Brand
+/**
+ * Una MARCA: lo mismo, más su logo.
+ *
+ * ## Por qué ya no es el mismo tipo que una familia
+ *
+ * Lo era —`productFamilySchema = brandSchema`— y por comodidad: las dos tenían
+ * la misma forma y la misma pantalla. El día que la marca ganó un campo
+ * publicable, esa comodidad se convirtió en un problema concreto: la familia
+ * heredaba `logo_url` sin tener dónde pintarlo ni columna donde guardarlo, así
+ * que el formulario compartido ofrecía subir un logo a una clasificación
+ * interna y el `insert` moría con «column does not exist».
+ *
+ * Ahora la marca EXTIENDE a la familia. Lo que comparten sigue escrito una vez
+ * y lo que solo tiene la marca no llega a donde no va.
+ *
+ * `catch(null)`: una fila con un `logo_url` que esta versión no sabe leer se
+ * lee como una marca sin logo —cae al monograma— en vez de dejar la tabla de
+ * marcas sin cargar.
+ */
+export const brandSchema = productFamilySchema.extend({
+  logo_url: z.string().nullable().catch(null).default(null),
+})
+export type Brand = z.infer<typeof brandSchema>
 
 export const unitOfMeasureSchema = z.object({
   id: z.string().uuid(),
@@ -199,6 +227,24 @@ export const catalogEntryFormSchema = z.object({
   is_active: z.boolean(),
 })
 export type CatalogEntryFormValues = z.infer<typeof catalogEntryFormSchema>
+
+/**
+ * El formulario de una MARCA: lo del vocabulario, más el logo.
+ *
+ * `logo_url` guarda la RUTA del objeto, no una URL firmada: una firma caduca en
+ * una hora y dejaría la vitrina sin logo al día siguiente. Quien firma para ver
+ * es cada lado —el backoffice con la sesión, la vitrina con el cliente
+ * anónimo— y cada uno bajo su propia policy.
+ *
+ * El límite de 1024 es el del CHECK `brands_logo_len`; la FORMA de la ruta la
+ * valida `ebim.is_brand_logo_ref` contra las columnas de tenant de la fila, así
+ * que aquí no hace falta repetirla: lo que este campo recibe siempre viene de
+ * `buildBrandLogoPath`, nunca escrito a mano.
+ */
+export const brandFormSchema = catalogEntryFormSchema.extend({
+  logo_url: z.string().max(1024).nullable(),
+})
+export type BrandFormValues = z.infer<typeof brandFormSchema>
 
 export const unitFormSchema = z.object({
   code: z.string().trim().regex(UOM_CODE_RE, errorKey('pim.error.uomCode')),
@@ -397,11 +443,18 @@ export function variantToForm(variant: ProductVariant | null): VariantFormValues
   }
 }
 
-export function catalogEntryToForm(entry: Brand | null): CatalogEntryFormValues {
+export function catalogEntryToForm(entry: ProductFamily | null): CatalogEntryFormValues {
   return {
     code: entry?.code ?? '',
     name: entry?.name ?? '',
     is_active: entry?.is_active ?? true,
+  }
+}
+
+export function brandToForm(entry: Brand | null): BrandFormValues {
+  return {
+    ...catalogEntryToForm(entry),
+    logo_url: entry?.logo_url ?? null,
   }
 }
 

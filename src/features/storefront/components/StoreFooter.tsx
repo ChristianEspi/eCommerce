@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { R, TS } from '@/theme/tokens'
 import { initials } from '../branding'
+import { resolveStoreDescription } from '../identity'
 import { usePublicCategories, useStoreNavigation } from '../hooks'
 import { useStorefrontTheme } from '../theme/useStorefrontTheme'
 import type { PublicStore } from '../types'
@@ -61,7 +62,16 @@ export function StoreFooter({ store, storeSlug }: { store: PublicStore; storeSlu
   const { data: categories } = usePublicCategories(store.store_id)
 
   const nombre = store.business_display_name?.trim() || store.name
-  const descripcion = store.hero_subtitle?.trim() ?? ''
+  /**
+   * La descripción ESTABLE, no la bajada del hero (Storefront V3 · P01).
+   *
+   * Hasta V3 el pie pintaba `hero_subtitle`, así que un comercio que estrenaba
+   * campaña cambiaba de paso lo que su tienda decía de sí misma en el pie de
+   * todas sus páginas. `resolveStoreDescription` usa `store_description` y solo
+   * cae a la bajada mientras esa descripción esté sin escribir — compatibilidad
+   * para las tiendas que ya funcionaban, no acoplamiento.
+   */
+  const descripcion = resolveStoreDescription(store)
 
   const contactos = [
     store.support_email?.trim()
@@ -89,9 +99,15 @@ export function StoreFooter({ store, storeSlug }: { store: PublicStore; storeSlu
 
   return (
     <Container
-      maxWidth={style.contentWidth}
+      maxWidth={false}
       component="footer"
-      sx={{ pb: 3, pt: 'var(--sf-section-gap-md)' }}
+      data-content-width={style.contentWidth}
+      sx={{
+        maxWidth: 'var(--sf-content-w)',
+        mx: 'auto',
+        pb: 3,
+        pt: 'var(--sf-section-gap-md)',
+      }}
     >
       <Box
         sx={{

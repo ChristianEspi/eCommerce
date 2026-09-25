@@ -1,6 +1,6 @@
 import { Box, Breadcrumbs, Button, Card, Link as MuiLink, Stack, Typography } from '@mui/material'
 import { visuallyHidden } from '@mui/utils'
-import { Suspense, useEffect, useMemo, useRef } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { lazyPage } from '@/app/lazyPage'
 import type { SearchQuery, SearchSort } from '@/domain'
@@ -15,22 +15,34 @@ import { BackToTop } from './components/BackToTop'
 import { CategoryBar } from './components/CategoryBar'
 import { ProductGrid, ProductGridSkeleton } from './components/ProductGrid'
 import { useFavorites } from './useFavorites'
-import { StoreFilterPanel } from './components/StoreFilterPanel'
 import { StoreLandingSkeleton } from './components/StoreLandingSkeleton'
 import { HomeComposer } from './home/HomeComposer'
 import type { HomeSectionData } from './home/types'
 import { useStorefrontTheme } from './theme/useStorefrontTheme'
-import { StoreSortMenu } from './components/StoreSortMenu'
+
+/**
+ * La salida del catálogo, por `lazy` (Storefront V2 · P14).
+ *
+ * Solo se pinta cuando una búsqueda devuelve cero resultados o muy pocos, que
+ * es la minoría de las visitas. Cargarla siempre era pagar en el primer pintado
+ * de la portada —donde ni siquiera puede aparecer— por una sección de rescate.
+ */
+const ExploreMore = lazy(() =>
+  import('./components/ExploreMore').then((modulo) => ({ default: modulo.ExploreMore })),
+)
 import {
   OFERTAS_QUERY,
   useCatalogPages,
   useContentAssets,
   useSignedStoreAssets,
+  useBestSellers,
   usePrefetchProduct,
+  usePublicBrands,
   usePublicCategories,
   useSignedThumbnails,
   useStoreContent,
   useStorefront,
+  useStoreNavigation,
   useStorePromotions,
 } from './hooks'
 import { categoryBarItems, categoryTrail, rollUpCategoryCounts } from './categoryTree'
@@ -53,8 +65,52 @@ const ProductQuickView = lazyPage(() =>
   import('./components/ProductQuickView').then((m) => ({ default: m.ProductQuickView })),
 )
 
+/**
+ * La vista de CATÁLOGO, aparte de la portada (Storefront V3 · P09).
+ *
+ * Estos tres —la barra, el panel de filtros y el menú de orden— solo existen
+ * cuando alguien pide «Ver todo» o toca un filtro. En la portada no se pintan
+ * nunca, así que viajaban en la primera descarga de TODAS las visitas para no
+ * aparecer en la mayoría de ellas.
+ *
+ * Es la misma regla que la vista rápida y el cajón: lo que aparece por una
+ * acción se descarga con la acción. El presupuesto de la portada se había
+ * quedado a 0,1 kB del techo, y esto es lo que lo devuelve a un margen con el
+ * que se puede seguir trabajando (396,0 kB de 405).
+ */
+const StoreCatalogToolbar = lazy(() =>
+  import('./components/StoreCatalogToolbar').then((m) => ({ default: m.StoreCatalogToolbar })),
+)
+const StoreFilterPanel = lazy(() =>
+  import('./components/StoreFilterPanel').then((m) => ({ default: m.StoreFilterPanel })),
+)
+const StoreSortMenu = lazy(() =>
+  import('./components/StoreSortMenu').then((m) => ({ default: m.StoreSortMenu })),
+)
+
+/**
+ * Y el cajón de filtros del teléfono, también aparte (Storefront V3 · P09).
+ *
+ * Solo se monta cuando alguien pulsa «Filtros», que en escritorio no existe y
+ * en el teléfono es una minoría de las visitas. Traerlo en la primera descarga
+ * del catálogo sería pagar un diálogo por adelantado por cada visita que no lo
+ * abre.
+ */
+const StoreFilterDrawer = lazy(() =>
+  import('./components/StoreFilterDrawer').then((m) => ({ default: m.StoreFilterDrawer })),
+)
+
 /** Cuántos resultados por página. El «ver más» suma otra tanda. */
 const PAGE_SIZE = 24
+
+/**
+ * A partir de cuántos resultados la rejilla ya se sostiene sola (P07).
+ *
+ * El mismo número que usa la fila de la portada para crecer, y por el mismo
+ * motivo: con tres tarjetas o menos queda media pantalla en blanco debajo, y
+ * quien buscó algo y encontró poco necesita una salida.
+ */
+const POCOS_RESULTADOS = 3
 
 const SORTS: readonly SearchSort[] = ['relevance', 'price-asc', 'price-desc', 'name', 'recent']
 
@@ -120,14 +176,25 @@ export function StoreHomePage() {
   // consulta paginada, así que otra combinación es otra consulta y empieza en
   // su primera página por construcción.
 
-  function update(key: string, value: string | null) {
-    setParams((prev) => {
-      const next = new URLSearchParams(prev)
-      if (value) next.set(key, value)
-      else next.delete(key)
-      return next
-    })
-  }
+  /**
+   * Pone o quita un parámetro de la URL, que es donde vive el estado.
+   *
+   * `useCallback` desde V3 · P09: la lista de filtros puestos la construye un
+   * `useMemo` que lo llama, y con una función nueva en cada pintado ese memo no
+   * podría declarar honestamente sus dependencias. `setParams` es estable, así
+   * que esto también.
+   */
+  const update = useCallback(
+    (key: string, value: string | null) => {
+      setParams((prev) => {
+        const next = new URLSearchParams(prev)
+        if (value) next.set(key, value)
+        else next.delete(key)
+        return next
+      })
+    },
+    [setParams],
+  )
 
   const content = useStoreContent(storeSlug)
   const { assets, images } = useContentAssets(content.data)
@@ -225,45 +292,49 @@ export function StoreHomePage() {
       ),
     [ofertasPages.data, store.store_id],
   )
+
+  /**
+   * Storefront V2 · P06 · Lo rebajado CON FOTO va primero.
+   *
+   * La portada de producto es media pantalla de imagen. Con un rebajado sin
+   * foto abría con un marcador gris del tamaño de la cubierta —lo peor que
+   * puede enseñar una tienda en su primera pantalla— mientras el siguiente
+   * rebajado, que sí tenía foto, esperaba su turno en la banda de ofertas.
+   *
+   * No se DESCARTA nada ni se cambia qué está rebajado: solo se ordena. El
+   * orden es estable —los que tienen foto conservan el suyo entre ellos, y los
+   * que no, el suyo— así que una tienda sin ninguna foto ve exactamente lo que
+   * veía, y la banda de ofertas sigue recibiendo a todos.
+   */
+  const ofertasPorMedia = useMemo(() => {
+    const conFoto = ofertas.filter((producto) => Boolean(producto.primary_image_path))
+    const sinFoto = ofertas.filter((producto) => !producto.primary_image_path)
+    return [...conFoto, ...sinFoto]
+  }, [ofertas])
   const rebajadosThumbs = useSignedThumbnails(ofertas.map((p) => p.primary_image_path))
   const prefetchProduct = usePrefetchProduct(store.store_id)
 
   /**
-   * Ningún producto sale dos veces en la portada.
+   * Storefront V2 · P08 · Los más vendidos, de los PEDIDOS.
    *
-   * Cinco secciones tiran de tres consultas —lo rebajado, lo reciente y la
-   * primera página del catálogo—, y en una tienda pequeña las tres devuelven
-   * casi lo mismo: el mismo frasco aparecía en el hero, en «Ofertas de la
-   * semana», en «Productos destacados» y en «Novedades». Eso no se lee como
-   * cuatro secciones, se lee como una tienda con cuatro productos.
+   * Hasta P08 la sección «Lo más vendido» se llenaba con `tomar(products, 12)`,
+   * o sea con la primera página del catálogo ordenada por RELEVANCIA de
+   * búsqueda. Tres afirmaciones sobre el comportamiento de los compradores
+   * —«lo más vendido», «lo que más sale», «los que más repiten nuestros
+   * clientes»— sostenidas por el orden de un índice de texto.
    *
-   * Se reparten por ORDEN DE PRIORIDAD, que es el orden en que se leen: el
-   * hero coge primero, y cada sección siguiente se queda con lo que nadie ha
-   * usado. Si a una no le queda nada, desaparece — mejor una sección menos que
-   * una sección que repite.
+   * Ahora sale de `store_best_sellers_for_slug`, que agrega unidades de pedidos
+   * pagados o entregados de los últimos noventa días. Y cuando no hay ventas
+   * devuelve la lista vacía: la sección NO cae a relevancia con el mismo
+   * título, cambia de título. Ver `masVendidoEsReal` y el registro de secciones.
+   *
+   * Apagada en el catálogo, como el resto de consultas de portada: pedir un
+   * agregado de pedidos para una fila que no se pinta es pagar por nada.
    */
-  const secciones = useMemo(() => {
-    const usados = new Set<string>()
-    const tomar = (lista: readonly PublicProduct[], cuantos: number) => {
-      const elegidos: PublicProduct[] = []
-      for (const producto of lista) {
-        if (elegidos.length >= cuantos) break
-        if (usados.has(producto.product_id)) continue
-        usados.add(producto.product_id)
-        elegidos.push(producto)
-      }
-      return elegidos
-    }
-
-    const rebajados = ofertas
-    return {
-      hero: tomar(rebajados, 4),
-      ofertas: tomar(rebajados, 3),
-      destacados: tomar(products, 12),
-      novedades: tomar(novedades, 12),
-      masVendido: tomar(products, 12),
-    }
-  }, [ofertas, products, novedades])
+  const masVendidos = useBestSellers(catalogo ? undefined : storeSlug, store.store_id)
+  const masVendidoThumbs = useSignedThumbnails(
+    (masVendidos.data ?? []).map((producto) => producto.primary_image_path),
+  )
 
   const blocks = content.data?.cms ? (content.data.blocks ?? []) : []
   const hasCmsHero = blocks.some((block) => block.type === 'hero')
@@ -283,6 +354,80 @@ export function StoreHomePage() {
     (block) => block.type === 'hero' || (block.type === 'slider' && block.items.length > 0),
   )
   const cmsTraeProductos = blocks.some((block) => block.items.length > 0)
+
+  /**
+   * Ningún producto sale dos veces en la portada.
+   *
+   * Cinco secciones tiran de tres consultas —lo rebajado, lo reciente y la
+   * primera página del catálogo—, y en una tienda pequeña las tres devuelven
+   * casi lo mismo: el mismo frasco aparecía en el hero, en «Ofertas de la
+   * semana», en «Productos destacados» y en «Novedades». Eso no se lee como
+   * cuatro secciones, se lee como una tienda con cuatro productos.
+   *
+   * Se reparten por ORDEN DE PRIORIDAD, que es el orden en que se leen: el
+   * hero coge primero, y cada sección siguiente se queda con lo que nadie ha
+   * usado. Si a una no le queda nada, desaparece — mejor una sección menos que
+   * una sección que repite.
+   */
+  /**
+   * Cuántos productos se reserva la portada, y por qué puede ser CERO (P04).
+   *
+   * El reparto de abajo da por usado lo que el hero coge, para que el mismo
+   * producto no salga en cuatro sitios. Eso era correcto mientras la portada
+   * pintara siempre la de producto.
+   *
+   * Desde P04 hay dos composiciones: con `heroVariant: 'statement'` la portada
+   * es editorial y NO pinta producto, y si el CMS trae su propia cubierta no se
+   * pinta ninguna de las dos. En esos casos, reservar cuatro productos los
+   * apartaba de la banda de ofertas sin enseñarlos en ninguna parte — el
+   * producto rebajado desaparecía de la portada entera. Lo cazó la prueba de
+   * paridad de temas, que exige que el precio y el descuento sean los mismos en
+   * los cuatro.
+   *
+   * La decisión vive AQUÍ y no en el registro de secciones porque es la página
+   * quien tiene las listas completas: el registro recibe el reparto ya hecho.
+   */
+  const heroReserva =
+    tema.style.heroVariant === 'statement' || cmsTraePortada ? 0 : 4
+
+  const secciones = useMemo(() => {
+    const usados = new Set<string>()
+    const tomar = (lista: readonly PublicProduct[], cuantos: number) => {
+      const elegidos: PublicProduct[] = []
+      for (const producto of lista) {
+        if (elegidos.length >= cuantos) break
+        if (usados.has(producto.product_id)) continue
+        usados.add(producto.product_id)
+        elegidos.push(producto)
+      }
+      return elegidos
+    }
+
+    const rebajados = ofertasPorMedia
+    const ranking = masVendidos.data ?? []
+
+    /**
+     * El ranking se reparte ANTES que lo destacado (P08).
+     *
+     * El reparto va por orden de prioridad y cada lista se queda con lo que
+     * nadie usó. Con `destacados` delante, un superventas que también estaba en
+     * la primera página del catálogo se lo quedaba la banda de ofertas y
+     * desaparecía de su propia sección — la fila que dice «lo más vendido»
+     * enseñaba entonces el cuarto, el quinto y el sexto.
+     *
+     * Lo destacado es una muestra del catálogo y da igual cuál sea; el ranking
+     * es una afirmación concreta sobre unos productos concretos. Manda el que
+     * no se puede sustituir.
+     */
+    return {
+      hero: tomar(rebajados, heroReserva),
+      ofertas: tomar(rebajados, 3),
+      masVendido: tomar(ranking.length > 0 ? ranking : products, 12),
+      destacados: tomar(products, 12),
+      novedades: tomar(novedades, 12),
+    }
+  }, [ofertasPorMedia, products, novedades, heroReserva, masVendidos.data])
+
 
   /**
    * El carrusel no repite lo que el comercio ya puso a mano.
@@ -354,11 +499,48 @@ export function StoreHomePage() {
     () => categoryTrail(categories.data ?? [], categorySlug),
     [categories.data, categorySlug],
   )
-  const brandOptions = brandFacets.map((facet) => ({
-    code: facet.code,
-    name: facet.name,
-    count: brand ? null : facet.count,
-  }))
+  /**
+   * Storefront V2 · P02 · Las marcas de la portada, con su logo.
+   *
+   * ## De dónde sale cada mitad, y por qué hacen falta las dos
+   *
+   * Las FACETAS de la búsqueda dicen qué marcas tienen producto AHORA y cuántos
+   * — se calculan sobre el resultado ya filtrado, que es lo que hace que el
+   * contador sea cierto. Lo que no traen es el logo, y no puede traerlo: al
+   * elegir una marca las facetas devuelven una sola.
+   *
+   * `public_brands` trae las marcas de la tienda con su logo, en UNA consulta y
+   * compartida por las dos secciones que las pintan. Cruzarlas por `code` es lo
+   * que evita el N+1 —una petición por marca— que el rediseño prohíbe.
+   *
+   * El ORDEN manda el de las facetas (por tamaño): es el que ya tenía la fila,
+   * y reordenar por nombre habría enterrado las marcas que de verdad se compran.
+   */
+  const brandsConLogo = usePublicBrands(catalogo ? null : store.store_id)
+  const logosPorMarca = useMemo(() => {
+    const mapa = new Map<string, string | null>()
+    for (const marca of brandsConLogo.data ?? []) mapa.set(marca.code, marca.logo_url)
+    return mapa
+  }, [brandsConLogo.data])
+
+  // Las firmas, en un lote para todas. Una por marca serían cuarenta viajes en
+  // un catálogo real, y el bucket es privado: no hay URL pública que valga.
+  const logosFirmados = useSignedStoreAssets(
+    useMemo(() => [...logosPorMarca.values()], [logosPorMarca]),
+  )
+
+  const brandOptions = brandFacets.map((facet) => {
+    const ref = logosPorMarca.get(facet.code) ?? null
+    return {
+      code: facet.code,
+      name: facet.name,
+      count: brand ? null : facet.count,
+      // Una `https://` externa se pinta tal cual; una ruta, ya firmada. Si la
+      // firma no ha llegado todavía, `null` y monograma: mejor el respaldo que
+      // un hueco que se rellena a medio segundo.
+      logoUrl: ref === null ? null : (logosFirmados[ref] ?? (/^https:\/\//i.test(ref) ? ref : null)),
+    }
+  })
 
   // Los favoritos se cargan UNA vez por tienda y se reparten a las tarjetas.
   const favorites = useFavorites(store.store_id)
@@ -422,6 +604,69 @@ export function StoreHomePage() {
   }, [listaVista])
 
   const resultCount = new Intl.NumberFormat(locale === 'en' ? 'en-US' : 'es-PE').format(total)
+  const cuentaDeResultados = `${resultCount} ${
+    total === 1 ? t('store.catalog.result') : t('store.catalog.results')
+  }`
+
+  /** ¿Está abierto el cajón de filtros? (V3 · P09) */
+  const [cajonAbierto, setCajonAbierto] = useState(false)
+
+  /**
+   * Lo que hay puesto, con su nombre y con la forma de quitarlo (V3 · P09).
+   *
+   * Sale de la URL, que es donde vive el estado del catálogo, así que la lista
+   * es correcta también al volver atrás o al abrir un enlace compartido. El
+   * nombre es el que el comprador eligió —«Jarabes», «Genfar»— y no el slug: un
+   * chip que dijera `cuidado-personal` sería la implementación asomando.
+   *
+   * El término buscado NO entra: se quita desde el buscador de la cabecera, que
+   * es donde se escribió, y ponerlo aquí ofrecería dos sitios para deshacer lo
+   * mismo.
+   */
+  const filtrosPuestos = useMemo(() => {
+    const puestos: { id: string; label: string; onRemove: () => void }[] = []
+    if (categorySlug) {
+      puestos.push({
+        id: `c:${categorySlug}`,
+        label:
+          trail.at(-1)?.name ??
+          categoryOptions.find((opcion) => opcion.code === categorySlug)?.name ??
+          categorySlug,
+        onRemove: () => update('c', null),
+      })
+    }
+    if (brand) {
+      puestos.push({
+        id: `b:${brand}`,
+        label: brandOptions.find((opcion) => opcion.code === brand)?.name ?? brand,
+        onRemove: () => update('b', null),
+      })
+    }
+    if (availability === 'in-stock') {
+      puestos.push({ id: 'd', label: t('store.filter.inStock'), onRemove: () => update('d', null) })
+    }
+    if (soloOferta) {
+      puestos.push({
+        id: 'oferta',
+        label: t('store.filter.discounted'),
+        onRemove: () => update('oferta', null),
+      })
+    }
+    return puestos
+  }, [
+    categorySlug,
+    brand,
+    availability,
+    soloOferta,
+    trail,
+    categoryOptions,
+    brandOptions,
+    t,
+    update,
+  ])
+
+  /** Quitar los filtros deja el CATÁLOGO, no la portada. */
+  const quitarFiltros = () => setParams(new URLSearchParams({ ver: 'todo' }))
 
   /**
    * Qué se está mirando, dicho con sus palabras.
@@ -494,31 +739,110 @@ export function StoreHomePage() {
   )
 
   /**
+   * ¿Están las MARCAS encendidas como sección propia? (Storefront V3 · P07)
+   *
+   * La misma coordinación, por el mismo motivo. `brands` y `trust` salen de la
+   * misma lista de marcas: con las dos encendidas, la portada enseñaba dos veces
+   * lo mismo con dos maquetaciones distintas, y eso se lee como un fallo de la
+   * tienda y no como una decisión.
+   *
+   * Vive aquí y no en un `useContext` porque una sección que consulta a otra por
+   * su cuenta es una dependencia que no se ve al leer el registro.
+   */
+  const marcasAparte = tema.layout.sections.some(
+    (seccion) => seccion.id === 'brands' && seccion.enabled,
+  )
+
+  /**
    * H07 · Las familias para la sección `categories`: raíces, en el orden que el
    * comercio les dio. Salen de la MISMA consulta que la barra de la cabecera
    * (`usePublicCategories` comparte clave), así que no cuestan una petición.
    */
+  /**
+   * Storefront V2 · P03 · Las fotos de las categorías, firmadas en UN lote.
+   *
+   * Todas las de la tienda y no solo las raíces: las mismas fotos las necesitan
+   * las puertas de la portada Y los bloques `category_collection` del CMS, que
+   * pueden apuntar a cualquier nivel del árbol. Un solo lote sirve a los dos y
+   * la clave de la consulta no cambia por el orden en que llegaron.
+   */
+  const fotosDeCategoria = useMemo(
+    () => (categories.data ?? []).map((category) => category.image_url),
+    [categories.data],
+  )
+  const fotosFirmadas = useSignedStoreAssets(fotosDeCategoria)
+
+  /** La foto de cada categoría por id, para lo que pinta el CMS. */
+  const categoryMedia = useMemo(() => {
+    const mapa: Record<string, { imageUrl: string | null; imageAlt: string | null }> = {}
+    for (const category of categories.data ?? []) {
+      if (!category.image_url) continue
+      mapa[category.category_id] = {
+        // Una `https://` externa se pinta tal cual; una ruta, ya firmada. Si la
+        // firma aún no ha llegado, `null` y la puerta cae a su tinte: mejor el
+        // respaldo que un hueco que se rellena a medio segundo.
+        imageUrl:
+          fotosFirmadas[category.image_url] ??
+          (/^https:\/\//i.test(category.image_url) ? category.image_url : null),
+        imageAlt: category.image_alt,
+      }
+    }
+    return mapa
+  }, [categories.data, fotosFirmadas])
+
   const familias = useMemo(
     () =>
       (categories.data ?? [])
         .filter((category) => category.parent_id === null)
         .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name))
-        .map((category) => ({ category_id: category.category_id, name: category.name, slug: category.slug })),
-    [categories.data],
+        .map((category) => ({
+          category_id: category.category_id,
+          name: category.name,
+          slug: category.slug,
+          ...(categoryMedia[category.category_id] ?? {}),
+        })),
+    [categories.data, categoryMedia],
   )
+
+  /**
+   * Las páginas publicadas, para la sección `business-info` (P09).
+   *
+   * La MISMA consulta que hace el pie, con la misma clave: encender la sección
+   * no añade una petición, la comparte. Y sale de una función de base que solo
+   * devuelve páginas publicadas, dentro de su ventana y del canal público, así
+   * que aquí no hay nada que filtrar.
+   */
+  const navegacion = useStoreNavigation(storeSlug)
 
   const datosPortada: HomeSectionData = {
     store,
     storeSlug,
+    // P04 · El tema resuelto. Dos controles del contrato eligen COMPOSICIÓN
+    // —`heroVariant` y `categoryVariant`— y eso no se puede resolver con una
+    // variable de CSS: son árboles de React distintos y quien decide qué se
+    // pinta es el registro de secciones.
+    theme: tema,
     t,
     hero: secciones.hero,
     ofertas: secciones.ofertas,
     destacados: secciones.destacados,
     novedades: secciones.novedades,
     masVendido: secciones.masVendido,
+    /**
+     * ¿La fila de más vendidos está SOSTENIDA por ventas?
+     *
+     * Es lo que decide el título. Con ranking real dice «Lo más vendido» y
+     * explica de dónde sale; sin él dice «Recomendados», que es exactamente lo
+     * que está enseñando — una muestra del catálogo.
+     */
+    masVendidoEsReal: (masVendidos.data?.length ?? 0) > 0,
     thumbsOfertas: rebajadosThumbs,
     thumbsCatalogo: thumbnails,
     thumbsNovedades: novedadesThumbs,
+    // Los más vendidos vienen del MISMO modelo de lectura que el catálogo, así
+    // que sus miniaturas ya están en el lote del catálogo cuando coinciden; las
+    // que no, se firman aquí.
+    thumbsMasVendido: masVendidoThumbs,
     blocks,
     assets,
     images,
@@ -528,16 +852,24 @@ export function StoreHomePage() {
     promociones: promosVigentes,
     promoAssets: assetsPromos,
     categorias: familias,
+    categoryMedia,
+    paginas: navegacion.data ?? [],
     brands: brandOptions,
     brandSelected: brand,
+    // Lo mismo que ya sabe la banda de ofertas, sin preguntarlo dos veces.
+    hayOfertas: ofertas.length > 0,
     favorites: favorites.ids,
     cargandoNovedades: novedadesPages.isPending,
-    cargandoCatalogo: results.isPending,
+    // El ranking cuenta como carga de esta fila: sin esto, la portada enseñaría
+    // «Recomendados» medio segundo y lo cambiaría por «Lo más vendido» al
+    // llegar el agregado, que se lee como un fallo.
+    cargandoCatalogo: results.isPending || masVendidos.isPending,
     onToggleFavorite: (productId) => void favorites.toggle(productId),
     onQuickView: (slug) => update('p', slug),
     onPrefetch: prefetchProduct,
     onSelectBrand: (code) => update('b', code),
     destacadosAparte,
+    marcasAparte,
   }
 
   return (
@@ -587,7 +919,7 @@ export function StoreHomePage() {
           >
             {tituloCatalogo}
           </Typography>
-        </Stack>
+      </Stack>
       ) : null}
 
       {/* La portada, en el orden que el comercio configuró.
@@ -669,49 +1001,64 @@ export function StoreHomePage() {
 
       {cargandoPortada ? null : catalogo ? (
       <Stack direction={{ xs: 'column', md: 'row' }} sx={{ gap: { xs: 2, md: 3 }, alignItems: 'flex-start' }}>
-        <Box sx={{ width: { xs: '100%', md: 280 }, flexShrink: 0 }}>
-          <StoreFilterPanel
-            brands={brandOptions}
-            categories={categoryOptions}
-            selectedBrand={brand}
-            selectedCategory={categorySlug}
-            inStockOnly={availability === 'in-stock'}
-            discountedOnly={soloOferta}
-            onBrand={(code) => update('b', code)}
-            onCategory={(slug) => update('c', slug)}
-            onInStock={(only) => update('d', only ? '1' : null)}
-            onDiscounted={(only) => update('oferta', only ? '1' : null)}
-            // Quitar los filtros deja el CATALOGO, no la portada: quien pulsa
-            // «limpiar» quiere verlo todo, no volver a la primera pantalla.
-            onClear={() => setParams(new URLSearchParams({ ver: 'todo' }))}
-          />
-        </Box>
-
         <Box sx={{ flex: 1, minWidth: 0, width: '100%' }}>
-          {/* Cuántos resultados hay y en qué orden se miran, en la misma línea
-              y encima de la rejilla: son las dos preguntas que se hacen antes
-              de empezar a recorrerla. */}
-          <Stack
-            direction="row"
-            sx={{ gap: 1.5, alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap' }}
-          >
-            <Stack direction="row" sx={{ gap: 1, alignItems: 'baseline', flexWrap: 'wrap' }}>
-              <Typography
-                aria-live="polite"
-                sx={{ fontSize: TS.label, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--muted)' }}
+          {/* Cuántos resultados hay, en qué orden se miran y —en el teléfono—
+              cómo se filtran: las preguntas que se hacen antes de empezar a
+              recorrer la lista, en una sola barra.
+
+              Sin esqueleto mientras llega su módulo: la barra es una línea, y
+              un hueco gris parpadeando encima de la rejilla informa menos que
+              el propio retraso. */}
+          <Suspense fallback={null}>
+            <StoreCatalogToolbar
+              count={cuentaDeResultados}
+              note={
+                /* Un resultado por tolerancia a erratas no es lo mismo que uno
+                   exacto, y decirlo es la diferencia entre ayudar y fingir. */
+                first?.mode === 'fuzzy' ? (
+                  <Typography sx={{ fontSize: TS.label, color: 'var(--amber)', fontWeight: 700 }}>
+                    {t('store.search.fuzzy')}
+                  </Typography>
+                ) : null
+              }
+              sortMenu={<StoreSortMenu value={sort} onChange={(next) => update('sort', next)} />}
+              activeFilters={filtrosPuestos}
+              onOpenFilters={() => setCajonAbierto(true)}
+              onClearFilters={quitarFiltros}
+            />
+          </Suspense>
+
+          {/* El cajón: el MISMO panel, sin recortar nada. Solo se monta cuando
+              se abre, y con él llega su módulo. */}
+          {cajonAbierto ? (
+            <Suspense fallback={null}>
+              <StoreFilterDrawer
+                open
+                onClose={() => setCajonAbierto(false)}
+                resultsLabel={`${t('store.catalog.showResults')} (${resultCount})`}
+                onClear={() => {
+                  quitarFiltros()
+                  setCajonAbierto(false)
+                }}
+                canClear={filtrosPuestos.length > 0}
               >
-                {`${resultCount} ${total === 1 ? t('store.catalog.result') : t('store.catalog.results')}`}
-              </Typography>
-              {/* Un resultado por tolerancia a erratas no es lo mismo que uno
-                  exacto, y decirlo es la diferencia entre ayudar y fingir. */}
-              {first?.mode === 'fuzzy' && (
-                <Typography sx={{ fontSize: TS.label, color: 'var(--amber)', fontWeight: 700 }}>
-                  {t('store.search.fuzzy')}
-                </Typography>
-              )}
-            </Stack>
-            <StoreSortMenu value={sort} onChange={(next) => update('sort', next)} />
-          </Stack>
+                <StoreFilterPanel
+                  marco="hoja"
+                  brands={brandOptions}
+                  categories={categoryOptions}
+                  selectedBrand={brand}
+                  selectedCategory={categorySlug}
+                  inStockOnly={availability === 'in-stock'}
+                  discountedOnly={soloOferta}
+                  onBrand={(code) => update('b', code)}
+                  onCategory={(slug) => update('c', slug)}
+                  onInStock={(only) => update('d', only ? '1' : null)}
+                  onDiscounted={(only) => update('oferta', only ? '1' : null)}
+                  onClear={quitarFiltros}
+                />
+              </StoreFilterDrawer>
+            </Suspense>
+          ) : null}
 
           {results.isPending && <ProductGridSkeleton />}
 
@@ -776,6 +1123,86 @@ export function StoreHomePage() {
           )}
             </Box>
           )}
+
+          {/* P07 · Con pocos resultados, una salida que NO es un resultado.
+
+              Va DEBAJO de la rejilla, en su propia sección y con su propio
+              título, y no lleva ni un producto: solo familias y marcas. Meter
+              productos «recomendados» dentro de la rejilla sería añadir a la
+              lista cosas que el filtro no devolvió, y el contador de arriba
+              pasaría a mentir — «2 resultados» sobre nueve tarjetas.
+
+              El umbral es el mismo que usa la fila de la portada para crecer:
+              hasta tres, la pantalla se queda corta. */}
+          {results.isSuccess && total > 0 && total <= POCOS_RESULTADOS && (
+            <Suspense fallback={null}>
+              <ExploreMore
+                storeSlug={storeSlug}
+                categories={familias.map((f) => ({ code: f.slug, name: f.name }))}
+                brands={brandOptions}
+                selectedCategory={categorySlug}
+                selectedBrand={brand}
+              />
+            </Suspense>
+          )}
+
+          {/* Y sin NINGÚN resultado, la misma salida bajo el estado vacío: el
+              botón de quitar filtros arregla el caso de quien filtró de más,
+              pero no el de quien buscó algo que esta tienda no vende. */}
+          {results.isSuccess && total === 0 && (
+            <Suspense fallback={null}>
+              <ExploreMore
+                storeSlug={storeSlug}
+                categories={familias.map((f) => ({ code: f.slug, name: f.name }))}
+                brands={brandOptions}
+                selectedCategory={categorySlug}
+                selectedBrand={brand}
+              />
+            </Suspense>
+          )}
+        </Box>
+
+        {/**
+         * La columna de filtros: SOLO en escritorio, y DESPUÉS de los
+         * resultados en el árbol (Storefront V3 · P09).
+         *
+         * Las dos cosas arreglan el mismo fallo. En el teléfono esta columna iba
+         * ENCIMA de los productos: quien buscaba «jarabe» recibía primero una
+         * lista de marcas y familias con sus interruptores, y los jarabes
+         * empezaban pasada la primera pantalla. Ahí el panel entero —sin
+         * recortar ninguna opción— vive en el cajón que abre la barra.
+         *
+         * Y va después en el DOM porque el orden del documento es el que recorre
+         * un lector de pantalla y el que sigue el tabulador: con los filtros
+         * primero, llegar al primer producto costaba treinta tabulaciones.
+         * `order` lo devuelve a la izquierda en escritorio — la vista no cambia,
+         * la lectura sí.
+         */}
+        <Box
+          sx={{
+            display: { xs: 'none', md: 'block' },
+            width: { md: 280 },
+            flexShrink: 0,
+            order: { md: -1 },
+          }}
+        >
+          <Suspense fallback={null}>
+            <StoreFilterPanel
+              marco="columna"
+              brands={brandOptions}
+              categories={categoryOptions}
+              selectedBrand={brand}
+              selectedCategory={categorySlug}
+              inStockOnly={availability === 'in-stock'}
+              discountedOnly={soloOferta}
+              onBrand={(code) => update('b', code)}
+              onCategory={(slug) => update('c', slug)}
+              onInStock={(only) => update('d', only ? '1' : null)}
+              onDiscounted={(only) => update('oferta', only ? '1' : null)}
+              // Quien pulsa «limpiar» quiere verlo todo, no volver a la portada.
+              onClear={quitarFiltros}
+            />
+          </Suspense>
         </Box>
       </Stack>
       ) : null}

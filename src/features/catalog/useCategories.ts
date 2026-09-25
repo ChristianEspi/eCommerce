@@ -6,6 +6,7 @@ import {
   saveCategory,
   setCategoryActive,
 } from './api/categories'
+import { signedCategoryImageUrls, uploadCategoryImage } from './api/categoryMedia'
 import type { Category, CategoryFormValues, CategoryUsage } from './types'
 import { CATALOG_KEY } from './useProducts'
 
@@ -22,6 +23,38 @@ export function useCategories(storeId: string | null) {
     enabled: Boolean(storeId),
     staleTime: 30_000,
   })
+}
+
+/**
+ * Las URL para VER las fotos de las categorías en el backoffice.
+ *
+ * UN lote, nunca una por fila: el árbol de una tienda real tiene treinta
+ * categorías. Las rutas se deduplican y se ordenan para que la clave de caché
+ * no cambie por el orden en que llegaron, y media hora de `staleTime` contra
+ * una firma de una hora evita servir desde caché una URL a punto de caducar.
+ */
+export function useCategoryImageUrls(refs: readonly (string | null)[]): Record<string, string> {
+  const lote = [...new Set(refs.filter((ref): ref is string => Boolean(ref)))].sort()
+
+  const { data } = useQuery({
+    queryKey: [...CATALOG_KEY, 'category-images', lote] as const,
+    queryFn: () => signedCategoryImageUrls(lote),
+    enabled: lote.length > 0,
+    staleTime: 30 * 60 * 1000,
+    retry: false,
+  })
+
+  return data ?? {}
+}
+
+/**
+ * Sube la foto y devuelve su ruta.
+ *
+ * No invalida nada: lo que cambia el estado de la pantalla es GUARDAR la
+ * categoría, y hasta entonces la ruta solo vive en el formulario.
+ */
+export function useUploadCategoryImage() {
+  return useMutation({ mutationFn: uploadCategoryImage })
 }
 
 export function useCategoryUsage(categoryId: string | null) {

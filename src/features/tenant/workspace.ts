@@ -2,6 +2,7 @@ import { AppError } from '@/domain/errors'
 import { codeFromDbError } from '@/shared/lib/appError'
 import { tryGetSupabaseClient } from '@/shared/lib/supabase'
 import type { AppRole } from '@/shared/lib/roles'
+import { CLAIM_PROVISIONED_TENANT_RPC } from '@/shared/lib/db-schema'
 import {
   STORES_TABLE,
   TENANTS_TABLE,
@@ -44,6 +45,24 @@ export async function fetchWorkspace(userId: string): Promise<Workspace> {
   const supabase = tryGetSupabaseClient()
   if (!supabase) throw new BackendNotConfiguredError()
 
+  const workspace = await loadWorkspace(supabase, userId)
+  if (workspace.memberships.length > 0) return workspace
+
+  // Sin membresia puede ser el administrador que EBIM MasterAdmin dejo
+  // PREPROVISIONED: el tenant existe y le espera a el. El reclamo no lleva
+  // argumentos —la base cruza organizacion, sociedad y correo del JWT con lo
+  // aprovisionado— y responde `claimed: false` a cualquier otro. Si falla, se
+  // sigue como antes: onboarding.
+  const { data, error } = await supabase.rpc(CLAIM_PROVISIONED_TENANT_RPC)
+  const claimed =
+    !error && typeof data === 'object' && data !== null && (data as { claimed?: unknown }).claimed === true
+  return claimed ? loadWorkspace(supabase, userId) : workspace
+}
+
+async function loadWorkspace(
+  supabase: NonNullable<ReturnType<typeof tryGetSupabaseClient>>,
+  userId: string,
+): Promise<Workspace> {
   const [tenantsRes, membersRes, storesRes] = await Promise.all([
     supabase.from(TENANTS_TABLE).select('organization_id, slug, name, status'),
     supabase

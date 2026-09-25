@@ -7,6 +7,7 @@ import {
   HOME_SECTION_IDS,
   IMAGE_RATIOS,
   PRODUCT_CARD_VARIANTS,
+  PRODUCT_MEDIA_FITS,
   SECTION_SPACINGS,
   THEME_PRESET_IDS,
   type HomeLayout,
@@ -49,6 +50,8 @@ export const storefrontStyleOverridesSchema = z
     contentWidth: z.enum(CONTENT_WIDTHS).optional(),
     imageRatio: z.enum(IMAGE_RATIOS).optional(),
     sectionSpacing: z.enum(SECTION_SPACINGS).optional(),
+    // Storefront V3 · P02.
+    productMediaFit: z.enum(PRODUCT_MEDIA_FITS).optional(),
   })
   .strict()
 

@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { tryGetSupabaseClient } from '@/shared/lib/supabase'
 import { buildTextSearchFilter } from '@/shared/lib/search'
-import { blockUsesMediaItems } from '@/domain/content'
+import { blockChoosesLayout } from '@/domain/content'
 import { ContentError, contentErrorFromDb } from './errors'
 import {
   CONTENT_BLOCKS_TABLE,
@@ -219,8 +219,9 @@ function blockPatch(values: BlockFormValues) {
       columns: values.columns,
       descendants: values.descendants,
       // Solo donde significa algo: un `layout` en un hero seria una clave que
-      // nadie lee ocupando sitio en un vocabulario de doce.
-      ...(blockUsesMediaItems(values.block_type) ? { layout: values.layout } : {}),
+      // nadie lee ocupando sitio en un vocabulario de doce. Desde V3 · P08 son
+      // cinco tipos los que eligen composicion, no solo el carrusel de imagenes.
+      ...(blockChoosesLayout(values.block_type) ? { layout: values.layout } : {}),
     },
   }
 }

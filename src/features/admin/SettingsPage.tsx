@@ -4,11 +4,13 @@ import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded'
 import DensityMediumRoundedIcon from '@mui/icons-material/DensityMediumRounded'
 import LaunchRoundedIcon from '@mui/icons-material/LaunchRounded'
 import MailOutlineRoundedIcon from '@mui/icons-material/MailOutlineRounded'
+import CampaignRoundedIcon from '@mui/icons-material/CampaignRounded'
 import PaletteRoundedIcon from '@mui/icons-material/PaletteRounded'
 import PhotoLibraryRoundedIcon from '@mui/icons-material/PhotoLibraryRounded'
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded'
 import StorefrontRoundedIcon from '@mui/icons-material/StorefrontRounded'
 import TuneRoundedIcon from '@mui/icons-material/TuneRounded'
+import VerifiedUserRoundedIcon from '@mui/icons-material/VerifiedUserRounded'
 import WorkspacePremiumRoundedIcon from '@mui/icons-material/WorkspacePremiumRounded'
 import {
   Alert,
@@ -48,6 +50,8 @@ import { CartRecoverySection } from '@/features/notifications/CartRecoverySectio
 import RemoveShoppingCartRoundedIcon from '@mui/icons-material/RemoveShoppingCartRounded'
 import { StorefrontDesignSection } from './settings/StorefrontDesignSection'
 import { TaxesSection } from './settings/TaxesSection'
+import { StoreIdentitySection } from './settings/StoreIdentitySection'
+import { ValuePropsSection } from './settings/ValuePropsSection'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState, ErrorState, LoadingState, UnauthorizedState } from '@/shared/ui/states'
 import { useAppearance } from '@/theme/appearance-context'
@@ -343,14 +347,58 @@ export function SettingsPage() {
                             {...form.register('name')}
                           />
                         </Grid>
+                        {/* Storefront V3 · P01 · Tres campos donde antes había
+                            uno, porque eran tres cosas.
+
+                            `hero_subtitle` hacía de bajada del hero Y de
+                            descripción del comercio en el pie. Estrenar campaña
+                            cambiaba de paso lo que la tienda decía de sí misma
+                            en todas sus páginas; y querer un resumen serio abajo
+                            dejaba el hero sin poder hablar de la campaña.
+
+                            Ahora la descripción es estable, la bajada es de
+                            campaña, y el kicker es la línea que permite que el
+                            hero deje de repetir el nombre de la tienda. */}
                         <Grid item xs={12} md={7}>
                           <TextField
                             fullWidth
                             slotProps={SHRINK}
-                            label={t('settings.description')}
+                            label={t('settings.storeDescription')}
+                            helperText={
+                              fieldError(form.formState.errors.store_description?.message, t) ??
+                              t('settings.storeDescriptionHelp')
+                            }
+                            error={Boolean(form.formState.errors.store_description)}
+                            disabled={busy}
+                            multiline
+                            minRows={2}
+                            inputProps={{ maxLength: 360 }}
+                            {...form.register('store_description')}
+                          />
+                        </Grid>
+                        <Grid item xs={12} md={4}>
+                          <TextField
+                            fullWidth
+                            slotProps={SHRINK}
+                            label={t('settings.heroKicker')}
+                            helperText={
+                              fieldError(form.formState.errors.hero_kicker?.message, t) ??
+                              t('settings.heroKickerHelp')
+                            }
+                            error={Boolean(form.formState.errors.hero_kicker)}
+                            disabled={busy}
+                            inputProps={{ maxLength: 80 }}
+                            {...form.register('hero_kicker')}
+                          />
+                        </Grid>
+                        <Grid item xs={12} md={8}>
+                          <TextField
+                            fullWidth
+                            slotProps={SHRINK}
+                            label={t('settings.heroSubtitle')}
                             helperText={
                               fieldError(form.formState.errors.hero_subtitle?.message, t) ??
-                              t('settings.descriptionHelp')
+                              t('settings.heroSubtitleHelp')
                             }
                             error={Boolean(form.formState.errors.hero_subtitle)}
                             disabled={busy}
@@ -411,6 +459,23 @@ export function SettingsPage() {
                           />
                         </Grid>
                       </Grid>
+                    </SectionCard>
+
+                    {/* Storefront V2 · P01 · Las promesas de la franja de
+                        portada.
+                        Va en General, junto al contacto y la descripción,
+                        porque es CONTENIDO del comercio y no disposición: en
+                        Diseño se elige cómo se presenta lo que se vende, aquí
+                        se escribe una afirmación sobre el negocio. Mezclarlas
+                        obligaría a bajar por un selector de proporción de
+                        imagen para llegar a escribir «Garantía de 12 meses». */}
+                    <SectionCard
+                      icon={<VerifiedUserRoundedIcon />}
+                      title={t('settings.valueProps.title')}
+                      subtitle={t('settings.valueProps.help')}
+                      padded
+                    >
+                      <ValuePropsSection form={form} busy={busy} />
                     </SectionCard>
 
                     {/* P18 · Quién puede comprar.
@@ -759,6 +824,22 @@ export function SettingsPage() {
                       </Grid>
                     </SectionCard>
 
+                    {/* Storefront V3 · P01 · Cabecera y avisos.
+
+                        Va en Marca y no en General porque es el CHROME de la
+                        vitrina —lo que se ve arriba— y vive al lado del
+                        logotipo, que es justo lo que el lockup decide enseñar o
+                        no. La barra de avisos les acompaña porque aparece en esa
+                        misma franja de la pantalla. */}
+                    <SectionCard
+                      icon={<CampaignRoundedIcon />}
+                      title={t('settings.identity.title')}
+                      subtitle={t('settings.identity.help')}
+                      padded
+                    >
+                      <StoreIdentitySection form={form} busy={busy} />
+                    </SectionCard>
+
                     {/* Marca blanca: addon premium de suite (contrato §4.3). Es
                         el primer módulo vendible con superficie real, y está
                         aquí explicado en vez de escondido: un control que
@@ -884,7 +965,12 @@ export function SettingsPage() {
                           color, nombre—; el diseño es cómo se presenta lo que
                           vendes. Mezclarlas obliga a bajar por un color para
                           llegar al orden de la portada. */}
-                      <StorefrontDesignSection form={form} busy={busy} />
+                      <StorefrontDesignSection
+                        form={form}
+                        busy={busy}
+                        storeId={storeId}
+                        storeSlug={activeStore?.slug ?? null}
+                      />
                     </CardContent>
                   </Card>
                 )}

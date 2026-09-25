@@ -28,7 +28,7 @@ export type EnvioResumen = {
  * y tenía dos problemas que no son de gusto:
  *
  *  1. **No se reconocía lo que se está comprando.** Con nombres largos de
- *     farmacia, dos presentaciones del mismo producto se distinguen en la
+ *     catálogo, dos presentaciones del mismo producto se distinguen en la
  *     penúltima palabra. La foto lo resuelve de un vistazo, y es la misma que
  *     el comprador ya vio en la ficha.
  *  2. **El TOTAL no destacaba.** Es la única cifra por la que alguien decide
@@ -166,7 +166,7 @@ export function CheckoutSummary({
                     fontSize: TS.label,
                     fontWeight: 700,
                     lineHeight: 1.35,
-                    // Dos líneas y puntos suspensivos: un nombre de farmacia
+                    // Dos líneas y puntos suspensivos: un nombre de producto
                     // ocupa cuatro y empuja el total fuera de la vista.
                     display: '-webkit-box',
                     WebkitLineClamp: 2,

@@ -1,7 +1,8 @@
-import { screen } from '@testing-library/react'
+import { cleanup, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '@/test/render'
 import { CartProvider } from '../cart/CartProvider'
+import { DEFAULT_STORE_THEME } from '../theme/resolve'
 import { DEFAULT_HOME_LAYOUT } from '../theme/presets'
 import type { HomeLayout } from '../theme/types'
 import type { PublicProduct, PublicStore } from '../types'
@@ -64,12 +65,23 @@ function datos(overrides: Partial<HomeSectionData> = {}): HomeSectionData {
   return {
     store: STORE,
     storeSlug: 'botica',
+    /**
+     * El tema por defecto (`universal`), que es el que ve una tienda que nunca
+     * eligió nada. Desde P04 el registro lo necesita: `heroVariant` y
+     * `categoryVariant` eligen entre composiciones distintas, y sin tema no hay
+     * de dónde leerlas. Cada prueba que quiera otra composición lo pisa.
+     */
+    theme: DEFAULT_STORE_THEME,
     t: ((key: string) => key) as HomeSectionData['t'],
     hero: [producto('Jarabe Hero', 'p-hero')],
     ofertas: [producto('Crema Oferta', 'p-oferta')],
     destacados: [producto('Vitamina Destacada', 'p-destacada')],
     novedades: [producto('Gel Nuevo', 'p-nuevo')],
     masVendido: [producto('Alcohol Vendido', 'p-vendido')],
+    // P08 · Por defecto NO hay ranking de ventas: es el estado de una tienda
+    // que todavía no ha vendido, y el que hacía que la portada mintiera.
+    masVendidoEsReal: false,
+    thumbsMasVendido: {},
     thumbsOfertas: {},
     thumbsCatalogo: {},
     thumbsNovedades: {},
@@ -82,8 +94,11 @@ function datos(overrides: Partial<HomeSectionData> = {}): HomeSectionData {
     promociones: [],
     promoAssets: {},
     categorias: [],
+    // P09 · Las páginas publicadas, que pinta `business-info`.
+    paginas: [],
     brands: [{ code: 'genfar', name: 'Genfar', count: 4 }],
     brandSelected: null,
+    hayOfertas: true,
     favorites: new Set<string>(),
     cargandoNovedades: false,
     cargandoCatalogo: false,
@@ -92,6 +107,7 @@ function datos(overrides: Partial<HomeSectionData> = {}): HomeSectionData {
     onPrefetch: vi.fn(),
     onSelectBrand: vi.fn(),
     destacadosAparte: false,
+    marcasAparte: false,
     ...overrides,
   } as HomeSectionData
 }
@@ -202,15 +218,45 @@ describe('una sección sin datos se omite sola', () => {
     expect(container.textContent).toBe('')
   })
 
-  it('las secciones declaradas sin componente devuelven nada, no un error', () => {
-    const { container } = pintar(
-      layout([
-        { id: 'business-info', enabled: true },
-        { id: 'newsletter', enabled: true },
-      ]),
-    )
+  it('newsletter sigue declarada sin componente y no rompe la portada', () => {
+    // Y seguirá así mientras no exista dónde guardar la suscripción y el
+    // consentimiento: un formulario que pide un correo y lo tira es peor que
+    // no ofrecerlo.
+    const { container } = pintar(layout([{ id: 'newsletter', enabled: true }]))
 
     expect(container.textContent).toBe('')
+  })
+
+  /**
+   * `business-info` — la sección que se calla (Storefront V2 · P09).
+   *
+   * Hasta P09 devolvía `null` SIEMPRE: estaba en el contrato, salía en el
+   * editor del backoffice y un comercio podía encenderla y arrastrarla de
+   * sitio sin que pasara nada. Ahora pinta, pero solo cuando hay algo cierto
+   * que decir — y eso, desde fuera, se ve igual que no estar implementada.
+   * Estas dos pruebas son las que distinguen una cosa de la otra.
+   */
+  it('business-info encendida sin contacto sigue sin pintar: sería la cabecera repetida', () => {
+    const { container } = pintar(layout([{ id: 'business-info', enabled: true }]))
+
+    expect(container.textContent).toBe('')
+  })
+
+  it('business-info con contacto pinta la sección y sus páginas publicadas', () => {
+    pintar(
+      layout([{ id: 'business-info', enabled: true }]),
+      datos({
+        store: { ...STORE, support_email: 'hola@botica.pe' } as typeof STORE,
+        paginas: [{ slug: 'terminos', title: 'Términos' }],
+      }),
+    )
+
+    expect(screen.getByRole('region', { name: 'Sobre la tienda' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'hola@botica.pe' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Términos/ })).toHaveAttribute(
+      'href',
+      '/s/botica/p/terminos',
+    )
   })
 
   it('categories sin familias no pinta nada: no inventa categorías', () => {
@@ -219,7 +265,7 @@ describe('una sección sin datos se omite sola', () => {
     expect(container.textContent).toBe('')
   })
 
-  it('categories pinta las familias del catálogo como puertas, en su orden y con su tope', () => {
+  it('categories pinta las familias del catálogo como puertas, en su orden y con su tope', async () => {
     const familias = [
       { category_id: 'c1', name: 'Zapatillas', slug: 'zapatillas' },
       { category_id: 'c2', name: 'Botas', slug: 'botas' },
@@ -227,7 +273,11 @@ describe('una sección sin datos se omite sola', () => {
     ]
     pintar(layout([{ id: 'categories', enabled: true, maxItems: 2 }]), datos({ categorias: familias }))
 
-    const seccion = screen.getByRole('region', { name: 'store.categories.shopBy' })
+    // Las puertas llegan por `lazy` desde P14 —la sección viene apagada en los
+    // cuatro temas y su módulo no tiene por qué pesar en la portada de quien no
+    // la enciende—, así que se espera al módulo. Lo que se comprueba no cambia:
+    // cuáles se pintan, en qué orden y cuántas.
+    const seccion = await screen.findByRole('region', { name: 'store.categories.shopBy' })
     const puertas = seccion.querySelectorAll('a')
     expect([...puertas].map((a) => a.getAttribute('href'))).toEqual([
       '/s/botica?c=zapatillas',
@@ -314,5 +364,228 @@ describe('la cubierta del comercio manda sobre la de reserva', () => {
 
     expect(screen.getByText('Jarabe Hero')).toBeInTheDocument()
     expect(screen.queryByText('Salud cerca de casa')).not.toBeInTheDocument()
+  })
+})
+
+/**
+ * Storefront V2 · P08 · El título de la fila lo decide el DATO.
+ *
+ * La sección se llamaba «Lo más vendido» con el antetítulo «Lo que más sale» y
+ * la bajada «Los productos que más repiten nuestros clientes», sobre una lista
+ * que salía del orden por RELEVANCIA del buscador. Tres afirmaciones sobre el
+ * comportamiento de los compradores sostenidas por un índice de texto.
+ *
+ * Lo que se fija aquí es la regla: **no se cambia la lista para salvar el
+ * título; se cambia el título para que diga la verdad sobre la lista.**
+ */
+describe('la fila de más vendidos dice lo que los datos sostienen', () => {
+  const SOLO_VENDIDOS = layout([{ id: 'best-sellers', enabled: true }])
+
+  it('sin ventas se llama «Recomendados» y no afirma nada', () => {
+    pintar(SOLO_VENDIDOS, datos({ masVendidoEsReal: false }))
+
+    expect(screen.getByText('store.row.recommended')).toBeInTheDocument()
+    expect(screen.queryByText('store.row.bestSellers')).not.toBeInTheDocument()
+  })
+
+  it('con ventas se llama «Lo más vendido» y explica de dónde sale', () => {
+    pintar(SOLO_VENDIDOS, datos({ masVendidoEsReal: true }))
+
+    expect(screen.getByText('store.row.bestSellers')).toBeInTheDocument()
+    expect(screen.getByText('store.row.bestSellersSubtitle')).toBeInTheDocument()
+    expect(screen.queryByText('store.row.recommended')).not.toBeInTheDocument()
+  })
+
+  it('la lista es la MISMA: lo que cambia es lo que se afirma sobre ella', () => {
+    // Si al no haber ventas se vaciara la fila, la portada perdería una sección
+    // por decir la verdad. Lo que se corrige es la afirmación, no el contenido.
+    pintar(SOLO_VENDIDOS, datos({ masVendidoEsReal: false }))
+    expect(screen.getByText('Alcohol Vendido')).toBeInTheDocument()
+
+    cleanup()
+    pintar(SOLO_VENDIDOS, datos({ masVendidoEsReal: true }))
+    expect(screen.getByText('Alcohol Vendido')).toBeInTheDocument()
+  })
+
+  it('«Destacados» ya no comparte título con «Lo más vendido»', () => {
+    // Compartían las tres claves, así que una tienda que encendiera las dos
+    // secciones veía dos veces el mismo título sobre dos listas distintas.
+    pintar(layout([
+      { id: 'best-sellers', enabled: true },
+      { id: 'featured', enabled: true },
+    ]), datos({ masVendidoEsReal: true }))
+
+    expect(screen.getByText('store.row.bestSellers')).toBeInTheDocument()
+    expect(screen.getByText('store.row.highlighted')).toBeInTheDocument()
+  })
+})
+
+describe('el copy de las demás filas dice lo que el dato sabe', () => {
+  it('novedades habla de PUBLICACIÓN, no de entrada al almacén', () => {
+    // La fuente es `published_at` del catálogo publicado: la tienda no sabe
+    // cuándo entró algo a un almacén, y desde luego no sabe si fue esta semana.
+    pintar(layout([{ id: 'new-arrivals', enabled: true }]))
+
+    expect(screen.getByText('store.row.newSubtitle')).toBeInTheDocument()
+    expect(screen.getByText('store.row.newEyebrow')).toBeInTheDocument()
+  })
+})
+
+/**
+ * Storefront V3 · P07 · Cómo se ENSEÑAN las familias y las marcas.
+ *
+ * La sección es la misma —los mismos datos, el mismo enlace, el mismo filtro—
+ * y lo que cambia es la composición. Eso tiene que venir de la presentación
+ * resuelta (sección → tema), nunca de un `if` sobre el rubro del comercio
+ * dentro del registro.
+ */
+describe('las familias y las marcas cambian de composición, no de contenido', () => {
+  const FAMILIAS = [
+    { category_id: 'c-1', name: 'Familia 1', slug: 'familia-1' },
+    { category_id: 'c-2', name: 'Familia 2', slug: 'familia-2' },
+    { category_id: 'c-3', name: 'Familia 3', slug: 'familia-3' },
+  ]
+
+  it('la sección pedida en mosaico se pinta en mosaico', async () => {
+    pintar(
+      layout([
+        {
+          id: 'categories',
+          enabled: true,
+          presentation: { variant: 'mosaic', surface: 'plain', width: 'contained' },
+        },
+      ]),
+      datos({ categorias: FAMILIAS }),
+    )
+
+    // El mosaico llega por `lazy`, como las puertas: primero hay que esperar a
+    // que el trozo esté.
+    await screen.findByRole('link', { name: /Familia 1/ })
+    expect(document.querySelector('[data-category-mosaic]')).toHaveAttribute(
+      'data-category-mosaic',
+      '3',
+    )
+  })
+
+  it('sin pedir nada, el tema por defecto sigue dando azulejos', async () => {
+    pintar(layout([{ id: 'categories', enabled: true }]), datos({ categorias: FAMILIAS }))
+
+    // Las puertas siguen ahí —el enlace con su filtro es el de siempre— pero
+    // ninguna manda sobre las otras.
+    expect(await screen.findByRole('link', { name: /Familia 1/ })).toHaveAttribute(
+      'href',
+      '/s/botica?c=familia-1',
+    )
+    expect(document.querySelector('[data-category-mosaic]')).toBeNull()
+  })
+
+  it('las marcas pedidas como logotipos se pintan como muro', () => {
+    pintar(
+      layout([
+        {
+          id: 'brands',
+          enabled: true,
+          presentation: { variant: 'logos', surface: 'plain', width: 'contained' },
+        },
+      ]),
+    )
+
+    expect(document.querySelector('[data-brand-wall]')).toHaveAttribute('data-brand-wall', '1')
+    // El muro reconoce; no informa. La cuenta de productos es de la tarjeta.
+    expect(screen.queryByText(/\b4\b/)).not.toBeInTheDocument()
+  })
+
+  it('sin pedir nada, las marcas siguen siendo tarjetas con su cuenta', () => {
+    pintar(layout([{ id: 'brands', enabled: true }]))
+
+    expect(document.querySelector('[data-brand-wall]')).toBeNull()
+    expect(screen.getAllByText('Genfar').length).toBeGreaterThan(0)
+  })
+})
+
+describe('marcas y reconocimiento no se pintan dos veces', () => {
+  it('la franja de cierre sola se pinta', () => {
+    pintar(layout([{ id: 'trust', enabled: true }]))
+
+    expect(document.querySelector('[data-brand-trust]')).not.toBeNull()
+    expect(screen.getAllByText('Genfar').length).toBeGreaterThan(0)
+  })
+
+  it('con la sección de marcas encendida, la franja se calla', () => {
+    // Las dos salen de la misma lista: con las dos encendidas la portada
+    // enseñaba dos veces lo mismo con dos maquetaciones distintas, y eso se lee
+    // como un fallo de la tienda.
+    pintar(
+      layout([
+        { id: 'brands', enabled: true },
+        { id: 'trust', enabled: true },
+      ]),
+      datos({ marcasAparte: true }),
+    )
+
+    // La sección de marcas sigue ahí —es la que ofrece el filtro—; la franja no.
+    expect(document.querySelector('#marcas')).not.toBeNull()
+    expect(document.querySelector('[data-brand-trust]')).toBeNull()
+  })
+
+  it('y sigue en el contrato: apagar `brands` la devuelve', () => {
+    pintar(layout([{ id: 'trust', enabled: true }]), datos({ marcasAparte: false }))
+
+    expect(document.querySelector('[data-brand-trust]')).not.toBeNull()
+  })
+})
+
+/**
+ * Storefront V3 · P08 · La banda de rebajados, partida.
+ *
+ * `split` estaba en el contrato desde P06 y no lo pintaba nadie. Se pinta aquí,
+ * y sigue siendo una elección del comercio: ningún tema lo resuelve, porque
+ * cuesta alto de página.
+ */
+describe('lo rebajado puede llevar su mensaje al lado', () => {
+  it('sin pedir nada es la banda de siempre', () => {
+    pintar(layout([{ id: 'offers', enabled: true }]))
+
+    expect(document.querySelector('[data-offers-presentation]')).toHaveAttribute(
+      'data-offers-presentation',
+      'band',
+    )
+    expect(document.querySelector('[data-split-band]')).toBeNull()
+  })
+
+  it('pedida partida, el titular y su enlace se van a su columna', () => {
+    pintar(
+      layout([
+        {
+          id: 'offers',
+          enabled: true,
+          presentation: { variant: 'split', surface: 'plain', width: 'contained' },
+        },
+      ]),
+    )
+
+    expect(document.querySelector('[data-offers-presentation]')).toHaveAttribute(
+      'data-offers-presentation',
+      'split',
+    )
+    const mensaje = document.querySelector('[data-split-part="copy"]')
+    expect(mensaje).not.toBeNull()
+    // Y las ofertas siguen siendo las mismas: cambia el reparto, no la lista.
+    expect(screen.getAllByText('Crema Oferta').length).toBeGreaterThan(0)
+  })
+
+  it('partida o no, el enlace lleva al catálogo filtrado por lo rebajado', () => {
+    // Soltar al visitante en el catálogo entero es hacerle perder justo la
+    // oferta que estaba mirando.
+    for (const presentation of [undefined, { variant: 'split', surface: 'plain', width: 'contained' } as const]) {
+      cleanup()
+      pintar(layout([{ id: 'offers', enabled: true, ...(presentation ? { presentation } : {}) }]))
+      // Por su destino y no por su texto: la banda traduce con su propio
+      // diccionario, no con la `t` de identidad del compositor.
+      const enlaces = Array.from(document.querySelectorAll('a[href]'))
+      expect(
+        enlaces.some((enlace) => enlace.getAttribute('href') === '/s/botica?ver=todo&oferta=1'),
+      ).toBe(true)
+    }
   })
 })

@@ -8,12 +8,40 @@ import { formatMoney } from '@/shared/lib/format'
 import { isInternalPath, isSafeHref } from '@/domain/href'
 import { RichText } from '@/shared/ui/RichText'
 import { TS } from '@/theme/tokens'
+import { blockLayoutOf, type ProductCollectionLayout } from '@/domain/content'
 import type { ContentBlock, ContentCollectionItem } from '../content'
 import { moneyCorto, offerBadge, vigenciaTexto } from '../offer'
-import { iconoDe } from '../categoryIcon'
-import { tintFor } from '../tint'
+import {
+  CategoryDoor,
+  CategoryDoorGrid,
+  CategoryPills,
+  type CategoryDoorItem,
+} from './CategoryDoors'
+import { CategoryMosaic } from './CategoryMosaic'
 import { ProductMedia } from './ProductMedia'
 import { LoopingRow } from './LoopingRow'
+import { StoreSectionFrame } from './StoreSectionFrame'
+import { StoreSplitBand } from './StoreSplitBand'
+
+/**
+ * Las puertas de categoría se mudaron a `CategoryDoors.tsx` en Storefront
+ * V2 · P03: las usan el CMS, la portada y —desde P13— la vista previa del
+ * backoffice, y ninguna de las tres necesita el resolvedor de bloques del CMS
+ * para pintar un azulejo. Se reexportan para no tocar a quien las importaba de
+ * aquí.
+ */
+export { CategoryDoorGrid, type CategoryDoorItem }
+
+/**
+ * La foto de cada categoría, por id y ya firmada (Storefront V2 · P03).
+ *
+ * Llega firmada porque el bucket es privado y firmar por puerta serían tantas
+ * peticiones como categorías. Quien lo arma es la pantalla, que ya tiene la
+ * lista completa de categorías de la tienda.
+ */
+export type CategoryMedia = Readonly<
+  Record<string, { readonly imageUrl?: string | null; readonly imageAlt?: string | null }>
+>
 
 /**
  * Pinta los bloques de una página del CMS (P11-SaaS).
@@ -36,11 +64,19 @@ export function ContentBlocks({
   images,
   currency,
   leadingHeading = false,
+  categoryMedia = {},
 }: {
   blocks: readonly ContentBlock[]
   storeSlug: string
   /** Rutas de `store-assets` ya firmadas. */
   assets: Record<string, string>
+  /**
+   * Storefront V2 · P03 · La foto de cada categoría, por id y ya firmada.
+   *
+   * Opcional y vacío por defecto: una página del CMS que no la pase pinta sus
+   * puertas con tinte e icono, que es lo que hacían antes de esta fase.
+   */
+  categoryMedia?: CategoryMedia
   /** Rutas de `product-images` ya firmadas. */
   images: Record<string, string>
   /** Moneda de la tienda: sin ella, «20 de descuento» no dice de que. */
@@ -73,6 +109,7 @@ export function ContentBlocks({
               assets={assets}
               images={images}
               currency={currency}
+              categoryMedia={categoryMedia}
               heading={group[0].id === leadHeroId ? 'h1' : 'h2'}
             />
           )}
@@ -231,6 +268,7 @@ function ContentBlockView({
   assets,
   images,
   currency,
+  categoryMedia,
   heading,
 }: {
   block: ContentBlock
@@ -238,6 +276,7 @@ function ContentBlockView({
   assets: Record<string, string>
   images: Record<string, string>
   currency?: string
+  categoryMedia: CategoryMedia
   heading: 'h1' | 'h2'
 }) {
   switch (block.type) {
@@ -252,7 +291,13 @@ function ContentBlockView({
     case 'rich_text':
       return <RichTextBlock block={block} />
     case 'category_collection':
-      return <CategoryCollectionBlock block={block} storeSlug={storeSlug} />
+      return (
+        <CategoryCollectionBlock
+          block={block}
+          storeSlug={storeSlug}
+          categoryMedia={categoryMedia}
+        />
+      )
     default:
       return <ProductCollectionBlock block={block} storeSlug={storeSlug} images={images} />
   }
@@ -457,11 +502,38 @@ function BannerBlock({ block, assets }: { block: ContentBlock; assets: Record<st
   const url = mediaUrl(block.mediaUrl, assets)
   const reverse = block.settings.reverse === true
 
-  return (
+  /**
+   * Las tres disposiciones del banner (V3 · P08).
+   *
+   *  · `contained` es la de siempre: una franja dentro del ancho de la página,
+   *    con la imagen al 40 % y su alto limitado a 260 px. Es el banner
+   *    informativo —«Envíos a todo el país», si el comercio lo escribió— y ese
+   *    tope es lo que evita que ocupe la primera pantalla entera.
+   *  · `bleed` es la misma franja llevada al ancho de la ventana. NO trae
+   *    cálculo propio: lo hace el marco de sección de P06, que es donde vive el
+   *    único `50vw` de la vitrina — repetir ese truco por bloque es cómo
+   *    aparece una barra de desplazamiento horizontal en toda la tienda.
+   *  · `split` es mitad y mitad, con la imagen sin tope de alto y el mensaje en
+   *    su propia mitad. Es la composición de una campaña, no de un aviso: la
+   *    imagen deja de ser una viñeta al lado del texto y pasa a ser la mitad del
+   *    argumento.
+   */
+  const disposicion = blockLayoutOf('banner', block.settings)
+  const aSangre = disposicion === 'bleed'
+  const mitades = disposicion === 'split'
+
+  const tarjeta = (
     <Card
       component="section"
       aria-label={block.title ?? undefined}
-      sx={{ p: 0, overflow: 'hidden' }}
+      data-banner-layout={disposicion}
+      sx={{
+        p: 0,
+        overflow: 'hidden',
+        // A sangre, el borde redondeado no tiene sentido: los cantos se salen
+        // de la pantalla, así que solo se vería el de abajo a medias.
+        ...(aSangre ? { borderRadius: 0, borderInline: 'none' } : {}),
+      }}
     >
       <Stack
         direction={{ xs: 'column', md: reverse ? 'row-reverse' : 'row' }}
@@ -480,14 +552,26 @@ function BannerBlock({ block, assets }: { block: ContentBlock; assets: Record<st
             // va DEBAJO— caía de golpe media pantalla. Con la proporción
             // declarada el navegador reserva el sitio antes de descargarla.
             sx={{
-              width: { xs: '100%', md: '40%' },
+              // Mitad y mitad en `split`, y sin tope de alto: ahí la imagen ES
+              // la mitad del argumento, y limitarla a 260 px la devolvía a ser
+              // una viñeta al lado del texto.
+              width: { xs: '100%', md: mitades ? '50%' : '40%' },
               aspectRatio: { xs: '16 / 9', md: 'auto' },
-              maxHeight: 260,
+              ...(mitades ? { minHeight: { md: 320 } } : { maxHeight: 260 }),
               objectFit: 'cover',
             }}
           />
         ) : null}
-        <Stack sx={{ gap: 1, p: { xs: 2.5, md: 3.5 }, justifyContent: 'center', flex: 1 }}>
+        <Stack
+          sx={{
+            gap: 1,
+            // Más aire en `split`: una mitad de pantalla con el relleno de una
+            // franja deja el texto pegado al canto de la imagen.
+            p: mitades ? { xs: 2.5, md: 5 } : { xs: 2.5, md: 3.5 },
+            justifyContent: 'center',
+            flex: 1,
+          }}
+        >
           {block.title ? (
             <Typography component="h2" sx={{ fontSize: TS.pageTitle, fontWeight: 800 }}>
               {block.title}
@@ -503,6 +587,17 @@ function BannerBlock({ block, assets }: { block: ContentBlock; assets: Record<st
         </Stack>
       </Stack>
     </Card>
+  )
+
+  // El ancho de ventana, con el primitivo de P06 y su `50vw` único.
+  if (!aSangre) return tarjeta
+  return (
+    <StoreSectionFrame
+      presentation={{ variant: disposicion, surface: 'plain', width: 'bleed' }}
+      sectionId={`cms-banner-${block.id}`}
+    >
+      {tarjeta}
+    </StoreSectionFrame>
   )
 }
 
@@ -889,45 +984,82 @@ function RichTextBlock({ block }: { block: ContentBlock }) {
   )
 }
 
-/** Cuantas puertas de categoria caben a lo ancho sin apretarse. */
-const PUERTAS_A_LO_ANCHO = 4
-
 function CategoryCollectionBlock({
   block,
   storeSlug,
+  categoryMedia,
 }: {
   block: ContentBlock
   storeSlug: string
+  categoryMedia: CategoryMedia
 }) {
   const categories = block.items.filter(
     (item): item is Extract<ContentCollectionItem, { kind: 'category' }> => item.kind === 'category',
   )
   if (categories.length === 0) return null
 
+  /**
+   * La foto se CRUZA por `category_id`, no viene en el bloque.
+   *
+   * El resolvedor del CMS devuelve de cada categoría lo que necesita una
+   * puerta —id, slug y nombre— y no su media. Ampliar esa función SQL para
+   * traerla habría sido un cambio en el borde público del CMS por una foto
+   * opcional; la vitrina ya tiene las categorías de la tienda cargadas
+   * (`usePublicCategories`, la misma consulta que la barra de familias), así
+   * que basta cruzarlas. Cero peticiones nuevas y la mejora llega a los dos
+   * sitios a la vez, que es lo que pedía la fase.
+   */
+  const conFoto = categories.map((item) => ({
+    ...item,
+    ...(categoryMedia[item.category_id] ?? {}),
+  }))
+
+  /**
+   * Las cuatro disposiciones (V3 · P08).
+   *
+   * `tiles` es la de siempre: puertas, y fila desplazable a partir de cuatro.
+   * `pills` es navegación densa, la que ya usa el tema `catalog` en la portada.
+   * Las dos nuevas aprovechan la foto por categoría que V2 ya deja subir:
+   * `photo-grid` las enseña TODAS a la vez en piezas iguales —sin convertirse
+   * en carrusel, que es lo que `tiles` hace a partir de cuatro— y `mosaic` es
+   * la composición editorial, donde la primera manda.
+   *
+   * Ninguna inventa imágenes: la familia sin foto sigue cayendo a su tinte.
+   */
+  const disposicion = blockLayoutOf('category_collection', block.settings)
+  const etiqueta = block.title ?? undefined
+
   return (
-    <Stack component="section" aria-label={block.title ?? undefined} sx={{ gap: 1.5 }}>
+    <Stack component="section" aria-label={etiqueta} sx={{ gap: 1.5 }}>
       <BlockHeading block={block} />
-      <CategoryDoorGrid categories={categories} storeSlug={storeSlug} ariaLabel={block.title ?? undefined} />
+      {disposicion === 'pills' ? (
+        <CategoryPills categories={conFoto} storeSlug={storeSlug} ariaLabel={etiqueta} />
+      ) : disposicion === 'mosaic' ? (
+        <CategoryMosaic categories={conFoto} storeSlug={storeSlug} ariaLabel={etiqueta} />
+      ) : disposicion === 'photo-grid' ? (
+        <CategoryPhotoGrid categories={conFoto} storeSlug={storeSlug} ariaLabel={etiqueta} />
+      ) : (
+        <CategoryDoorGrid categories={conFoto} storeSlug={storeSlug} ariaLabel={etiqueta} />
+      )}
     </Stack>
   )
 }
 
-/** Lo mínimo que una puerta necesita de una categoría, venga del CMS o del catálogo. */
-export interface CategoryDoorItem {
-  readonly category_id: string
-  readonly name: string
-  readonly slug: string
-}
-
 /**
- * Las puertas de categoría, sin cabecera.
+ * Las familias en una rejilla de piezas IGUALES, todas a la vez (V3 · P08).
  *
- * La usan el bloque `category_collection` del CMS y la sección `categories` de
- * la portada (H07), que pinta las familias REALES del tenant. Una sola
- * implementación: la misma familia tiene el mismo tinte e icono en los dos
- * sitios, y un arreglo de accesibilidad llega a los dos a la vez.
+ * ## En qué se diferencia de las puertas
+ *
+ * En que no se rinde. `CategoryDoorGrid` pasa a fila desplazable a partir de
+ * cuatro familias —correcto cuando son muchas y no caben del mismo tamaño— y eso
+ * deja media colección detrás de una flecha. Quien subió foto a ocho familias
+ * las quiere ver a las ocho: la rejilla crece hacia abajo, que es la dirección
+ * en la que una página tiene sitio.
+ *
+ * Y en que no hay pieza principal. Eso es `mosaic`. Aquí todas pesan lo mismo,
+ * que es lo correcto cuando ninguna manda.
  */
-export function CategoryDoorGrid({
+function CategoryPhotoGrid({
   categories,
   storeSlug,
   ariaLabel,
@@ -936,195 +1068,46 @@ export function CategoryDoorGrid({
   storeSlug: string
   ariaLabel?: string
 }) {
+  if (categories.length === 0) return null
+
   return (
-    <>
-      {/* Puertas, no etiquetas.
-          Eran `Chip` en fila: el mismo tratamiento que un filtro activo del
-          catálogo, y aquí no filtran nada — llevan a otro sitio. Una fila de
-          píldoras grises tampoco se recorre con el rabillo del ojo, que es como
-          se lee una portada.
-
-          El tinte sale de `tintFor`, asignado por el NOMBRE: la misma familia
-          cae siempre en el mismo color aunque cambie de orden o entren otras. Un
-          color que baila en cada recarga no orienta, marea. Y no le quita el
-          acento al comercio: estos seis tintes son señalización, mientras que el
-          acento sigue siendo el único color de ACCIÓN. */}
-      {/* Rejilla mientras quepan, carrusel en cuanto no quepan.
-
-          No es un capricho de dos modos: con cuatro familias o menos, la
-          rejilla las enseña TODAS de una vez, y esconder tras una flecha algo
-          que cabe entero es esconderlo por nada. Pasadas las cuatro, la
-          rejilla las apretaba en filas de sobras desiguales —dos arriba y una
-          sola abajo— y ahi la fila que se desplaza es lo unico que mantiene
-          todas las puertas del mismo tamaño.
-
-          Es la misma regla que sigue `ScrollRow` con sus flechas: aparece
-          cuando hay algo a lo que ir. */}
-      {categories.length <= PUERTAS_A_LO_ANCHO ? (
-        <Box
-          sx={{
-            display: 'grid',
-            gap: { xs: 1.25, md: 2 },
-            gridTemplateColumns: {
-              xs: 'repeat(2, minmax(0, 1fr))',
-              sm: 'repeat(3, minmax(0, 1fr))',
-              md: `repeat(${Math.min(Math.max(categories.length, 2), 4)}, minmax(0, 1fr))`,
-            },
-          }}
-        >
-          {categories.map((category) => (
-            <CategoryDoor key={category.category_id} category={category} storeSlug={storeSlug} />
-          ))}
-        </Box>
-      ) : (
-        <LoopingRow
-          items={categories}
-          keyOf={(category) => category.category_id}
-          itemWidth={{ xs: '68%', sm: '42%', md: 260 }}
-          ariaLabel={ariaLabel}
-          render={(category, duplicada) => (
-            <CategoryDoor category={category} storeSlug={storeSlug} sinFoco={duplicada} />
-          )}
-        />
-      )}
-    </>
+    <Box
+      {...(ariaLabel ? { 'aria-label': ariaLabel } : {})}
+      data-category-photo-grid={categories.length}
+      sx={{
+        display: 'grid',
+        gap: { xs: 1.25, md: 2 },
+        /**
+         * Dos columnas en el teléfono y tres o cuatro en escritorio, según
+         * cuántas haya: con cinco familias a cuatro columnas queda una sola en
+         * la segunda fila, y eso se lee como un hueco, no como una rejilla.
+         */
+        gridTemplateColumns: {
+          xs: 'repeat(2, minmax(0, 1fr))',
+          md: `repeat(${categories.length % 4 === 0 || categories.length > 6 ? 4 : 3}, minmax(0, 1fr))`,
+        },
+      }}
+    >
+      {categories.map((category) => (
+        <CategoryDoor key={category.category_id} category={category} storeSlug={storeSlug} />
+      ))}
+    </Box>
   )
 }
 
 /**
- * Una puerta de categoría.
+ * Cuántas piezas hacen falta para que «la primera manda» signifique algo.
  *
- * Lo que la hace legible de un vistazo es que cada familia tiene SITIO propio:
- * su tinte y su icono, los dos derivados del nombre, así que se vuelve a
- * encontrar por el color antes de leerla. Es la misma asignación que usa la
- * barra de la cabecera — la categoría que arriba es azul, aquí también.
- *
- * La flecha no es decoración: dice que esto lleva a otro sitio, que es
- * exactamente lo que una píldora gris no decía.
+ * La misma cifra y el mismo motivo que el mosaico de familias: con dos, una
+ * pieza doble y una sencilla no es una jerarquía, es un hueco.
  */
-function CategoryDoor({
-  category,
-  storeSlug,
-  sinFoco = false,
-}: {
-  category: CategoryDoorItem
-  storeSlug: string
-  /** La copia del bucle: se ve y se pulsa, pero no se tabula ni se anuncia. */
-  sinFoco?: boolean
-}) {
-  const { t } = useI18n()
-  const tinte = tintFor(category.name)
-  const Icono = iconoDe(category.name)
+const MINIMO_PARA_DESTACAR = 3
 
-  return (
-    <Box
-      component={Link}
-      to={`/s/${storeSlug}?c=${encodeURIComponent(category.slug)}`}
-      {...(sinFoco ? { tabIndex: -1 } : {})}
-      sx={{
-        position: 'relative',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 1,
-        p: { xs: 2, md: 2.5 },
-        minHeight: { xs: 132, md: 168 },
-        borderRadius: 'var(--sf-radius)',
-        textDecoration: 'none',
-        // Degradado del propio tinte en vez de un plano: una fila de rectángulos
-        // planos de color se lee como una tabla pintada, no como puertas.
-        background: `linear-gradient(150deg, ${tinte.bg} 0%, color-mix(in srgb, ${tinte.fg} 12%, ${tinte.bg}) 100%)`,
-        border: `1px solid ${tinte.line}`,
-        color: tinte.fg,
-        boxShadow: 'var(--sf-shadow)',
-        transition: 'transform .18s ease, box-shadow .18s ease',
-        '@media (hover: hover)': {
-          '&:hover': { transform: 'translateY(-2px)', boxShadow: 'var(--sf-shadow-hover)' },
-          '&:hover .sf-cat-flecha': { transform: 'translateX(3px)' },
-        },
-        '@media (prefers-reduced-motion: reduce)': {
-          transition: 'none',
-          '&:hover': { transform: 'none' },
-        },
-      }}
-    >
-      {/* Marca de agua: el mismo icono, enorme y casi transparente en la
-          esquina. Da cuerpo al azulejo sin meter una foto que habría que
-          mantener por categoría. */}
-      <Box
-        aria-hidden
-        sx={{
-          position: 'absolute',
-          right: -14,
-          bottom: -18,
-          opacity: 0.16,
-          color: tinte.fg,
-          pointerEvents: 'none',
-        }}
-      >
-        <Icono sx={{ fontSize: 104 }} />
-      </Box>
-
-      <Box
-        aria-hidden
-        sx={{
-          position: 'relative',
-          width: 42,
-          height: 42,
-          display: 'grid',
-          placeItems: 'center',
-          borderRadius: '50%',
-          bgcolor: 'var(--card)',
-          color: tinte.fg,
-          boxShadow: `0 6px 16px -10px ${tinte.fg}`,
-        }}
-      >
-        <Icono sx={{ fontSize: 22 }} />
-      </Box>
-
-      <Typography
-        sx={{
-          position: 'relative',
-          mt: 'auto',
-          fontSize: { xs: 16, md: 18 },
-          fontWeight: 800,
-          letterSpacing: '-0.02em',
-          lineHeight: 1.25,
-        }}
-      >
-        {category.name}
-      </Typography>
-
-      <Stack
-        direction="row"
-        sx={{
-          position: 'relative',
-          alignSelf: 'flex-start',
-          alignItems: 'center',
-          gap: 0.5,
-          px: 1.25,
-          py: 0.375,
-          borderRadius: 'var(--sf-pill)',
-          bgcolor: 'var(--card)',
-          fontSize: TS.label,
-          fontWeight: 800,
-        }}
-      >
-        {t('store.categories.see')}
-        <Box
-          className="sf-cat-flecha"
-          component="span"
-          aria-hidden
-          sx={{
-            transition: 'transform .18s ease',
-            '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
-          }}
-        >
-          →
-        </Box>
-      </Stack>
-    </Box>
-  )
+/** La disposición de una colección de productos: la guardada, o la del tipo. */
+function disposicionDeColeccion(block: ContentBlock): ProductCollectionLayout {
+  // Los dos tipos ofrecen las mismas cinco y se diferencian en su defecto:
+  // `carousel` nace en franja, `product_collection` en rejilla.
+  return blockLayoutOf(block.type === 'carousel' ? 'carousel' : 'product_collection', block.settings)
 }
 
 function ProductCollectionBlock({
@@ -1147,56 +1130,131 @@ function ProductCollectionBlock({
 
   const columns = typeof block.settings.columns === 'number' ? block.settings.columns : 4
   const showPrice = block.settings.show_price !== false
-  // `carousel` es el mismo contenido con desplazamiento horizontal en vez de
-  // rejilla. No es otro componente: es otra caja.
-  const scroll = block.type === 'carousel'
+
+  /**
+   * Las cinco disposiciones (V3 · P08). La MISMA lista de productos, los mismos
+   * ids, la misma consulta: lo único que cambia es el reparto en pantalla.
+   *
+   *  · `rail` es lo que hacía el tipo `carousel`, y sigue siendo su defecto.
+   *  · `grid` es lo que hacía `product_collection`, y sigue siendo el suyo.
+   *  · `editorial` da el doble de foto a cada pieza y le quita la caja.
+   *  · `spotlight` hace que la primera ocupe el doble de área.
+   *  · `split` saca el mensaje del bloque a su propia columna.
+   */
+  const disposicion = disposicionDeColeccion(block)
+  const editorial = disposicion === 'editorial'
+  const destaca = disposicion === 'spotlight' && items.length >= MINIMO_PARA_DESTACAR
+
+  const clave = (item: (typeof items)[number]) =>
+    'variant_id' in item ? item.variant_id : item.product_id
+
+  const tarjeta = (item: (typeof items)[number]) => (
+    <CollectionCard
+      item={item}
+      storeSlug={storeSlug}
+      images={images}
+      showPrice={showPrice}
+      snap={false}
+      variante={editorial ? 'editorial' : 'card'}
+    />
+  )
+
+  /**
+   * Cuántas columnas en escritorio.
+   *
+   * `editorial` no respeta el ajuste del comercio a propósito: seis columnas de
+   * foto grande son seis fotos pequeñas, y entonces `editorial` no significa
+   * nada. `split` tampoco, porque su rejilla vive en media pantalla.
+   */
+  const columnasEscritorio = editorial
+    ? Math.min(Math.max(columns, 2), 3)
+    : disposicion === 'split'
+      ? 2
+      : Math.min(Math.max(columns, 2), 6)
+
+  const franja = (
+    /* Carrusel de verdad: `LoopingRow` pone las flechas, el difuminado del
+       borde y esconde la barra. Antes era un `overflow-x` pelado, que en
+       escritorio no ofrece ningun gesto —no hay rueda horizontal— y encima
+       dejaba la barra gris cruzando la seccion. */
+    <LoopingRow
+      items={items}
+      keyOf={clave}
+      itemWidth={{ xs: '68%', sm: '42%', md: 250 }}
+      ariaLabel={block.title ?? undefined}
+      render={(item) => tarjeta(item)}
+    />
+  )
+
+  const rejilla = (
+    <Box
+      data-collection-layout={disposicion}
+      sx={{
+        display: 'grid',
+        gap: editorial ? { xs: 2, md: 3 } : 2,
+        gridTemplateColumns: {
+          xs: 'repeat(2, minmax(0, 1fr))',
+          md: `repeat(${columnasEscritorio}, minmax(0, 1fr))`,
+        },
+        // La pieza destacada estira su fila; sin alto mínimo igual para todas,
+        // las pequeñas de al lado se deforman.
+        ...(destaca ? { gridAutoRows: { md: 'minmax(0, auto)' } } : {}),
+      }}
+    >
+      {items.map((item, indice) => (
+        <Box
+          key={clave(item)}
+          data-collection-cell={indice === 0 && destaca ? 'lead' : 'follow'}
+          sx={{
+            display: 'flex',
+            minWidth: 0,
+            '& > *': { width: '100%' },
+            // El doble de área, y solo en escritorio: en 390 px una pieza doble
+            // deja las otras sin sitio. Es la misma regla del mosaico.
+            ...(indice === 0 && destaca
+              ? { gridColumn: { md: 'span 2' }, gridRow: { md: 'span 2' } }
+              : {}),
+          }}
+        >
+          {tarjeta(item)}
+        </Box>
+      ))}
+    </Box>
+  )
+
+  const cuerpo = disposicion === 'rail' ? franja : rejilla
+
+  /**
+   * `split`: el mensaje a un lado y los productos al otro.
+   *
+   * La cabecera se va a la columna del mensaje, así que NO se pinta encima —
+   * pintarla dos veces era el error evidente—. Y el reparto y el apilado en el
+   * teléfono los decide el primitivo, que es el mismo de la banda de rebajados.
+   */
+  if (disposicion === 'split') {
+    return (
+      <Stack component="section" aria-label={block.title ?? undefined} sx={{ gap: 1.5 }}>
+        <StoreSplitBand
+          reverse={block.settings.reverse === true}
+          copy={
+            <>
+              <BlockHeading block={block} />
+              <BlockCta block={block} />
+            </>
+          }
+          content={cuerpo}
+        />
+      </Stack>
+    )
+  }
 
   return (
     <Stack component="section" aria-label={block.title ?? undefined} sx={{ gap: 1.5 }}>
       <BlockHeading block={block} />
-      {/* Carrusel de verdad: `ScrollRow` pone las flechas, el difuminado del
-          borde y esconde la barra. Antes era un `overflow-x` pelado, que en
-          escritorio no ofrece ningun gesto —no hay rueda horizontal— y encima
-          dejaba la barra gris cruzando la seccion. */}
-      {scroll ? (
-        <LoopingRow
-          items={items}
-          keyOf={(item) => ('variant_id' in item ? item.variant_id : item.product_id)}
-          itemWidth={{ xs: '68%', sm: '42%', md: 250 }}
-          ariaLabel={block.title ?? undefined}
-          render={(item) => (
-            <CollectionCard
-              item={item}
-              storeSlug={storeSlug}
-              images={images}
-              showPrice={showPrice}
-              snap={false}
-            />
-          )}
-        />
-      ) : (
-        <Box
-          sx={{
-            display: 'grid',
-            gap: 2,
-            gridTemplateColumns: {
-              xs: 'repeat(2, minmax(0, 1fr))',
-              md: `repeat(${Math.min(Math.max(columns, 2), 6)}, minmax(0, 1fr))`,
-            },
-          }}
-        >
-          {items.map((item) => (
-            <CollectionCard
-              key={'variant_id' in item ? item.variant_id : item.product_id}
-              item={item}
-              storeSlug={storeSlug}
-              images={images}
-              showPrice={showPrice}
-              snap={false}
-            />
-          ))}
-        </Box>
-      )}
+      {cuerpo}
+      {/* El botón del bloque, si lo escribió el comercio: una colección puede
+          ser la entrada a algo más grande («ver toda la selección»). */}
+      <BlockCta block={block} />
     </Stack>
   )
 }
@@ -1223,12 +1281,25 @@ function CollectionCard({
   images,
   showPrice,
   snap,
+  variante = 'card',
 }: {
   item: Exclude<ContentCollectionItem, { kind: 'category' } | { kind: 'media' }>
   storeSlug: string
   images: Record<string, string>
   showPrice: boolean
   snap: boolean
+  /**
+   * Cómo se enmarca la pieza (V3 · P08).
+   *
+   * `card` es la de siempre: caja, línea y sombra. `editorial` las quita y deja
+   * la foto sola, que es lo que pide una selección corta donde la imagen es el
+   * argumento — doce cajas con sombra alrededor de doce fotos compiten con las
+   * fotos.
+   *
+   * La línea no desaparece, se vuelve transparente: si se quitara, la tarjeta
+   * mediría un píxel menos por lado y la rejilla se movería al pasar el ratón.
+   */
+  variante?: 'card' | 'editorial'
 }) {
   const { t, locale } = useI18n()
   const price = item.kind === 'product' ? (item.price_from ?? item.price) : item.price
@@ -1239,20 +1310,24 @@ function CollectionCard({
       ? Math.round((1 - Number(price) / Number(item.compare_at_price)) * 100)
       : null
 
+  const editorial = variante === 'editorial'
+
   return (
     <Card
       component={Link}
       to={`/s/${storeSlug}/product/${item.slug}`}
+      data-card-variant={variante}
       sx={{
-        p: 1.5,
+        p: editorial ? 0 : 1.5,
         display: 'grid',
         gap: 0.5,
         alignContent: 'start',
         textDecoration: 'none',
         color: 'inherit',
         borderRadius: 'var(--sf-radius)',
-        border: '1px solid var(--sf-line)',
-        boxShadow: 'var(--sf-shadow)',
+        border: editorial ? '1px solid transparent' : '1px solid var(--sf-line)',
+        boxShadow: editorial ? 'none' : 'var(--sf-shadow)',
+        bgcolor: editorial ? 'transparent' : undefined,
         scrollSnapAlign: snap ? 'start' : undefined,
         transition: 'box-shadow .18s ease, transform .18s ease',
         '&:hover': {

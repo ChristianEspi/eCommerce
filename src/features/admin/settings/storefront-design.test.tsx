@@ -1,10 +1,10 @@
-import { screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { renderWithProviders } from '@/test/render'
-import { DEFAULT_HOME_LAYOUT } from '@/features/storefront/theme/presets'
+import { DEFAULT_HOME_LAYOUT, THEME_PRESETS } from '@/features/storefront/theme/presets'
 import { HOME_SECTION_IDS } from '@/features/storefront/theme/types'
 import { StorefrontDesignSection } from './StorefrontDesignSection'
 import { storeFormSchema, toForm, type StoreFormValues } from './types'
@@ -27,7 +27,23 @@ import { storeFormSchema, toForm, type StoreFormValues } from './types'
  */
 
 /** Un formulario real, con el mismo esquema y los mismos valores que la pantalla. */
-function Anfitrion({ inicial }: { inicial?: Partial<StoreFormValues> }) {
+/** Cuenta los renders del anfitrión: un `watch` realimentado se ve aquí. */
+let renders = 0
+
+function Anfitrion({
+  inicial,
+  conTienda = false,
+}: {
+  inicial?: Partial<StoreFormValues>
+  /**
+   * Monta también el panel «Cómo se ve tu tienda» (V3 · P12).
+   *
+   * Apagado por defecto: ese panel necesita tienda y hace sus cuentas contra la
+   * base, y la mayoría de las pruebas de esta pantalla no van de eso.
+   */
+  conTienda?: boolean
+}) {
+  renders += 1
   const form = useForm<StoreFormValues>({
     resolver: zodResolver(storeFormSchema),
     defaultValues: { ...toForm('Botica', null), ...inicial },
@@ -36,16 +52,26 @@ function Anfitrion({ inicial }: { inicial?: Partial<StoreFormValues> }) {
 
   return (
     <>
-      <StorefrontDesignSection form={form} />
+      <StorefrontDesignSection
+        form={form}
+        {...(conTienda
+          ? { storeId: 'aaaa1111-1111-4111-8111-111111111111', storeSlug: 'botica' }
+          : {})}
+      />
       {/* Espejo del estado: lo que se guardaría si alguien pulsara Guardar. */}
       <pre data-testid="valores">{JSON.stringify(form.watch())}</pre>
       <span data-testid="sucio">{String(form.formState.isDirty)}</span>
+      <span data-testid="renders">{renders}</span>
     </>
   )
 }
 
-function pintar(inicial?: Partial<StoreFormValues>) {
-  renderWithProviders(<Anfitrion inicial={inicial} />, { route: '/app/settings' })
+function pintar(inicial?: Partial<StoreFormValues>, opciones: { conTienda?: boolean } = {}) {
+  renders = 0
+  renderWithProviders(
+    <Anfitrion inicial={inicial} conTienda={opciones.conTienda ?? false} />,
+    { route: '/app/settings' },
+  )
 }
 
 function valores(): StoreFormValues {
@@ -53,6 +79,17 @@ function valores(): StoreFormValues {
 }
 
 const tema = (nombre: string) => screen.getByRole('radio', { name: new RegExp(nombre, 'i') })
+
+/**
+ * Abre un grupo de ajustes finos (Storefront V2 · P10).
+ *
+ * Desde P10 los siete desplegables van plegados en tres grupos: los ajustes
+ * son la excepción, no el caso normal, y siete controles abiertos ocupaban más
+ * pantalla que la elección del tema — que es LA decisión.
+ */
+async function abrirGrupo(user: ReturnType<typeof userEvent.setup>, nombre: string) {
+  await user.click(screen.getByRole('button', { name: new RegExp(nombre, 'i') }))
+}
 
 // ---------------------------------------------------------------------------
 // Elegir tema
@@ -122,17 +159,90 @@ describe('elegir el tema', () => {
 // ---------------------------------------------------------------------------
 
 describe('ajustar el tema', () => {
-  it('todo empieza heredando, sin nada pisado', () => {
+  it('todo empieza heredando, sin nada pisado', async () => {
+    const user = userEvent.setup()
     pintar()
 
     expect(valores().storefront_style).toEqual({})
+
+    // Los siete siguen ahí; lo que cambia en P10 es que hay que abrir su grupo.
+    for (const grupo of ['Estructura', 'Producto', 'Espaciado y ancho']) {
+      await abrirGrupo(user, grupo)
+    }
     expect(screen.getAllByRole('combobox').length).toBeGreaterThanOrEqual(7)
+  })
+
+  /**
+   * Los tres grupos (Storefront V2 · P10).
+   *
+   * Siete desplegables abiertos, todos con el mismo peso y todos diciendo
+   * «Heredar del tema», ocupaban más pantalla que la elección del tema y
+   * ofrecían siete preguntas a quien acababa de responder una.
+   */
+  it('los grupos llegan plegados, pero el que lleva algo pisado se abre solo', () => {
+    pintar({ storefront_style: { contentWidth: 'xl' } })
+
+    // El de espaciado, que es donde vive lo pisado, está abierto.
+    expect(screen.getByRole('button', { name: /Espaciado y ancho/i })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
+    // Los otros dos, no: lo normal no tiene por qué ocupar sitio.
+    expect(screen.getByRole('button', { name: /^Estructura/i })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
+  })
+
+  it('un grupo plegado dice cuántos ajustes lleva dentro', () => {
+    // Si no, esconder es esconder: quien no recuerda qué tocó hace tres meses
+    // tendría que abrir los tres grupos para encontrarlo.
+    pintar({ storefront_style: { heroVariant: 'statement', categoryVariant: 'pills' } })
+
+    expect(screen.getByLabelText('2 personalizados en este grupo')).toBeInTheDocument()
+  })
+
+  it('se cuenta lo personalizado, y sin nada dice que todo lo hereda', () => {
+    pintar({ storefront_style: { contentWidth: 'xl', imageRatio: 'portrait' } })
+    // Ocho desde V3 · P02: el contrato gana el encaje de la foto, que hasta
+    // entonces estaba cableado dentro de la tarjeta.
+    expect(screen.getByText('2 de 8 ajustes personalizados')).toBeInTheDocument()
+
+    cleanup()
+    pintar()
+    expect(screen.getByText('Todo lo hereda del tema.')).toBeInTheDocument()
+  })
+
+  it('la opción de heredar DICE qué se hereda, no solo que hereda', async () => {
+    // «Heredar del tema» a secas obligaba a abrir la vitrina para saber si la
+    // tienda tenía las tarjetas cómodas o compactas. El dato estaba aquí.
+    const user = userEvent.setup()
+    pintar()
+
+    await abrirGrupo(user, 'Espaciado y ancho')
+    await user.click(screen.getByLabelText('Ancho del contenido'))
+
+    // universal hereda `lg`, que en la pantalla se llama «Normal».
+    expect(screen.getByRole('option', { name: 'Usar tema: Normal' })).toBeInTheDocument()
+  })
+
+  it('y lo que dice cambia con el tema elegido', async () => {
+    const user = userEvent.setup()
+    pintar({ theme_preset: 'premium' })
+
+    await abrirGrupo(user, 'Producto')
+    await user.click(screen.getByLabelText('Tarjeta de producto'))
+
+    // premium hereda tarjeta EDITORIAL desde V3 · P02 —la que suelta el
+    // recuadro y deja mandar a la fotografía—; retail sigue compacta.
+    expect(screen.getByRole('option', { name: 'Usar tema: Editorial' })).toBeInTheDocument()
   })
 
   it('pisar un ajuste guarda ese y solo ese', async () => {
     const user = userEvent.setup()
     pintar()
 
+    await abrirGrupo(user, 'Espaciado y ancho')
     await user.click(screen.getByLabelText('Ancho del contenido'))
     await user.click(screen.getByRole('option', { name: 'Extra ancho' }))
 
@@ -144,7 +254,7 @@ describe('ajustar el tema', () => {
     pintar({ storefront_style: { contentWidth: 'xl' } })
 
     await user.click(screen.getByLabelText('Ancho del contenido'))
-    await user.click(screen.getByRole('option', { name: 'Heredar del tema' }))
+    await user.click(screen.getByRole('option', { name: 'Usar tema: Normal' }))
 
     expect(valores().storefront_style).toEqual({})
   })
@@ -153,7 +263,7 @@ describe('ajustar el tema', () => {
     const user = userEvent.setup()
     pintar({ storefront_style: { contentWidth: 'xl', imageRatio: 'portrait' } })
 
-    await user.click(screen.getByRole('button', { name: 'Restablecer estilo del tema' }))
+    await user.click(screen.getByRole('button', { name: 'Restablecer al tema' }))
 
     expect(valores().storefront_style).toEqual({})
   })
@@ -161,7 +271,7 @@ describe('ajustar el tema', () => {
   it('restablecer está apagado cuando no hay nada que restablecer', () => {
     pintar()
 
-    expect(screen.getByRole('button', { name: 'Restablecer estilo del tema' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Restablecer al tema' })).toBeDisabled()
   })
 
   it('no hay ni un campo libre donde escribir estilos', () => {
@@ -200,7 +310,9 @@ describe('ordenar la portada', () => {
     const primera = DEFAULT_HOME_LAYOUT.sections[0]?.id
     expect(primera).toBe('hero')
     expect(screen.getByRole('button', { name: 'Subir: Portada' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Bajar: Boletín' })).toBeDisabled()
+    // Desde P12 la última ORDENABLE es la última que se pinta: «Boletín» ya no
+    // está en la lista, está en «Próximamente» y no tiene flechas.
+    expect(screen.getByRole('button', { name: 'Bajar: Datos del negocio' })).toBeDisabled()
   })
 
   it('bajar una sección la mueve una posición, con el teclado', async () => {
@@ -231,13 +343,51 @@ describe('ordenar la portada', () => {
     expect(screen.getByRole('checkbox', { name: 'Mostrar: Categorías' })).toBeEnabled()
   })
 
-  it('una sección sin componente todavía no se puede encender', () => {
+  it('los datos del negocio ya se pueden encender (P09)', () => {
+    // Estuvo en el contrato y en esta pantalla desde el principio, apagada y
+    // sin poder encenderse. Ahora pinta contacto, nombre y páginas reales.
     pintar()
 
-    expect(screen.getByRole('checkbox', { name: 'Mostrar: Boletín' })).toBeDisabled()
-    // Y se dice por qué, en vez de esconderla: quien la busca y no la
-    // encuentra no sabe si no existe o si no la ha visto.
-    expect(screen.getAllByText('Todavía no disponible').length).toBeGreaterThan(0)
+    expect(screen.getByRole('checkbox', { name: 'Mostrar: Datos del negocio' })).toBeEnabled()
+  })
+
+  /**
+   * «Próximamente» (Storefront V2 · P12).
+   *
+   * Las secciones sin componente estaban mezcladas con las demás, apagadas y
+   * con una nota debajo, y se podían subir y bajar como si significara algo.
+   * Ordenar lo que no se pinta es ordenar nada, y además empujaba a las de
+   * verdad fuera de sitio.
+   */
+  it('una sección sin componente no se puede encender NI ordenar', () => {
+    pintar()
+
+    // Ni interruptor ni flechas: un control desactivado invita a pulsarlo.
+    expect(screen.queryByRole('checkbox', { name: 'Mostrar: Boletín' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Boletín/ })).not.toBeInTheDocument()
+  })
+
+  it('pero se sigue enseñando, y se dice por qué', () => {
+    // Esconderla sería más limpio y peor: quien busca «boletín» y no lo
+    // encuentra no sabe si no existe o si no lo ha visto.
+    pintar()
+
+    expect(screen.getByText('Próximamente')).toBeInTheDocument()
+    expect(screen.getByText('Boletín')).toBeInTheDocument()
+    expect(screen.getAllByText(/Todavía no disponible/).length).toBeGreaterThan(0)
+  })
+
+  it('reordenar las activas no mueve a las pendientes de su sitio', () => {
+    // El array guardado lleva las trece. Si al mover una activa se arrastrara
+    // una pendiente, el orden guardado cambiaría por algo que el comercio no
+    // tocó — la clase de diferencia que aparece meses después como «yo no moví
+    // eso».
+    pintar()
+    const antes = valores().home_layout.sections.findIndex((s) => s.id === 'newsletter')
+
+    screen.getByRole('button', { name: 'Bajar: Portada' }).click()
+
+    expect(valores().home_layout.sections.findIndex((s) => s.id === 'newsletter')).toBe(antes)
   })
 
   it('el tope solo aparece donde significa algo', () => {
@@ -368,5 +518,495 @@ describe('lo que sale de esta pantalla es válido', () => {
 
     expect(valores().name).toBe('Botica del Centro')
     expect(valores().support_email).toBe('hola@botica.pe')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// El taller (Storefront V2 · P10)
+// ---------------------------------------------------------------------------
+
+/**
+ * «Diseño de tienda» como TALLER, no como formulario.
+ *
+ * Hasta P10 la vista previa estaba al final: se elegía el tema arriba, se bajaba
+ * por siete desplegables y el editor de secciones, y se llegaba a la vista
+ * previa cuando ya no se veía lo que se había tocado. Configurar una tienda es
+ * un lazo de prueba y error, y si el lazo no cabe en una pantalla, se rompe: se
+ * elige un tema a ciegas y no se vuelve.
+ */
+describe('el taller de diseño', () => {
+  it('son dos zonas con nombre: se configura en una y se mira en la otra', () => {
+    pintar()
+
+    expect(screen.getByRole('region', { name: 'Configuración del diseño' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Vista previa' })).toBeInTheDocument()
+  })
+
+  it('la configuración va ANTES que la vista previa en el documento', () => {
+    // En dos columnas eso es «izquierda y derecha»; en una —tableta y
+    // teléfono— es «primero configuro, luego miro», que es el orden en el que
+    // se lee y el que oye quien navega con un lector de pantalla. Fijarlo aquí
+    // es lo que impide que un día la vista previa acabe encima del formulario
+    // en un teléfono, empujando la configuración fuera de la primera pantalla.
+    pintar()
+
+    const taller = screen.getByTestId('design-workspace')
+    const configuracion = screen.getByRole('region', { name: 'Configuración del diseño' })
+    const previa = screen.getByRole('region', { name: 'Vista previa' })
+
+    expect(taller).toContainElement(configuracion)
+    expect(taller).toContainElement(previa)
+    expect(
+      configuracion.compareDocumentPosition(previa) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it('las tres decisiones están en la columna de configuración, y la tienda no', () => {
+    pintar()
+
+    const configuracion = screen.getByRole('region', { name: 'Configuración del diseño' })
+
+    expect(within(configuracion).getByRole('radiogroup')).toBeInTheDocument()
+    expect(within(configuracion).getByText('Ajustes del tema')).toBeInTheDocument()
+    expect(within(configuracion).getByRole('checkbox', { name: 'Mostrar: Marcas' })).toBeInTheDocument()
+    expect(within(configuracion).queryByTestId('preview-frame')).not.toBeInTheDocument()
+  })
+
+  it('abrir y cerrar un grupo no ensucia el formulario', async () => {
+    // Lo que está abierto es de quien mira, no de la tienda. Si esto ensuciara
+    // el formulario, la barra de Guardar avisaría de cambios sin guardar por
+    // haber abierto un desplegable, y al pulsar Guardar no cambiaría nada.
+    const user = userEvent.setup()
+    pintar()
+
+    await abrirGrupo(user, 'Estructura')
+    await abrirGrupo(user, 'Estructura')
+
+    expect(screen.getByTestId('sucio')).toHaveTextContent('false')
+  })
+
+  it('los grupos se abren con el teclado', async () => {
+    const user = userEvent.setup()
+    pintar()
+
+    const grupo = screen.getByRole('button', { name: /^Producto/i })
+    grupo.focus()
+    await user.keyboard('{Enter}')
+
+    expect(grupo).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('mirar la tienda y cambiarla no dispara un bucle de renders', async () => {
+    // El taller lee el formulario con `form.watch`, y un `watch` que escriba
+    // en el formulario al renderizar se realimenta hasta colgar la pestaña.
+    // Un cambio = un puñado de renders, no cientos.
+    const user = userEvent.setup()
+    pintar()
+
+    const antes = Number(screen.getByTestId('renders').textContent)
+    await user.click(tema('premium'))
+    const despues = Number(screen.getByTestId('renders').textContent)
+
+    expect(despues).toBeGreaterThan(antes)
+    expect(despues - antes).toBeLessThan(10)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// El selector visual y el editor compacto (Storefront V2 · P12)
+// ---------------------------------------------------------------------------
+
+/**
+ * Elegir un tema es una decisión VISUAL.
+ *
+ * Hasta P12 se tomaba leyendo cuatro frases de una línea. «Visual y editorial:
+ * fotos grandes, más aire» describe bien `premium` y no dice cuántas columnas
+ * tiene, que es lo que de verdad cambia la pantalla.
+ *
+ * Las miniaturas se dibujan con la DEFINICIÓN del preset. Cuatro capturas
+ * habrían sido más bonitas y estarían mal el mismo día que alguien cambie un
+ * valor: una imagen no se entera de que `retail` pasó de cinco columnas a seis.
+ */
+describe('el selector visual de temas', () => {
+  const miniatura = (preset: string) =>
+    document.querySelector(`[data-theme-mini="${preset}"]`) as HTMLElement | null
+
+  it('cada tarjeta lleva su miniatura', () => {
+    pintar()
+
+    for (const preset of ['universal', 'retail', 'premium', 'catalog']) {
+      expect(miniatura(preset)).toBeInTheDocument()
+    }
+  })
+
+  it('la miniatura sale de la definición del preset, no de un dibujo fijo', () => {
+    // `retail` declara cinco columnas y `premium` tres. Si esto se rompe al
+    // cambiar un preset, la miniatura estaba mintiendo.
+    pintar()
+
+    const columnas = (preset: string) =>
+      miniatura(preset)?.querySelector('[data-mini-columns]')?.getAttribute('data-mini-columns')
+
+    expect(columnas('retail')).toBe(String(THEME_PRESETS.retail.gridColumns.lg))
+    expect(columnas('premium')).toBe(String(THEME_PRESETS.premium.gridColumns.lg))
+    expect(columnas('retail')).not.toBe(columnas('premium'))
+  })
+
+  it('las miniaturas no se anuncian: lo que se lee es el texto de al lado', () => {
+    pintar()
+
+    expect(miniatura('universal')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('cada tarjeta dice sus diferencias en datos, para quien no ve la miniatura', () => {
+    pintar()
+
+    const catalogo = tema('catálogo')
+    expect(catalogo.textContent).toContain(`${THEME_PRESETS.catalog.gridColumns.lg} columnas`)
+    // Y la tarjeta de producto y la portada que trae el preset.
+    expect(catalogo.textContent).toContain('Compacta')
+  })
+
+  it('siguen siendo cuatro opciones excluyentes y se ve cuál está elegida', async () => {
+    const user = userEvent.setup()
+    pintar()
+
+    await user.click(tema('premium'))
+
+    expect(tema('premium')).toHaveAttribute('aria-checked', 'true')
+    expect(tema('universal')).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getAllByRole('radio')).toHaveLength(4)
+  })
+
+  it('ninguna tarjeta ata un tema a un rubro', () => {
+    // El resumen se arma con la definición, así que no puede colar un rubro sin
+    // querer; esta prueba lo fija por si alguien redacta uno a mano.
+    pintar()
+
+    // Por palabra entera: «cómoda» es el nombre de una tarjeta de producto y
+    // contiene «moda» sin hablar de ropa.
+    const prohibidos = ['farmacia', 'botica', 'moda', 'calzado', 'zapatilla', 'restaurante']
+    const texto = screen.getByRole('radiogroup').textContent?.toLowerCase() ?? ''
+    for (const palabra of prohibidos) {
+      expect(texto).not.toMatch(new RegExp(`\b${palabra}`))
+    }
+  })
+})
+
+/**
+ * Arrastrar, como AÑADIDO.
+ *
+ * Los botones siguen siendo el camino completo: arrastrar no se puede hacer con
+ * el teclado. Lo que se comprueba aquí es que arrastrar hace lo mismo que las
+ * flechas, no que las sustituye.
+ */
+describe('reordenar arrastrando', () => {
+  /** Un arrastre nativo: empezar, pasar por encima y soltar. */
+  function arrastrar(desde: HTMLElement, hasta: HTMLElement) {
+    fireEvent.dragStart(desde)
+    fireEvent.dragOver(hasta)
+    fireEvent.drop(hasta)
+  }
+
+  const fila = (id: string) => document.querySelector(`[data-section="${id}"]`) as HTMLElement
+
+  it('soltar una sección sobre otra la lleva a su posición', () => {
+    pintar()
+
+    // Portada · Servicios · Ofertas → soltar «Portada» sobre «Ofertas» la deja
+    // DONDE estaba «Ofertas», que al bajar significa justo detrás de ella.
+    arrastrar(fila('hero'), fila('offers'))
+
+    const orden = valores().home_layout.sections.map((s) => s.id)
+    expect(orden.slice(0, 3)).toEqual(['services', 'offers', 'hero'])
+  })
+
+  it('arrastrar hacia arriba también funciona', () => {
+    pintar()
+
+    arrastrar(fila('offers'), fila('hero'))
+
+    expect(valores().home_layout.sections[0]?.id).toBe('offers')
+  })
+
+  it('soltar una sección sobre sí misma no cambia nada', () => {
+    pintar()
+    const antes = JSON.stringify(valores().home_layout)
+
+    arrastrar(fila('hero'), fila('hero'))
+
+    expect(JSON.stringify(valores().home_layout)).toBe(antes)
+  })
+
+  it('las flechas SIGUEN ahí y hacen lo mismo', async () => {
+    // La prueba que impide que un día arrastrar sustituya a las flechas y la
+    // pantalla deje de servirle a quien no usa ratón.
+    const user = userEvent.setup()
+    pintar()
+
+    await user.click(screen.getByRole('button', { name: 'Bajar: Portada' }))
+
+    expect(valores().home_layout.sections[0]?.id).toBe('services')
+    expect(valores().home_layout.sections[1]?.id).toBe('hero')
+  })
+
+  it('el orden guardado sigue teniendo las trece secciones', () => {
+    // Reordenar no puede perder ninguna por el camino: la que se cayera del
+    // array volvería a aparecer al final en la próxima normalización, en un
+    // sitio que el comercio no eligió.
+    pintar()
+
+    arrastrar(fila('trust'), fila('hero'))
+
+    const orden = valores().home_layout.sections.map((s) => s.id)
+    expect(orden).toHaveLength(HOME_SECTION_IDS.length)
+    expect(new Set(orden).size).toBe(HOME_SECTION_IDS.length)
+  })
+
+  it('arrastrar se refleja en la vista previa sin guardar', () => {
+    pintar()
+
+    arrastrar(fila('brands'), fila('hero'))
+
+    const marco = screen.getByTestId('preview-frame')
+    const titulos = Array.from(marco.querySelectorAll('h1, h2, p, span'))
+      .map((n) => n.textContent)
+      .filter(Boolean)
+    // «Marcas» pasa a estar antes que cualquier otra sección de la portada.
+    expect(titulos.indexOf('Marcas')).toBeGreaterThan(-1)
+  })
+})
+
+/**
+ * Storefront V3 · P12 · La presentación por sección, desde el taller.
+ *
+ * ## Qué defiende este bloque
+ *
+ * **Que la lista siga siendo una lista.** El panel se abre; los tres
+ * desplegables no viven en la fila. Trece filas con seis controles cada una son
+ * 78 controles en la columna estrecha del taller.
+ *
+ * **Que solo se ofrezca lo que la sección admite.** Las opciones salen de la
+ * misma tabla que valida la base: ofrecer aquí algo que la base rechaza es un
+ * formulario que no guarda.
+ *
+ * **Que lo heredado diga lo que hereda.** «Usar Fila», no «Automático».
+ *
+ * **Que lo guardado sea lo mínimo y con la VERSIÓN correcta.** Una lista con
+ * presentaciones guardada como versión 1 dice de sí misma que no las lleva, y
+ * el validador de la base la rechaza.
+ *
+ * **Y que arrastrar y las flechas sigan funcionando**, que es lo que no puede
+ * romper una fase de UI.
+ */
+describe('cómo se enseña cada sección', () => {
+  /** Abre el panel de una sección por su nombre. */
+  async function abrirPanel(user: ReturnType<typeof userEvent.setup>, nombre: string) {
+    await user.click(screen.getByRole('button', { name: new RegExp(`Cómo se enseña: ${nombre}`) }))
+    return await waitFor(() => {
+      const panel = document.querySelector('[data-presentation-popover]')
+      expect(panel).not.toBeNull()
+      return panel as HTMLElement
+    })
+  }
+
+  it('la fila no lleva los desplegables: se abren en un panel', async () => {
+    const user = userEvent.setup()
+    pintar()
+
+    // Antes de abrir nada, ningún panel.
+    expect(document.querySelector('[data-presentation-popover]')).toBeNull()
+
+    const panel = await abrirPanel(user, 'Ofertas')
+    expect(panel).toHaveAttribute('data-presentation-popover', 'offers')
+  })
+
+  it('solo ofrece las composiciones de esa sección', async () => {
+    const user = userEvent.setup()
+    pintar()
+
+    const panel = await abrirPanel(user, 'Ofertas')
+    await user.click(within(panel).getByLabelText('Composición'))
+
+    const opciones = (await screen.findAllByRole('option')).map((o) => o.textContent)
+    // Las de ofertas: banda o mensaje al lado. Nada de rejillas de producto ni
+    // de mosaicos de familia.
+    expect(opciones.some((texto) => texto?.includes('Banda'))).toBe(true)
+    expect(opciones.some((texto) => texto?.includes('Mensaje al lado'))).toBe(true)
+    expect(opciones.some((texto) => texto?.includes('Muro de logotipos'))).toBe(false)
+  })
+
+  it('una sección que no elige composición no enseña ese desplegable', async () => {
+    const user = userEvent.setup()
+    pintar()
+
+    // El hero trae su variante en el contrato del tema: ofrecer otra aquí
+    // serían dos verdades para el mismo píxel.
+    const panel = await abrirPanel(user, 'Portada')
+    expect(within(panel).queryByLabelText('Composición')).toBeNull()
+    // El ancho sí, que lo admite cualquier sección.
+    expect(within(panel).getByLabelText('Ancho')).toBeInTheDocument()
+  })
+
+  it('lo heredado dice lo que hereda, no «automático»', async () => {
+    const user = userEvent.setup()
+    pintar()
+
+    const panel = await abrirPanel(user, 'Novedades')
+    // Universal resuelve `rail` para producto: el desplegable lo escribe.
+    // Se mira el TEXTO del panel: el valor visible de un select de MUI no vive
+    // en el input, que es el que lleva la etiqueta.
+    await user.click(within(panel).getByLabelText('Composición'))
+    expect(
+      await screen.findByRole('option', { name: 'Usar tema: Fila que se desplaza' }),
+    ).toBeInTheDocument()
+  })
+
+  it('elegir una composición la guarda, y la lista pasa a versión 2', async () => {
+    const user = userEvent.setup()
+    pintar()
+
+    const panel = await abrirPanel(user, 'Novedades')
+    await user.click(within(panel).getByLabelText('Composición'))
+    await user.click(await screen.findByRole('option', { name: /Rejilla, todos iguales/ }))
+
+    await waitFor(() => {
+      const guardado = valores().home_layout
+      const seccion = guardado.sections.find((s) => s.id === 'new-arrivals')
+      expect(seccion?.presentation).toEqual({ variant: 'grid' })
+      // La versión describe el CONTENIDO: con presentaciones, es la 2.
+      expect(guardado.version).toBe(2)
+    })
+  })
+
+  it('volver a lo heredado borra la clave y devuelve la lista a versión 1', async () => {
+    const user = userEvent.setup()
+    pintar({
+      home_layout: {
+        version: 2,
+        sections: [{ id: 'new-arrivals', enabled: true, presentation: { variant: 'grid' } }],
+      },
+    })
+
+    const panel = await abrirPanel(user, 'Novedades')
+    await user.click(within(panel).getByLabelText('Composición'))
+    // La primera opción es la heredada.
+    await user.click((await screen.findAllByRole('option'))[0] as HTMLElement)
+
+    await waitFor(() => {
+      const guardado = valores().home_layout
+      expect(guardado.sections.find((s) => s.id === 'new-arrivals')?.presentation).toBeUndefined()
+      // Sin nada personalizado, vuelve a declararse V1: no se sube la versión
+      // «porque estamos en V3».
+      expect(guardado.version).toBe(1)
+    })
+  })
+
+  it('«Quitar personalización» limpia la sección entera', async () => {
+    const user = userEvent.setup()
+    pintar({
+      home_layout: {
+        version: 2,
+        sections: [
+          {
+            id: 'offers',
+            enabled: true,
+            presentation: { variant: 'split', surface: 'soft', width: 'bleed' },
+          },
+        ],
+      },
+    })
+
+    const panel = await abrirPanel(user, 'Ofertas')
+    await user.click(within(panel).getByRole('button', { name: 'Quitar personalización' }))
+
+    await waitFor(() => {
+      const guardado = valores().home_layout
+      expect(guardado.sections.find((s) => s.id === 'offers')?.presentation).toBeUndefined()
+      expect(guardado.version).toBe(1)
+    })
+  })
+
+  it('el botón de la fila marca la sección que lleva algo personalizado', async () => {
+    pintar({
+      home_layout: {
+        version: 2,
+        sections: [{ id: 'offers', enabled: true, presentation: { surface: 'soft' } }],
+      },
+    })
+
+    expect(document.querySelector('[data-presentation-open="offers"]')).toHaveAttribute(
+      'data-presentation-custom',
+      'true',
+    )
+    // Y la que no, no lo marca.
+    expect(
+      document.querySelector('[data-presentation-open="new-arrivals"]'),
+    ).not.toHaveAttribute('data-presentation-custom')
+  })
+
+  it('las flechas de subir y bajar siguen ahí, con el panel en medio', async () => {
+    // Es lo que no puede romper una fase de UI: arrastrar no se puede hacer con
+    // el teclado.
+    pintar()
+
+    expect(screen.getByRole('button', { name: /Subir: Ofertas/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Bajar: Ofertas/ })).toBeInTheDocument()
+  })
+})
+
+describe('los campos de marca no se editan en dos sitios', () => {
+  it('el taller no repite el lockup ni el interruptor de tema: lleva a Marca', async () => {
+    // El encargo de la fase los pedía en el grupo de estructura, y ponerlos
+    // sería tener la misma propiedad editable en dos pestañas: el día que las
+    // dos no coincidan, ninguna es la verdad.
+    const user = userEvent.setup()
+    pintar()
+
+    expect(screen.queryByLabelText('Lockup de marca')).toBeNull()
+
+    // El grupo viene plegado —los ajustes son la excepción— así que se abre.
+    await abrirGrupo(user, 'Estructura')
+    const enlace = screen.getByRole('link', { name: 'Marca' })
+    expect(enlace).toHaveAttribute('href', '#branding')
+  })
+})
+
+describe('readiness lleva a donde se arregla', () => {
+  it('cada señal por mejorar ofrece su enlace, y las que están al día no', async () => {
+    pintar({ logo_url: null }, { conTienda: true })
+
+    const enlace = await waitFor(() => {
+      const encontrado = document.querySelector('[data-readiness-link="logo"]')
+      expect(encontrado).not.toBeNull()
+      return encontrado as HTMLElement
+    })
+    // El logotipo se sube en Marca, que es una pestaña de esta misma página.
+    expect(enlace).toHaveAttribute('href', '#branding')
+
+    // Y con el logotipo puesto, la señal no ofrece nada que arreglar.
+    expect(
+      document.querySelector('[data-readiness="logo"][data-state="ok"]'),
+    ).toBeNull()
+  })
+
+  it('la señal que vive en otra pantalla lleva a su ruta, no a una pestaña', async () => {
+    /**
+     * Se usa la de PÁGINAS y no la de fotos de producto, y el motivo es una
+     * regla del panel que conviene no perder de vista: una señal que no tiene
+     * nada que medir está al día. Sin catálogo no hay productos sin foto, así
+     * que esa línea sale en verde y —con razón— no ofrece nada que arreglar.
+     * Las páginas sí: cero páginas es cero.
+     */
+    pintar(undefined, { conTienda: true })
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-readiness-link="pages"]')).toHaveAttribute(
+        'href',
+        '/app/content',
+      )
+    })
+    // Y las que no tienen nada que medir no ofrecen enlace: no hay nada roto.
+    expect(document.querySelector('[data-readiness-link="product-images"]')).toBeNull()
   })
 })

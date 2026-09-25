@@ -1,7 +1,11 @@
-import { Box, Button, Skeleton, Stack } from '@mui/material'
+import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded'
+import { Box, Button, Skeleton, Stack, Typography } from '@mui/material'
 import { Link } from 'react-router-dom'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { TS } from '@/theme/tokens'
 import { useCatalogCommercialPrices } from '../commerce/catalogPrices'
+import { useStorefrontTheme } from '../theme/useStorefrontTheme'
+import { ROW_SLOT_GAP, ROW_SLOT_WIDTH } from './rowSlots'
 import type { PublicProduct } from '../types'
 import { ProductCard } from './ProductCard'
 import { LoopingRow } from './LoopingRow'
@@ -9,17 +13,50 @@ import { ScrollRow } from './ScrollRow'
 import { SectionHeading } from './SectionHeading'
 
 /**
- * Una fila de productos con su título y su «Ver todo».
+ * Una fila de productos que se ADAPTA a cuántos productos hay.
  *
- * La portada dejó de ser una rejilla infinita de catálogo. Una rejilla es lo
- * que se quiere cuando YA se sabe qué se busca; quien acaba de entrar necesita
- * saber qué hay, y eso se enseña mejor en filas cortas con nombre —novedades,
- * ofertas, lo de siempre— que en 400 productos ordenados por relevancia.
+ * ## El problema que resuelve, con números
  *
- * Cada fila lleva su puerta al catálogo completo: «Ver todo» es lo que abre la
- * rejilla con sus filtros. Antes esa rejilla estaba siempre puesta y no había
- * forma de enseñar nada por encima sin empujarla fuera de la pantalla.
+ * La fila pintaba siempre lo mismo: un carrusel de tarjetas de 168 px. Con
+ * veinte productos está bien. Con UNO, la portada enseñaba una tarjeta pequeña
+ * pegada al margen izquierdo y **mil doscientos píxeles de blanco** a su
+ * derecha, debajo de un título que prometía una sección. Con dos o tres, lo
+ * mismo en menor grado.
+ *
+ * Eso no se lee como «esta tienda tiene tres ofertas»: se lee como una tienda
+ * rota. Y le pasa a toda tienda que empieza, que es justo cuando peor sienta.
+ *
+ * ## Las tres composiciones, y el criterio
+ *
+ * La regla es una sola: **la fila ocupa su ancho con lo que de verdad tiene.**
+ * Nunca se rellena con productos inventados, repetidos ni «recomendados» que
+ * salgan de otra parte — eso sería mentir sobre el catálogo.
+ *
+ *  · **1–3 productos → rejilla con tarjetas GRANDES.** Las columnas se reparten
+ *    entre los productos que hay más una puerta al catálogo, así que con uno se
+ *    ven dos columnas anchas y con tres, cuatro. Las tarjetas crecen en vez de
+ *    quedarse pequeñas en una esquina.
+ *  · **4–6 → rejilla normal**, una columna por producto. Ya llenan la fila.
+ *  · **7 o más → carrusel.** A partir de ahí no caben, y una rejilla que se
+ *    parte en dos filas desiguales —seis arriba y una abajo— se ve peor que una
+ *    fila que gira.
+ *
+ * ## Por qué la puerta al catálogo es una CELDA y no solo un botón
+ *
+ * El botón «Ver todo» sigue junto al título, donde estaba. Lo que la celda
+ * añade es ocupar el hueco con algo que sirve: quien mira una fila de dos
+ * productos y quiere más, tiene la salida en el sitio donde estaba mirando. Y
+ * su texto no afirma nada sobre cuántos productos hay —sería mentira en una
+ * tienda con dos— sino que invita a recorrer el catálogo, que es cierto siempre.
  */
+
+/** A partir de aquí la rejilla ya no cabe y la fila gira. */
+const TOPE_REJILLA = 6
+
+
+/** Hasta aquí las tarjetas crecen y se acompañan de la puerta al catálogo. */
+const POCOS = 3
+
 export function ProductRow({
   title,
   eyebrow,
@@ -29,18 +66,20 @@ export function ProductRow({
   thumbnails,
   seeAllHref,
   loading = false,
+  tone = 'plain',
   onPrefetch,
   onQuickView,
   favorites,
   onToggleFavorite,
+  presentation,
 }: {
   title: string
   /**
    * Versalitas y frase de apoyo sobre el titulo.
    *
    * Opcionales porque no toda fila las necesita: en la portada dicen de que va
-   * la fila ANTES de leer los productos —«recien llegado», «lo que mas sale»—,
-   * y ahi es donde el cierre de la pagina se quedaba como una lista mas.
+   * la fila ANTES de leer los productos, y ahi es donde el cierre de la pagina
+   * se quedaba como una lista mas.
    */
   eyebrow?: string
   subtitle?: string
@@ -49,19 +88,108 @@ export function ProductRow({
   thumbnails: Record<string, string>
   seeAllHref: string
   loading?: boolean
+  /**
+   * El fondo de la fila (P06).
+   *
+   * `plain` es el de siempre: la fila sobre el fondo de la página. `tinted` la
+   * apoya en un tinte muy bajo del acento del comercio.
+   *
+   * No es decoración: es lo que permite que dos filas seguidas se lean como dos
+   * secciones. Una portada de cuatro filas idénticas —título, tarjetas, título,
+   * tarjetas— se recorre como una lista sin fin, y el comprador deja de
+   * distinguir dónde acaba una cosa y empieza otra. Quien decide el ritmo es el
+   * registro de secciones, que es el único que sabe qué va antes y después.
+   */
+  tone?: 'plain' | 'tinted'
   onPrefetch?: (slug: string) => void
   onQuickView?: (slug: string) => void
   favorites?: ReadonlySet<string>
   onToggleFavorite?: (productId: string) => void
+  /**
+   * El reparto que pide la portada (Storefront V3 · P06).
+   *
+   * Sin él la fila decide por CANTIDAD, que es lo que hacía y sigue siendo lo
+   * correcto por defecto: rejilla con pocos, carrusel con muchos. Con él, el
+   * comercio —o su tema— pide un ritmo:
+   *
+   *  · `rail` — lo de siempre: la cantidad decide.
+   *  · `grid` — rejilla siempre, aunque haya veinte. Enseña todo de una vez, que
+   *    es lo que quiere una tienda de conversión: el carrusel esconde la mitad
+   *    del surtido detrás de un gesto.
+   *  · `spotlight` — tres piezas grandes y la puerta al catálogo. Pocas cosas
+   *    bien enseñadas, que es el ritmo de una portada editorial.
+   */
+  presentation?: 'rail' | 'grid' | 'spotlight'
 }) {
   const { t } = useI18n()
   // Una cotización por fila, no por tarjeta: la fila que gira repite tarjetas
   // pero no productos (N03).
   const commercial = useCatalogCommercialPrices(storeSlug, products)
+  /**
+   * La presentación que pide el tema, para el ancho de los huecos.
+   *
+   * La fila no decide cómo es una tarjeta —eso es del contrato— pero sí cuánto
+   * sitio le da. Y ese sitio dejó de ser un número universal en V3 · P05: 168 px
+   * es un ancho de catálogo denso, y aplicarlo a las cuatro personalidades era
+   * la razón por la que Premium se veía como Catalog en cuanto una fila pasaba
+   * de seis productos.
+   *
+   * Va ANTES del retorno temprano, con los otros dos hooks: el orden de los
+   * hooks no puede depender de si la fila tiene productos.
+   */
+  const { style } = useStorefrontTheme()
+  const presentacion = style.productCardVariant
+
   if (!loading && products.length === 0) return null
 
+  /**
+   * El reparto: lo que pide la portada, o la cantidad si no pide nada.
+   *
+   * `spotlight` recorta a tres: es lo que significa —pocas piezas, grandes— y
+   * pintar ocho «destacadas» no destaca ninguna. El recorte se hace aquí y no
+   * en el tope de la sección porque el tope es del comercio («enseña 12») y esto
+   * es del ritmo («enséñalas en grande»).
+   */
+  const impuesto = presentation && presentation !== 'rail' ? presentation : null
+  const visibles = impuesto === 'spotlight' ? products.slice(0, POCOS) : products
+
+  const cuantos = visibles.length
+  const pocos = !loading && cuantos > 0 && (impuesto === 'spotlight' || cuantos <= POCOS)
+  const rejilla =
+    !loading && cuantos > 0 && (impuesto === 'grid' || pocos || cuantos <= TOPE_REJILLA)
+
+  const tarjeta = (product: PublicProduct, anuncio: boolean) => (
+    <ProductCard
+      reduced={anuncio}
+      product={product}
+      storeSlug={storeSlug}
+      commercialPrice={commercial.get(product.product_id) ?? null}
+      {...(onQuickView ? { onQuickView } : {})}
+      {...(onToggleFavorite ? { onToggleFavorite } : {})}
+      favorite={favorites?.has(product.product_id) ?? false}
+      imageUrl={product.primary_image_path ? (thumbnails[product.primary_image_path] ?? null) : null}
+      onPrefetch={onPrefetch}
+    />
+  )
+
   return (
-    <Stack component="section" aria-label={title} sx={{ gap: 1.25 }}>
+    <Stack
+      component="section"
+      aria-label={title}
+      data-row-layout={loading ? 'loading' : pocos ? 'spotlight' : rejilla ? 'grid' : 'carousel'}
+      data-row-count={cuantos}
+      sx={{
+        gap: 1.25,
+        ...(tone === 'tinted'
+          ? {
+              p: { xs: 1.75, md: 2.5 },
+              borderRadius: 'var(--sf-radius)',
+              background:
+                'linear-gradient(180deg, color-mix(in srgb, var(--accent2) 8%, transparent) 0%, transparent 100%)',
+            }
+          : {}),
+      }}
+    >
       <SectionHeading
         title={title}
         {...(eyebrow ? { eyebrow } : {})}
@@ -89,44 +217,127 @@ export function ProductRow({
         }
       />
 
-      {/* Cargando NO gira: unos esqueletos derivando parecen contenido que se
-          va sin haber llegado. La fila arranca cuando hay algo que enseñar. */}
       {loading ? (
+        /* Cargando NO gira: unos esqueletos derivando parecen contenido que se
+           va sin haber llegado. La fila arranca cuando hay algo que enseñar. */
         <ScrollRow ariaLabel={title} gap={1.5}>
           {Array.from({ length: 6 }, (_, i) => (
-            <Box key={i} sx={{ width: 168, flexShrink: 0 }}>
+            <Box key={i} sx={{ width: ROW_SLOT_WIDTH[presentacion], flexShrink: 0 }}>
               <Skeleton variant="rounded" height={220} sx={{ borderRadius: 'var(--sf-radius)' }} />
             </Box>
           ))}
         </ScrollRow>
+      ) : rejilla ? (
+        <Box
+          sx={{
+            display: 'grid',
+            gap: { xs: 'var(--sf-grid-gap, 12px)', md: 'var(--sf-grid-gap-md, 20px)' },
+            // Con pocos productos entra una columna más: la puerta al catálogo.
+            // Sin ella, dos tarjetas dejaban media fila en blanco debajo de un
+            // título que prometía una sección.
+            gridTemplateColumns: {
+              xs: cuantos === 1 ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+              md: `repeat(${pocos ? cuantos + 1 : cuantos}, minmax(0, 1fr))`,
+            },
+            gridAutoRows: '1fr',
+          }}
+        >
+          {visibles.map((product) => (
+            <Box key={product.product_id} sx={{ display: 'flex' }}>
+              {/* Tarjeta COMPLETA —con estado y botón de comprar— cuando hay
+                  sitio: con tres productos en fila no se está ojeando un
+                  escaparate, se está mirando lo que hay. La versión reducida es
+                  para la fila que gira, donde la tarjeta es un anuncio. */}
+              {tarjeta(product, false)}
+            </Box>
+          ))}
+          {pocos && <PuertaAlCatalogo href={seeAllHref} />}
+        </Box>
       ) : (
         <LoopingRow
-          items={products}
+          items={visibles}
           keyOf={(product) => product.product_id}
-          itemWidth={168}
-          gap={1.5}
+          // Storefront V3 · P05 · El ancho lo pone la PRESENTACIÓN del tema.
+          itemWidth={ROW_SLOT_WIDTH[presentacion]}
+          gap={ROW_SLOT_GAP[presentacion]}
           ariaLabel={title}
           render={(product) => (
-            <Box sx={{ display: 'flex', width: '100%' }}>
-              <ProductCard
-                compact
-                product={product}
-                storeSlug={storeSlug}
-                commercialPrice={commercial.get(product.product_id) ?? null}
-                {...(onQuickView ? { onQuickView } : {})}
-                {...(onToggleFavorite ? { onToggleFavorite } : {})}
-                favorite={favorites?.has(product.product_id) ?? false}
-                imageUrl={
-                  product.primary_image_path
-                    ? (thumbnails[product.primary_image_path] ?? null)
-                    : null
-                }
-                onPrefetch={onPrefetch}
-              />
-            </Box>
+            // `true` = es un ANUNCIO, no un mostrador: se quitan el botón de
+            // comprar y la pastilla de estado, que es lo que se decide dentro de
+            // la ficha. Lo que NO se quita es la densidad del tema: hasta V3
+            // este mismo booleano forzaba tarjetas de catálogo denso, así que
+            // Premium acababa con miniaturas en su portada editorial.
+            <Box sx={{ display: 'flex', width: '100%' }}>{tarjeta(product, true)}</Box>
           )}
         />
       )}
     </Stack>
+  )
+}
+
+/**
+ * La celda que cierra una fila corta.
+ *
+ * ## Qué dice y qué NO dice
+ *
+ * Invita a recorrer el catálogo. No afirma que haya más productos —en una
+ * tienda con dos sería falso— ni inventa recomendaciones para rellenar. Lo
+ * único que promete es lo que hace: llevar al catálogo.
+ *
+ * Es un enlace de altura completa, así que la fila queda cuadrada: todas las
+ * celdas miden lo mismo y no hay un hueco a la derecha.
+ */
+function PuertaAlCatalogo({ href }: { href: string }) {
+  const { t } = useI18n()
+
+  return (
+    <Box
+      component={Link}
+      to={href}
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'flex-start',
+        gap: 1,
+        p: { xs: 2, md: 2.5 },
+        minHeight: '100%',
+        borderRadius: 'var(--sf-radius)',
+        textDecoration: 'none',
+        // Trazo discontinuo y fondo casi transparente: dice «esto no es un
+        // producto» sin gritar. Con el mismo relleno que una tarjeta, la fila
+        // se lee como una sola pieza.
+        border: '1px dashed var(--sf-line-strong)',
+        bgcolor: 'color-mix(in srgb, var(--accent) 4%, transparent)',
+        color: 'var(--accent-deep)',
+        transition: 'border-color .18s ease, background-color .18s ease',
+        '@media (hover: hover)': {
+          '&:hover': {
+            borderColor: 'var(--accent)',
+            bgcolor: 'color-mix(in srgb, var(--accent) 9%, transparent)',
+          },
+          '&:hover .sf-row-flecha': { transform: 'translateX(3px)' },
+        },
+        '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
+      }}
+    >
+      <Typography sx={{ fontSize: 15, fontWeight: 800, lineHeight: 1.3 }}>
+        {t('store.row.exploreTitle')}
+      </Typography>
+      <Typography sx={{ fontSize: TS.label, color: 'var(--muted)', lineHeight: 1.4 }}>
+        {t('store.row.exploreBody')}
+      </Typography>
+      <Box
+        className="sf-row-flecha"
+        aria-hidden
+        sx={{
+          display: 'inline-flex',
+          transition: 'transform .18s ease',
+          '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
+        }}
+      >
+        <ArrowForwardRoundedIcon sx={{ fontSize: 20 }} />
+      </Box>
+    </Box>
   )
 }

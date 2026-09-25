@@ -112,7 +112,19 @@ describe('lo que se publica y lo que no', () => {
     expect(message).toMatch(/permission denied/i)
   })
 
-  it('la vista conserva sus columnas y solo gana `default_country`', async () => {
+  /**
+   * El INVENTARIO de la vista pública, columna por columna y en orden.
+   *
+   * No es una lista de lo que hay: es la puerta por la que tiene que pasar
+   * cualquier columna nueva. `public_stores` se recrea en cada migración que la
+   * amplía, y un `select` que arrastrara de más —`config`, `tax_rate`, el token
+   * del dominio— se lo serviría a `anon` sin que nadie lo notara. Añadir aquí
+   * una línea es la decisión explícita de publicarla.
+   *
+   * Historia de las ampliaciones: `default_country` (`20260913120000`) y
+   * `value_props` (`20260923140000`, propuestas de valor de la portada).
+   */
+  it('la vista conserva sus columnas y solo suma lo que se declara aquí', async () => {
     const columnas = await svc<{ column_name: string }>(
       `select column_name from information_schema.columns
         where table_schema = 'public' and table_name = 'public_stores'
@@ -123,7 +135,13 @@ describe('lo que se publica y lo que no', () => {
       'white_label', 'default_locale', 'support_email', 'banner_url', 'hero_title', 'hero_subtitle',
       'contact_phone', 'contact_address', 'font_family', 'ui_radius', 'ui_density',
       'business_display_name', 'checkout_requires_account', 'theme_preset', 'storefront_style',
-      'home_layout', 'default_country',
+      'home_layout', 'value_props',
+      // Storefront V3 · P01 · Identidad con roles semánticos: la descripción
+      // estable deja de ser la bajada del hero, y la cabecera pasa a poder
+      // decidir qué enseña.
+      'store_description', 'hero_kicker', 'brand_lockup', 'show_theme_toggle',
+      'announcement_messages',
+      'default_country',
     ])
   })
 })

@@ -127,7 +127,7 @@ describe.each(THEME_PRESET_IDS)('con el tema %s', (preset) => {
     const user = userEvent.setup()
     pintar(preset)
 
-    const comprar = await screen.findByRole('button', { name: 'Agregar al carrito' })
+    const comprar = await screen.findByRole('button', { name: /^Agregar al carrito/ })
     expect(comprar).toBeEnabled()
     await user.click(comprar)
   })
@@ -141,8 +141,8 @@ describe.each(THEME_PRESET_IDS)('con el tema %s', (preset) => {
       producto({ kind: 'variant', variant_count: 3 } as Partial<PublicProduct>),
     )
 
-    expect(screen.queryByRole('button', { name: 'Agregar al carrito' })).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Elegir opciones' }))
+    expect(screen.queryByRole('button', { name: /^Agregar al carrito/ })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /^Elegir opciones/ }))
 
     expect(onQuickView).toHaveBeenCalledWith('silla-roble')
   })
@@ -157,7 +157,7 @@ describe.each(THEME_PRESET_IDS)('con el tema %s', (preset) => {
   it('lo agotado no se puede comprar en ningún tema', () => {
     pintar(preset, producto({ in_stock: false }))
 
-    expect(screen.getByRole('button', { name: 'Agregar al carrito' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /^Agregar al carrito/ })).toBeDisabled()
   })
 
   it('el nombre del producto es un encabezado de tercer nivel', () => {
@@ -175,7 +175,7 @@ describe.each(THEME_PRESET_IDS)('lo incómodo, con el tema %s', (preset) => {
     pintar(preset, producto({ primary_image_path: null }))
 
     expect(screen.getByRole('heading', { level: 3, name: 'Silla de roble' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Agregar al carrito' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Agregar al carrito/ })).toBeInTheDocument()
   })
 
   it('un nombre larguísimo no empuja el precio fuera de la tarjeta', () => {

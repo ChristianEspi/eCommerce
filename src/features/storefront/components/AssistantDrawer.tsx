@@ -190,7 +190,7 @@ export function AssistantDrawer({
                   {productos.map((producto) => (
                     <ProductCard
                       key={producto.product_id}
-                      compact
+                      reduced
                       product={producto}
                       storeSlug={storeSlug}
                       imageUrl={

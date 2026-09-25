@@ -3,6 +3,8 @@ import type { MessageKey } from '@/shared/i18n/messages'
 import type { BrandRow } from '../components/BrandRow'
 import type { CategoryDoorGrid, ContentBlocks } from '../components/ContentBlocks'
 import type { PromoCarousel } from '../components/PromoCarousel'
+import type { ResolvedPresentation } from '../theme/presentation'
+import type { ResolvedStoreTheme } from '../theme/resolve'
 import type { HomeSectionId } from '../theme/types'
 import type { PublicProduct, PublicStore } from '../types'
 
@@ -29,6 +31,27 @@ import type { PublicProduct, PublicStore } from '../types'
 export interface HomeSectionData {
   readonly store: PublicStore
   readonly storeSlug: string
+
+  /**
+   * El tema YA resuelto (Storefront V2 · P04).
+   *
+   * ## Por qué el registro necesita el tema y hasta P04 no lo tenía
+   *
+   * Porque dos controles del contrato eligen COMPOSICIÓN, no medidas:
+   * `heroVariant` decide entre dos portadas distintas y `categoryVariant` entre
+   * dos formas de enseñar las familias. Eso no se puede resolver con una
+   * variable de CSS —son árboles de React diferentes— y quien decide qué se
+   * pinta en la portada es este registro.
+   *
+   * Hasta P04 no llegaba, y la consecuencia era concreta: un tema podía
+   * declarar `heroVariant: 'statement'` y la portada seguía pintando la de
+   * producto. El contrato tenía dos opciones y una sola salida.
+   *
+   * Llega RESUELTO, no crudo: el preset, lo que la tienda pisó encima y los
+   * valores por defecto ya están aplicados, así que aquí no se decide qué hacer
+   * con lo que falta. Eso se resolvió una vez, en `resolveStoreTheme`.
+   */
+  readonly theme: ResolvedStoreTheme
   /**
    * La traducción, pasada como dato y no leída con un hook.
    *
@@ -52,10 +75,25 @@ export interface HomeSectionData {
   readonly novedades: readonly PublicProduct[]
   readonly masVendido: readonly PublicProduct[]
 
+  /**
+   * ¿La fila de más vendidos está SOSTENIDA por ventas? (Storefront V2 · P08)
+   *
+   * Es lo que decide el TÍTULO, y por eso viaja como bandera y no se deduce
+   * aquí: con ranking real la sección dice «Lo más vendido» y explica que sale
+   * de los pedidos de los últimos noventa días; sin él dice «Recomendados», que
+   * es exactamente lo que está enseñando — una muestra del catálogo.
+   *
+   * Hasta P08 decía «Lo más vendido» en los dos casos, y en el segundo era
+   * falso: los productos salían del orden por relevancia del buscador.
+   */
+  readonly masVendidoEsReal: boolean
+
   /** Miniaturas ya firmadas. Firmarlas por sección multiplicaría las llamadas. */
   readonly thumbsOfertas: Record<string, string>
   readonly thumbsCatalogo: Record<string, string>
   readonly thumbsNovedades: Record<string, string>
+  /** Los del ranking, que puede traer productos fuera de la primera página. */
+  readonly thumbsMasVendido: Record<string, string>
 
   readonly blocks: ComponentProps<typeof ContentBlocks>['blocks']
   readonly assets: ComponentProps<typeof ContentBlocks>['assets']
@@ -76,8 +114,39 @@ export interface HomeSectionData {
    */
   readonly categorias: ComponentProps<typeof CategoryDoorGrid>['categories']
 
+  /**
+   * Storefront V2 · P03 · La foto de cada categoría, por id y ya firmada.
+   *
+   * Va aparte de `categorias` porque los bloques `category_collection` del CMS
+   * pueden apuntar a cualquier nivel del árbol, no solo a las raíces que pinta
+   * la sección `categories`. El resolvedor del CMS devuelve de cada categoría
+   * lo justo para una puerta —id, slug y nombre—, así que la foto se cruza aquí
+   * con la lista que la vitrina ya tiene cargada: cero peticiones nuevas.
+   */
+  readonly categoryMedia: ComponentProps<typeof ContentBlocks>['categoryMedia']
+
+  /**
+   * Las páginas que el comercio publicó y marcó para el menú (P09).
+   *
+   * Las pinta `business-info`. Salen de la MISMA consulta que ya hace el pie
+   * —misma clave de caché—, así que encender la sección no cuesta una petición
+   * más. Y son las publicadas y vigentes: la función de base no devuelve
+   * borradores ni páginas fuera de su ventana.
+   */
+  readonly paginas: readonly { readonly slug: string; readonly title: string }[]
+
   readonly brands: ComponentProps<typeof BrandRow>['brands']
   readonly brandSelected: string | null
+
+  /**
+   * ¿Hay algo rebajado ahora mismo?
+   *
+   * Lo sabe la página, que ya lo consultó para su banda de ofertas. La portada
+   * editorial lo usa para decidir si enseña su puerta a las ofertas, y NO lo
+   * vuelve a preguntar: una segunda consulta para pintar un botón es una
+   * petición por visita.
+   */
+  readonly hayOfertas: boolean
 
   readonly favorites: ReadonlySet<string>
   readonly cargandoNovedades: boolean
@@ -98,6 +167,16 @@ export interface HomeSectionData {
    * por su cuenta es una dependencia que no se ve al leer el registro.
    */
   readonly destacadosAparte: boolean
+
+  /**
+   * ¿Está `brands` encendida como sección propia? (Storefront V3 · P07)
+   *
+   * La misma coordinación que `destacadosAparte`, y por el mismo motivo: las dos
+   * secciones de marcas salen de la misma lista, y con las dos encendidas la
+   * portada enseñaba dos veces lo mismo. `trust` se calla cuando `brands` ya lo
+   * dijo.
+   */
+  readonly marcasAparte: boolean
 }
 
 /**
@@ -111,6 +190,14 @@ export type HomeSectionRenderer = (
   data: HomeSectionData,
   /** El tope que la tienda configuró, si esta sección admite uno. */
   maxItems?: number,
+  /**
+   * Cómo se enseña esta sección (Storefront V3 · P06).
+   *
+   * Llega RESUELTA —sin `auto` y sin huecos— desde el compositor, que la calcula
+   * una vez con lo guardado y el tema. Una sección que no la use la ignora; el
+   * marco (superficie y ancho) lo pone el compositor de todas formas.
+   */
+  presentation?: ResolvedPresentation,
 ) => ReactNode
 
 export type HomeSectionRegistry = Readonly<Record<HomeSectionId, HomeSectionRenderer>>

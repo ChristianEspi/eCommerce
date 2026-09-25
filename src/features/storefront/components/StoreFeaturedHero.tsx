@@ -22,7 +22,7 @@ const INTERVALO_MS = 6000
  *
  * El hero anterior era un degradado con el lema del comercio. Se ve bonito y no
  * vende nada: no dice qué se compra, ni cuánto cuesta, ni por qué hoy. Una
- * botica en línea abre con una oferta concreta —producto, precio antes, precio
+ * tienda en línea abre con una oferta concreta —producto, precio antes, precio
  * ahora— porque eso es lo que hace entrar al catálogo.
  *
  * ## De dónde sale
@@ -86,6 +86,9 @@ export function StoreFeaturedHero({
       component="section"
       aria-roledescription="carousel"
       aria-label={t('store.hero.featured')}
+      // La otra mitad del contrato de `heroVariant`: esta es la composición
+      // orientada a producto. Ver `StoreHero` para la editorial.
+      data-hero-variant="product"
       onMouseEnter={() => setParado(true)}
       onMouseLeave={() => setParado(false)}
       onFocusCapture={() => setParado(true)}

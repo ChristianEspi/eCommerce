@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { UiError, codeFromDbError, type PostgrestLike } from '@/shared/lib/appError'
+import { optimizeImageFile } from '@/shared/lib/imageOptimizer'
 import { tryGetSupabaseClient } from '@/shared/lib/supabase'
 import {
   STORES_TABLE,
@@ -92,16 +93,31 @@ const SETTINGS_COLUMNS = [
 ]
 
 /**
- * Las tres columnas del Theme Engine, aparte.
+ * Las columnas de CONFIGURACIÓN DE VITRINA, aparte.
  *
  * ## Por qué no van en la lista de arriba sin más
  *
  * Porque PostgREST no ignora una columna que no existe: responde 400 con
- * `42703` y **la consulta entera se cae**. Con las tres dentro de la lista, una
+ * `42703` y **la consulta entera se cae**. Con estas dentro de la lista, una
  * base a la que todavía no se le ha aplicado la migración no deja abrir
  * Configuración: ni General, ni Marca, ni Impuestos. Una pantalla de ajustes
  * que muere porque una migración va por detrás es exactamente el fallo que un
  * despliegue en dos pasos produce, y no puede costar el backoffice entero.
+ *
+ * ## Por qué son UN grupo y no uno por migración
+ *
+ * Porque el error 42703 dice que FALTA UNA columna, no cuál — y leerlo del
+ * texto está prohibido en este repositorio con razón (`architecture.test.ts`:
+ * ramificar por el mensaje del servidor se rompe en cuanto cambia una palabra).
+ * Con un grupo hay UNA relectura y el resto de Configuración sigue sirviendo;
+ * con un grupo por migración habría que adivinar cuál falló o pagar una
+ * consulta de sondeo por grupo en cada apertura de la pantalla.
+ *
+ * La consecuencia se asume y se documenta: mientras falte CUALQUIERA de estas
+ * columnas, la pantalla de Diseño y el editor de propuestas de valor quedan
+ * apagados, aunque alguna de las otras sí exista. Es un estado transitorio de
+ * despliegue, y apagar una pantalla que no puede guardar es mejor que ofrecerla
+ * y perder lo que la persona escriba.
  *
  * ## Por qué aquí no vale el `*` que usa la vitrina
  *
@@ -111,7 +127,31 @@ const SETTINGS_COLUMNS = [
  * de verificación del dominio. La lista explícita es lo que mantiene esos tres
  * fuera del navegador, así que se queda.
  */
-const THEME_COLUMNS = ['theme_preset', 'storefront_style', 'home_layout'] as const
+const THEME_COLUMNS = [
+  'theme_preset',
+  'storefront_style',
+  'home_layout',
+  // Storefront V2 · P01. Contenido de portada, no marca blanca.
+  'value_props',
+  /**
+   * Storefront V3 · P01 · Identidad con roles semánticos.
+   *
+   * Entran en ESTE grupo y no en la lista general por lo mismo que las cuatro
+   * de arriba: hasta que su migración esté aplicada, pedirlas tumba la consulta
+   * entera con un 42703 y deja sin abrir toda la pantalla de Configuración.
+   *
+   * Y entran en el MISMO grupo, no en uno nuevo, porque el 42703 no dice qué
+   * columna falta: con dos grupos habría que adivinar cuál falló o pagar una
+   * consulta de sondeo por grupo en cada apertura. La consecuencia se asume —
+   * mientras falte cualquiera de las nueve, los controles que dependen de ellas
+   * quedan apagados— y es preferible a ofrecer campos que no se van a guardar.
+   */
+  'store_description',
+  'hero_kicker',
+  'brand_lockup',
+  'show_theme_toggle',
+  'announcement_messages',
+] as const
 
 const SETTINGS_SELECT = [...SETTINGS_COLUMNS, ...THEME_COLUMNS].join(', ')
 const SETTINGS_SELECT_SIN_TEMA = SETTINGS_COLUMNS.join(', ')
@@ -239,7 +279,7 @@ export async function saveStoreSettings(input: SaveSettingsInput): Promise<void>
     // vez de una capacidad. La policy no lo gatea; esto no lo gatea tampoco.
     //
     // La condición NO es de permisos: es de esquema. Si la base todavía no
-    // tiene las tres columnas, enviarlas devuelve 400 y se pierde también el
+    // tiene estas columnas, enviarlas devuelve 400 y se pierde también el
     // teléfono que la persona acababa de escribir. La pantalla de diseño está
     // apagada en ese caso, así que aquí no hay nada que guardar.
     ...(temaEnLaBase === false
@@ -248,6 +288,26 @@ export async function saveStoreSettings(input: SaveSettingsInput): Promise<void>
           theme_preset: values.theme_preset,
           storefront_style: values.storefront_style,
           home_layout: values.home_layout,
+          // Storefront V2 · P01 · CONTENIDO del comercio, no marca blanca: se
+          // envía siempre que la columna exista. Lo que la tienda no configura
+          // no se rellena aquí — la vitrina cae a lo que la plataforma puede
+          // afirmar de cualquier tienda. Ver `storefront/valueProps.ts`.
+          value_props: values.value_props,
+          /**
+           * Storefront V3 · P01 · Identidad con roles semánticos.
+           *
+           * Van en el mismo bloque condicionado por el esquema, no porque sean
+           * tema, sino porque comparten el grupo de columnas que una base sin
+           * la migración aplicada no tiene: enviarlas ahí devolvería 400 y se
+           * perdería de paso el teléfono que la persona acababa de escribir.
+           *
+           * Y son CONTENIDO del comercio, no marca blanca: no exigen addon.
+           */
+          store_description: orNull(values.store_description),
+          hero_kicker: orNull(values.hero_kicker),
+          brand_lockup: values.brand_lockup,
+          show_theme_toggle: values.show_theme_toggle,
+          announcement_messages: values.announcement_messages,
         }),
     // PREMIUM. Igual que `white_label` desde P02: sin la capacidad el campo NO
     // se envía, en vez de enviarse vacío. Guardar el teléfono de contacto no
@@ -291,26 +351,41 @@ export async function saveStoreSettings(input: SaveSettingsInput): Promise<void>
  * firma para ver es cada lado —el backoffice con la sesión del usuario, la
  * vitrina con el cliente anónimo— y cada uno bajo su propia policy.
  */
+/**
+ * El orden importa: primero se REDUCE y después se valida (V3 · P11).
+ *
+ * Al revés, una foto de teléfono de 6 MB se rechazaba por tamaño aunque
+ * reducida pesara ciento cincuenta kilobytes — y el comercio se quedaba sin
+ * foto, que es el peor resultado posible. Lo que se valida es lo que de verdad
+ * se va a subir.
+ *
+ * Y la ruta se construye con el tipo del archivo YA reducido: si la conversión
+ * acabó en WebP, la extensión del objeto tiene que decirlo.
+ */
 export async function uploadStoreAsset(input: {
   organizationId: string
   storeId: string
   kind: AssetKind
   file: File
 }): Promise<string> {
-  const validation = validateAssetFile(input.file)
+  // El logotipo se pinta a 44 px en el muro de marcas y a 120 en la cabecera;
+  // el banner es la única imagen que llega al ancho completo de la ventana.
+  const { file } = await optimizeImageFile(input.file, input.kind === 'logo' ? 'logo' : 'banner')
+
+  const validation = validateAssetFile(file)
   if (!validation.ok) throw new SettingsError(validation.key, 'ARCHIVO_INVALIDO')
 
   const path = buildAssetPath({
     organizationId: input.organizationId,
     storeId: input.storeId,
     kind: input.kind,
-    mimeType: input.file.type,
+    mimeType: file.type,
   })
 
   const { error } = await client()
     .storage.from(STORE_ASSETS_BUCKET)
-    .upload(path, input.file, {
-      contentType: input.file.type,
+    .upload(path, file, {
+      contentType: file.type,
       upsert: false,
       // Mismo criterio que las fotos de producto: ruta con uuid, contenido
       // inmutable, siete días de caché de navegador.

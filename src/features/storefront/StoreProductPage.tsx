@@ -13,7 +13,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material'
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAgreementPrice } from '@/features/pricing/useAgreementPrice'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -28,7 +28,9 @@ import { notFoundMeta, productMeta } from './seo'
 import { track } from './analytics'
 import { useAddToCart } from './cart/useAddToCart'
 import { ProductGallery } from './components/ProductGallery'
-import { ProductGrid } from './components/ProductGrid'
+import { ProductRow } from './components/ProductRow'
+import { StoreProductDetails } from './components/StoreProductDetails'
+import { StoreProductPurchaseBar } from './components/StoreProductPurchaseBar'
 import { QuantityStepper } from './components/QuantityStepper'
 import { VariantPicker } from './components/VariantPicker'
 import { useRelatedSections } from './relations'
@@ -202,8 +204,53 @@ export function StoreProductPage() {
   const available = item.in_stock !== false
   const hasVariants = item.kind === 'variant'
 
+  /**
+   * A dónde lleva el «ver todo» de las filas de sugerencias.
+   *
+   * Al catálogo filtrado por la familia del producto cuando la tiene: es a
+   * donde quiere ir quien descarta esto y busca otro parecido. Sin familia, al
+   * catálogo entero — y nunca a una lista inventada de «recomendados», que no
+   * existe como consulta.
+   */
+  /**
+   * El precio que se enseña en la ficha, calculado UNA vez (V3 · P10).
+   *
+   * Manda el acuerdo comercial si la sesión lo tiene; si no, el precio del
+   * producto —y con variantes, el «desde», porque el maestro puede costar 60 y
+   * la talla XL 70, y anunciar 60 a secas es un precio que no se va a cobrar.
+   *
+   * Sale a una constante porque ahora lo dicen DOS sitios: la columna de compra
+   * y la barra del teléfono. Calcularlo dos veces es cómo se acaba enseñando un
+   * número arriba y otro abajo.
+   */
+  const precioDeLaFicha = formatMoney(
+    conAcuerdo
+      ? conAcuerdo.amount
+      : Number(hasVariants ? (item.price_from ?? item.price) : item.price),
+    conAcuerdo?.currency ?? item.currency,
+    locale,
+  )
+
+  const salidaAlCatalogo = item.category_slug
+    ? `/s/${storeSlug}?c=${encodeURIComponent(item.category_slug)}`
+    : `/s/${storeSlug}?ver=todo`
+
   return (
-    <Stack sx={{ gap: { xs: 2.5, md: 4 } }}>
+    <Stack
+      sx={{
+        gap: { xs: 2.5, md: 4 },
+        /**
+         * Hueco para la barra de compra del teléfono (V3 · P10).
+         *
+         * Sin él, la barra tapa la última fila de sugerencias: una barra fija
+         * no ocupa sitio en el flujo, así que el sitio hay que dárselo. Va
+         * condicionado a que la barra exista —solo se pinta si se puede
+         * comprar— para no dejar un hueco en blanco al pie de un producto
+         * agotado.
+         */
+        pb: available ? { xs: 'calc(84px + env(safe-area-inset-bottom, 0px))', md: 0 } : 0,
+      }}
+    >
       {/* Migas ADEMÁS del «volver»: dicen dónde estás —de qué categoría cuelga
           esto— y no solo por dónde salir. La categoría es un enlace al catálogo
           ya filtrado, que es a donde se quiere ir tras descartar un producto. */}
@@ -244,33 +291,30 @@ export function StoreProductPage() {
           alignItems: 'start',
         }}
       >
-        {/* Cada mitad en su tarjeta: sobre el fondo desnudo, la foto y los datos
-            parecían dos cosas que están cerca por casualidad. */}
-        <Card
-          sx={{
-            p: { xs: 1.5, md: 2 },
-            borderRadius: 'var(--sf-radius)',
-            border: '1px solid var(--sf-line)',
-            boxShadow: 'var(--sf-shadow)',
-          }}
-        >
+        {/**
+         * La galería, SIN tarjeta (V3 · P10).
+         *
+         * Iba en una `Card` con borde y sombra, y con la columna de compra en
+         * otra la ficha se leía como dos paneles de backoffice puestos uno al
+         * lado del otro. Lo que une una foto con su precio no es que las dos
+         * tengan marco: es que están a la misma altura y comparten el aire.
+         *
+         * La caja no desaparece del todo —la galería tiene su propio fondo para
+         * el hueco de la imagen, que es lo que evita el salto al cargar— pero
+         * deja de dibujar un recuadro alrededor del producto.
+         */}
+        <Box data-pdp-gallery="true">
           <ProductGallery images={gallery.data ?? []} alt={item.name} />
-        </Card>
+        </Box>
 
         {/* La compra y la ficha de datos, en la MISMA columna y pegadas arriba.
             Antes los datos iban abajo a lo ancho y la columna de compra se
             quedaba flotando sobre medio metro de fondo vacio: la mirada acababa
             en un hueco justo al lado del boton que hay que pulsar. */}
-        <Stack sx={{ gap: 2, position: { md: 'sticky' }, top: { md: 88 } }}>
-        <Card
-          sx={{
-            p: { xs: 2, md: 2.5 },
-            borderRadius: 'var(--sf-radius)',
-            border: '1px solid var(--sf-line)',
-            boxShadow: 'var(--sf-shadow)',
-          }}
+        <Stack
+          data-pdp-purchase="true"
+          sx={{ gap: 1.25, position: { md: 'sticky' }, top: { md: 88 } }}
         >
-        <Stack sx={{ gap: 1.25 }}>
           {item.brand_name && (
             <Typography sx={{ fontSize: TS.label, fontWeight: 800, color: 'var(--accent-deep)' }}>
               {item.brand_name}
@@ -313,13 +357,7 @@ export function StoreProductPage() {
                 fontVariantNumeric: 'tabular-nums',
               }}
             >
-              {formatMoney(
-                conAcuerdo
-                  ? conAcuerdo.amount
-                  : Number(hasVariants ? (item.price_from ?? item.price) : item.price),
-                conAcuerdo?.currency ?? item.currency,
-                locale,
-              )}
+              {precioDeLaFicha}
             </Typography>
             {/* Con acuerdo, el tachado es el precio PÚBLICO —de eso se ahorra— y
                 no el `compare_at_price`, que es la referencia de la oferta
@@ -380,6 +418,12 @@ export function StoreProductPage() {
             available={available}
             variants={hasVariants ? (variants.data ?? []) : []}
             variantsPending={hasVariants && variants.isPending}
+            priceLabel={precioDeLaFicha}
+            {...(conAcuerdo
+              ? { priceNote: t('store.product.agreementPrice') }
+              : hasVariants && item.variant_count > 1
+                ? { priceNote: t('store.product.priceFrom') }
+                : {})}
           />
 
           {/* Las tres dudas que frenan un «anadir al carrito», justo donde se
@@ -410,78 +454,66 @@ export function StoreProductPage() {
           </Stack>
 
         </Stack>
-        </Card>
-
-        <Card
-          sx={{
-            p: { xs: 2, md: 2.5 },
-            borderRadius: 'var(--sf-radius)',
-            border: '1px solid var(--sf-line)',
-            boxShadow: 'var(--sf-shadow)',
-          }}
-        >
-          <Typography
-            component="h2"
-            sx={{
-              fontSize: TS.label,
-              fontWeight: 800,
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              color: 'var(--muted)',
-              mb: 1,
-            }}
-          >
-            {t('store.product.sheet')}
-          </Typography>
-          <Stack>
-            <SheetRow label={t('store.filter.brand')} value={item.brand_name} />
-            <SheetRow label={t('store.filter.category')} value={item.category_name} />
-            <SheetRow
-              label={t('store.product.availabilityLabel')}
-              value={
-                available ? t('store.availability.inStock') : t('store.availability.outOfStock')
-              }
-            />
-          </Stack>
-        </Card>
-        </Stack>
       </Box>
 
-      {/* La descripción, a lo ancho y debajo: es texto corrido, y en una columna
-          estrecha al lado de la foto se lee peor que en una línea larga. */}
-      <Card
-        sx={{
-          p: { xs: 2, md: 3 },
-          borderRadius: 'var(--sf-radius)',
-          border: '1px solid var(--sf-line)',
-          boxShadow: 'var(--sf-shadow)',
-        }}
-      >
-        <Typography
-          component="h2"
-          sx={{
-            fontSize: TS.label,
-            fontWeight: 800,
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-            color: 'var(--muted)',
-            mb: 1,
-          }}
-        >
-          {t('store.product.description')}
-        </Typography>
-        <Typography
-          sx={{
-            fontSize: 15,
-            color: item.description ? 'var(--text)' : 'var(--muted)',
-            whiteSpace: 'pre-line',
-            lineHeight: 1.7,
-            maxWidth: '72ch',
-          }}
-        >
-          {item.description?.trim() || t('store.product.noDescription')}
-        </Typography>
-      </Card>
+      {/**
+       * El detalle, plegado y debajo (V3 · P10).
+       *
+       * La descripción y la ficha de datos eran dos tarjetas con su rótulo en
+       * versalitas: en el teléfono, dos pantallas de texto entre el botón de
+       * comprar y las sugerencias. Plegadas, la información sigue entera y se
+       * elige cuál se abre.
+       *
+       * Y los apartados se construyen aquí, no dentro del componente: solo esta
+       * página sabe qué dato existe de verdad. Una descripción vacía no se
+       * ofrece —no hay apartado que decir «sin descripción»— y no hay ni un
+       * apartado de envíos o devoluciones, porque la plataforma no conoce esas
+       * políticas y escribirlas sería inventarlas.
+       */}
+      <StoreProductDetails
+        ariaLabel={t('store.product.detailsSection')}
+        panels={[
+          ...(item.description?.trim()
+            ? [
+                {
+                  id: 'description',
+                  title: t('store.product.description'),
+                  content: (
+                    <Typography
+                      sx={{
+                        fontSize: 15,
+                        color: 'var(--text)',
+                        whiteSpace: 'pre-line',
+                        lineHeight: 1.7,
+                        // Texto corrido a lo ancho de la página se lee peor que
+                        // en una línea larga pero acotada.
+                        maxWidth: '72ch',
+                      }}
+                    >
+                      {item.description.trim()}
+                    </Typography>
+                  ),
+                },
+              ]
+            : []),
+          {
+            id: 'sheet',
+            title: t('store.product.sheet'),
+            content: (
+              <Stack sx={{ maxWidth: '60ch' }}>
+                <SheetRow label={t('store.filter.brand')} value={item.brand_name} />
+                <SheetRow label={t('store.filter.category')} value={item.category_name} />
+                <SheetRow
+                  label={t('store.product.availabilityLabel')}
+                  value={
+                    available ? t('store.availability.inStock') : t('store.availability.outOfStock')
+                  }
+                />
+              </Stack>
+            ),
+          },
+        ]}
+      />
 
       {/* Opiniones (cierre): solo lo moderado, más la reseña propia con su
           estado. Ver `reviews/ProductReviews.tsx`. */}
@@ -496,46 +528,68 @@ export function StoreProductPage() {
         products={complete}
         storeSlug={storeSlug}
         thumbnails={relatedThumbs}
+        seeAllHref={salidaAlCatalogo}
       />
       <RelatedRow
         title={t('store.product.relations.upgrade')}
         products={upgrade}
         storeSlug={storeSlug}
         thumbnails={relatedThumbs}
+        seeAllHref={salidaAlCatalogo}
       />
       <RelatedRow
         title={t('store.product.related')}
         products={related}
         storeSlug={storeSlug}
         thumbnails={relatedThumbs}
+        seeAllHref={salidaAlCatalogo}
       />
     </Stack>
   )
 }
 
-/** Una fila de productos sugeridos. Sin productos no se pinta ni el título. */
+/**
+ * Una fila de productos sugeridos. Sin productos no se pinta ni el título.
+ *
+ * ## Por qué es una FILA y no una rejilla (V3 · P10)
+ *
+ * Usaba `ProductGrid`, la del catálogo: cuatro tarjetas a lo ancho con el
+ * mismo peso que los resultados de una búsqueda. Tres rejillas seguidas al pie
+ * de una ficha —completa, mejora, parecidos— son doce tarjetas que compiten con
+ * el producto que se está mirando.
+ *
+ * `ProductRow` es la fila de la portada, y trae tres cosas que aquí importan:
+ * se desplaza de lado en vez de crecer hacia abajo, su tarjeta y su ancho de
+ * hueco los decide el TEMA —así que en Premium son piezas editoriales y en
+ * Catalog compactas, sin una sola rama por tema aquí— y lleva su salida al
+ * catálogo.
+ *
+ * El destino de esa salida es el catálogo filtrado por la familia del producto
+ * cuando la tiene: es a donde quiere ir quien descarta esto y busca otro
+ * parecido. Sin familia, el catálogo entero.
+ */
 function RelatedRow({
   title,
   products,
   storeSlug,
   thumbnails,
+  seeAllHref,
 }: {
   title: string
   products: PublicProduct[]
   storeSlug: string
   thumbnails: Record<string, string>
+  seeAllHref: string
 }) {
   if (products.length === 0) return null
   return (
-    <Box component="section">
-      <Typography
-        component="h2"
-        sx={{ fontSize: { xs: 20, md: 24 }, fontWeight: 800, letterSpacing: '-0.02em', mb: 2 }}
-      >
-        {title}
-      </Typography>
-      <ProductGrid products={products} storeSlug={storeSlug} thumbnails={thumbnails} />
-    </Box>
+    <ProductRow
+      title={title}
+      products={products}
+      storeSlug={storeSlug}
+      thumbnails={thumbnails}
+      seeAllHref={seeAllHref}
+    />
   )
 }
 
@@ -584,11 +638,24 @@ function AddToCart({
   available,
   variants,
   variantsPending,
+  priceLabel,
+  priceNote,
 }: {
   product: PublicProduct
   available: boolean
   variants: PublicVariant[]
   variantsPending: boolean
+  /**
+   * El precio de la ficha, YA formateado (V3 · P10).
+   *
+   * Lo calcula la página, que es quien sabe del acuerdo comercial, del «desde»
+   * de las variantes y de la moneda. Llega hecho porque la barra del teléfono
+   * tiene que decir el MISMO número que la columna de arriba: calcularlo dos
+   * veces es cómo se acaba enseñando un precio en un sitio y otro en el otro.
+   */
+  priceLabel: string
+  /** «Desde», «precio de acuerdo»… si hace falta decirlo. */
+  priceNote?: string
 }) {
   const { t, locale } = useI18n()
   const { storeSlug } = useStorefront()
@@ -599,12 +666,60 @@ function AddToCart({
   const { selected, select } = useVariantChoice(variants, hasVariants)
   const canBuy = available && (!hasVariants || (selected !== null && selected.in_stock !== false))
 
+  /**
+   * El grupo de compra, para poder volver a él desde la barra del teléfono.
+   *
+   * Cuando hay variantes y no se ha elegido ninguna, la barra no puede añadir
+   * nada: lo honesto es llevar a donde se elige, no apagar un botón sin decir
+   * por qué.
+   */
+  const grupoDeCompra = useRef<HTMLDivElement | null>(null)
+
+  /** Añade al carrito con lo elegido, y cuenta el hecho una sola vez. */
+  function añadirAlCarrito() {
+    void agregar(product, quantity, selected)
+    // `add_to_cart` es el ÚNICO de los tres hechos de vitrina que corresponde a
+    // una decisión y no a una visita, y por eso se emite aquí y no en el
+    // carrito: el carrito se reescribe entero al recotizar (P07) y contar allí
+    // convertiría un refresco de precio en una intención de compra.
+    track(storeSlug, {
+      type: 'add_to_cart',
+      product_id: product.product_id,
+      ...(selected ? { variant_id: selected.variant_id } : {}),
+      quantity,
+    })
+  }
+
+  /** Lleva al selector de variante y deja el foco dentro. */
+  function irAElegir() {
+    const grupo = grupoDeCompra.current
+    if (!grupo) return
+    try {
+      grupo.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    } catch {
+      // jsdom no implementa `scrollIntoView`. Que no haya a dónde desplazarse
+      // no puede impedir que el foco llegue, que es la mitad que importa.
+    }
+    const primero = grupo.querySelector<HTMLElement>(
+      'button, [role="combobox"], select, input, [tabindex]:not([tabindex="-1"])',
+    )
+    primero?.focus()
+  }
+
   return (
-    // `role="group"` con nombre: la variante, la cantidad y el botón son UNA
-    // sola decisión, y anunciarlos sueltos deja al lector de pantalla leyendo
-    // tres controles sin relación. Además distingue este botón de los que ahora
-    // llevan las tarjetas de «también te puede interesar», que se llaman igual.
+    <>
+    {/* `role="group"` con nombre: la variante, la cantidad y el botón son UNA
+        sola decisión, y anunciarlos sueltos deja al lector de pantalla leyendo
+        tres controles sin relación. Además distingue este botón de los que ahora
+        llevan las tarjetas de «también te puede interesar», que se llaman igual.
+
+        Y va con llaves: dentro de un fragmento, `//` NO es un comentario — es
+        texto, y se pinta. Antes de V3 · P10 este mismo comentario estaba justo
+        después del `return (`, donde sí era código; al envolver el retorno en
+        un fragmento para añadir la barra de compra, pasó a ser contenido. Lo
+        cazó la matriz visual de P13 en la ficha, en los tres anchos. */}
     <Stack
+      ref={grupoDeCompra}
       role="group"
       aria-label={t('store.product.buyGroup')}
       sx={{ gap: 1.5, mt: 1 }}
@@ -644,24 +759,43 @@ function AddToCart({
             pending ? <CircularProgress size={16} color="inherit" /> : <ShoppingCartRoundedIcon />
           }
           disabled={!canBuy || pending}
-          onClick={() => {
-            void agregar(product, quantity, selected)
-            // `add_to_cart` es el ÚNICO de los tres hechos de vitrina que
-            // corresponde a una decisión y no a una visita, y por eso se emite
-            // aquí y no en el carrito: el carrito se reescribe entero al
-            // recotizar (P07) y contar allí convertiría un refresco de precio
-            // en una intención de compra.
-            track(storeSlug, {
-              type: 'add_to_cart',
-              product_id: product.product_id,
-              ...(selected ? { variant_id: selected.variant_id } : {}),
-              quantity,
-            })
-          }}
+          onClick={añadirAlCarrito}
         >
           {t('store.product.addToCart')}
         </Button>
       </Stack>
     </Stack>
+
+    {/**
+      * La barra de compra del teléfono (V3 · P10).
+      *
+      * Vive aquí y no en la página, y esa es la decisión que importa: el precio
+      * de la variante elegida, la cantidad, si se puede comprar y el propio
+      * `agregar` ya están en este componente. Sacarla arriba habría obligado a
+      * subir ese estado y a tener DOS caminos hacia el carrito — y dos caminos
+      * con dos reglas es cómo se acaba cobrando un precio distinto del que se
+      * enseñó.
+      *
+      * No se pinta si no se puede comprar por STOCK: una barra pegada abajo con
+      * un botón apagado ocupa sitio para no ofrecer nada. Sí se pinta cuando
+      * falta elegir variante, porque ahí tiene algo que hacer: llevar a
+      * elegirla.
+      */}
+    {available ? (
+      <StoreProductPurchaseBar
+        priceLabel={
+          selected ? formatMoney(Number(selected.price), selected.currency, locale) : priceLabel
+        }
+        // El nombre de la variante elegida —«Talla XL»— dice más que «desde»,
+        // y cuando no hay ninguna elegida vale la nota de la página.
+        note={selected?.name ?? priceNote}
+        ctaLabel={canBuy ? t('store.product.addToCart') : t('store.product.chooseOptions')}
+        onCta={canBuy ? añadirAlCarrito : irAElegir}
+        pending={pending}
+        // Elegida y agotada: no hay nada que añadir ni nada que elegir.
+        disabled={hasVariants && selected !== null && selected.in_stock === false}
+      />
+    ) : null}
+    </>
   )
 }
