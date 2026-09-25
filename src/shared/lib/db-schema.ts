@@ -75,6 +75,13 @@ export const INVOICE_ITEMS_TABLE = 'invoice_items' satisfies TableName
 export const INVOICE_ISSUE_STATUS_VIEW = 'invoice_issue_status'
 /** Pide emitir un comprobante completo; el tenant sale de la fila, no del cliente. */
 export const INVOICE_REQUEST_ISSUE_RPC = 'invoice_request_issue'
+// --- Alta desde EBIM MasterAdmin (20260924120000) ---------------------------
+// Sin `satisfies`: la migracion aun no esta aplicada en el proyecto enlazado.
+/**
+ * El administrador que MasterAdmin dejo PREPROVISIONED reclama su tenant. Sin
+ * argumentos: usuario, organizacion, sociedad y correo salen del JWT.
+ */
+export const CLAIM_PROVISIONED_TENANT_RPC = 'claim_provisioned_tenant'
 
 export const QUOTES_TABLE = 'quotes' satisfies TableName
 export const QUOTE_ITEMS_TABLE = 'quote_items' satisfies TableName

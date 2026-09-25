@@ -42,6 +42,14 @@ verify_jwt = false
 [functions.create-order]
 verify_jwt = false
 
+# Alta M2M desde EBIM MasterAdmin (contrato GENERIC v1). La autentica un JWT
+# ES256 de MasterAdmin, no un JWT de Supabase: con el flag puesto el gateway lo
+# rechazaria antes de llegar. La funcion verifica firma, iss, aud, sub, vida y
+# scope ANTES de crear el cliente con service_role, y sin configuracion responde
+# 503 a todo (fail-closed).
+[functions.platform-provisioning]
+verify_jwt = false
+
 [functions.catalog-product]
 verify_jwt = true
 
