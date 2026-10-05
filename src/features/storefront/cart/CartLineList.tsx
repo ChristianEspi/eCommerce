@@ -227,10 +227,28 @@ function CartLineRow({
             onChange={(next) => setQuantity(line.product_id, next, line.variant_id)}
           />
 
-          {/* La papelera se va al otro extremo. Pegada al «+» convertia un
-              dedo torpe en una linea borrada, y deshacer eso es volver a
-              buscar el producto. */}
-          <Box sx={{ flex: 1 }} />
+        </Stack>
+      </Stack>
+
+      {/* Importe arriba y acciones abajo, en la MISMA columna y pegadas al
+          borde derecho (2026-10-05). Antes las acciones vivían en la columna
+          del medio, cuyo ancho cambia con lo largo del importe («S/ 2,199.60»
+          frente a «S/ 39.90»): cada línea las ponía en otro sitio. La
+          papelera sigue lejos del «+»: pegada a él, un dedo torpe borraba la
+          línea. */}
+      <Stack
+        sx={{
+          alignSelf: 'stretch',
+          alignItems: 'flex-end',
+          justifyContent: 'space-between',
+          gap: 1,
+          flexShrink: 0,
+        }}
+      >
+        <Typography sx={{ fontWeight: 800, fontSize: TS.bodyStrong, whiteSpace: 'nowrap' }}>
+          {formatMoney(precio.amount * line.quantity, precio.currency, locale)}
+        </Typography>
+        <Stack direction="row" sx={{ alignItems: 'center', gap: 0.25, mr: -0.75 }}>
           {/* Guardar para después sin perderlo: el corazón deja el producto en
               favoritos y la línea sigue donde estaba. */}
           <IconButton
@@ -253,10 +271,6 @@ function CartLineRow({
           </IconButton>
         </Stack>
       </Stack>
-
-      <Typography sx={{ fontWeight: 800, fontSize: TS.bodyStrong, whiteSpace: 'nowrap' }}>
-        {formatMoney(precio.amount * line.quantity, precio.currency, locale)}
-      </Typography>
     </Stack>
   )
 }

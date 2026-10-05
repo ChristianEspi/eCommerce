@@ -1926,6 +1926,20 @@
 .sf-scope[data-store-theme='retail'] .sf-qv-detail .MuiButton-endIcon {
   display: none;
 }
+/* 2026-10-05 · Es un ENLACE subrayado: al pasar, ni fondo ni pastilla (el
+   rosado del botón con contorno lo convertía en un bloque de color). Se
+   engrosa y se separa el subrayado, como el resto de enlaces del estilo. */
+.sf-scope[data-store-theme='retail'] .sf-qv-detail:hover {
+  background: transparent;
+  border: 0;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 5px;
+}
+.sf-scope[data-store-theme='retail'] .sf-qv-detail:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
 .sf-scope[data-store-theme='retail'] .sf-qv-desc {
   padding: 16px 0 0;
   border-top: 1px solid var(--sf-line);

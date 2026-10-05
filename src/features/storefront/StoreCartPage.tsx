@@ -8,6 +8,7 @@ import { PageHeader } from '@/shared/ui/PageHeader'
 import { EmptyState } from '@/shared/ui/states'
 import { TS } from '@/theme/tokens'
 import { CartLineList } from './cart/CartLineList'
+import { CartPurchaseInfo } from './cart/CartPurchaseInfo'
 import { BuyerTermsNotice } from './commerce/BuyerTermsNotice'
 import { RequestQuoteButton } from './cart/RequestQuoteButton'
 import { ScheduleCartButton } from './cart/ScheduleCartButton'
@@ -183,6 +184,9 @@ export function StoreCartPage() {
               {t('store.cart.continue')}
             </Button>
           </Stack>
+
+          {/* 2026-10-05 · Cómo se paga y cómo llega, antes de ir al pago. */}
+          <CartPurchaseInfo storeId={store.store_id} />
         </Card>
       </Box>
     </>
