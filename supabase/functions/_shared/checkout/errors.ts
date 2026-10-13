@@ -64,6 +64,10 @@ const STAGE_CODE_STATUS: Record<string, ErrorStatus> = {
   CANAL_NO_DISPONIBLE: 409,
   CANAL_NO_PUBLICO: 403,
   CANAL_EXIGE_SESION: 401,
+  // lifecycle.v1: la cuenta de la tienda está suspendida. La primera escritura
+  // del checkout (el intento, la reserva) la frena el guardián de la base,
+  // ANTES de autorizar ningún cobro.
+  TENANT_SUSPENDED: 423,
   // La tienda no vende a quien no ha entrado. 401 y no 403: falta la sesion,
   // no el permiso — es exactamente el caso en el que el cliente debe mandar a
   // iniciar sesion y reintentar.
