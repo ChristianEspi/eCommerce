@@ -11,6 +11,18 @@ el recorrido SaaS P00–P17 queda cerrado)
 > (`claude-saas-opus/config/phases.json`), que se identifica siempre como «P0x-SaaS». No son la misma
 > serie: el P12 histórico es el framework de integraciones; el P12-SaaS es fulfillment y devoluciones.
 
+## Suspensión y reactivación desde EBIM MasterAdmin — `lifecycle.v1` (2026-10-13)
+
+- Rutas `PUT|GET /platform-provisioning/tenants/{id}/lifecycle` (scopes `ecommerce:lifecycle:write|read`),
+  migración `20261013100000_tenant_lifecycle.sql`. Detalle, configuración y exenciones en
+  `docs/platform-provisioning/LIFECYCLE.md`.
+- `SUSPENDED`: un trigger en las 162 tablas de negocio rechaza toda escritura (`TENANT_SUSPENDED`,
+  SQLSTATE `PT423` → HTTP 423); lectura, exportación y login siguen; vitrina con catálogo de solo
+  lectura y «Tienda no disponible temporalmente»; backoffice con «Cuenta suspendida». Exenta solo
+  `api_requests`. `tenants.status` NO se usa (cerraría la lectura).
+- Pruebas: `tenant-lifecycle-db.test.ts`, `platform-lifecycle-contract.test.ts`,
+  `src/features/tenant/lifecycle.test.ts`.
+
 ## Promoción a QAS (2026-11-15, a pedido del operador: «sube a qas todo»)
 
 - `origin/dev` y `origin/qas` en `7843a8a` (avance rápido, sin merge): libreta de direcciones en el
