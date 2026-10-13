@@ -130,14 +130,14 @@ La cifra de existencias nunca sale: `anon` lee `products.in_stock` —columna ge
 
 ### 1.6 La superficie anónima es una lista cerrada — PASS *(nuevo en P16)*
 
-`anon` puede ejecutar exactamente **25** funciones de `public`, cada una clasificada y justificada
-en el propio test. Una vigesimosexta pone la suite roja.
+`anon` puede ejecutar exactamente **30** funciones de `public`, cada una clasificada y justificada
+en el propio test. Una trigésima primera pone la suite roja.
 
 | Clase | Cuántas | Qué las protege |
 |---|---|---|
-| `publicado` | 14 | solo leen lo que la tienda ya publica (incluidas relaciones de producto y reseñas moderadas); la autoridad es la RLS |
-| `secreto` | 8 | exigen un token de 256 bits (pedido, carrito, devolución), un código de 96 (tarjeta regalo) o el secreto de baja de 244 bits de un recordatorio de carrito |
-| `techo` | 2 | escriben o revelan, y llevan límite de tasa desde P16 (§3.6) |
+| `publicado` | 17 | solo leen lo que la tienda ya publica (incluidas relaciones de producto y reseñas moderadas, y el booleano «tienda operativa» de lifecycle.v1); la autoridad es la RLS |
+| `secreto` | 9 | exigen un token de 256 bits (pedido, carrito, devolución), un código de 96 (tarjeta regalo) o el secreto de baja de 244 bits de un recordatorio de carrito |
+| `techo` | 3 | escriben o revelan, y llevan límite de tasa desde P16 (§3.6) |
 | `recogido` | 1 | escribe sin poder llevar techo —sería negar la venta— y por eso lo que escribe se recoge (§3.7) |
 
 > **Corrección de esta fase.** `cart_open` estaba clasificada como `secreto`
