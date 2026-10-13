@@ -109,6 +109,7 @@ export const es = {
     'store.footer.deals': "Ofertas del día",
     'store.footer.helpTitle': "Atención al cliente",
     'store.footer.helpColumn': "Ayuda",
+    'store.categories.seeAll': "Ver todo",
     'settings.help.title': 'Atención al cliente y datos legales',
     'settings.help.subtitle': 'Aparecen en el pie de la tienda y en la hoja del Libro de Reclamaciones.',
     'settings.help.legalName': 'Razón social',

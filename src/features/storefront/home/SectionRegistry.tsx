@@ -325,6 +325,7 @@ export const HOME_SECTIONS: HomeSectionRegistry = {
       return (
         <StoreUniversalHero
           storeSlug={data.storeSlug}
+          storeId={data.store.store_id}
           departments={data.categorias}
           promotions={data.promociones}
           promoAssets={data.promoAssets}

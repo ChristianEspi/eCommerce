@@ -1,10 +1,12 @@
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded'
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded'
 import { Box, ButtonBase, Stack, Typography } from '@mui/material'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { iconoDe } from '../categoryIcon'
+import { usePublicCategories } from '../hooks'
+import type { PublicCategory } from '../types'
 import { offerBadge, vigenciaTexto } from '../offer'
 import type { StorePromotion } from '../promotions'
 import type { ResolvedValueProp } from '../valueProps'
@@ -29,6 +31,7 @@ import { ProductMedia } from './ProductMedia'
  */
 export function StoreUniversalHero({
   storeSlug,
+  storeId,
   departments,
   promotions,
   promoAssets = {},
@@ -40,6 +43,8 @@ export function StoreUniversalHero({
   fallback,
 }: {
   storeSlug: string
+  /** Para leer las subcategorías del panel (misma consulta, ya en caché, que la cabecera). */
+  storeId: string
   departments: readonly { readonly category_id: string; readonly name: string; readonly slug: string }[]
   promotions: readonly StorePromotion[]
   promoAssets?: Record<string, string>
@@ -52,11 +57,37 @@ export function StoreUniversalHero({
   fallback: ReactNode
 }) {
   const { t } = useI18n()
+  const { data: todas } = usePublicCategories(storeId)
+  const hijasDe = (id: string) => (todas ?? []).filter((c) => c.parent_id === id)
+  const [abierta, setAbierta] = useState<string | null>(null)
+  const raiz = useRef<HTMLDivElement | null>(null)
+
+  // Se cierra con Escape y al pulsar fuera: un panel que solo se cierra con su
+  // propio botón es una trampa con el teclado.
+  useEffect(() => {
+    if (!abierta) return
+    const fuera = (event: MouseEvent) => {
+      if (!raiz.current?.contains(event.target as Node)) setAbierta(null)
+    }
+    const tecla = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setAbierta(null)
+    }
+    document.addEventListener('mousedown', fuera)
+    document.addEventListener('keydown', tecla)
+    return () => {
+      document.removeEventListener('mousedown', fuera)
+      document.removeEventListener('keydown', tecla)
+    }
+  }, [abierta])
+
+  const familiaAbierta = departments.find((dep) => dep.category_id === abierta) ?? null
 
   return (
     <Box
+      ref={raiz}
       data-hero-layout="universal"
       sx={{
+        position: 'relative',
         display: 'grid',
         gap: 2,
         gridTemplateColumns: {
@@ -80,33 +111,67 @@ export function StoreUniversalHero({
         >
           {departments.slice(0, 10).map((dep) => {
             const Icono = iconoDe(dep.name)
+            // Con subcategorías, la familia ABRE su panel (lámina del menú);
+            // sin ellas, es un enlace directo y no lleva flecha.
+            const desplegable = hijasDe(dep.category_id).length > 0
+            const activa = abierta === dep.category_id
             return (
               <Box
                 key={dep.category_id}
-                component={Link}
-                to={`/s/${storeSlug}?c=${encodeURIComponent(dep.slug)}`}
+                {...(desplegable
+                  ? {
+                      component: 'button',
+                      type: 'button',
+                      'aria-expanded': activa,
+                      'aria-controls': activa ? 'sf-uni-flyout' : undefined,
+                      onClick: () => setAbierta(activa ? null : dep.category_id),
+                    }
+                  : { component: Link, to: `/s/${storeSlug}?c=${encodeURIComponent(dep.slug)}` })}
+                className="sf-uni-dep"
+                data-active={activa || undefined}
                 sx={{
+                  width: '100%',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 1.25,
                   px: 2,
                   py: 1,
-                  color: 'var(--text)',
+                  border: 0,
+                  bgcolor: activa ? 'var(--neutral-soft)' : 'transparent',
+                  color: activa ? 'var(--accent-deep)' : 'var(--text)',
                   textDecoration: 'none',
+                  textAlign: 'left',
+                  font: 'inherit',
                   fontSize: 14,
-                  fontWeight: 500,
+                  fontWeight: activa ? 700 : 500,
+                  cursor: 'pointer',
                   '&:hover': { bgcolor: 'var(--neutral-soft)', color: 'var(--accent-deep)' },
+                  '&:focus-visible': { outline: '2px solid var(--accent-deep)', outlineOffset: -2 },
                 }}
               >
-                <Icono sx={{ fontSize: 18, color: 'var(--muted)' }} />
+                <Icono sx={{ fontSize: 18, color: activa ? 'var(--accent-deep)' : 'var(--muted)' }} />
                 <Box component="span" sx={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {dep.name}
                 </Box>
-                <ChevronRightRoundedIcon aria-hidden sx={{ fontSize: 18, color: 'var(--muted)' }} />
+                {desplegable ? (
+                  <ChevronRightRoundedIcon
+                    aria-hidden
+                    sx={{ fontSize: 18, color: activa ? 'var(--accent-deep)' : 'var(--muted)' }}
+                  />
+                ) : null}
               </Box>
             )
           })}
         </Box>
+      ) : null}
+
+      {familiaAbierta ? (
+        <PanelDeFamilia
+          familia={familiaAbierta}
+          hijas={hijasDe(familiaAbierta.category_id)}
+          nietasDe={hijasDe}
+          storeSlug={storeSlug}
+        />
       ) : null}
 
       {promotions.length > 0 ? (
@@ -312,6 +377,114 @@ function Banner({
           ))}
         </Stack>
       ) : null}
+    </Box>
+  )
+}
+
+/**
+ * El panel de una familia (lámina del menú, 2026-10-13).
+ *
+ * Se abre a la derecha de la barra lateral, ENCIMA del banner, al pulsar la
+ * familia. Con subcategorías de dos niveles, una columna por subcategoría con
+ * su lista y «Ver todo →» (como la lámina: Ropa · Superficies · Cocina y
+ * baño); con un solo nivel, la lista de subcategorías y «Ver todo» de la
+ * familia. La profundidad la decide el comercio, no este componente.
+ */
+function PanelDeFamilia({
+  familia,
+  hijas,
+  nietasDe,
+  storeSlug,
+}: {
+  familia: { readonly category_id: string; readonly name: string; readonly slug: string }
+  hijas: readonly PublicCategory[]
+  nietasDe: (id: string) => readonly PublicCategory[]
+  storeSlug: string
+}) {
+  const { t } = useI18n()
+  const enlace = (slug: string) => `/s/${storeSlug}?c=${encodeURIComponent(slug)}`
+  const conColumnas = hijas.some((hija) => nietasDe(hija.category_id).length > 0)
+  const verTodo = (slug: string, etiqueta: string) => (
+    <Box
+      component={Link}
+      to={enlace(slug)}
+      sx={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 0.5,
+        mt: 1,
+        fontSize: 13,
+        fontWeight: 700,
+        color: 'var(--accent-deep)',
+        textDecoration: 'none',
+        '&:hover': { textDecoration: 'underline' },
+      }}
+    >
+      {etiqueta}
+      <ArrowForwardRoundedIcon aria-hidden sx={{ fontSize: 15 }} />
+    </Box>
+  )
+  const item = (c: PublicCategory) => (
+    <Box
+      key={c.category_id}
+      component={Link}
+      to={enlace(c.slug)}
+      sx={{
+        display: 'block',
+        py: 0.6,
+        fontSize: 13.5,
+        color: 'var(--muted)',
+        textDecoration: 'none',
+        '&:hover': { color: 'var(--accent-deep)', textDecoration: 'underline' },
+      }}
+    >
+      {c.name}
+    </Box>
+  )
+
+  return (
+    <Box
+      id="sf-uni-flyout"
+      role="region"
+      aria-label={familia.name}
+      className="sf-uni-flyout"
+      sx={{
+        position: 'absolute',
+        zIndex: 4,
+        top: 0,
+        bottom: 0,
+        left: 'calc(220px + 16px)',
+        width: conColumnas ? 'min(680px, calc(100% - 236px))' : 'min(360px, calc(100% - 236px))',
+        display: { xs: 'none', lg: 'block' },
+        overflowY: 'auto',
+        p: 3,
+        bgcolor: 'var(--card)',
+        border: '1px solid var(--sf-line)',
+        borderRadius: 'var(--sf-radius)',
+        boxShadow: '0 18px 40px -20px rgba(16, 24, 40, .35)',
+      }}
+    >
+      {conColumnas ? (
+        <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
+          {hijas.map((hija) => (
+            <Box key={hija.category_id}>
+              <Typography component="h3" sx={{ fontSize: 15, fontWeight: 800, mb: 1 }}>
+                {hija.name}
+              </Typography>
+              {nietasDe(hija.category_id).map(item)}
+              {verTodo(hija.slug, t('store.categories.seeAll'))}
+            </Box>
+          ))}
+        </Box>
+      ) : (
+        <Box>
+          <Typography component="h3" sx={{ fontSize: 15, fontWeight: 800, mb: 1 }}>
+            {familia.name}
+          </Typography>
+          {hijas.map(item)}
+          {verTodo(familia.slug, `${t('store.categories.seeAll')} ${familia.name}`)}
+        </Box>
+      )}
     </Box>
   )
 }

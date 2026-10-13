@@ -955,6 +955,15 @@
   }
 }
 
+/* En la PORTADA las familias viven en la barra lateral (lámina 2026-10-13):
+   la segunda fila sobra. Solo donde la lateral se ve (lg); por debajo, la fila
+   es la forma de navegar y se queda. */
+@media (min-width: 1200px) {
+  .sf-scope[data-store-theme='universal']:has([data-hero-layout='universal']) .sf-catnav {
+    display: none;
+  }
+}
+
 /* Marca: iniciales en un cuadrado del acento, letras blancas. */
 .sf-scope[data-store-theme='universal'] .sf-brand-initials {
   background: var(--accent-deep);

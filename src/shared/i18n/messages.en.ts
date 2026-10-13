@@ -107,6 +107,7 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.footer.deals': "Today's deals",
     'store.footer.helpTitle': "Customer care",
     'store.footer.helpColumn': "Help",
+    'store.categories.seeAll': "See all",
     'settings.help.title': 'Customer care and legal details',
     'settings.help.subtitle': 'Shown in the store footer and on the Complaints Book form.',
     'settings.help.legalName': 'Legal name',
