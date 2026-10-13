@@ -807,6 +807,10 @@ export function StoreProductPage() {
           variant={choice.selected}
           complements={complete}
           thumbnails={relatedThumbs}
+          mainImage={
+            galleryForVariant(gallery.data ?? [], variants.data ?? [], choice.selected).find((image) => image.url)
+              ?.url ?? null
+          }
           storeSlug={storeSlug}
           canBuy={puedeComprar}
         />

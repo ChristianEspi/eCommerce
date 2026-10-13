@@ -1,5 +1,6 @@
 import AddRoundedIcon from '@mui/icons-material/AddRounded'
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded'
+import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined'
 import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined'
 import ShoppingCartRoundedIcon from '@mui/icons-material/ShoppingCartRounded'
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined'
@@ -262,13 +263,17 @@ export function FrequentlyBoughtTogether({
   variant,
   complements,
   thumbnails,
+  mainImage,
   storeSlug,
   canBuy,
 }: {
   product: PublicProduct
   variant: PublicVariant | null
   complements: readonly PublicProduct[]
+  /** Mapa `ruta de imagen -> URL firmada` (`useThumbnails`), no por id. */
   thumbnails: Record<string, string>
+  /** La foto que la galería enseña AHORA (la de la variante elegida). */
+  mainImage: string | null
   storeSlug: string
   canBuy: boolean
 }) {
@@ -282,6 +287,12 @@ export function FrequentlyBoughtTogether({
     { item: product, price: precioPrincipal, name: variant ? `${product.name} · ${variant.name}` : product.name },
     ...otros.map((item) => ({ item, price: Number(item.price), name: item.name })),
   ]
+  const fotoDe = (pieza: (typeof piezas)[number], index: number): string | null =>
+    index === 0
+      ? (mainImage ?? (product.primary_image_path ? (thumbnails[product.primary_image_path] ?? null) : null))
+      : pieza.item.primary_image_path
+        ? (thumbnails[pieza.item.primary_image_path] ?? null)
+        : null
   const total = piezas.reduce((suma, pieza) => suma + pieza.price, 0)
   const cuantos = String(piezas.length)
 
@@ -326,15 +337,19 @@ export function FrequentlyBoughtTogether({
                   placeItems: 'center',
                 }}
               >
-                {thumbnails[pieza.item.product_id] ? (
+                {fotoDe(pieza, index) ? (
                   <Box
                     component="img"
-                    src={thumbnails[pieza.item.product_id]}
+                    src={fotoDe(pieza, index) ?? undefined}
                     alt=""
                     loading="lazy"
                     sx={{ width: '100%', height: '100%', objectFit: 'contain' }}
                   />
-                ) : null}
+                ) : (
+                  // Sin foto cargada: un marcador, no un recuadro vacío que
+                  // parece una imagen que no terminó de llegar.
+                  <ImageOutlinedIcon aria-hidden sx={{ fontSize: 24, color: 'var(--muted)', opacity: 0.6 }} />
+                )}
               </Box>
               <Box sx={{ minWidth: 0 }}>
                 <Typography
