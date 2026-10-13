@@ -159,6 +159,8 @@ describe('lo que se publica y lo que no', () => {
       'loader_url', 'loader_animation',
       // 2026-10-04 · Videos del carrusel de la portada.
       'home_videos',
+      // 2026-10-13 · Cuotas que anuncia la ficha.
+      'installments',
     ])
   })
 })

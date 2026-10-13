@@ -33,6 +33,14 @@ import { notFoundMeta, productMeta } from './seo'
 import { track } from './analytics'
 import { useAddToCart } from './cart/useAddToCart'
 import { PriceTiers } from './components/PriceTiers'
+import {
+  DeliveryAside,
+  FrequentlyBoughtTogether,
+  InstallmentLine,
+  ProductHighlights,
+  StoreAvailability,
+} from './components/ProductDetailBlocks'
+import { installmentFor, readInstallments, useProductDetail } from './productDetail'
 import { ProductGallery } from './components/ProductGallery'
 import { ProductRow } from './components/ProductRow'
 import { StoreProductDetails } from './components/StoreProductDetails'
@@ -108,6 +116,13 @@ export function StoreProductPage() {
   // La variante elegida vive en la pagina y no en la caja de compra: la
   // galeria tambien la necesita, para ensenar las fotos de ESE color.
   const choice = useVariantChoice(variants.data ?? [], product.data?.kind === 'variant')
+  // La ficha completa (2026-10-13): SKU, destacados, especificaciones, stock
+  // por tienda y entrega. Con variante elegida, el SKU y el stock son SUYOS.
+  const detail = useProductDetail(
+    storeSlug,
+    product.data?.product_id ?? null,
+    choice.selected?.variant_id ?? null,
+  )
 
   /**
    * El precio del acuerdo, si quien mira tiene uno.
@@ -231,6 +246,29 @@ export function StoreProductPage() {
   const discount = discountPercent(item)
   const available = item.in_stock !== false
   const hasVariants = item.kind === 'variant'
+  const extra = detail.data ?? null
+  const sku = extra?.sku ?? item.sku ?? null
+  /**
+   * Las cuotas sobre el precio que el comprador va a pagar: el del acuerdo, el
+   * de la variante elegida o el de la ficha. Sin configuración, nada.
+   */
+  const plan = installmentFor(
+    readInstallments(store.installments),
+    conAcuerdo
+      ? conAcuerdo.amount
+      : Number(choice.selected?.price ?? (hasVariants ? (item.price_from ?? item.price) : item.price)),
+  )
+  /** Lo que entra en «Frecuentemente comprados juntos» y no se repite abajo. */
+  const juntos = universal
+    ? new Set(
+        curated.sections.complete
+          .filter((p) => p.kind !== 'variant' && p.in_stock !== false)
+          .slice(0, 2)
+          .map((p) => p.product_id),
+      )
+    : new Set<string>()
+  const puedeComprar =
+    available && (!hasVariants || (choice.selected !== null && choice.selected.in_stock !== false))
   const esFavorito = favorites.ids.has(item.product_id)
   /**
    * Lámina 31 · Cuánto se ahorra, dicho en dinero y no solo en porcentaje.
@@ -279,8 +317,23 @@ export function StoreProductPage() {
     <Stack>
       {/* El SKU solo cuando llega: no todas las lecturas públicas lo traen, y
           una fila fija con «—» diría que no tiene código. */}
-      {item.sku ? <SheetRow label="SKU" value={item.sku} /> : null}
+      {sku ? <SheetRow label="SKU" value={sku} /> : null}
       <SheetRow label={t('store.filter.brand')} value={item.brand_name} />
+      {/* Las especificaciones que el comercio cargó en la pestaña «Ficha» del
+          producto (atributos que no son eje de variante), en su orden. */}
+      {(extra?.specs ?? []).map((spec) => (
+        <SheetRow
+          key={spec.label}
+          label={spec.label}
+          value={
+            spec.type === 'boolean'
+              ? spec.value === 'true'
+                ? t('store.product.specs.yes')
+                : t('store.product.specs.no')
+              : spec.value
+          }
+        />
+      ))}
       <SheetRow label={t('store.filter.category')} value={item.category_name} />
       <SheetRow
         label={t('store.product.availabilityLabel')}
@@ -510,6 +563,8 @@ export function StoreProductPage() {
                   },
                 })}
           />
+          {/* Lo destacado, bajo las fotos (lámina de ficha). */}
+          <ProductHighlights items={extra?.highlights ?? []} />
         </Box>
 
         {/* La compra y la ficha de datos, en la MISMA columna y pegadas arriba.
@@ -522,12 +577,12 @@ export function StoreProductPage() {
         >
           {/* Marca y SKU en una línea: el comprador de empresa verifica por
               código, y en Catálogo es lo primero que busca. */}
-          {(item.brand_name || item.sku) && (
+          {(item.brand_name || sku) && (
             <Typography
               data-pdp-eyebrow
               sx={{ fontSize: TS.label, fontWeight: 700, color: 'var(--accent-deep)', letterSpacing: '0.04em' }}
             >
-              {[item.brand_name, item.sku ? `SKU ${item.sku}` : null].filter(Boolean).join('  ·  ')}
+              {[item.brand_name, sku ? `SKU ${sku}` : null].filter(Boolean).join('  ·  ')}
             </Typography>
           )}
           {/* La categoría YA la dicen las migas, y allí además es un enlace al
@@ -618,6 +673,8 @@ export function StoreProductPage() {
             ) : null}
           </Stack>
 
+          <InstallmentLine plan={plan} currency={conAcuerdo?.currency ?? item.currency} />
+
           {/* Por qué ese precio y no el de la etiqueta. Sin esta línea, un
               número más bajo que el del catálogo parece un error de la tienda
               —o peor, un precio que va a cambiar en la caja. */}
@@ -692,6 +749,7 @@ export function StoreProductPage() {
           />
 
           {universal ? null : confianza}
+          {universal ? null : <StoreAvailability stores={extra?.stores ?? []} />}
 
           {/* Rediseño v3 · Retail: guardar como botón bajo la compra y el
               detalle plegado en la misma columna (lámina de ficha). */}
@@ -710,13 +768,11 @@ export function StoreProductPage() {
           {retail ? <Box className="sf-pdp-details">{detalles}</Box> : null}
         </Stack>
 
-        {/* Universal · la tercera columna: entrega, pago y stock en tarjeta. */}
+        {/* Universal · la tercera columna: entrega, tiendas, quién vende y el
+            envío gratis (lámina de ficha, 2026-10-13). */}
         {universal ? (
-          <Box className="sf-pdp-aside" sx={{ gridColumn: { md: '1 / -1', lg: 'auto' } }}>
-            {confianza}
-            <Typography className="sf-pdp-soldby" sx={{ fontSize: TS.label, color: 'var(--muted)' }}>
-              {t('store.product.soldBy').replace('{name}', store.name)}
-            </Typography>
+          <Box sx={{ gridColumn: { md: '1 / -1', lg: 'auto' } }}>
+            <DeliveryAside detail={extra} currency={item.currency} storeName={store.name} />
           </Box>
         ) : null}
       </Box>
@@ -745,9 +801,19 @@ export function StoreProductPage() {
 
       {/* Primero lo que completa la compra —es lo que suma al carrito que ya se
           está decidiendo—, después la mejora y al final lo parecido. */}
+      {universal ? (
+        <FrequentlyBoughtTogether
+          product={item}
+          variant={choice.selected}
+          complements={complete}
+          thumbnails={relatedThumbs}
+          storeSlug={storeSlug}
+          canBuy={puedeComprar}
+        />
+      ) : null}
       <RelatedRow
         title={t('store.product.relations.complete')}
-        products={complete}
+        products={complete.filter((p) => !juntos.has(p.product_id))}
         storeSlug={storeSlug}
         thumbnails={relatedThumbs}
         seeAllHref={salidaAlCatalogo}

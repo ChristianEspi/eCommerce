@@ -1,3 +1,4 @@
+import CreditCardRoundedIcon from '@mui/icons-material/CreditCardRounded'
 import SupportAgentRoundedIcon from '@mui/icons-material/SupportAgentRounded'
 import HourglassTopRoundedIcon from '@mui/icons-material/HourglassTopRounded'
 import VideoLibraryRoundedIcon from '@mui/icons-material/VideoLibraryRounded'
@@ -54,6 +55,7 @@ import { StorefrontDesignSection } from './settings/StorefrontDesignSection'
 import { TaxesSection } from './settings/TaxesSection'
 import { StoreIdentitySection } from './settings/StoreIdentitySection'
 import { HelpContactSection } from './settings/HelpContactSection'
+import { InstallmentsSection } from './settings/InstallmentsSection'
 import { LoaderSection } from './settings/LoaderSection'
 import { HomeVideosSection } from './settings/HomeVideosSection'
 import { useFeedback } from '@/shared/ui/feedback-context'
@@ -579,6 +581,14 @@ export function SettingsPage() {
                       subtitle={t('settings.help.subtitle')}
                     >
                       <HelpContactSection storeId={storeId} canManage={canManage} />
+                    </SectionCard>
+                    {/* 2026-10-13 · Cuotas que anuncia la ficha: su propio guardado. */}
+                    <SectionCard
+                      icon={<CreditCardRoundedIcon />}
+                      title={t('settings.installments.title')}
+                      subtitle={t('settings.installments.subtitle')}
+                    >
+                      <InstallmentsSection storeId={storeId} canManage={canManage} />
                     </SectionCard>
                   </Stack>
                 )}

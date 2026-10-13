@@ -34,6 +34,7 @@ import { ProductImagesPanel } from './ProductImagesPanel'
 import { StorePublicationsPanel } from './StorePublicationsPanel'
 import { BundlePanel } from './pim/BundlePanel'
 import { ProductAttributesPanel } from './pim/ProductAttributesPanel'
+import { ProductHighlightsPanel } from './pim/ProductHighlightsPanel'
 import { RelationsPanel } from './pim/RelationsPanel'
 import { UomsPanel } from './pim/UomsPanel'
 import { VariantsPanel } from './pim/VariantsPanel'
@@ -683,6 +684,7 @@ export function ProductDrawer({
         <BundlePanel product={pimProduct} products={products} {...scope} />
       )}
       {active === 'unidades' && <UomsPanel product={pimProduct} {...scope} />}
+      {active === 'ficha' && product && <ProductHighlightsPanel productId={product.id} canWrite={canWrite} />}
       {active === 'ficha' && <ProductAttributesPanel product={pimProduct} {...scope} />}
       {active === 'relacionados' && (
         <RelationsPanel product={pimProduct} products={products} {...scope} />

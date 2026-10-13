@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -7963,6 +7963,7 @@ export type Database = {
           description: string | null
           family_id: string | null
           gtin: string | null
+          highlights: string[]
           id: string
           in_stock: boolean | null
           kind: Database["public"]["Enums"]["product_kind"]
@@ -7992,6 +7993,7 @@ export type Database = {
           description?: string | null
           family_id?: string | null
           gtin?: string | null
+          highlights?: string[]
           id?: string
           in_stock?: boolean | null
           kind?: Database["public"]["Enums"]["product_kind"]
@@ -8021,6 +8023,7 @@ export type Database = {
           description?: string | null
           family_id?: string | null
           gtin?: string | null
+          highlights?: string[]
           id?: string
           in_stock?: boolean | null
           kind?: Database["public"]["Enums"]["product_kind"]
@@ -10476,6 +10479,7 @@ export type Database = {
           hero_title: string | null
           home_layout: Json
           home_videos: Json
+          installments: Json | null
           legal_name: string | null
           loader_animation: string
           loader_url: string | null
@@ -10530,6 +10534,7 @@ export type Database = {
           hero_title?: string | null
           home_layout?: Json
           home_videos?: Json
+          installments?: Json | null
           legal_name?: string | null
           loader_animation?: string
           loader_url?: string | null
@@ -10584,6 +10589,7 @@ export type Database = {
           hero_title?: string | null
           home_layout?: Json
           home_videos?: Json
+          installments?: Json | null
           legal_name?: string | null
           loader_animation?: string
           loader_url?: string | null
@@ -12543,6 +12549,7 @@ export type Database = {
           hero_title: string | null
           home_layout: Json | null
           home_videos: Json | null
+          installments: Json | null
           legal_name: string | null
           loader_animation: string | null
           loader_url: string | null
@@ -13715,6 +13722,14 @@ export type Database = {
         Returns: Json
       }
       product_deletion_usage: { Args: { p_product_id: string }; Returns: Json }
+      product_detail_for_slug: {
+        Args: {
+          p_product_id: string
+          p_store_slug: string
+          p_variant_id?: string
+        }
+        Returns: Json
+      }
       product_price_tiers_for_slug: {
         Args: { p_product_id: string; p_store_slug: string }
         Returns: Json

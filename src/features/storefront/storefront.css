@@ -2327,12 +2327,10 @@
   border-radius: var(--sf-btn-radius);
 }
 /* La columna derecha: UNA tarjeta con filas separadas y el vendedor al pie. */
+/* La columna de la derecha son tarjetas sueltas (entrega, quién vende, envío
+   gratis): cada una lleva su borde, la columna no. */
 .sf-scope[data-store-theme='universal'] .sf-pdp-aside {
   align-self: start;
-  border: 1px solid var(--sf-line);
-  border-radius: var(--sf-radius);
-  background: var(--card);
-  overflow: hidden;
 }
 .sf-scope[data-store-theme='universal'] .sf-pdp-aside [data-pdp-trust] {
   border: 0;
@@ -2344,10 +2342,6 @@
 .sf-scope[data-store-theme='universal'] .sf-pdp-aside [data-pdp-trust] li > [aria-hidden] {
   background: transparent;
   color: var(--accent-deep);
-}
-.sf-scope[data-store-theme='universal'] .sf-pdp-soldby {
-  padding: 12px 14px;
-  border-top: 1px solid var(--sf-line);
 }
 /* Especificaciones: tabla a lo ancho con filas alternas. */
 .sf-scope[data-store-theme='universal'] [data-product-details] .sf-sheet-row {

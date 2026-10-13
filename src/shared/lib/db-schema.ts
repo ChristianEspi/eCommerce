@@ -476,6 +476,9 @@ export const RESOLVE_ORDER_LINES_RPC = 'resolve_order_lines_for_slug'
 // los tipos: la red mientras tanto es
 // `supabase/tests/storefront-product-relations.test.ts`.
 export const PRODUCT_RELATIONS_PUBLIC_RPC = 'product_relations_for_slug'
+// 2026-10-13 · La ficha completa: SKU, destacados, especificaciones, stock por
+// tienda (estado) y entrega. Red: `supabase/tests/product-detail-extras.test.ts`.
+export const PRODUCT_DETAIL_PUBLIC_RPC = 'product_detail_for_slug'
 // --- fin relaciones ----------------------------------------------------------
 
 // --- Cierre · reseñas y valoraciones (20260914141000) -----------------------

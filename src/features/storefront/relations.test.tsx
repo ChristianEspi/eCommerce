@@ -120,6 +120,9 @@ function renderFicha(fake: FakeSupabase) {
   )
 }
 
+/** Donde Universal pinta los complementos curados (venta cruzada, accesorio, repuesto). */
+const COMPLEMENTOS = 'Frecuentemente comprados juntos'
+
 async function seccion(nombre: string): Promise<HTMLElement> {
   const heading = await screen.findByRole('heading', { name: nombre, level: 2 })
   return heading.closest('section') as HTMLElement
@@ -138,7 +141,10 @@ describe('relaciones curadas en la ficha', () => {
     ])
     renderFicha(fake)
 
-    expect(within(await seccion('Completa tu compra')).getByText('Cojín de lana')).toBeInTheDocument()
+    // Universal (el tema por defecto) junta los complementos en «Frecuentemente
+    // comprados juntos» con el producto abierto (lámina de ficha, 2026-10-13).
+    expect(within(await seccion(COMPLEMENTOS)).getByText('Cojín de lana')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Completa tu compra' })).not.toBeInTheDocument()
     expect(within(await seccion('Mejora tu elección')).getByText('Butaca de roble')).toBeInTheDocument()
     const relacionados = await seccion('También te puede interesar')
     expect(within(relacionados).getByText('Mesa de roble')).toBeInTheDocument()
@@ -173,7 +179,7 @@ describe('relaciones curadas en la ficha', () => {
   it('solo accesorios curados: salen en su fila y el relleno no los repite', async () => {
     renderFicha(backend(() => [{ related_product_id: P_LINO, relation_kind: 'accessory', position: 0 }]))
 
-    expect(within(await seccion('Completa tu compra')).getByText('Silla de lino')).toBeInTheDocument()
+    expect(within(await seccion(COMPLEMENTOS)).getByText('Silla de lino')).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'También te puede interesar' })).not.toBeInTheDocument())
   })
 })
