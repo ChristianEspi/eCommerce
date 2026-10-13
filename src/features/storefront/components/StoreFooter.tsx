@@ -10,10 +10,13 @@ import { Link } from 'react-router-dom'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { R, TS } from '@/theme/tokens'
 import { initials } from '../branding'
-import { resolveStoreDescription, sanitizeSocialLinks, whatsappHref, type SocialNetwork } from '../identity'
+import type { StoreNavigationItem } from '../content'
+import { resolveStoreDescription, sanitizeSocialLinks, whatsappHref, type SocialLink, type SocialNetwork } from '../identity'
 import { usePublicCategories, useStoreNavigation } from '../hooks'
 import { useStorefrontTheme } from '../theme/useStorefrontTheme'
-import type { PublicStore } from '../types'
+import { usePaymentMethods } from '../payment'
+import type { PublicCategory, PublicStore } from '../types'
+import { StoreBrandLockup } from './StoreBrandLockup'
 
 /**
  * El pie de la tienda.
@@ -63,7 +66,7 @@ import type { PublicStore } from '../types'
  */
 export function StoreFooter({ store, storeSlug }: { store: PublicStore; storeSlug: string }) {
   const { t } = useI18n()
-  const { style } = useStorefrontTheme()
+  const { style, preset } = useStorefrontTheme()
   const { data: pages } = useStoreNavigation(storeSlug)
   const { data: categories } = usePublicCategories(store.store_id)
 
@@ -119,6 +122,27 @@ export function StoreFooter({ store, storeSlug }: { store: PublicStore; storeSlu
   const paginas = organizado ? empresa : (pages ?? []).slice(0, 6)
   const firmaLegal = store.legal_name?.trim() || nombre
   const reclamos = `/s/${storeSlug}/libro-de-reclamaciones`
+
+  // Universal (lámina 2026-10-13): marca a la izquierda y cuatro columnas de
+  // tienda grande. Las mismas piezas que el pie organizado, en su orden.
+  if (organizado && preset === 'universal') {
+    return (
+      <PieUniversal
+        store={store}
+        storeSlug={storeSlug}
+        nombre={nombre}
+        descripcion={descripcion}
+        familias={familias}
+        empresa={empresa}
+        legales={legales}
+        whatsapp={whatsapp}
+        horario={horario}
+        redes={redes}
+        firmaLegal={firmaLegal}
+        reclamos={reclamos}
+      />
+    )
+  }
 
   if (organizado) {
     return (
@@ -452,6 +476,197 @@ export function StoreFooter({ store, storeSlug }: { store: PublicStore; storeSlu
 }
 
 /** Una columna del pie: su rótulo y lo que lleve debajo. */
+/**
+ * El pie de Universal (lámina 2026-10-13).
+ *
+ * Marca y descripción a la izquierda; Departamentos (las familias), Compra,
+ * Ayuda (lo legal) y Empresa (las páginas de la tienda y el Libro de
+ * Reclamaciones); y un bloque de atención con WhatsApp, horario y redes donde
+ * la lámina pone un boletín, que la tienda todavía no tiene. Abajo, la firma
+ * legal y los medios de pago REALES de la tienda.
+ */
+function PieUniversal({
+  store,
+  storeSlug,
+  nombre,
+  descripcion,
+  familias,
+  empresa,
+  legales,
+  whatsapp,
+  horario,
+  redes,
+  firmaLegal,
+  reclamos,
+}: {
+  store: PublicStore
+  storeSlug: string
+  nombre: string
+  descripcion: string | null
+  familias: readonly PublicCategory[]
+  empresa: readonly StoreNavigationItem[]
+  legales: readonly StoreNavigationItem[]
+  whatsapp: string | null
+  horario: string | null
+  redes: readonly SocialLink[]
+  firmaLegal: string
+  reclamos: string
+}) {
+  const { t } = useI18n()
+  const { style } = useStorefrontTheme()
+  const pagos = usePaymentMethods(store.store_id)
+  const medios = (pagos.data ?? []).map((medio) => medio.display_name)
+
+  return (
+    <Container
+      maxWidth={false}
+      component="footer"
+      data-content-width={style.contentWidth}
+      data-footer-layout="universal"
+      className="sf-footer"
+      sx={{ maxWidth: 'var(--sf-content-w)', mx: 'auto', pb: 3, pt: 'var(--sf-section-gap-md)' }}
+    >
+      <Box
+        sx={{
+          display: 'grid',
+          gap: { xs: 3, md: 4 },
+          gridTemplateColumns: {
+            xs: '1fr',
+            sm: 'repeat(2, minmax(0, 1fr))',
+            md: 'minmax(0, 1.4fr) repeat(4, minmax(0, 1fr)) minmax(0, 1.3fr)',
+          },
+        }}
+      >
+        <Stack sx={{ gap: 1.5 }}>
+          <StoreBrandLockup store={store} storeSlug={storeSlug} size="md" />
+          {descripcion ? (
+            <Typography sx={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.5, maxWidth: 260 }}>{descripcion}</Typography>
+          ) : null}
+        </Stack>
+
+        {familias.length > 0 ? (
+          <BloqueDelPie titulo={t('store.footer.departments')}>
+            <Stack component="nav" aria-label={t('store.footer.departments')} sx={{ gap: 0.75 }}>
+              {familias.slice(0, 5).map((familia) => (
+                <EnlaceDelPie key={familia.category_id} to={`/s/${storeSlug}?c=${encodeURIComponent(familia.slug)}`}>
+                  {familia.name}
+                </EnlaceDelPie>
+              ))}
+            </Stack>
+          </BloqueDelPie>
+        ) : null}
+
+        <BloqueDelPie titulo={t('store.footer.shop')}>
+          <Stack component="nav" aria-label={t('store.footer.shop')} sx={{ gap: 0.75 }}>
+            <EnlaceDelPie to={`/s/${storeSlug}?ver=todo&oferta=1`}>{t('store.footer.deals')}</EnlaceDelPie>
+            <EnlaceDelPie to={`/s/${storeSlug}?ver=todo#marcas`}>{t('store.nav.brands')}</EnlaceDelPie>
+            <EnlaceDelPie to={`/s/${storeSlug}/account#pedidos`}>{t('store.footer.orders')}</EnlaceDelPie>
+            <EnlaceDelPie to={`/s/${storeSlug}/register`}>{t('store.footer.register')}</EnlaceDelPie>
+          </Stack>
+        </BloqueDelPie>
+
+        {legales.length > 0 ? (
+          <BloqueDelPie titulo={t('store.footer.helpColumn')}>
+            <Stack component="nav" aria-label={t('store.footer.helpColumn')} sx={{ gap: 0.75 }}>
+              {legales.map((item) => (
+                <EnlaceDelPie key={item.slug} to={`/s/${storeSlug}/p/${item.slug}`}>
+                  {item.title}
+                </EnlaceDelPie>
+              ))}
+            </Stack>
+          </BloqueDelPie>
+        ) : null}
+
+        <BloqueDelPie titulo={t('store.footer.company')}>
+          <Stack component="nav" aria-label={t('store.footer.company')} sx={{ gap: 0.75 }}>
+            {empresa.map((item) => (
+              <EnlaceDelPie key={item.slug} to={`/s/${storeSlug}/p/${item.slug}`}>
+                {item.title}
+              </EnlaceDelPie>
+            ))}
+            <EnlaceDelPie to={reclamos}>{t('store.complaints.book')}</EnlaceDelPie>
+          </Stack>
+        </BloqueDelPie>
+
+        <Stack sx={{ gap: 1.25 }} data-footer-help>
+          <Typography component="h2" sx={{ fontSize: 16, fontWeight: 800 }}>
+            {t('store.footer.helpTitle')}
+          </Typography>
+          {whatsapp ? (
+            <Typography sx={{ fontSize: 13.5 }}>
+              {t('store.footer.whatsapp')}:{' '}
+              {whatsappHref(whatsapp) ? (
+                <EnlaceDelPie href={whatsappHref(whatsapp) as string}>{whatsapp}</EnlaceDelPie>
+              ) : (
+                whatsapp
+              )}
+            </Typography>
+          ) : null}
+          {horario ? (
+            <Typography sx={{ fontSize: 13, color: 'var(--muted)', whiteSpace: 'pre-line' }}>{horario}</Typography>
+          ) : null}
+          {redes.length > 0 ? (
+            <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap', mt: 0.5 }}>
+              {redes.map((red) => (
+                <Box
+                  key={red.network}
+                  component="a"
+                  href={red.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={t('store.footer.social').replace('{network}', NOMBRE_RED[red.network])}
+                  sx={{
+                    width: 34,
+                    height: 34,
+                    display: 'grid',
+                    placeItems: 'center',
+                    borderRadius: '50%',
+                    border: '1px solid var(--sf-line)',
+                    color: 'var(--text)',
+                    '&:hover': { bgcolor: 'var(--text)', color: 'var(--sf-band)' },
+                    '& svg': { fontSize: 17, width: 17, height: 17 },
+                  }}
+                >
+                  <IconoRed network={red.network} />
+                </Box>
+              ))}
+            </Stack>
+          ) : null}
+        </Stack>
+      </Box>
+
+      <Box aria-hidden className="sf-footer-mark" data-mark={nombre} sx={{ display: 'none' }} />
+
+      <Stack
+        direction={{ xs: 'column', md: 'row' }}
+        sx={{
+          justifyContent: 'space-between',
+          gap: 1,
+          mt: 'var(--sf-section-gap-md)',
+          pt: 2,
+          borderTop: '1px solid var(--sf-line)',
+          fontSize: TS.label,
+          color: 'var(--muted)',
+        }}
+      >
+        <Typography sx={{ fontSize: 'inherit', color: 'inherit' }}>
+          {[
+            `© ${new Date().getFullYear()} ${firmaLegal}`,
+            store.tax_id?.trim() ? `${t('store.footer.taxId')} ${store.tax_id.trim()}` : null,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </Typography>
+        {medios.length > 0 ? (
+          <Typography sx={{ fontSize: 'inherit', color: 'inherit' }} aria-label={t('store.cart.info.payments')}>
+            {medios.join(' · ')}
+          </Typography>
+        ) : null}
+      </Stack>
+    </Container>
+  )
+}
+
 function BloqueDelPie({ titulo, children }: { titulo: string; children: ReactNode }) {
   return (
     <Stack sx={{ gap: 1, minWidth: 0 }}>

@@ -96,6 +96,9 @@ export function StoreBrandLockup({
         // vez de plantar el isotipo de la suite como si fuera su marca.
         <Box
           aria-hidden
+          // Enganche para que el estilo pinte las iniciales (universal: azul
+          // lleno con letras blancas, como su lámina).
+          className="sf-brand-initials"
           sx={{
             width: altura + 4,
             height: altura + 4,

@@ -53,6 +53,7 @@ import {
   useCatalogPages,
   usePublicCategories,
   usePublicStore,
+  useStoreNavigation,
   type StorefrontOutlet,
 } from './hooks'
 import { useFavorites } from './useFavorites'
@@ -567,8 +568,13 @@ function StoreHeader({ store, storeSlug }: { store: PublicStore; storeSlug: stri
                 está en TODAS las pantallas de la tienda. En el teléfono baja a
                 su propia fila —ver abajo—, porque a 360 px no cabe junto al
                 logotipo y el carrito sin dejar los tres apretados. */}
+            {/* Las páginas de la tienda y «Mi pedido»: solo los pinta el estilo
+                que los pide (universal, lámina 2026-10-13), con `sf-hdr-links`.
+                El buscador sigue en la fila: ningún estilo esconde la búsqueda. */}
+            <HeaderLinks storeSlug={storeSlug} />
+
             {!enMovil && (
-              <Box sx={{ display: 'flex', flex: 1, minWidth: 0, mx: compacta ? 0.5 : 1 }}>
+              <Box className="sf-header-search-slot" sx={{ display: 'flex', flex: 1, minWidth: 0, mx: compacta ? 0.5 : 1 }}>
                 {buscador}
               </Box>
             )}
@@ -591,6 +597,43 @@ function StoreHeader({ store, storeSlug }: { store: PublicStore; storeSlug: stri
           Estaban a media portada: para cambiar de familia habia que volver
           arriba, y desde una ficha de producto no habia forma de llegar. */}
       <StoreCategories storeSlug={storeSlug} storeId={store.store_id} />
+    </Box>
+  )
+}
+
+/**
+ * Enlaces de la primera fila (Universal, lámina 2026-10-13): las páginas de la
+ * tienda marcadas para el menú —«Nuestras tiendas», «Empresas», «Ayuda»— y
+ * «Mi pedido». Salen de la navegación del CMS, no de una lista escrita aquí: la
+ * tienda que no tiene páginas solo enseña «Mi pedido».
+ *
+ * Ocultos por defecto (`sf-hdr-links`); los enciende el estilo en escritorio.
+ */
+function HeaderLinks({ storeSlug }: { storeSlug: string }) {
+  const { t } = useI18n()
+  const { pathname } = useLocation()
+  const { data } = useStoreNavigation(storeSlug)
+  const paginas = (data ?? []).filter((item) => item.kind !== 'legal').slice(0, 3)
+  const enlaces = [
+    ...paginas.map((item) => ({ to: `/s/${storeSlug}/p/${item.slug}`, label: item.title })),
+    { to: `/s/${storeSlug}/account#pedidos`, label: t('store.hdr.myOrder') },
+  ]
+  return (
+    <Box component="nav" aria-label={t('store.hdr.links')} className="sf-hdr-links" sx={{ display: 'none' }}>
+      {enlaces.map((enlace) => {
+        const actual = pathname === enlace.to.split('#')[0]
+        return (
+          <Box
+            key={enlace.to}
+            component={Link}
+            to={enlace.to}
+            aria-current={actual ? 'page' : undefined}
+            className="sf-hdr-link"
+          >
+            {enlace.label}
+          </Box>
+        )
+      })}
     </Box>
   )
 }
@@ -679,7 +722,10 @@ function HeaderAction({
   trailing,
   menu,
   extra,
+  kicker,
 }: {
+  /** Una línea encima del nombre («Hola, inicia sesión»). Oculta salvo en el estilo que la pide. */
+  kicker?: string
   icon: ReactNode
   label: string
   badge?: number
@@ -763,6 +809,11 @@ function HeaderAction({
       </Badge>
       {!iconOnly && (
         <Box component="span" className="sf-hdr-label" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+          {kicker ? (
+            <Box component="span" aria-hidden className="sf-hdr-kicker" sx={{ display: 'none' }}>
+              {kicker}
+            </Box>
+          ) : null}
           {label}
           {/* La cifra junto al texto solo la enseña el estilo que no pinta el
               icono (premium: «Bolsa (2)»); el resto la lleva en la insignia. */}
@@ -890,6 +941,7 @@ function AccountButton({ storeSlug }: { storeSlug: string }) {
       state={{ from: `${location.pathname}${location.search}` }}
       icon={<LoginRoundedIcon />}
       label={t('store.signIn')}
+      kicker={t('store.hdr.hello')}
       tone="account"
     />
   )

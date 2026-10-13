@@ -836,7 +836,10 @@
   }
 }
 
-/* ---- UNIVERSAL · gran superficie: buscador ancho, carrito con importe --- */
+/* ---- UNIVERSAL · gran superficie (lámina 2026-10-13) ---------------------
+   Fila 1: marca, enlaces de la tienda y acciones; el carrito es un botón
+   verde con el importe. El buscador sigue en la fila, compacto: la lámina lo
+   lleva al cuerpo de la portada, pero ningún estilo esconde la búsqueda. */
 .sf-scope[data-store-theme='universal'] .sf-header [role='search'] {
   max-width: none;
 }
@@ -859,40 +862,149 @@
 .sf-scope[data-store-theme='universal'] .sf-search .sf-search-submit-label {
   display: none;
 }
-.sf-scope[data-store-theme='universal'] .sf-catnav .sf-catnav-all {
-  display: flex;
-  background: var(--text);
-  color: var(--card);
-}
-.sf-scope[data-store-theme='universal'] .sf-catnav .sf-catnav-door[data-door='offers'] {
-  border-left: 0;
-  margin-left: 4px;
-  padding: 4px 12px;
-  border-radius: var(--sf-pill);
-  background: var(--accent-soft);
-}
 @media (min-width: 900px) {
+  /* Enlaces de la tienda: texto plano, el actual subrayado en el acento. */
+  .sf-scope[data-store-theme='universal'] .sf-hdr-links {
+    display: flex;
+    flex: 1;
+    justify-content: center;
+    gap: 28px;
+    align-self: stretch;
+  }
+  .sf-scope[data-store-theme='universal'] .sf-header .sf-header-search-slot {
+    flex: 0 1 340px;
+  }
+  .sf-scope[data-store-theme='universal'] .sf-hdr-link {
+    display: flex;
+    align-items: center;
+    padding: 0 6px;
+    font-size: 14.5px;
+    font-weight: 500;
+    color: var(--muted);
+    text-decoration: none;
+    border-bottom: 3px solid transparent;
+  }
+  .sf-scope[data-store-theme='universal'] .sf-hdr-link:hover {
+    color: var(--text);
+  }
+  .sf-scope[data-store-theme='universal'] .sf-hdr-link[aria-current='page'] {
+    color: var(--accent-deep);
+    font-weight: 700;
+    border-bottom-color: var(--accent);
+  }
+  .sf-scope[data-store-theme='universal'] .sf-hdr-link:focus-visible {
+    outline: 2px solid var(--accent-deep);
+    outline-offset: -2px;
+  }
+
+  /* Acciones sin pastilla de color: iconos de línea, como la lámina. */
+  .sf-scope[data-store-theme='universal'] .sf-hdr-action .sf-hdr-icon {
+    background: transparent;
+    color: var(--accent-deep);
+  }
+  .sf-scope[data-store-theme='universal'] .sf-hdr-action[data-tone='favorite'] .sf-hdr-label {
+    display: none;
+  }
+  /* Cuenta: avatar redondo en el acento y dos líneas, «Hola, inicia sesión /
+     Entrar». */
+  .sf-scope[data-store-theme='universal'] .sf-hdr-action[data-tone='account'] .sf-hdr-icon {
+    background: var(--accent);
+    color: #fff;
+  }
+  .sf-scope[data-store-theme='universal'] .sf-hdr-action[data-tone='account'] .sf-hdr-label {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1.2;
+    font-size: 13.5px;
+    font-weight: 800;
+  }
+  .sf-scope[data-store-theme='universal'] .sf-hdr-kicker {
+    display: block;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--muted);
+  }
+
+  /* Carrito: botón verde con el importe; sin artículos, «Carrito». */
   .sf-scope[data-store-theme='universal'] .sf-hdr-action[data-tone='cart'] {
-    background: var(--accent-deep);
+    background: var(--sf-buy);
     color: #fff;
     border-radius: var(--sf-btn-radius);
-    padding: 6px 14px 6px 8px;
+    padding: 6px 16px 6px 10px;
+    margin-left: 4px;
   }
   .sf-scope[data-store-theme='universal'] .sf-hdr-action[data-tone='cart']:hover {
-    background: color-mix(in srgb, var(--accent-deep) 88%, #000);
+    background: var(--sf-buy-deep);
   }
   .sf-scope[data-store-theme='universal'] .sf-hdr-action[data-tone='cart'] .sf-hdr-icon {
+    background: transparent;
     color: #fff;
   }
   .sf-scope[data-store-theme='universal'] .sf-hdr-action[data-tone='cart'] .MuiBadge-badge {
     background: #fff;
-    color: var(--accent-deep);
-    border-color: var(--accent-deep);
+    color: var(--sf-buy-deep);
+    border-color: var(--sf-buy);
+  }
+  .sf-scope[data-store-theme='universal'] .sf-hdr-action[data-tone='cart']:has(.sf-hdr-cart-total) .sf-hdr-label {
+    display: none;
   }
   .sf-scope[data-store-theme='universal'] .sf-hdr-cart-total {
     display: inline;
     font-weight: 800;
   }
+}
+
+/* Marca: iniciales en un cuadrado del acento, letras blancas. */
+.sf-scope[data-store-theme='universal'] .sf-brand-initials {
+  background: var(--accent-deep);
+  color: #fff;
+  font-size: 14px;
+}
+
+/* Fila 2: «Todas las categorías» en el acento, familias en texto plano y
+   «Ofertas del día» como pastilla amarilla a la derecha. */
+.sf-scope[data-store-theme='universal'] .sf-catnav .sf-catnav-all {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: var(--sf-btn-radius);
+  background: var(--accent-deep);
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.sf-scope[data-store-theme='universal'] .sf-catnav .sf-catnav-icon {
+  display: none;
+}
+.sf-scope[data-store-theme='universal'] .sf-catnav .sf-catnav-item {
+  font-weight: 600;
+  color: var(--text);
+}
+.sf-scope[data-store-theme='universal'] .sf-catnav nav {
+  align-items: center;
+}
+.sf-scope[data-store-theme='universal'] .sf-catnav .sf-catnav-door[data-door='offers'] {
+  margin-left: auto;
+  border-left: 0;
+  padding: 6px 14px;
+  border-radius: var(--sf-pill);
+  background: var(--sf-deal);
+  color: var(--sf-deal-fg);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.sf-scope[data-store-theme='universal'] .sf-catnav .sf-catnav-door[data-door='offers']::before {
+  content: '\2726';
+  margin-right: 6px;
+}
+.sf-scope[data-store-theme='universal'] .sf-catnav .sf-catnav-door[data-door='brands'] {
+  display: none;
 }
 
 /* ---- CATÁLOGO · barra de trabajo: buscador con botón en tinta ----------- */
@@ -1962,6 +2074,11 @@
 .sf-scope {
   --sf-deal: #ffd60a;
   --sf-deal-fg: #16191f;
+  /* El verde de COMPRAR (botón del carrito, «Comprar ahora», «Gratis»):
+     semántico como el amarillo. Oscuro a propósito: con texto blanco da AA
+     (5,0:1); el verde claro del diseño se quedaba en 2,6:1. */
+  --sf-buy: #15803d;
+  --sf-buy-deep: #116632;
 }
 
 /* ---- Universal · títulos de sección: el título y «Ver más ›» en el acento -- */
