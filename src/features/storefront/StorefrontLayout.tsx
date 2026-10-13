@@ -47,6 +47,7 @@ import { CheckoutHeader } from './components/CheckoutHeader'
 import { StoreBrandLockup } from './components/StoreBrandLockup'
 import { StoreQuickSearch } from './components/StoreQuickSearch'
 import { StoreBottomBar } from './components/StoreBottomBar'
+import { StoreUnavailableNotice } from './components/StoreUnavailableNotice'
 import { CartDrawer } from './cart/CartDrawer'
 import { CartProvider } from './cart/CartProvider'
 import { useCart } from './cart/cart-context'
@@ -250,6 +251,9 @@ export function StorefrontLayout() {
                 tráfico de una portada— no descarga ni un byte de ella, y la
                 portada estaba a medio kB de su techo de rendimiento. */}
             {sessionStatus === 'authenticated' && <CommerceBarInMain storeSlug={storeSlug as string} />}
+            {/* lifecycle.v1: cuenta del comercio suspendida → catálogo de solo
+                lectura con el aviso. Carrito y checkout los bloquea el servidor. */}
+            <StoreUnavailableNotice storeSlug={storeSlug as string} />
             <ErrorBoundary>
               <Outlet context={context} />
             </ErrorBoundary>

@@ -866,6 +866,11 @@ export const FULFILLMENT_WEBHOOK_FUNCTION = 'fulfillment-webhook'
 export const API_FUNCTION = 'api'
 export const INTEGRATION_WORKER_FUNCTION = 'integration-worker'
 
+// lifecycle.v1 · estado operativo que ordena EBIM MasterAdmin. Solo UX: la
+// autoridad es el guardián de la base (`ebim.enforce_tenant_lifecycle`).
+export const MY_TENANT_LIFECYCLE_RPC = 'my_tenant_lifecycle' satisfies FunctionName
+export const STORE_OPERATIONAL_RPC = 'store_operational_for_slug' satisfies FunctionName
+
 // Centro de vigilancia: los hallazgos y el silencio del equipo.
 export const WATCH_FINDINGS_RPC = 'watch_findings'
 export const WATCH_DISMISS_RPC = 'watch_dismiss'
