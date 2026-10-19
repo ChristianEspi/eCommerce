@@ -6,6 +6,7 @@ import { usePurchasedProducts } from '../commerce/purchased'
 import type { PublicProduct } from '../types'
 import { ProductCard } from './ProductCard'
 import { ProductListRow } from './ProductListRow'
+import { useI18n } from '@/shared/i18n/i18n-context'
 
 /** Cómo se pinta el resultado: tarjetas para mirar, filas para despachar. */
 export type CatalogView = 'grid' | 'list'
@@ -61,6 +62,7 @@ export function ProductGrid({
 }) {
   // UNA cotización para toda la rejilla, y solo si la sesión tiene condiciones
   // comerciales (N03). Invitado y consumidor: ninguna.
+  const { t } = useI18n()
   const commercial = useCatalogCommercialPrices(storeSlug, products)
   // Comprador empresa o comercio: pide cantidad antes de agregar. La consulta
   // es la misma que usa la barra de la cuenta, así que no cuesta otra lectura.
@@ -86,6 +88,15 @@ export function ProductGrid({
           overflow: 'hidden',
         }}
       >
+        {/* Los rótulos de columna: solo los enciende el estilo que pinta la lista
+            como tabla (catálogo). Decorativos para el lector de pantalla: cada
+            fila ya nombra su producto, su precio y su botón. */}
+        <Box component="li" aria-hidden className="sf-list-head" sx={{ display: 'none' }}>
+          <span>{t('store.list.product')}</span>
+          <span>{t('store.list.stock')}</span>
+          <span>{t('store.list.price')}</span>
+          <span>{t('store.list.quantity')}</span>
+        </Box>
         {products.map((product) => (
           <ProductListRow
             key={product.product_id}

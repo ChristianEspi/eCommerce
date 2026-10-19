@@ -1127,6 +1127,74 @@
   }
 }
 
+/* ---- CATÁLOGO · la lista es una TABLA de pedido (lámina B2B, 2026-10-19) --
+   Producto · Disponibilidad · Precio · Cantidad, con rótulos en una franja
+   gris. Por debajo de 900 px vuelve a ser la fila apilada de siempre. */
+@media (min-width: 900px) {
+  .sf-scope[data-store-theme='catalog'] [data-catalog-view='list'] :is(.sf-list-head, [data-list-row]) {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr) minmax(0, 9rem) minmax(0, 8rem) minmax(0, 15rem);
+    align-items: center;
+    column-gap: 16px;
+  }
+  .sf-scope[data-store-theme='catalog'] [data-catalog-view='list'] .sf-list-head {
+    padding: 10px 16px;
+    background: var(--neutral-soft);
+    border-bottom: 1px solid var(--sf-line);
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .sf-scope[data-store-theme='catalog'] [data-catalog-view='list'] .sf-list-head > :first-child {
+    grid-column: span 2;
+  }
+  .sf-scope[data-store-theme='catalog'] [data-catalog-view='list'] .sf-list-head > :last-child {
+    text-align: right;
+  }
+  .sf-scope[data-store-theme='catalog'] [data-list-row] .sf-row-stock {
+    display: block;
+  }
+  .sf-scope[data-store-theme='catalog'] [data-list-row] .sf-row-stock-inline {
+    display: none;
+  }
+  .sf-scope[data-store-theme='catalog'] [data-list-row] .sf-row-price {
+    align-items: flex-start;
+  }
+  .sf-scope[data-store-theme='catalog'] [data-list-row] .sf-row-actions {
+    justify-content: flex-end;
+  }
+  .sf-scope[data-store-theme='catalog'] [data-list-row] .sf-row-add-label {
+    display: inline;
+  }
+  .sf-scope[data-store-theme='catalog'] [data-list-row] .sf-row-actions .MuiButton-root {
+    padding-inline: 14px;
+  }
+  /* Filas alternas suaves: una tabla de treinta líneas se sigue con la vista. */
+  .sf-scope[data-store-theme='catalog'] [data-list-row]:hover {
+    background: color-mix(in srgb, var(--accent) 4%, var(--card));
+  }
+}
+/* SKU y marca en UNA línea técnica encima del nombre: «FMX-0221 · AQUAFIX». */
+.sf-scope[data-store-theme='catalog'] [data-list-row] .sf-row-info:has(.sf-row-sku) {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 6px;
+  align-items: baseline;
+}
+.sf-scope[data-store-theme='catalog'] [data-list-row] .sf-row-info:has(.sf-row-sku) > * {
+  grid-column: 1 / -1;
+}
+.sf-scope[data-store-theme='catalog'] [data-list-row] .sf-row-info > .sf-row-sku {
+  grid-column: 1;
+  grid-row: 1;
+}
+.sf-scope[data-store-theme='catalog'] [data-list-row] .sf-row-info:has(.sf-row-sku) > .sf-row-brand {
+  grid-column: 2;
+  grid-row: 1;
+}
+.sf-scope[data-store-theme='catalog'] [data-list-row] .sf-row-info:has(.sf-row-sku) > .sf-row-brand::before {
+  content: '· ';
+}
 /* ---- PREMIUM · marca serif al centro, todo lo demás en texto ------------ */
 .sf-scope[data-store-theme='premium'] .sf-brand-name {
   font-family: var(--sf-display);

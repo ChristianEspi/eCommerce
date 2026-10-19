@@ -15,6 +15,7 @@ import { discountPercent, type PublicProduct } from '../types'
 import { B2BProductMeta } from './B2BProductMeta'
 import { ProductMedia } from './ProductMedia'
 import { QuantityStepper } from './QuantityStepper'
+import { useStorefrontTheme } from '../theme/useStorefrontTheme'
 
 /**
  * Una fila de la vista de LISTA del catálogo.
@@ -57,9 +58,14 @@ export function ProductListRow({
   const { t, locale } = useI18n()
   const { agregar, pending } = useAddToCart()
   const [cantidad, setCantidad] = useState(1)
+  // Catálogo (lámina B2B, 2026-10-19): la lista es una TABLA de pedido y toda
+  // fila pide cantidad, haya o no sesión de empresa.
+  const { preset } = useStorefrontTheme()
+  const pideCantidad = b2b || preset === 'catalog'
   const discount = discountPercent(product)
   const available = product.in_stock !== false
   const hasVariants = product.kind === 'variant'
+  const textoStock = available ? t('store.availability.inStock') : t('store.availability.outOfStock')
   const to = `/s/${storeSlug}/product/${product.slug}`
   const precio = commercialPrice ? commercialPrice.amount : Number(product.price)
   const tachado = commercialPrice
@@ -86,6 +92,7 @@ export function ProductListRow({
       }}
     >
       <Box
+        className="sf-row-media"
         sx={{
           position: 'relative',
           width: { xs: 56, md: 64 },
@@ -116,9 +123,10 @@ export function ProductListRow({
         ) : null}
       </Box>
 
-      <Stack sx={{ flex: 1, minWidth: 0, gap: 0.25 }}>
+      <Stack className="sf-row-info" sx={{ flex: 1, minWidth: 0, gap: 0.25 }}>
         {product.brand_name || product.category_name ? (
           <Typography
+            className="sf-row-brand"
             sx={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--muted)' }}
             noWrap
           >
@@ -163,13 +171,24 @@ export function ProductListRow({
         ) : null}
         <Typography
           data-stock={available ? 'in' : 'out'}
+          className="sf-row-stock-inline"
           sx={{ fontSize: 11.5, fontWeight: 700, color: available ? 'var(--sf-ok, var(--accent-deep))' : 'var(--muted)' }}
         >
-          {available ? t('store.availability.inStock') : t('store.availability.outOfStock')}
+          {textoStock}
         </Typography>
       </Stack>
 
-      <Stack sx={{ alignItems: 'flex-end', flexShrink: 0, minWidth: { xs: 84, md: 120 } }}>
+      {/* La disponibilidad en SU columna: solo la enciende el estilo que pinta
+          la lista como tabla (catálogo). Oculta, no está en el árbol accesible,
+          así que no se anuncia dos veces. */}
+      <Typography
+        className="sf-row-stock"
+        sx={{ display: 'none', fontSize: 13, fontWeight: 700, color: available ? 'var(--sf-ok, var(--accent-deep))' : 'var(--muted)' }}
+      >
+        {textoStock}
+      </Typography>
+
+      <Stack className="sf-row-price" sx={{ alignItems: 'flex-end', flexShrink: 0, minWidth: { xs: 84, md: 120 } }}>
         {tachado !== null ? (
           <Typography component="s" className="tnum" sx={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>
             {formatMoney(tachado, product.currency, locale)}
@@ -193,7 +212,7 @@ export function ProductListRow({
         ) : null}
       </Stack>
 
-      <Stack direction="row" sx={{ alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
+      <Stack direction="row" className="sf-row-actions" sx={{ alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
         {onToggleFavorite ? (
           <IconButton
             size="small"
@@ -210,7 +229,7 @@ export function ProductListRow({
             {favorite ? <FavoriteRoundedIcon sx={{ fontSize: 18 }} /> : <FavoriteBorderRoundedIcon sx={{ fontSize: 18 }} />}
           </IconButton>
         ) : null}
-        {b2b && available && !hasVariants ? (
+        {pideCantidad && available && !hasVariants ? (
           <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
             <QuantityStepper value={cantidad} onChange={setCantidad} size="sm" disabled={pending} />
           </Box>
@@ -239,6 +258,10 @@ export function ProductListRow({
           ) : (
             <ShoppingCartRoundedIcon fontSize="small" />
           )}
+          {/* «Agregar» con letra: lo enciende el estilo que tiene sitio (catálogo). */}
+          <Box component="span" aria-hidden className="sf-row-add-label" sx={{ display: 'none', ml: 0.75 }}>
+            {hasVariants ? t('store.list.choose') : t('store.list.add')}
+          </Box>
         </Button>
       </Stack>
     </Stack>
