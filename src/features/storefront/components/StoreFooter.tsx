@@ -8,6 +8,7 @@ import { Box, Container, Link as MuiLink, Stack, Typography } from '@mui/materia
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import type { MessageKey } from '@/shared/i18n/messages'
 import { R, TS } from '@/theme/tokens'
 import { initials } from '../branding'
 import type { StoreNavigationItem } from '../content'
@@ -122,6 +123,23 @@ export function StoreFooter({ store, storeSlug }: { store: PublicStore; storeSlu
   const paginas = organizado ? empresa : (pages ?? []).slice(0, 6)
   const firmaLegal = store.legal_name?.trim() || nombre
   const reclamos = `/s/${storeSlug}/libro-de-reclamaciones`
+
+  // Catálogo (lámina B2B, 2026-10-19): una banda del color de la tienda con
+  // cuatro columnas de distribuidor. Siempre, haya o no páginas: las columnas
+  // Comprar y Empresas salen de rutas que toda tienda tiene.
+  if (preset === 'catalog') {
+    return (
+      <PieCatalogo
+        storeSlug={storeSlug}
+        paginas={[...empresa, ...legales]}
+        contactos={contactos}
+        whatsapp={whatsapp}
+        horario={horario}
+        firmaLegal={firmaLegal}
+        reclamos={reclamos}
+      />
+    )
+  }
 
   // Universal (lámina 2026-10-13): marca a la izquierda y cuatro columnas de
   // tienda grande. Las mismas piezas que el pie organizado, en su orden.
@@ -753,6 +771,133 @@ function IconoRed({ network }: { network: SocialNetwork }) {
         </svg>
       )
   }
+}
+
+/**
+ * Pie de Catálogo (lámina B2B, 2026-10-19).
+ *
+ * Una banda a todo el ancho en `accent-deep` —el tono del acento que garantiza
+ * AA con texto blanco, así que vale para el naranja de una ferretería y para
+ * cualquier otro acento— con las cuatro columnas de un distribuidor: Comprar,
+ * Empresas, Ayuda (las páginas que el comercio escribió) y Atención (lo que
+ * declaró: horario, correo, teléfono, WhatsApp, dirección). Todo enlace va a
+ * una ruta que existe; lo que el comercio no escribió no aparece.
+ */
+function PieCatalogo({
+  storeSlug,
+  paginas,
+  contactos,
+  whatsapp,
+  horario,
+  firmaLegal,
+  reclamos,
+}: {
+  storeSlug: string
+  paginas: readonly StoreNavigationItem[]
+  contactos: readonly { clave: MessageKey; valor: string; href: string | null }[]
+  whatsapp: string | null
+  horario: string | null
+  firmaLegal: string
+  reclamos: string
+}) {
+  const { t } = useI18n()
+  const { style } = useStorefrontTheme()
+  const enlace = {
+    fontSize: 13.5,
+    fontWeight: 500,
+    color: 'inherit',
+    textDecoration: 'none',
+    width: 'fit-content',
+    '&:hover': { textDecoration: 'underline' },
+  } as const
+  const columna = (titulo: string, items: { to?: string; href?: string; label: string }[]) =>
+    items.length === 0 ? null : (
+      <Stack component="nav" aria-label={titulo} sx={{ gap: 0.9, minWidth: 0 }}>
+        <Typography component="h2" sx={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', opacity: 0.85 }}>
+          {titulo}
+        </Typography>
+        {items.map((item) => (
+          <MuiLink key={`${item.to ?? item.href}-${item.label}`} {...(item.to ? { component: Link, to: item.to } : { href: item.href })} sx={enlace}>
+            {item.label}
+          </MuiLink>
+        ))}
+      </Stack>
+    )
+
+  return (
+    <Box
+      component="footer"
+      className="sf-footer"
+      data-footer-layout="catalog"
+      sx={{ bgcolor: 'var(--accent-deep)', color: '#fff', mt: 'var(--sf-section-gap-md)' }}
+    >
+      <Container
+        maxWidth={false}
+        data-content-width={style.contentWidth}
+        sx={{ maxWidth: 'var(--sf-content-w)', mx: 'auto', pt: { xs: 4, md: 5 }, pb: 3 }}
+      >
+        <Box
+          sx={{
+            display: 'grid',
+            gap: { xs: 3, md: 4 },
+            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', md: 'repeat(4, minmax(0, 1fr)) auto' },
+          }}
+        >
+          {columna(t('store.footer.shop'), [
+            { to: `/s/${storeSlug}?ver=todo`, label: t('store.catalog.title') },
+            { to: `/s/${storeSlug}/pedido-rapido`, label: t('store.quickOrder.open') },
+            { to: `/s/${storeSlug}?ver=todo#marcas`, label: t('store.nav.brands') },
+            { to: `/s/${storeSlug}?ver=todo&oferta=1`, label: t('store.footer.deals') },
+          ])}
+          {columna(t('store.footer.business'), [
+            { to: `/s/${storeSlug}/register`, label: t('store.footer.openAccount') },
+            { to: `/s/${storeSlug}/account#pedidos`, label: t('store.footer.orders') },
+            { to: `/s/${storeSlug}/account#cotizaciones`, label: t('account.tab.quotes') },
+            { to: `/s/${storeSlug}/account#estado`, label: t('account.tab.statement') },
+          ])}
+          {columna(
+            t('store.footer.helpColumn'),
+            paginas.slice(0, 6).map((item) => ({ to: `/s/${storeSlug}/p/${item.slug}`, label: item.title })),
+          )}
+          <Stack sx={{ gap: 0.9, minWidth: 0 }} data-footer-help>
+            <Typography component="h2" sx={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', opacity: 0.85 }}>
+              {t('store.footer.attention')}
+            </Typography>
+            {horario ? <Typography sx={{ fontSize: 13.5, whiteSpace: 'pre-line' }}>{horario}</Typography> : null}
+            {contactos.map((c) =>
+              c.href ? (
+                <MuiLink key={c.clave} href={c.href} sx={enlace}>
+                  {c.valor}
+                </MuiLink>
+              ) : (
+                <Typography key={c.clave} sx={{ fontSize: 13.5 }}>
+                  {c.valor}
+                </Typography>
+              ),
+            )}
+            {whatsapp && whatsappHref(whatsapp) ? (
+              <MuiLink href={whatsappHref(whatsapp) as string} sx={enlace}>
+                {t('store.footer.whatsapp')}: {whatsapp}
+              </MuiLink>
+            ) : null}
+          </Stack>
+          <MuiLink
+            component={Link}
+            to={reclamos}
+            sx={{ ...enlace, display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, fontSize: 12, fontWeight: 700, textAlign: 'center', alignSelf: 'start' }}
+          >
+            <LibroIcono />
+            {t('store.complaints.book')}
+          </MuiLink>
+        </Box>
+        <Typography
+          sx={{ mt: 4, pt: 2, borderTop: '1px solid rgba(255, 255, 255, 0.25)', fontSize: 12.5, textAlign: 'center', opacity: 0.9 }}
+        >
+          © {new Date().getFullYear()} {firmaLegal}
+        </Typography>
+      </Container>
+    </Box>
+  )
 }
 
 /** El libro abierto del Libro de Reclamaciones, en el color del texto. */

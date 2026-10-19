@@ -1,4 +1,6 @@
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded'
+import BoltRoundedIcon from '@mui/icons-material/BoltRounded'
+import RequestQuoteRoundedIcon from '@mui/icons-material/RequestQuoteRounded'
 import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded'
 import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded'
 import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded'
@@ -247,11 +249,7 @@ export function StorefrontLayout() {
                 Diferida y solo con sesión: el visitante anónimo —casi todo el
                 tráfico de una portada— no descarga ni un byte de ella, y la
                 portada estaba a medio kB de su techo de rendimiento. */}
-            {sessionStatus === 'authenticated' && (
-              <Suspense fallback={null}>
-                <CommerceContextBar storeSlug={storeSlug as string} />
-              </Suspense>
-            )}
+            {sessionStatus === 'authenticated' && <CommerceBarInMain storeSlug={storeSlug as string} />}
             <ErrorBoundary>
               <Outlet context={context} />
             </ErrorBoundary>
@@ -471,8 +469,9 @@ function StoreHeader({ store, storeSlug }: { store: PublicStore; storeSlug: stri
    * es el REPARTO, y eso sí hay que leerlo aquí: son árboles distintos, no
    * medidas distintas.
    */
-  const { style } = useStorefrontTheme()
+  const { style, preset } = useStorefrontTheme()
   const variante = style.headerVariant
+  const { status } = useSessionContext()
 
   // En el teléfono las tres se comportan igual, y a propósito: dos filas de
   // marca centrada en 390 px se comen media pantalla antes del primer producto.
@@ -514,6 +513,15 @@ function StoreHeader({ store, storeSlug }: { store: PublicStore; storeSlug: stri
       {/* Los avisos del comercio, ENCIMA de todo y solo si los escribió. Ver
           `StoreAnnouncementBar`: la plataforma no genera ninguno. */}
       <StoreAnnouncementBar messages={store.announcement_messages} />
+
+      {/* Catálogo (lámina B2B, 2026-10-19): para quién se compra, su lista y su
+          crédito, en una franja ENCIMA de la cabecera. Es la misma barra que
+          los demás estilos pintan al inicio del contenido; aquí cambia de sitio. */}
+      {preset === 'catalog' && status === 'authenticated' ? (
+        <Suspense fallback={null}>
+          <CommerceContextBar storeSlug={storeSlug} />
+        </Suspense>
+      ) : null}
 
       <Container
         maxWidth={false}
@@ -579,6 +587,9 @@ function StoreHeader({ store, storeSlug }: { store: PublicStore; storeSlug: stri
               </Box>
             )}
 
+            {/* Catálogo: los atajos de quien compra por referencia. */}
+            <HeaderTools storeSlug={storeSlug} />
+
             {acciones}
           </Toolbar>
         )}
@@ -634,6 +645,47 @@ function HeaderLinks({ storeSlug }: { storeSlug: string }) {
           </Box>
         )
       })}
+    </Box>
+  )
+}
+
+/**
+ * La barra de «para quién se compra» en el cuerpo de la página, salvo en el
+ * estilo que la sube a la cabecera (catálogo). Una sola instancia siempre.
+ */
+function CommerceBarInMain({ storeSlug }: { storeSlug: string }) {
+  const { preset } = useStorefrontTheme()
+  if (preset === 'catalog') return null
+  return (
+    <Suspense fallback={null}>
+      <CommerceContextBar storeSlug={storeSlug} />
+    </Suspense>
+  )
+}
+
+/**
+ * Atajos B2B de la cabecera (Catálogo, lámina 2026-10-19): «Pedido rápido» y
+ * «Cotizaciones». Los dos destinos ya existen; ocultos por defecto
+ * (`sf-hdr-tools`), los enciende el estilo en escritorio.
+ */
+function HeaderTools({ storeSlug }: { storeSlug: string }) {
+  const { t } = useI18n()
+  const { status } = useSessionContext()
+  const enlaces = [
+    { to: `/s/${storeSlug}/pedido-rapido`, label: t('store.quickOrder.open'), icon: <BoltRoundedIcon /> },
+    // Las cotizaciones viven en la cuenta: sin sesión no hay ninguna que ver.
+    ...(status === 'authenticated'
+      ? [{ to: `/s/${storeSlug}/account#cotizaciones`, label: t('account.tab.quotes'), icon: <RequestQuoteRoundedIcon /> }]
+      : []),
+  ]
+  return (
+    <Box component="nav" aria-label={t('store.hdr.tools')} className="sf-hdr-tools" sx={{ display: 'none' }}>
+      {enlaces.map((enlace) => (
+        <Box key={enlace.to} component={Link} to={enlace.to} className="sf-hdr-tool">
+          {enlace.icon}
+          {enlace.label}
+        </Box>
+      ))}
     </Box>
   )
 }

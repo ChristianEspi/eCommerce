@@ -1039,10 +1039,11 @@
 .sf-scope[data-store-theme='catalog'] .sf-search .sf-search-submit-icon {
   display: none;
 }
+/* «Catálogo» en tinta, primero de la fila (lámina B2B, 2026-10-19). */
 .sf-scope[data-store-theme='catalog'] .sf-catnav .sf-catnav-all {
   display: flex;
-  background: var(--neutral-soft);
-  color: var(--text);
+  background: var(--text);
+  color: var(--card);
 }
 .sf-scope[data-store-theme='catalog'] .sf-catnav .sf-catnav-item {
   font-weight: 500;
@@ -1059,19 +1060,70 @@
 .sf-scope[data-store-theme='catalog'] .sf-catnav .sf-catnav-door[data-door='offers'] {
   order: 3;
 }
+/* La franja de la cuenta de empresa, encima de la cabecera y en tinta: lista,
+   crédito y atajos en una línea, como la barra de un sistema de compras. */
+.sf-scope[data-store-theme='catalog'] .sf-header .sf-commerce-bar {
+  margin: 0;
+  border-radius: 0;
+  padding: 6px 24px;
+  background: var(--sf-band);
+  color: #fff;
+}
+.sf-scope[data-store-theme='catalog'] .sf-header .sf-commerce-bar :is(p, a, span, svg, button) {
+  color: inherit;
+}
+.sf-scope[data-store-theme='catalog'] .sf-header .sf-commerce-bar [data-credit-available] :is(p, svg) {
+  color: var(--accent);
+}
+.sf-scope[data-store-theme='catalog'] .sf-header .sf-commerce-bar [aria-hidden] {
+  background: transparent;
+}
 @media (min-width: 900px) {
+  /* Pedido rápido y Cotizaciones: texto con su icono, antes del carrito. */
+  .sf-scope[data-store-theme='catalog'] .sf-hdr-tools {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-inline: 6px;
+  }
+  .sf-scope[data-store-theme='catalog'] .sf-hdr-tool {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .sf-scope[data-store-theme='catalog'] .sf-hdr-tool svg {
+    font-size: 18px;
+    color: var(--accent-deep);
+  }
+  .sf-scope[data-store-theme='catalog'] .sf-hdr-tool:hover {
+    color: var(--accent-deep);
+  }
+  /* El carrito es EL botón: relleno del acento, con el importe dentro. */
   .sf-scope[data-store-theme='catalog'] .sf-hdr-action[data-tone='cart'] {
-    border: 1px solid var(--text);
     border-radius: var(--sf-btn-radius);
-    padding: 4px 12px 4px 6px;
+    padding: 4px 14px 4px 8px;
+    background: var(--accent);
+    color: #fff;
+  }
+  .sf-scope[data-store-theme='catalog'] .sf-hdr-action[data-tone='cart']:hover {
+    background: var(--accent-deep);
+  }
+  .sf-scope[data-store-theme='catalog'] .sf-hdr-action[data-tone='cart'] .sf-hdr-icon {
+    background: transparent;
+    color: inherit;
   }
   .sf-scope[data-store-theme='catalog'] .sf-hdr-cart-total {
     display: inline;
-    font-weight: 700;
+    font-weight: 800;
   }
   .sf-scope[data-store-theme='catalog'] .sf-hdr-cart-total::before {
     content: '· ';
-    color: var(--muted);
+    opacity: 0.8;
   }
 }
 
