@@ -54,7 +54,7 @@ import {
   type ProductMaster,
   type ProductStatus,
 } from './types'
-import { useProductPublications, useSaveProduct } from './useProducts'
+import { useProductCandidates, useProductPublications, useSaveProduct } from './useProducts'
 
 const STATUS_LABEL: Record<ProductStatus, MessageKey> = {
   draft: 'catalog.status.draft',
@@ -104,7 +104,7 @@ export function ProductDrawer({
   product: ProductMaster | null
   /** Categorías de la tienda ACTIVA: solo para la publicación inicial del alta. */
   categories: Category[]
-  /** Catálogo cargado por el listado: candidatos de kit y de relacionados. */
+  /** Página del listado: candidatos provisionales hasta que llega el catálogo completo. */
   products: ProductCandidate[]
   organizationId: string
   companyId: string
@@ -298,6 +298,14 @@ export function ProductDrawer({
   const active = tabs.some((item) => item.id === tab) ? tab : 'general'
 
   const scope = { organizationId, companyId, storeId, canWrite }
+
+  // Kit y relacionados eligen entre TODO el catálogo, no entre la página que el
+  // listado tenga a la vista (con un buscador puesto, el selector quedaba vacío
+  // y el botón «Añadir componente» desaparecía). Solo se consulta al abrir esas
+  // pestañas; mientras llega, vale lo que ya traía el listado.
+  const needsCandidates = open && (active === 'componentes' || active === 'relacionados')
+  const candidates = useProductCandidates(companyId, needsCandidates)
+  const pool = candidates.data ?? products
 
   return (
     <FormDrawer
@@ -681,13 +689,13 @@ export function ProductDrawer({
       )}
       {active === 'variantes' && <VariantsPanel product={pimProduct} {...scope} />}
       {active === 'componentes' && (
-        <BundlePanel product={pimProduct} products={products} {...scope} />
+        <BundlePanel product={pimProduct} products={pool} {...scope} />
       )}
       {active === 'unidades' && <UomsPanel product={pimProduct} {...scope} />}
       {active === 'ficha' && product && <ProductHighlightsPanel productId={product.id} canWrite={canWrite} />}
       {active === 'ficha' && <ProductAttributesPanel product={pimProduct} {...scope} />}
       {active === 'relacionados' && (
-        <RelationsPanel product={pimProduct} products={products} {...scope} />
+        <RelationsPanel product={pimProduct} products={pool} {...scope} />
       )}
     </FormDrawer>
   )

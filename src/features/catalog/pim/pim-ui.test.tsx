@@ -97,11 +97,14 @@ const ORIGIN_PUBLICATION = {
   updated_at: '2026-08-27T00:00:00.000Z',
 }
 
-function backend(options: { entitlements?: string[] } = {}): FakeSupabase {
-  const { entitlements = ADVANCED } = options
+function backend(
+  options: { entitlements?: string[]; masters?: ProductMaster[] } = {},
+): FakeSupabase {
+  const { entitlements = ADVANCED, masters } = options
   return createFakeSupabase({
     session: makeSession(),
     tables: {
+      ...(masters ? { admin_product_masters: masters } : {}),
       tenants: [{ organization_id: ORG, slug: 'mi-negocio', name: 'Mi Negocio', status: 'active' }],
       tenant_members: [
         { organization_id: ORG, company_id: COMPANY_A, user_id: USER, role: 'admin', status: 'active' },
@@ -400,6 +403,33 @@ describe('El cajón del producto se gatea por `catalog.advanced`', () => {
     expect(created.company_id).toBe(COMPANY_A)
     // Precio vacío = hereda. Guardar 0 aquí sería regalar el producto.
     expect(created.price).toBeNull()
+  })
+
+  it('el kit elige componentes de TODO el catálogo, no de la página filtrada del listado', async () => {
+    // Regresión: con el buscador del listado puesto en el kit, la página solo
+    // traía el kit; el selector quedaba vacío y «Añadir componente» no salía.
+    const kit = { ...variantProduct(), kind: 'bundle' as const, sku: 'KIT-1', name: 'Kit taladro' }
+    const taladro = {
+      ...variantProduct(),
+      id: '77777777-7777-4777-8777-777777777777',
+      kind: 'simple' as const,
+      sku: 'TAL-1',
+      name: 'Taladro percutor',
+      stock: 9,
+    }
+    const user = userEvent.setup()
+    // El cajón recibe SOLO el kit, como si el listado estuviera filtrado.
+    renderDrawer(backend({ masters: [kit, taladro] }), kit)
+    const drawer = await screen.findByRole('dialog')
+
+    await user.click(await within(drawer).findByRole('tab', { name: 'Componentes' }))
+    await user.click(await within(drawer).findByRole('button', { name: 'Añadir componente' }))
+    const form = await within(drawer).findByRole('form', { name: 'Añadir componente' })
+    await user.click(within(form).getByRole('combobox', { name: 'Componente' }))
+
+    expect(await screen.findByRole('option', { name: 'TAL-1 · Taladro percutor' })).toBeInTheDocument()
+    // Un kit no puede ser componente de otro kit.
+    expect(screen.queryByRole('option', { name: 'KIT-1 · Kit taladro' })).not.toBeInTheDocument()
   })
 
   it('un producto simple no ofrece la pestaña de componentes de kit', async () => {

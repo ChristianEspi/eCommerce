@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   deleteProduct,
   fetchProductPublications,
+  fetchProductCandidates,
   fetchProductUsage,
   fetchProducts,
   publishProduct,
@@ -13,6 +14,7 @@ import {
   type ProductQuery,
 } from './api/products'
 import type {
+  ProductCandidate,
   ProductFormValues,
   ProductPublication,
   ProductStatus,
@@ -59,6 +61,20 @@ export function useProducts(query: ProductQuery) {
     // Mantener la tabla anterior mientras se teclea —o mientras se pasa de
     // página— evita el parpadeo a esqueleto en cada letra del buscador.
     placeholderData: (previous) => previous,
+  })
+}
+
+/**
+ * Candidatos para kits y relacionados: todo el catálogo, no la página del
+ * listado. Cuelga de `CATALOG_KEY`, así que crear o borrar un producto lo
+ * refresca con el resto del catálogo.
+ */
+export function useProductCandidates(companyId: string | null, enabled = true) {
+  return useQuery<ProductCandidate[]>({
+    queryKey: [...CATALOG_KEY, 'product-candidates', companyId],
+    queryFn: () => fetchProductCandidates(companyId),
+    enabled: enabled && Boolean(companyId),
+    staleTime: 60_000,
   })
 }
 

@@ -3,6 +3,7 @@ import {
   productMasterSchema,
   productPublicationSchema,
   productUsageSchema,
+  type ProductCandidate,
   type ProductFormValues,
   type ProductMaster,
   type ProductPublication,
@@ -176,6 +177,34 @@ export async function fetchProducts({
     rows: productMasterSchema.array().parse(data ?? []),
     total: typeof count === 'number' ? count : (data?.length ?? 0),
   }
+}
+
+/** Tope de candidatos: el máximo de filas que PostgREST devuelve de una vez. */
+export const PRODUCT_CANDIDATES_LIMIT = 1000
+
+/**
+ * Todo el catálogo de la sociedad, en ligero, para elegir componentes de un
+ * kit o productos relacionados.
+ *
+ * Antes esas pestañas usaban la página en curso del listado: con un buscador
+ * puesto (o con solo 25 filas por página) el selector se quedaba vacío y el
+ * botón «Añadir componente» desaparecía. Lo que se puede meter en un kit no
+ * puede depender del filtro de otra pantalla. El tenant lo pone RLS.
+ */
+export async function fetchProductCandidates(companyId: string | null): Promise<ProductCandidate[]> {
+  if (!companyId) return []
+  const supabase = catalogClient()
+  const { data, error } = await supabase
+    .from(ADMIN_PRODUCT_MASTERS_VIEW)
+    .select('id, sku, name, kind, stock')
+    .order('name', { ascending: true })
+    .order('id', { ascending: true })
+    .range(0, PRODUCT_CANDIDATES_LIMIT - 1)
+  if (error) throw catalogErrorFromDb(error)
+  return productMasterSchema
+    .pick({ id: true, sku: true, name: true, kind: true, stock: true })
+    .array()
+    .parse(data ?? [])
 }
 
 interface CatalogProductResponse {

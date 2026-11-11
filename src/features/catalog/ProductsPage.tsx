@@ -621,8 +621,8 @@ export function ProductsPage() {
         open={drawer.open}
         product={drawer.product}
         categories={categories.data ?? []}
-        // El catálogo de la página en curso: es lo que las pestañas de kit y de
-        // relacionados ofrecen como candidatos, sin una segunda consulta.
+        // Provisional: el cajón carga el catálogo completo al abrir kit o
+        // relacionados; esto solo cubre el instante hasta que llega.
         products={list}
         organizationId={tenant.organization_id}
         companyId={activeCompanyId}
