@@ -319,7 +319,14 @@ export function StoreCheckoutPage() {
     cvv: '',
     email: '',
   })
-  const paymentMethods = useMemo(() => payment.data ?? [], [payment.data])
+  // «Crédito empresa» solo para quien compra con una cuenta con línea de
+  // crédito. Antes se ofrecía a cualquiera —un consumidor sin empresa podía
+  // confirmar un pedido «a crédito» que luego no se podía despachar sin cobro—.
+  const conCredito = contextoComercial?.has_credit_terms === true
+  const paymentMethods = useMemo(
+    () => (payment.data ?? []).filter((metodo) => metodo.kind !== 'credit' || conCredito),
+    [payment.data, conCredito],
+  )
 
   // Se pregunta por la FAMILIA y no por el codigo: `tarjeta`, `visa` o
   // `culqi-card` son nombres que pone el comercio; `card` es del sistema.

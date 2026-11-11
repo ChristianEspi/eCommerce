@@ -186,7 +186,7 @@ export function StoreCartPage() {
           </Stack>
 
           {/* 2026-10-05 · Cómo se paga y cómo llega, antes de ir al pago. */}
-          <CartPurchaseInfo storeId={store.store_id} />
+          <CartPurchaseInfo storeId={store.store_id} storeSlug={storeSlug} />
         </Card>
       </Box>
     </>

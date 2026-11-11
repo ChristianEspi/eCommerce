@@ -13,6 +13,8 @@ import { PUBLIC_DELIVERY_METHODS_VIEW } from '@/shared/lib/db-schema'
 import { TS } from '@/theme/tokens'
 import { storefrontClient } from '../api'
 import { usePaymentMethods } from '../payment'
+import { useCommerceContext } from '../commerce/context'
+import { useSessionContext } from '@/features/auth/session-context'
 
 /**
  * Cómo se paga y cómo llega, ANTES de ir al pago (2026-10-05).
@@ -63,11 +65,15 @@ const ICONO_PAGO: Record<string, ReactNode> = {
   card: <CreditCardRoundedIcon fontSize="inherit" />,
 }
 
-export function CartPurchaseInfo({ storeId }: { storeId: string }) {
+export function CartPurchaseInfo({ storeId, storeSlug }: { storeId: string; storeSlug: string }) {
   const { t } = useI18n()
   const pagos = usePaymentMethods(storeId)
   const envios = useStoreDeliveryMethods(storeId)
-  const medios = pagos.data ?? []
+  // Igual que el checkout: «Crédito empresa» solo para una cuenta con línea.
+  const { status } = useSessionContext()
+  const { context } = useCommerceContext(storeSlug, status === 'authenticated')
+  const conCredito = context?.has_credit_terms === true
+  const medios = (pagos.data ?? []).filter((medio) => medio.kind !== 'credit' || conCredito)
   const formas = envios.data ?? []
   if (medios.length === 0 && formas.length === 0) return null
 

@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router-dom'
@@ -1609,6 +1609,34 @@ describe('orden de compra (N05)', () => {
       expect(Object.keys(linea)).not.toContain('purchase_order_number')
     }
     for (const prohibida of CLAVES_PROHIBIDAS) expect(todasLasClaves(body)).not.toContain(prohibida)
+  })
+
+  it('«Crédito empresa» solo aparece si la cuenta tiene línea de crédito', async () => {
+    // Antes se ofrecía a cualquiera: un consumidor sin empresa confirmaba un
+    // pedido «a crédito» que la tienda luego no podía despachar sin cobrar.
+    const CREDITO = {
+      payment_method_id: 'dddd3333-3333-4333-8333-333333333333',
+      store_id: STORE,
+      code: 'credito',
+      kind: 'credit',
+      display_name: 'Crédito empresa',
+      position: 30,
+      instructions: null,
+    }
+    for (const [contexto, esperado] of [
+      [{ ...CONTEXTO_EMPRESA, purchase_order_required: false, has_credit_terms: false }, false],
+      [{ ...CONTEXTO_EMPRESA, purchase_order_required: false, has_credit_terms: true }, true],
+    ] as const) {
+      const user = userEvent.setup()
+      const fake = conSesion(contexto)
+      fake.state.tables.public_payment_methods = [MEDIOS_PAGO[1]!, CREDITO]
+      await rellenarConSesion(user)
+      await irAPagar(user)
+      await screen.findByRole('radio', { name: /Transferencia bancaria/ })
+      if (esperado) expect(await screen.findByRole('radio', { name: /Crédito empresa/ })).toBeInTheDocument()
+      else expect(screen.queryByRole('radio', { name: /Crédito empresa/ })).not.toBeInTheDocument()
+      cleanup()
+    }
   })
 
   it('sin exigencia no hay campo y el cuerpo no lleva la clave', async () => {
