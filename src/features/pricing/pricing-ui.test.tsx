@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '@/test/render'
@@ -251,6 +251,26 @@ describe('Precios — la pantalla', () => {
     // esperan dos celdas y no una.
     expect(screen.getAllByText('100')).toHaveLength(2)
     expect(screen.getAllByRole('searchbox')).toHaveLength(1)
+  })
+
+  it('al crear una lista, el cajón pasa a editarla para cargar precios y asignarla', async () => {
+    // Antes se quedaba en «Nueva lista»: sin pestañas de precios y con riesgo de
+    // pulsar Guardar otra vez y chocar con el código ya creado.
+    const user = userEvent.setup()
+    const fake = backend()
+    renderPricing(fake)
+    await user.click(await screen.findByRole('button', { name: 'Nueva lista' }))
+    const drawer = await screen.findByRole('dialog')
+    await user.type(within(drawer).getByLabelText('Nombre'), 'Distribuidores')
+    await user.type(within(drawer).getByLabelText('Código'), 'distribuidores')
+    await user.click(within(drawer).getByRole('button', { name: 'Guardar' }))
+
+    await waitFor(() =>
+      expect(fake.state.tables.price_lists?.some((row) => row.code === 'distribuidores')).toBe(true),
+    )
+    expect(await within(drawer).findByText('distribuidores')).toBeInTheDocument()
+    expect(within(drawer).queryByText('Guarda la lista y podrás cargar precios y asignarla.')).not.toBeInTheDocument()
+    expect(within(drawer).getAllByRole('tab').length).toBeGreaterThan(1)
   })
 
   it('marca como caducada la lista cuya ventana terminó', async () => {

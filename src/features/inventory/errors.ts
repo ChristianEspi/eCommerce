@@ -77,5 +77,11 @@ export function mapInventoryCode(code: string): MessageKey {
 
 export function inventoryErrorFromDb(error: PostgrestLike): InventoryError {
   const code = codeFromDbError(error)
+  // Un ajuste que deja el físico bajo cero choca con el CHECK de
+  // `inventory_levels` (23514). Decir «formato inesperado» no explica nada: lo
+  // que pasa es que no hay tanto para sacar.
+  if (code === '23514' && /inventory_levels|on_hand/i.test(error?.message ?? '')) {
+    return new InventoryError('inventory.error.insufficient', 'STOCK_INSUFICIENTE')
+  }
   return new InventoryError(mapInventoryCode(code), code)
 }

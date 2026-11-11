@@ -15,7 +15,7 @@ import {
   warehouseFormSchema,
   type InventoryAlert,
 } from './types'
-import { mapInventoryCode } from './errors'
+import { inventoryErrorFromDb, mapInventoryCode } from './errors'
 
 /**
  * Reglas PURAS del inventario en el cliente.
@@ -228,3 +228,20 @@ describe('el dominio declara lo que esta fase construyó', () => {
     expect(boundaryForPath('features/inventory/api.ts')?.id).toBe('inventory')
   })
 })
+
+describe('inventoryErrorFromDb — físico bajo cero', () => {
+  it('el CHECK de inventory_levels se explica como existencia insuficiente', () => {
+    const error = inventoryErrorFromDb({
+      code: '23514',
+      message: 'new row for relation "inventory_levels" violates check constraint "inventory_levels_on_hand_qty_check"',
+    })
+    expect(error.key).toBe('inventory.error.insufficient')
+  })
+
+  it('otro 23514 sigue siendo un dato inválido', () => {
+    expect(inventoryErrorFromDb({ code: '23514', message: 'violates check constraint "warehouses_code_check"' }).key).toBe(
+      'inventory.error.invalid',
+    )
+  })
+})
+

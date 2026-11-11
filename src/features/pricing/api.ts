@@ -139,7 +139,7 @@ export async function savePriceList(input: {
   id?: string | null
   scope: StoreScope
   values: PriceListFormValues
-}): Promise<void> {
+}): Promise<PriceList> {
   const supabase = client()
   const fields = {
     code: input.values.code,
@@ -152,16 +152,23 @@ export async function savePriceList(input: {
     notes: input.values.notes.trim() || null,
   }
 
-  const { error } = input.id
-    ? await supabase.from(PRICE_LISTS_TABLE).update(fields).eq('id', input.id)
-    : await supabase.from(PRICE_LISTS_TABLE).insert({
-        organization_id: input.scope.organizationId,
-        company_id: input.scope.companyId,
-        store_id: input.scope.storeId,
-        ...fields,
-      })
+  // Devuelve la fila guardada: tras el alta, el cajón pasa a editarla para
+  // cargar precios y asignarla (antes se quedaba en «Nueva lista»).
+  const { data, error } = input.id
+    ? await supabase.from(PRICE_LISTS_TABLE).update(fields).eq('id', input.id).select(LIST_SELECT).single()
+    : await supabase
+        .from(PRICE_LISTS_TABLE)
+        .insert({
+          organization_id: input.scope.organizationId,
+          company_id: input.scope.companyId,
+          store_id: input.scope.storeId,
+          ...fields,
+        })
+        .select(LIST_SELECT)
+        .single()
 
   if (error) throw pricingErrorFromDb(error)
+  return priceListSchema.parse(data)
 }
 
 export async function deletePriceList(id: string): Promise<void> {

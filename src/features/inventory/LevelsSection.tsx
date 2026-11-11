@@ -38,6 +38,7 @@ import {
   useSetInventoryPolicy,
   useStockProductSearch,
   useStockVariants,
+  useStoreWarehouses,
   useWarehouses,
 } from './hooks'
 import {
@@ -244,6 +245,7 @@ function MovementDrawer({
   const [productTerm, setProductTerm] = useState('')
 
   const warehouses = useWarehouses(open)
+  const links = useStoreWarehouses(open ? (activeStore?.id ?? null) : null)
   const debounced = useDebouncedValue(productTerm, 250)
   const products = useStockProductSearch(activeStore?.id ?? null, debounced, open)
 
@@ -347,6 +349,19 @@ function MovementDrawer({
             </MenuItem>
           ))}
         </TextField>
+
+        {/* Existencias (y la vitrina) solo cuentan los almacenes que abastecen a
+            la tienda. Sin este aviso, una entrada en un almacén sin vincular
+            «desaparecía»: quedaba guardada pero no se veía en ningún sitio. */}
+        {(() => {
+          const chosen = watch('warehouse_id')
+          const rows = links.data ?? []
+          if (!chosen || rows.length === 0) return null
+          const serves = rows.some((link) => link.warehouse_id === chosen && link.is_active)
+          return serves ? null : (
+            <Alert severity="warning">{t('inventory.movement.notServing')}</Alert>
+          )
+        })()}
 
         {/* Un solo campo: se escribe SKU o nombre y se elige de la lista. Abre
             con los primeros por SKU, sin tener que escribir nada. */}

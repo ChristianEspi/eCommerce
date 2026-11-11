@@ -8,7 +8,8 @@ import SellRoundedIcon from '@mui/icons-material/SellRounded'
 import {
   Box,
   Button,
-  Card,  Stack,
+  Card,
+  Stack,
   Table,
   TableBody,
   TableCell,
@@ -169,6 +170,7 @@ export function PriceListsSection() {
         list={editing.list}
         canWrite={canWrite}
         onClose={() => setEditing({ open: false, list: null })}
+        onCreated={(created) => setEditing({ open: true, list: created })}
       />
     </Stack>
   )

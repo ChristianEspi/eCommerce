@@ -2965,6 +2965,8 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'inventory.levels.help':
       'On hand is what sits on the shelf; reserved is what already has an owner. Available is the difference.',
     'inventory.levels.search': 'Search by SKU, name or warehouse',
+    'inventory.movement.notServing':
+      'This warehouse does not supply this store: the movement is saved, but its stock will not show in Stock levels or on the storefront. Turn it on in Warehouses › Supplies.',
     'inventory.levels.empty': 'This warehouse holds no stock yet',
     'inventory.levels.emptyBody':
       'Record a receipt, or load catalog stock from the warehouses tab.',

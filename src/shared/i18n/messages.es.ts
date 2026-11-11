@@ -2577,6 +2577,8 @@ export const es = {
     'inventory.levels.help':
       'Físico es lo que está en la estantería; comprometido, lo que ya tiene dueño. Disponible es la resta.',
     'inventory.levels.search': 'Buscar por SKU, nombre o almacén',
+    'inventory.movement.notServing':
+      'Este almacén no abastece a esta tienda: el movimiento se guarda, pero su stock no se verá en Existencias ni en la vitrina. Actívalo en Almacenes › Abastece.',
     'inventory.levels.empty': 'Este almacén todavía no tiene existencias',
     'inventory.levels.emptyBody':
       'Registra una entrada o carga la existencia del catálogo desde la pestaña de almacenes.',

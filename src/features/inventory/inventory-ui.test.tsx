@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '@/test/render'
@@ -304,6 +304,25 @@ describe('Inventario — la pantalla', () => {
     await user.type(campo, 'tala')
     await user.click(await screen.findByRole('option', { name: /Taladro/ }))
     expect(campo).toHaveValue('Taladro')
+  })
+
+  it('avisa si el movimiento va a un almacén que no abastece a la tienda', async () => {
+    // Antes la entrada se guardaba y su stock no aparecía en ningún sitio.
+    const user = userEvent.setup()
+    renderInventory(backend({ links: true }))
+    await screen.findByText('CD Lima')
+    await user.click(screen.getByRole('tab', { name: 'Existencias' }))
+    await user.click(await screen.findByRole('button', { name: 'Registrar movimiento' }))
+    const drawer = await screen.findByRole('dialog')
+    const aviso = /no abastece a esta tienda/
+
+    await user.click(within(drawer).getByRole('combobox', { name: 'Almacén' }))
+    await user.click(await screen.findByRole('option', { name: 'LIMA · CD Lima' }))
+    expect(within(drawer).queryByText(aviso)).not.toBeInTheDocument()
+
+    await user.click(within(drawer).getByRole('combobox', { name: 'Almacén' }))
+    await user.click(await screen.findByRole('option', { name: 'ERP-AQP · Arequipa (ERP)' }))
+    expect(await within(drawer).findByText(aviso)).toBeInTheDocument()
   })
 
   it('el libro mayor enseña el motivo y el saldo que dejó cada asiento', async () => {

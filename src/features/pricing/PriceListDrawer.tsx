@@ -41,11 +41,14 @@ export function PriceListDrawer({
   list,
   canWrite,
   onClose,
+  onCreated,
 }: {
   open: boolean
   list: PriceList | null
   canWrite: boolean
   onClose: () => void
+  /** Alta hecha: quien abrió el cajón lo pasa a editar la lista nueva. */
+  onCreated?: (list: PriceList) => void
 }) {
   const { t } = useI18n()
   const { notify } = useFeedback()
@@ -86,7 +89,7 @@ export function PriceListDrawer({
     if (!tenant || !activeCompanyId || !activeStore) return
     setServerError(null)
     try {
-      await save.mutateAsync({
+      const saved = await save.mutateAsync({
         id: list?.id ?? null,
         scope: {
           organizationId: tenant.organization_id,
@@ -97,6 +100,7 @@ export function PriceListDrawer({
       })
       notify(t('pricing.toast.saved'))
       if (list) onClose()
+      else onCreated?.(saved)
     } catch (error) {
       setServerError(error instanceof PricingError ? error.key : 'pricing.error.generic')
     }
