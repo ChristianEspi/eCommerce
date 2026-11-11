@@ -255,8 +255,11 @@ export function ProductsPage() {
    */
   const refrescando = products.isFetching && !products.isPending
 
-  const usage = useProductUsage(deleteTarget?.id ?? null)
   const removeProduct = useDeleteProduct()
+  // Mismo criterio que Categorías: no se pide el uso de lo que se está borrando.
+  const borrandoEste =
+    Boolean(deleteTarget) && removeProduct.variables === deleteTarget?.id && !removeProduct.isError
+  const usage = useProductUsage(borrandoEste ? null : (deleteTarget?.id ?? null))
 
   // Mientras el espacio de trabajo se resuelve NO se dice "no tienes tiendas":
   // sería afirmar algo que todavía no se sabe (mismo criterio que la sesión).

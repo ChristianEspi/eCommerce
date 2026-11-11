@@ -68,9 +68,14 @@ export function CategoriesPage() {
 
   const storeId = activeStore?.id ?? null
   const categories = useCategories(storeId)
-  const usage = useCategoryUsage(deleteTarget?.id ?? null)
   const toggleActive = useSetCategoryActive()
   const removeCategory = useDeleteCategory()
+  // No se pregunta el uso de lo que se está borrando (o ya se borró): entre el
+  // éxito y el cierre del diálogo, la consulta se repetía contra una categoría
+  // inexistente y el servidor respondía 400 CATEGORIA_NO_ENCONTRADA.
+  const borrandoEsta =
+    Boolean(deleteTarget) && removeCategory.variables === deleteTarget?.id && !removeCategory.isError
+  const usage = useCategoryUsage(borrandoEsta ? null : (deleteTarget?.id ?? null))
 
   /**
    * El listado, en orden de ÁRBOL: cada madre seguida de su descendencia.
