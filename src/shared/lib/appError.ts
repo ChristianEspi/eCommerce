@@ -23,6 +23,15 @@ export type PostgrestLike = { message?: string; code?: string } | null | undefin
 
 export const INTERNAL_DB_CODE = 'ERROR_INTERNO'
 
+/**
+ * ¿El error de Postgres nombra esta restricción o tabla? Para distinguir dos
+ * errores con el MISMO código (p. ej. dos `23505` o dos `23514`) sin que el
+ * texto del servidor salga de este módulo: se devuelve un sí/no, no el texto.
+ */
+export function dbErrorMentions(error: PostgrestLike, pattern: RegExp): boolean {
+  return pattern.test(error?.message ?? '')
+}
+
 export function codeFromDbError(error: PostgrestLike): string {
   const raw = (error?.message ?? '').trim()
   const business = /(?:^|[:\s])([A-Z][A-Z0-9_]{3,60}):\s/.exec(raw)?.[1]

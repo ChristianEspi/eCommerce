@@ -1,5 +1,5 @@
 import type { MessageKey } from '@/shared/i18n/messages'
-import { UiError, codeFromDbError, type PostgrestLike } from '@/shared/lib/appError'
+import { UiError, codeFromDbError, dbErrorMentions, type PostgrestLike } from '@/shared/lib/appError'
 
 /**
  * Error del dominio de clientes con una clave de i18n ya resuelta.
@@ -63,7 +63,7 @@ export function customersErrorFromDb(error: PostgrestLike): CustomersError {
   const code = codeFromDbError(error)
   // Una empresa, una cuenta B2B. «Ya existe un registro con ese dato» no dice
   // cuál: el selector deja elegir un cliente que ya tiene la suya.
-  if (code === '23505' && /business_accounts_one_per_customer/.test(error?.message ?? '')) {
+  if (code === '23505' && dbErrorMentions(error, /business_accounts_one_per_customer/)) {
     return new CustomersError('customers.error.accountExists', code)
   }
   return new CustomersError(mapCustomersCode(code), code)

@@ -1,5 +1,5 @@
 import type { MessageKey } from '@/shared/i18n/messages'
-import { UiError, codeFromDbError, type PostgrestLike } from '@/shared/lib/appError'
+import { UiError, codeFromDbError, dbErrorMentions, type PostgrestLike } from '@/shared/lib/appError'
 
 /**
  * Error de inventario con una clave de i18n ya resuelta.
@@ -80,7 +80,7 @@ export function inventoryErrorFromDb(error: PostgrestLike): InventoryError {
   // Un ajuste que deja el físico bajo cero choca con el CHECK de
   // `inventory_levels` (23514). Decir «formato inesperado» no explica nada: lo
   // que pasa es que no hay tanto para sacar.
-  if (code === '23514' && /inventory_levels|on_hand/i.test(error?.message ?? '')) {
+  if (code === '23514' && dbErrorMentions(error, /inventory_levels|on_hand/i)) {
     return new InventoryError('inventory.error.insufficient', 'STOCK_INSUFICIENTE')
   }
   return new InventoryError(mapInventoryCode(code), code)

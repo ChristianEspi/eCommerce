@@ -1,12 +1,10 @@
 import { Button, FormControlLabel, Grid, Stack, Switch, TextField, Typography } from '@mui/material'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { installmentFor, readInstallments, type StoreInstallments } from '@/features/storefront/productDetail'
+import { installmentFor, type StoreInstallments } from '@/features/storefront/productDetail'
 import { useI18n } from '@/shared/i18n/i18n-context'
-import { STORE_SETTINGS_TABLE } from '@/shared/lib/db-schema'
 import { formatMoney } from '@/shared/lib/format'
-import { tryGetSupabaseClient } from '@/shared/lib/supabase'
 import { useFeedback } from '@/shared/ui/feedback-context'
+import { useSaveStoreInstallments, useStoreInstallments } from './installments'
 
 /**
  * Cuotas sin intereses que anuncia la ficha (2026-10-13 · migración
@@ -17,28 +15,11 @@ import { useFeedback } from '@/shared/ui/feedback-context'
  * cobra en cuotas: esto ANUNCIA lo que el medio de pago del comercio ofrece, y
  * por eso pide el nombre del medio y un mínimo.
  */
-const key = (storeId: string | null) => ['admin', 'store-installments', storeId] as const
-
 export function InstallmentsSection({ storeId, canManage }: { storeId: string | null; canManage: boolean }) {
   const { t, locale } = useI18n()
   const { notify } = useFeedback()
-  const queryClient = useQueryClient()
-
-  const current = useQuery({
-    queryKey: key(storeId),
-    enabled: Boolean(storeId),
-    queryFn: async (): Promise<StoreInstallments | null> => {
-      const client = tryGetSupabaseClient()
-      if (!client || !storeId) throw new Error('SIN_BACKEND')
-      const { data, error } = await client
-        .from(STORE_SETTINGS_TABLE)
-        .select('installments')
-        .eq('store_id', storeId)
-        .maybeSingle()
-      if (error) throw error
-      return readInstallments(data?.installments ?? null)
-    },
-  })
+  const current = useStoreInstallments(storeId)
+  const guardar = useSaveStoreInstallments(storeId)
 
   const [enabled, setEnabled] = useState(false)
   const [count, setCount] = useState('3')
@@ -70,19 +51,14 @@ export function InstallmentsSection({ storeId, canManage }: { storeId: string | 
       }
     : null
 
-  const save = useMutation({
-    mutationFn: async () => {
-      const client = tryGetSupabaseClient()
-      if (!client || !storeId) throw new Error('SIN_BACKEND')
-      const { error } = await client.from(STORE_SETTINGS_TABLE).update({ installments: valor }).eq('store_id', storeId)
-      if (error) throw error
-    },
-    onSuccess: () => {
-      notify(t('settings.installments.saved'), 'success')
-      void queryClient.invalidateQueries({ queryKey: key(storeId) })
-    },
-    onError: () => notify(t('settings.installments.error'), 'error'),
-  })
+  const save = {
+    isPending: guardar.isPending,
+    mutate: () =>
+      guardar.mutate(valor, {
+        onSuccess: () => notify(t('settings.installments.saved'), 'success'),
+        onError: () => notify(t('settings.installments.error'), 'error'),
+      }),
+  }
 
   const ejemplo = installmentFor(valido ? valor : null, 100)
   const busy = !canManage || save.isPending
