@@ -98,9 +98,24 @@ const ORIGIN_PUBLICATION = {
 }
 
 function backend(
-  options: { entitlements?: string[]; masters?: ProductMaster[] } = {},
+  options: {
+    entitlements?: string[]
+    masters?: ProductMaster[]
+    bundleItems?: Record<string, unknown>[]
+    /** Atributos y valores extra: p. ej. uno de lista que NO es eje. */
+    extraAttributes?: Record<string, unknown>[]
+    extraValues?: Record<string, unknown>[]
+    productAttributeValues?: Record<string, unknown>[]
+  } = {},
 ): FakeSupabase {
-  const { entitlements = ADVANCED, masters } = options
+  const {
+    entitlements = ADVANCED,
+    masters,
+    bundleItems = [],
+    extraAttributes = [],
+    extraValues = [],
+    productAttributeValues,
+  } = options
   return createFakeSupabase({
     session: makeSession(),
     tables: {
@@ -146,6 +161,7 @@ function backend(
           position: 0,
           is_active: true,
         },
+        ...extraAttributes,
       ],
       attribute_values: [
         {
@@ -158,6 +174,7 @@ function backend(
           position: 0,
           is_active: true,
         },
+        ...extraValues,
       ],
       units_of_measure: [
         {
@@ -200,7 +217,8 @@ function backend(
         },
       ],
       product_uoms: [],
-      bundle_items: [],
+      bundle_items: bundleItems,
+      ...(productAttributeValues ? { product_attribute_values: productAttributeValues } : {}),
       product_relations: [],
       product_images: [],
     },
@@ -430,6 +448,111 @@ describe('El cajón del producto se gatea por `catalog.advanced`', () => {
     expect(await screen.findByRole('option', { name: 'TAL-1 · Taladro percutor' })).toBeInTheDocument()
     // Un kit no puede ser componente de otro kit.
     expect(screen.queryByRole('option', { name: 'KIT-1 · Kit taladro' })).not.toBeInTheDocument()
+  })
+
+  it('el componente del kit enseña su cantidad limpia y se puede quitar', async () => {
+    const kit = { ...variantProduct(), kind: 'bundle' as const, sku: 'KIT-1', name: 'Kit taladro' }
+    const taladro = {
+      ...variantProduct(),
+      id: '77777777-7777-4777-8777-777777777777',
+      kind: 'simple' as const,
+      sku: 'TAL-1',
+      name: 'Taladro percutor',
+      stock: 9,
+    }
+    const ITEM_ID = '66666666-6666-4666-8666-666666666666'
+    const fake = backend({
+      masters: [kit, taladro],
+      bundleItems: [
+        {
+          id: ITEM_ID,
+          organization_id: ORG,
+          company_id: COMPANY_A,
+          store_id: STORE_A,
+          bundle_product_id: PRODUCT_ID,
+          component_product_id: taladro.id,
+          component_kind: 'simple',
+          component_variant_id: null,
+          // numeric de Postgres: llega con seis decimales.
+          quantity: '2.000000',
+          uom_id: null,
+          position: 0,
+        },
+      ],
+    })
+    const user = userEvent.setup()
+    renderDrawer(fake, kit)
+    const drawer = await screen.findByRole('dialog')
+    await user.click(await within(drawer).findByRole('tab', { name: 'Componentes' }))
+
+    const row = (await within(drawer).findByText('Taladro percutor')).closest('tr') as HTMLElement
+    expect(within(row).getByText('2')).toBeInTheDocument()
+    expect(within(row).queryByText('2.000000')).not.toBeInTheDocument()
+
+    await user.click(within(row).getByRole('button', { name: 'Quitar Taladro percutor del kit' }))
+    await waitFor(() => expect(fake.state.tables.bundle_items).toHaveLength(0))
+    expect(await within(drawer).findByText('Este kit todavía no tiene componentes')).toBeInTheDocument()
+  })
+
+  it('elegir «Sin asignar» en un atributo de lista quita el valor guardado', async () => {
+    // Antes el cambio a vacío se ignoraba: rellenado una vez, no tenía vuelta.
+    const MATERIAL = '99999999-9999-4999-8999-999999999a01'
+    const ACERO = '99999999-9999-4999-8999-999999999a02'
+    const fake = backend({
+      extraAttributes: [
+        {
+          id: MATERIAL,
+          organization_id: ORG,
+          company_id: COMPANY_A,
+          code: 'material',
+          name: 'Material',
+          data_type: 'option',
+          unit: null,
+          is_variant_axis: false,
+          is_filterable: true,
+          position: 1,
+          is_active: true,
+        },
+      ],
+      extraValues: [
+        {
+          id: ACERO,
+          organization_id: ORG,
+          company_id: COMPANY_A,
+          attribute_id: MATERIAL,
+          code: 'acero',
+          label: 'Acero',
+          position: 0,
+          is_active: true,
+        },
+      ],
+      productAttributeValues: [
+        {
+          id: '99999999-9999-4999-8999-999999999a03',
+          organization_id: ORG,
+          company_id: COMPANY_A,
+          store_id: STORE_A,
+          product_id: PRODUCT_ID,
+          attribute_id: MATERIAL,
+          value_id: ACERO,
+          value_text: null,
+          value_number: null,
+          value_boolean: null,
+          value_date: null,
+        },
+      ],
+    })
+    const user = userEvent.setup()
+    renderDrawer(fake, { ...variantProduct(), kind: 'simple' })
+    const drawer = await screen.findByRole('dialog')
+    await user.click(await within(drawer).findByRole('tab', { name: 'Ficha técnica' }))
+
+    const material = await within(drawer).findByRole('combobox', { name: 'Material' })
+    await waitFor(() => expect(material).toHaveTextContent('Acero'))
+    await user.click(material)
+    await user.click(await screen.findByRole('option', { name: 'Sin asignar' }))
+
+    await waitFor(() => expect(fake.state.tables.product_attribute_values).toHaveLength(0))
   })
 
   it('un producto simple no ofrece la pestaña de componentes de kit', async () => {

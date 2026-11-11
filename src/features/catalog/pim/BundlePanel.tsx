@@ -7,6 +7,7 @@ import {
   Button,
   Chip,
   Collapse,
+  IconButton,
   MenuItem,
   Stack,
   Table,
@@ -17,6 +18,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
+import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
 import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -25,7 +27,7 @@ import { LoadingState } from '@/shared/ui/states'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { CatalogError } from '../api/errors'
 import { PanelHint } from './VariantsPanel'
-import { useAddBundleItem, useBundleItems, useUnits, useVariants } from './hooks'
+import { useAddBundleItem, useBundleItems, useDeleteBundleItem, useUnits, useVariants } from './hooks'
 import {
   assemblableUnits,
   bundleItemFormSchema,
@@ -70,6 +72,7 @@ export function BundlePanel({
   const items = useBundleItems(productId)
   const units = useUnits(Boolean(productId))
   const add = useAddBundleItem()
+  const remove = useDeleteBundleItem()
   const [open, setOpen] = useState(false)
 
   const candidates = useMemo(
@@ -128,6 +131,17 @@ export function BundlePanel({
     setOpen(false)
   }
 
+  // Sin esto un componente puesto por error no tenía arreglo: la receta solo
+  // crecía. La política `bundle_items_delete_catalog` ya lo permitía.
+  async function onRemove(id: string) {
+    try {
+      await remove.mutateAsync(id)
+      notify(t('pim.bundle.removed'))
+    } catch (error) {
+      notify(t(error instanceof CatalogError ? error.key : 'catalog.error.generic'), 'error')
+    }
+  }
+
   return (
     <Stack spacing={2}>
       <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
@@ -173,6 +187,7 @@ export function BundlePanel({
               <TableCell align="right">{t('pim.field.quantity')}</TableCell>
               <TableCell>{t('pim.tab.units')}</TableCell>
               <TableCell align="right">{t('catalog.field.stock')}</TableCell>
+              {canWrite && <TableCell align="right">{t('common.actions')}</TableCell>}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -187,7 +202,8 @@ export function BundlePanel({
                     )}
                   </TableCell>
                   <TableCell align="right" className="tnum">
-                    {item.quantity}
+                    {/* La columna es numeric: llega como "1.000000". */}
+                    {formatQuantity(item.quantity)}
                   </TableCell>
                   <TableCell sx={{ color: 'var(--muted)' }}>
                     {item.uom_id ? (unitLabel.get(item.uom_id) ?? '') : t('pim.field.base')}
@@ -195,6 +211,18 @@ export function BundlePanel({
                   <TableCell align="right" className="tnum">
                     {component && !item.component_variant_id ? component.stock : '—'}
                   </TableCell>
+                  {canWrite && (
+                    <TableCell align="right">
+                      <IconButton
+                        size="small"
+                        aria-label={t('pim.bundle.remove').replace('{name}', component?.name ?? '')}
+                        disabled={remove.isPending}
+                        onClick={() => void onRemove(item.id)}
+                      >
+                        <DeleteOutlineRoundedIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  )}
                 </TableRow>
               )
             })}
@@ -214,6 +242,12 @@ export function BundlePanel({
       )}
     </Stack>
   )
+}
+
+/** "1.000000" → "1"; "2.500000" → "2.5". Sin redondear lo que la receta guarda. */
+function formatQuantity(value: string | number): string {
+  const n = Number(value)
+  return Number.isFinite(n) ? String(n) : String(value)
 }
 
 function BundleItemForm({

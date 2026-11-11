@@ -1000,7 +1000,9 @@ describe('ProductsPage — eliminacion segura (contrato §4.2)', () => {
     expect(within(dialog).getByRole('button', { name: 'Gestionar tiendas' })).toBeInTheDocument()
   })
 
-  it('borrar pasa por el comando del servidor, que lo niega si sigue publicado', async () => {
+  it('con el producto aún en alguna tienda no se ofrece un borrado que el servidor niega', async () => {
+    // Antes el diálogo enseñaba «Eliminar de todas formas» y el servidor
+    // respondía PRODUCTO_PUBLICADO siempre: un botón que nunca funcionaba.
     const user = userEvent.setup()
     const fake = backend()
     renderPage(fake)
@@ -1008,7 +1010,27 @@ describe('ProductsPage — eliminacion segura (contrato §4.2)', () => {
     const row = await rowActions()
     await user.click(row.getByRole('button', { name: /Eliminar: Silla A/ }))
     const dialog = await screen.findByRole('dialog')
-    await user.click(within(dialog).getByRole('button', { name: 'Eliminar de todas formas' }))
+    await within(dialog).findByText('Tiendas donde está publicado')
+
+    await waitFor(() =>
+      expect(within(dialog).queryByRole('button', { name: 'Eliminar de todas formas' })).not.toBeInTheDocument(),
+    )
+    expect(within(dialog).getByRole('button', { name: 'Gestionar tiendas' })).toBeInTheDocument()
+    expect(fake.state.rpcCalls.some((call) => call.name === 'delete_product_master')).toBe(false)
+  })
+
+  it('si el servidor aun así lo niega, se explica por qué', async () => {
+    // Carrera: el conteo decía 0 tiendas, pero alguien lo publicó entretanto.
+    const user = userEvent.setup()
+    const fake = backend()
+    const usage = fake.state.rpc.product_deletion_usage as () => Record<string, unknown>
+    fake.state.rpc.product_deletion_usage = () => ({ ...usage(), publications: 0 })
+    renderPage(fake)
+
+    const row = await rowActions()
+    await user.click(row.getByRole('button', { name: /Eliminar: Silla A/ }))
+    const dialog = await screen.findByRole('dialog')
+    await user.click(await within(dialog).findByRole('button', { name: 'Eliminar de todas formas' }))
 
     await waitFor(() => expect(fake.state.rpcCalls.some((call) => call.name === 'delete_product_master')).toBe(true))
     expect(
@@ -1020,12 +1042,14 @@ describe('ProductsPage — eliminacion segura (contrato §4.2)', () => {
     const user = userEvent.setup()
     const fake = backend()
     fake.state.rpc.delete_product_master = () => null
+    const usage = fake.state.rpc.product_deletion_usage as () => Record<string, unknown>
+    fake.state.rpc.product_deletion_usage = () => ({ ...usage(), publications: 0 })
     renderPage(fake)
 
     const row = await rowActions()
     await user.click(row.getByRole('button', { name: /Eliminar: Silla A/ }))
     const dialog = await screen.findByRole('dialog')
-    await user.click(within(dialog).getByRole('button', { name: 'Eliminar de todas formas' }))
+    await user.click(await within(dialog).findByRole('button', { name: 'Eliminar de todas formas' }))
 
     expect(await screen.findByText('Producto eliminado')).toBeInTheDocument()
   })

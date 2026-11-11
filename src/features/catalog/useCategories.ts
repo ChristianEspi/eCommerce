@@ -97,9 +97,18 @@ export function useSetCategoryActive() {
 }
 
 export function useDeleteCategory() {
-  const invalidate = useInvalidateCategories()
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (categoryId: string) => deleteCategory(categoryId),
-    onSuccess: invalidate,
+    onSuccess: (_, categoryId) => {
+      // El uso de la categoría borrada ya no existe: si se invalida con el resto
+      // del catálogo, el diálogo lo vuelve a pedir y el servidor responde 400
+      // CATEGORIA_NO_ENCONTRADA. Se quita de la caché sin volver a consultarlo.
+      queryClient.removeQueries({ queryKey: categoryUsageKey(categoryId) })
+      void queryClient.invalidateQueries({
+        queryKey: CATALOG_KEY,
+        predicate: (query) => query.queryKey[1] !== 'category-usage',
+      })
+    },
   })
 }

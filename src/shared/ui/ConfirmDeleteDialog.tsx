@@ -41,6 +41,7 @@ export function ConfirmDeleteDialog({
   onDelete,
   onClose,
   isBusy = false,
+  blocked = false,
 }: {
   open: boolean
   title: string
@@ -55,6 +56,12 @@ export function ConfirmDeleteDialog({
   onDelete: () => void
   onClose: () => void
   isBusy?: boolean
+  /**
+   * El servidor NO dejará borrar (p. ej. un producto que sigue en alguna
+   * tienda). Ofrecer «Eliminar de todas formas» sería un botón que siempre
+   * falla: se oculta y queda solo la alternativa segura.
+   */
+  blocked?: boolean
 }) {
   const t = useT()
   const inUse = usage.some((line) => line.count > 0)
@@ -98,7 +105,7 @@ export function ConfirmDeleteDialog({
             </Stack>
           )}
 
-          {!isLoadingUsage && !usageError && inUse && (
+          {!isLoadingUsage && !usageError && inUse && !blocked && (
             <Alert severity="warning">{t('catalog.delete.inUse')}</Alert>
           )}
 
@@ -111,9 +118,11 @@ export function ConfirmDeleteDialog({
         <Button onClick={onClose} disabled={isBusy}>
           {t('common.cancel')}
         </Button>
-        <Button color="error" onClick={onDelete} disabled={isBusy || isLoadingUsage}>
-          {inUse ? t('catalog.delete.anyway') : t('catalog.delete.confirm')}
-        </Button>
+        {!blocked && (
+          <Button color="error" onClick={onDelete} disabled={isBusy || isLoadingUsage}>
+            {inUse ? t('catalog.delete.anyway') : t('catalog.delete.confirm')}
+          </Button>
+        )}
         {safeActionLabel && onSafeAction && (
           <Button variant="contained" onClick={onSafeAction} disabled={isBusy}>
             {safeActionLabel}

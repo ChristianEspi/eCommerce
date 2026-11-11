@@ -659,6 +659,9 @@ export function ProductsPage() {
         onDelete={() => void onDelete()}
         onClose={() => setDeleteTarget(null)}
         isBusy={removeProduct.isPending}
+        // `delete_product_master` rechaza cualquier producto con fila en
+        // `store_products` (también en borrador): no se ofrece un botón que falla.
+        blocked={(usage.data?.publications ?? 0) > 0}
       />
     </>
   )

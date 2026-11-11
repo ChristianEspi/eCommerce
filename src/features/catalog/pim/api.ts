@@ -518,6 +518,11 @@ export async function fetchProductAttributes(
  * omitirse: en un `update` parcial, omitirlas dejaría el valor anterior y la
  * fila tendría dos.
  */
+/** Vacía un atributo del producto: sin fila, la ficha vuelve a "sin asignar". */
+export async function clearProductAttribute(id: string): Promise<void> {
+  await deleteRow(PRODUCT_ATTRIBUTE_VALUES_TABLE, id)
+}
+
 export async function saveProductAttribute(input: {
   id?: string | null
   productId: string
@@ -603,6 +608,11 @@ export async function addBundleItem(input: {
       uom_id: input.values.uom_id || null,
     })
   if (error) throw catalogErrorFromDb(error)
+}
+
+/** Quita un componente de la receta. RLS (`bundle_items_delete_catalog`) decide quién puede. */
+export async function deleteBundleItem(id: string): Promise<void> {
+  await deleteRow(BUNDLE_ITEMS_TABLE, id)
 }
 
 // ---------------------------------------------------------------------------

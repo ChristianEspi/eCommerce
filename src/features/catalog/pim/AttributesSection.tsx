@@ -468,7 +468,7 @@ function AttributeValuesPanel({
         <Typography component="h3" sx={{ fontSize: 15, fontWeight: 800 }}>
           {t('pim.values.title')}
         </Typography>
-        <Typography sx={{ color: 'var(--muted)' }}>{t('pim.variants.saveFirst')}</Typography>
+        <Typography sx={{ color: 'var(--muted)' }}>{t('pim.attributes.saveFirst')}</Typography>
       </Stack>
     )
   }

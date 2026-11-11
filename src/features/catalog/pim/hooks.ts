@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   addBundleItem,
+  deleteBundleItem,
   addRelation,
   deleteRelation,
   deleteRow,
@@ -21,6 +22,7 @@ import {
   saveBrand,
   saveFamily,
   saveProductAttribute,
+  clearProductAttribute,
   saveProductUom,
   saveUnit,
   saveVariant,
@@ -240,6 +242,11 @@ export function useSaveProductUom() {
   return useMutation({ mutationFn: saveProductUom, onSuccess: invalidate })
 }
 
+export function useClearProductAttribute() {
+  const invalidate = useInvalidatePim()
+  return useMutation({ mutationFn: clearProductAttribute, onSuccess: invalidate })
+}
+
 export function useSaveProductAttribute() {
   const invalidate = useInvalidatePim()
   return useMutation({ mutationFn: saveProductAttribute, onSuccess: invalidate })
@@ -248,6 +255,11 @@ export function useSaveProductAttribute() {
 export function useAddBundleItem() {
   const invalidate = useInvalidatePim()
   return useMutation({ mutationFn: addBundleItem, onSuccess: invalidate })
+}
+
+export function useDeleteBundleItem() {
+  const invalidate = useInvalidatePim()
+  return useMutation({ mutationFn: deleteBundleItem, onSuccess: invalidate })
 }
 
 export function useAddRelation() {

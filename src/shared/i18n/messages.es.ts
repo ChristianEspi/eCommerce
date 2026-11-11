@@ -1133,7 +1133,7 @@ export const es = {
     'catalog.error.description': 'La descripción es demasiado larga',
     'catalog.error.price': 'Escribe un importe con hasta 2 decimales, por ejemplo 19.90',
     'catalog.error.stock': 'Escribe una cantidad entera, cero o mayor',
-    'catalog.error.duplicate': 'Ya existe otro registro con ese SKU o esa dirección.',
+    'catalog.error.duplicate': 'Ya existe otro registro con ese código, SKU o dirección.',
     'catalog.error.forbidden': 'Tu rol no puede hacer este cambio en el catálogo.',
     'catalog.error.notFound': 'Ese registro ya no existe. Vuelve a cargar el listado.',
     'catalog.error.invalid': 'Revisa los datos: alguno no cumple el formato esperado.',

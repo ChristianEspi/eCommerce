@@ -16,6 +16,7 @@ import { PanelHint } from './VariantsPanel'
 import {
   useAttributeValues,
   useAttributes,
+  useClearProductAttribute,
   useProductAttributes,
   useSaveProductAttribute,
 } from './hooks'
@@ -57,6 +58,7 @@ export function ProductAttributesPanel({
   const options = useAttributeValues(Boolean(productId))
   const assigned = useProductAttributes(productId)
   const save = useSaveProductAttribute()
+  const clear = useClearProductAttribute()
   const [error, setError] = useState<MessageKey | null>(null)
 
   const byAttribute = useMemo(() => {
@@ -105,6 +107,20 @@ export function ProductAttributesPanel({
     }
   }
 
+  // Elegir "Sin asignar" o vaciar el campo QUITA el valor. Antes se ignoraba:
+  // una vez rellenado, el atributo no tenía vuelta atrás.
+  async function unset(attributeId: string) {
+    const row = byAttribute.get(attributeId)
+    if (!row) return
+    setError(null)
+    try {
+      await clear.mutateAsync(row.id)
+      notify(t('pim.toast.saved'))
+    } catch (caught) {
+      setError(caught instanceof CatalogError ? caught.key : 'catalog.error.generic')
+    }
+  }
+
   return (
     <Stack spacing={2}>
       <Typography component="h3" sx={{ fontSize: 15, fontWeight: 800 }}>
@@ -135,7 +151,10 @@ export function ProductAttributesPanel({
                   disabled={!canWrite}
                   value={row?.value_id ?? ''}
                   onChange={(event) => {
-                    if (!event.target.value) return
+                    if (!event.target.value) {
+                      void unset(attribute.id)
+                      return
+                    }
                     void write(attribute.id, { kind: 'option', optionId: event.target.value })
                   }}
                 >
@@ -198,7 +217,10 @@ export function ProductAttributesPanel({
                 }
                 onBlur={(event) => {
                   const raw = event.target.value.trim()
-                  if (!raw) return
+                  if (!raw) {
+                    void unset(attribute.id)
+                    return
+                  }
                   if (attribute.data_type === 'number') {
                     if (!/^-?\d{1,12}(\.\d{1,6})?$/.test(raw)) {
                       setError('pim.error.factor')

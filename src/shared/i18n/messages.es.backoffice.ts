@@ -282,6 +282,7 @@ export const esBackoffice = {
   'pim.variants.needsKind':
       'Cambia el tipo de producto a «Con variantes» y guarda para poder añadirlas.',
   'pim.variants.saveFirst': 'Guarda el producto y podrás añadir sus variantes aquí.',
+  'pim.attributes.saveFirst': 'Guarda el atributo y podrás añadir sus valores admitidos aquí.',
   'pim.variants.default': 'Por defecto',
   'pim.variants.makeDefault': 'Preseleccionada en la ficha',
   'pim.variants.inherited': 'Hereda del producto',
@@ -307,6 +308,8 @@ export const esBackoffice = {
       'Un kit no tiene existencia propia: se calcula por sus componentes al vender.',
   'pim.bundle.assemblable': 'Kits que se pueden armar ahora',
   'pim.bundle.noComponents': 'Un kit sin componentes no se puede vender.',
+  'pim.bundle.remove': 'Quitar {name} del kit',
+  'pim.bundle.removed': 'Componente quitado del kit',
   'pim.productAttributes.title': 'Ficha técnica',
   'pim.productAttributes.empty': 'Todavía no hay atributos definidos para rellenar',
   'pim.productAttributes.help':
