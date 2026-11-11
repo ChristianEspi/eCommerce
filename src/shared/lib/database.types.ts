@@ -6242,6 +6242,7 @@ export type Database = {
           shipping_total: number
           source_channel: Database["public"]["Enums"]["order_source_channel"]
           status: Database["public"]["Enums"]["order_status"]
+          stock_restored_at: string | null
           store_id: string
           subtotal: number
           tax_inclusive: boolean
@@ -6283,6 +6284,7 @@ export type Database = {
           shipping_total?: number
           source_channel?: Database["public"]["Enums"]["order_source_channel"]
           status?: Database["public"]["Enums"]["order_status"]
+          stock_restored_at?: string | null
           store_id: string
           subtotal?: number
           tax_inclusive?: boolean
@@ -6324,6 +6326,7 @@ export type Database = {
           shipping_total?: number
           source_channel?: Database["public"]["Enums"]["order_source_channel"]
           status?: Database["public"]["Enums"]["order_status"]
+          stock_restored_at?: string | null
           store_id?: string
           subtotal?: number
           tax_inclusive?: boolean
@@ -13503,6 +13506,10 @@ export type Database = {
       }
       my_order_schedules: { Args: { p_store_slug: string }; Returns: Json }
       my_order_suggestions: { Args: never; Returns: Json }
+      my_order_token: {
+        Args: { p_order_number: string; p_store_slug: string }
+        Returns: string
+      }
       my_pending_business_accounts: { Args: never; Returns: Json }
       my_product_favorites: {
         Args: { p_store_id: string }
@@ -13933,6 +13940,10 @@ export type Database = {
           p_order_id: string
           p_reason_code: string
         }
+        Returns: Json
+      }
+      return_options_for_slug: {
+        Args: { p_order_number: string; p_store_slug: string; p_token: string }
         Returns: Json
       }
       return_receive: {

@@ -16,6 +16,7 @@ import {
   RETURN_CANCEL_RPC,
   RETURN_COMPLETE_RPC,
   RETURN_DECIDE_RPC,
+  RETURN_OPEN_RPC,
   RETURN_EVENTS_TABLE,
   RETURN_INSPECT_RPC,
   RETURN_ITEMS_TABLE,
@@ -575,6 +576,27 @@ export async function fetchReturnReasons(storeId: string | null): Promise<Return
     .order('position', { ascending: true })
   if (error) throw fulfillmentErrorFromDb(error)
   return (data ?? []).map((row) => returnReasonSchema.parse(row))
+}
+
+/**
+ * Abre una devolución desde el backoffice (teléfono, mostrador). El servidor
+ * valida que el operador pueda operar el pedido y que las líneas sean suyas.
+ */
+export async function openReturn(input: {
+  orderId: string
+  reasonCode: string
+  items: Array<{ order_item_id: string; quantity: number }>
+  note: string
+}): Promise<{ rma_number: string }> {
+  const { data, error } = await client().rpc(RETURN_OPEN_RPC, {
+    p_order_id: input.orderId,
+    p_reason_code: input.reasonCode,
+    p_items: input.items,
+    p_note: input.note.trim() === '' ? null : input.note.trim(),
+  })
+  if (error) throw fulfillmentErrorFromDb(error)
+  const rma = (data as { rma_number?: unknown } | null)?.rma_number
+  return { rma_number: typeof rma === 'string' ? rma : '' }
 }
 
 export async function decideReturn(input: {

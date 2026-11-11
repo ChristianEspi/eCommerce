@@ -10,6 +10,7 @@ import type { MessageKey } from '@/shared/i18n/messages'
 import { formatMoney } from '@/shared/lib/format'
 import { useDocumentMeta } from '@/shared/seo/useDocumentMeta'
 import { R, TS } from '@/theme/tokens'
+import { OrderReturnsSection } from './returns/OrderReturnsSection'
 import { fetchOrderByToken } from './api'
 import { addLinesToCart } from './cart/addLinesToCart'
 import { useCart } from './cart/cart-context'
@@ -344,6 +345,12 @@ export function StoreOrderPage() {
             strong
           />
         </Card>
+      )}
+
+      {/* 2026-11-11 · Devolver desde el propio pedido: solo con el token, que
+          es la autorización, y solo si ya se entregó. */}
+      {order && token && storeSlug && orderNumber && (
+        <OrderReturnsSection storeSlug={storeSlug} orderNumber={orderNumber} token={token} />
       )}
 
       {/* P09 · con que se paga, y que hay que hacer para pagarlo.

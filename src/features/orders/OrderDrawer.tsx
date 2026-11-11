@@ -35,6 +35,7 @@ import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
 import { useAiFeature } from '@/features/ai/hooks'
 import { OrderAiPanel } from './ai/OrderAiPanel'
+import { OpenReturnSection } from '@/features/fulfillment/OpenReturnSection'
 import type { OrderDrawerTab } from './ai/ordersAi'
 import { OrderError } from './errors'
 import {
@@ -804,6 +805,24 @@ export function OrderDrawer({
           )}
         </Stack>
       </Section>
+
+      {/* 2026-11-11 · Devolución por teléfono o mostrador. Solo con el pedido
+          entregado y sin cancelar: antes de la entrega, lo que procede es
+          cancelar. */}
+      {canWrite && current.status !== 'cancelled' && current.fulfillment_status === 'fulfilled' && items.data && (
+        <Section title={t('returns.open.title')} hint={t('returns.open.hint')}>
+          <OpenReturnSection
+            orderId={current.id}
+            storeId={current.store_id}
+            lines={items.data.map((item) => ({
+              id: item.id,
+              name: item.name,
+              variant_label: item.variant_label,
+              quantity: item.quantity,
+            }))}
+          />
+        </Section>
+      )}
 
       <Section title={t('orders.tags')}>
         <Stack spacing={1.5}>

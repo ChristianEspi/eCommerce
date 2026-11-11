@@ -116,7 +116,32 @@ beforeAll(async () => {
   )
   const privada = await lista('mayorista', 'segment', segmento)
   await renglon(privada, productP, 5, '40.00')
+
+  // 2026-11-11 · Un comprador B2B de ese segmento (20261111140000).
+  const cliente = await one(
+    `insert into public.customers (organization_id, company_id, kind, code, name, segment_id)
+     values ($1, $2, 'company', 'CLI-HOTEL', 'Hotel Sol', $3) returning id`,
+    [TENANT_A.organizationId, TENANT_A.companyId, segmento],
+  )
+  const cuenta = await one(
+    `insert into public.business_accounts (organization_id, company_id, customer_id, code, name)
+     values ($1, $2, $3, 'HOTEL', 'Hotel Sol') returning id`,
+    [TENANT_A.organizationId, TENANT_A.companyId, cliente],
+  )
+  await svc(
+    `insert into public.business_account_users (organization_id, company_id, business_account_id, user_id, email, role, status)
+     values ($1, $2, $3, $4, 'compras@hotel.test', 'buyer', 'active')`,
+    [TENANT_A.organizationId, TENANT_A.companyId, cuenta, COMPRADOR],
+  )
 }, 240_000)
+
+const COMPRADOR = '0a000000-0000-4000-8000-0000000000c7'
+async function tiersComo(sub: string, slug: string, product: string) {
+  const rows = await asRole(db, 'authenticated', { sub, email: 'compras@hotel.test', role: 'authenticated' } as never, () =>
+    sql(`select public.product_price_tiers_for_slug($1, $2) as r`, [slug, product]),
+  )
+  return ((rows[0]?.r as Row).tiers ?? []) as Array<{ min_quantity: string; unit_price: string }>
+}
 
 afterAll(async () => {
   await db?.close()
@@ -150,3 +175,17 @@ describe('product_price_tiers_for_slug', () => {
     expect(await tiers(TENANT_A.storeSlug, productQ)).toEqual([{ min_quantity: '1', unit_price: '70.00' }])
   })
 })
+
+describe('el comprador B2B ve SU escala (20261111140000)', () => {
+  it('con cuenta en el segmento mayorista, la ficha anuncia lo que su carrito cobra', async () => {
+    const escalas = await tiersComo(COMPRADOR, TENANT_A.storeSlug, productP)
+    expect(escalas.map((t) => Number(t.unit_price))).toEqual([70, 40])
+    expect(Number(escalas[1]?.min_quantity)).toBe(5)
+  })
+
+  it('sin cuenta B2B, una sesión cualquiera sigue viendo la escala pública', async () => {
+    const escalas = await tiersComo('0a000000-0000-4000-8000-0000000000c8', TENANT_A.storeSlug, productP)
+    expect(escalas.map((t) => Number(t.unit_price))).toEqual([70, 63, 59.5])
+  })
+})
+

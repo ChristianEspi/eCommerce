@@ -495,7 +495,9 @@ insert into public.return_reasons (id, organization_id, company_id, store_id, co
   ('d0000000-0000-4000-8000-f00000000542','d0000000-0000-4000-8000-000000000001','d0000000-0000-4000-8000-0000000000c1','d0000000-0000-4000-8000-0000000000a1','vencimiento','Vencimiento corto','Llego con la fecha de vencimiento demasiado proxima',true,false,true,20),
   ('d0000000-0000-4000-8000-f00000000543','d0000000-0000-4000-8000-000000000001','d0000000-0000-4000-8000-0000000000c1','d0000000-0000-4000-8000-0000000000a1','tarde','Llego tarde','Fuera del plazo comprometido',false,true,true,30),
   ('d0000000-0000-4000-8000-f00000000544','d0000000-0000-4000-8000-000000000001','d0000000-0000-4000-8000-0000000000c1','d0000000-0000-4000-8000-0000000000a1','equivocado','Producto equivocado','No corresponde al pedido',true,true,true,40)
-on conflict (id) do nothing;
+-- Sin destino: desde 20261111130000 la tienda ya nace con motivos de serie y
+-- `equivocado` coincide con uno; el de la demo no debe romper la carga.
+on conflict do nothing;
 
 -- Devoluciones en estados distintos: una cola donde todo esta resuelto no deja
 -- ver los tabs de estado ni el color de cada uno.

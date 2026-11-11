@@ -1725,3 +1725,52 @@ describe('botón flotante del asistente (N07)', () => {
     expect(await screen.findByRole('button', { name: ASISTENTE })).toBeInTheDocument()
   })
 })
+
+/**
+ * 2026-11-11 · Devoluciones desde la página del pedido (20261111130000).
+ */
+describe('devoluciones desde la página del pedido', () => {
+  const TOKEN = 'a'.repeat(64)
+  const LINEA = '99999999-9999-4999-8999-0000000000f1'
+  function conPedido(opciones: Record<string, unknown>) {
+    const fake = backend()
+    fake.state.rpc.order_by_token = () => ({
+      order_number: 'EC-1', status: 'fulfilled', payment_status: 'paid', approval_status: null,
+      fulfillment_status: 'fulfilled', currency: 'PEN', placed_at: '2026-11-11T10:00:00Z', customer_name: 'Ana',
+      subtotal: '100.00', tax_total: '0.00', discount_total: '0.00', shipping_total: '0.00', grand_total: '100.00',
+      shipping_address: {}, deliveries: [], items: [{ sku: 'SILLA', name: 'Silla de roble', unit_price: '100.00', quantity: 2 }],
+    })
+    fake.state.rpc.return_options_for_slug = () => opciones
+    return fake
+  }
+
+  it('entregado: pide la devolución con línea, cantidad y motivo, y muestra el RMA', async () => {
+    const user = userEvent.setup()
+    const enviado: Record<string, unknown>[] = []
+    const fake = conPedido({
+      returnable: true, reason: null,
+      items: [{ order_item_id: LINEA, sku: 'SILLA', name: 'Silla de roble', variant_label: null, quantity: 2, available: 2 }],
+      reasons: [{ code: 'defectuoso', label: 'Llegó dañado o no funciona', description: null, requires_evidence: true }],
+      requests: [],
+    })
+    fake.state.rpc.return_request_for_slug = (args) => { enviado.push(args); return { return_request_id: 'x', rma_number: 'RMA-20261111-00001', state: 'requested' } }
+    renderStorefront(fake, `/s/casa-nordica/order/EC-1?t=${TOKEN}`)
+
+    await user.click(await screen.findByRole('button', { name: 'Solicitar devolución' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Silla de roble' }))
+    await user.click(screen.getByRole('radio', { name: 'Llegó dañado o no funciona' }))
+    await user.click(screen.getByRole('button', { name: 'Enviar solicitud' }))
+
+    expect(await screen.findByText(/RMA-20261111-00001/)).toBeInTheDocument()
+    expect(enviado[0]).toMatchObject({ p_token: TOKEN, p_reason_code: 'defectuoso', p_items: [{ order_item_id: LINEA, quantity: 1 }] })
+  })
+
+  it('sin entregar no se ofrece devolver', async () => {
+    renderStorefront(
+      conPedido({ returnable: false, reason: 'not_delivered', items: [], reasons: [], requests: [] }),
+      `/s/casa-nordica/order/EC-1?t=${TOKEN}`,
+    )
+    await screen.findByText('Detalle del pedido')
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Solicitar devolución' })).not.toBeInTheDocument())
+  })
+})

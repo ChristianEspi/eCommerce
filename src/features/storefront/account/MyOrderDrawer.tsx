@@ -13,7 +13,8 @@ import { TS } from '@/theme/tokens'
 import { addLinesToCart } from '../cart/addLinesToCart'
 import { CartContext } from '../cart/cart-context'
 import { consumerOrderDetailKey, fetchConsumerOrderDetail, formatSavedAddress } from '../consumer'
-import { fetchMyOrderDetail, myOrderDetailKey } from '../portal'
+import { fetchMyOrderDetail, fetchMyOrderToken, myOrderDetailKey } from '../portal'
+import { useNavigate } from 'react-router-dom'
 import { EstadoChip } from './EstadoChip'
 
 /** De quién son los pedidos que se enseñan: de la empresa o de la persona. */
@@ -74,6 +75,17 @@ export function MyOrderDrawer({
   })
 
   const detail = query.data ?? null
+  const navigate = useNavigate()
+  // Seguimiento y devoluciones viven en la página del pedido, que se abre con
+  // su token. El servidor solo se lo da a quien compró (my_order_token).
+  const abrirPedido = useMutation({
+    mutationFn: () => fetchMyOrderToken(storeSlug, orderNumber ?? ''),
+    onSuccess: (token) => {
+      onClose()
+      navigate(`/s/${storeSlug}/order/${encodeURIComponent(orderNumber ?? '')}?t=${token}`)
+    },
+    onError: () => notify(t('account.orders.openError'), 'error'),
+  })
   const money = (value: string) => formatMoney(Number(value), detail?.currency ?? 'PEN', locale)
 
   /**
@@ -322,6 +334,12 @@ export function MyOrderDrawer({
             <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>
               {t('account.orders.reorderHint')}
             </Typography>
+          )}
+
+          {storeSlug && orderNumber && (
+            <Button variant="outlined" onClick={() => abrirPedido.mutate()} disabled={abrirPedido.isPending} sx={{ mt: 1 }}>
+              {t('account.orders.openOrder')}
+            </Button>
           )}
         </Stack>
       )}

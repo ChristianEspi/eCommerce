@@ -1380,3 +1380,98 @@ describe('el pedido sigue sin aceptar nada del navegador', () => {
     }
   })
 })
+
+/**
+ * 2026-11-11 · Cancelar devuelve la existencia (20261111120000).
+ *
+ * Antes, cancelar dejaba lo vendido descontado para siempre: el inventario
+ * se desfasaba hacia abajo con cada anulación.
+ */
+describe('cancelar un pedido devuelve lo vendido al almacén', () => {
+  async function cancel(orderId: unknown) {
+    await svc(`update public.orders set status = 'cancelled' where id = $1`, [orderId])
+  }
+
+  it('camino de almacén: un asiento `return` por cada salida, y el saldo vuelve', async () => {
+    await receive(lima, jabon, 10)
+    const order = await checkout(STORE_A_SLUG, [{ product_id: jabon, quantity: 3 }], { email: 'cancela1@compra.com' })
+    expect(Number((await level(lima, jabon)).on_hand)).toBe(7)
+
+    await cancel(order.order_id)
+
+    expect(Number((await level(lima, jabon)).on_hand)).toBe(10)
+    const movs = await svc(
+      `select kind::text as kind, quantity::float8 as q from public.inventory_movements
+        where reference_id = $1 order by created_at`,
+      [order.order_id],
+    )
+    expect(movs.map((m) => `${m.kind}:${m.q}`)).toEqual(['issue:-3', 'return:3'])
+    const [o] = await svc(`select stock_restored_at from public.orders where id = $1`, [order.order_id])
+    expect(o?.stock_restored_at).not.toBeNull()
+  })
+
+  it('un kit devuelve sus componentes, no una existencia propia', async () => {
+    await receive(lima, jabon, 10)
+    await receive(lima, camiseta, 3, camisetaRoja)
+    const order = await checkout(STORE_A_SLUG, [{ product_id: kit, quantity: 1 }], { email: 'cancela2@compra.com' })
+    expect(Number((await level(lima, jabon)).on_hand)).toBe(8)
+    expect(Number((await level(lima, camiseta, camisetaRoja)).on_hand)).toBe(2)
+
+    await cancel(order.order_id)
+
+    expect(Number((await level(lima, jabon)).on_hand)).toBe(10)
+    expect(Number((await level(lima, camiseta, camisetaRoja)).on_hand)).toBe(3)
+  })
+
+  it('camino de catálogo (sin almacenes): vuelve a `products.stock`', async () => {
+    await svc(`update public.warehouses set is_active = false`)
+    const order = await checkout(STORE_A_SLUG, [{ product_id: jabon, quantity: 4 }], { email: 'cancela3@compra.com' })
+    const [antes] = await svc(`select stock from public.products where id = $1`, [jabon])
+    expect(Number(antes?.stock)).toBe(96)
+
+    await cancel(order.order_id)
+
+    const [despues] = await svc(`select stock from public.products where id = $1`, [jabon])
+    expect(Number(despues?.stock)).toBe(100)
+  })
+
+  it('si la entrega ya salió, NO repone: eso entra por Devoluciones', async () => {
+    await receive(lima, jabon, 10)
+    const order = await checkout(STORE_A_SLUG, [{ product_id: jabon, quantity: 2 }], { email: 'cancela4@compra.com' })
+    await svc(
+      `insert into public.fulfillments
+         (organization_id, company_id, store_id, order_id, sequence, method_code, method_name, strategy, currency, state)
+       select organization_id, company_id, store_id, id, 9, 'delivery', 'Reparto', 'local_delivery', 'PEN', 'in_transit'
+         from public.orders where id = $1`,
+      [order.order_id],
+    )
+
+    await cancel(order.order_id)
+
+    expect(Number((await level(lima, jabon)).on_hand)).toBe(8)
+    const [o] = await svc(`select stock_restored_at from public.orders where id = $1`, [order.order_id])
+    expect(o?.stock_restored_at).toBeNull()
+  })
+})
+
+describe('cobrado + servido = entregado (20261111140000)', () => {
+  it('cobrar y luego entregar deja el pedido en `fulfilled`', async () => {
+    await receive(lima, jabon, 5)
+    const order = await checkout(STORE_A_SLUG, [{ product_id: jabon, quantity: 1 }], { email: 'entrega1@compra.com' })
+    await svc(`update public.orders set payment_status = 'paid' where id = $1`, [order.order_id])
+    await svc(`update public.orders set fulfillment_status = 'fulfilled' where id = $1`, [order.order_id])
+    const [o] = await svc(`select status::text as s from public.orders where id = $1`, [order.order_id])
+    expect(o?.s).toBe('fulfilled')
+  })
+
+  it('contra entrega: entregar y luego cobrar, también', async () => {
+    await receive(lima, jabon, 5)
+    const order = await checkout(STORE_A_SLUG, [{ product_id: jabon, quantity: 1 }], { email: 'entrega2@compra.com' })
+    await svc(`update public.orders set fulfillment_status = 'fulfilled' where id = $1`, [order.order_id])
+    const [antes] = await svc(`select status::text as s from public.orders where id = $1`, [order.order_id])
+    expect(antes?.s).toBe('pending')
+    await svc(`update public.orders set payment_status = 'paid' where id = $1`, [order.order_id])
+    const [o] = await svc(`select status::text as s from public.orders where id = $1`, [order.order_id])
+    expect(o?.s).toBe('fulfilled')
+  })
+})

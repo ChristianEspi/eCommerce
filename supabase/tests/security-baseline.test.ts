@@ -179,6 +179,8 @@ const ANON_SURFACE: Record<
   },
   promotion_quote_for_slug: { clase: 'techo', porque: 'oráculo de cupones: techo de sondeos fallidos (P16)' },
   return_request_for_slug: { clase: 'secreto', porque: 'exige el token del pedido' },
+  // 2026-11-11 · Qué se puede devolver: misma guarda que `order_by_token`.
+  return_options_for_slug: { clase: 'secreto', porque: 'exige el token del pedido; líneas, motivos y RMA del propio pedido' },
   returns_by_token: { clase: 'secreto', porque: 'token de pedido de 256 bits' },
   // Storefront V2 · P08 · Agrega pedidos, pero no devuelve ni uno: solo los
   // `product_id` de los productos PUBLICADOS más vendidos y su puesto. Ni
@@ -220,10 +222,10 @@ describe('la superficie anónima es una lista cerrada', () => {
    * publica esta tabla; sin este test, el documento y el código se separan en la
    * primera función nueva y nadie se entera hasta la siguiente auditoría.
    */
-  it('el reparto por clase es 15 publicado · 8 secreto · 3 techo · 1 recogido', () => {
+  it('el reparto por clase es 15 publicado · 9 secreto · 3 techo · 1 recogido', () => {
     const cuenta = { publicado: 0, secreto: 0, techo: 0, recogido: 0 }
     for (const entry of Object.values(ANON_SURFACE)) cuenta[entry.clase] += 1
-    expect(cuenta).toEqual({ publicado: 15, secreto: 8, techo: 3, recogido: 1 })
+    expect(cuenta).toEqual({ publicado: 15, secreto: 9, techo: 3, recogido: 1 })
   })
 
   /**

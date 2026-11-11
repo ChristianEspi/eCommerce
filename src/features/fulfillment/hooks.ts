@@ -37,6 +37,7 @@ import {
   type InspectLine,
   type QueueFilter,
   type StoreScope,
+  openReturn,
 } from './api'
 import type {
   MethodFormValues,
@@ -316,6 +317,11 @@ export function useReturnReasons(storeId: string | null) {
     queryFn: () => fetchReturnReasons(storeId),
     enabled: storeId !== null,
   })
+}
+
+export function useOpenReturn() {
+  const invalidate = useInvalidateFulfillment()
+  return useMutation({ mutationFn: openReturn, onSuccess: invalidate })
 }
 
 export function useDecideReturn() {

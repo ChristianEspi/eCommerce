@@ -144,6 +144,10 @@ beforeAll(async () => {
   )
   productA = String(product?.id)
 
+  // Desde 20261111130000 toda tienda nace con cuatro motivos de serie (se
+  // prueban abajo). Este bloque fija SU vocabulario para que los casos hablen de
+  // dos motivos conocidos; por eso se retiran los de serie de las dos tiendas.
+  await svc(`delete from public.return_reasons where store_id in ($1, $2)`, [storeA, storeB])
   await svc(
     `insert into public.return_reasons
        (organization_id, company_id, store_id, code, label, requires_evidence, restock_default)
@@ -664,3 +668,81 @@ describe('aislamiento entre tenants', () => {
     expect(deB[0]?.total).toBe(0)
   })
 })
+
+/**
+ * 2026-11-11 · Devoluciones utilizables (20261111130000).
+ */
+describe('devoluciones utilizables: motivos de serie, opciones y enlace del pedido', () => {
+  it('una tienda nace con los cuatro motivos de serie', async () => {
+    const [nueva] = await svc(
+      `insert into public.stores (organization_id, company_id, slug, name, currency)
+       values ($1, $2, 'tienda-recien-creada', 'Recién creada', 'PEN') returning id`,
+      [TENANT_B.organizationId, TENANT_B.companyId],
+    )
+    const motivos = await svc(`select code from public.return_reasons where store_id = $1 order by position`, [nueva?.id])
+    expect(motivos.map((r) => r.code)).toEqual(['defectuoso', 'equivocado', 'no-corresponde', 'arrepentimiento'])
+    await svc(`delete from public.stores where id = $1`, [nueva?.id])
+  })
+
+  it('antes de la entrega no se puede devolver: lo que procede es cancelar', async () => {
+    const order = await place(1)
+    const [row] = await asAnon(`select public.return_options_for_slug($1, $2, $3) as r`, [
+      TENANT_A.storeSlug, order.orderNumber, order.token,
+    ])
+    const r = row?.r as Row
+    expect(r.returnable).toBe(false)
+    expect(r.reason).toBe('not_delivered')
+    expect((r.reasons as Row[]).map((x) => x.code)).toEqual(['no-me-gusto', 'roto'])
+  })
+
+  it('entregado: lista las líneas con lo que queda por devolver', async () => {
+    const order = await place(3)
+    await svc(`update public.orders set fulfillment_status = 'fulfilled' where id = $1`, [order.orderId])
+    await asAnon(`select public.return_request_for_slug($1, $2, $3, 'no-me-gusto', $4::jsonb) as r`, [
+      TENANT_A.storeSlug, order.orderNumber, order.token, JSON.stringify([{ order_item_id: order.itemId, quantity: 1 }]),
+    ])
+    const [row] = await asAnon(`select public.return_options_for_slug($1, $2, $3) as r`, [
+      TENANT_A.storeSlug, order.orderNumber, order.token,
+    ])
+    const r = row?.r as Row
+    expect(r.returnable).toBe(true)
+    const [linea] = r.items as Row[]
+    expect(linea?.order_item_id).toBe(order.itemId)
+    expect(linea?.quantity).toBe(3)
+    expect(linea?.available).toBe(2)
+    expect((r.requests as Row[]).length).toBe(1)
+  })
+
+  it('sin el token correcto no hay opciones, y no se distingue de "no existe"', async () => {
+    const order = await place(1)
+    const message = await expectFailure(() =>
+      asAnon(`select public.return_options_for_slug($1, $2, $3) as r`, [TENANT_A.storeSlug, order.orderNumber, 'x'.repeat(64)]),
+    )
+    expect(message).toMatch(/PEDIDO_NO_ENCONTRADO/)
+  })
+
+  it('my_order_token: solo el comprador recibe el enlace de su pedido', async () => {
+    const BUYER = '0a000000-0000-4000-8000-0000000000b1'
+    const OTRO = '0a000000-0000-4000-8000-0000000000b2'
+    const order = await place(1)
+    await svc(
+      `insert into public.order_buyers (organization_id, company_id, store_id, order_id, user_id)
+       select organization_id, company_id, store_id, id, $2 from public.orders where id = $1`,
+      [order.orderId, BUYER],
+    )
+    const comprador = { sub: BUYER, email: 'buyer@correo.test', role: 'authenticated' }
+    const [mine] = await asRole(db, 'authenticated', comprador as never, async () =>
+      (await db.query<Row>(`select public.my_order_token($1, $2) as t`, [TENANT_A.storeSlug, order.orderNumber])).rows,
+    )
+    expect(mine?.t).toBe(order.token)
+
+    const ajeno = { sub: OTRO, email: 'otro@correo.test', role: 'authenticated' }
+    const message = await expectFailure(() =>
+      asRole(db, 'authenticated', ajeno as never, async () =>
+        (await db.query<Row>(`select public.my_order_token($1, $2) as t`, [TENANT_A.storeSlug, order.orderNumber])).rows,
+      ),
+    )
+    expect(message).toMatch(/PEDIDO_NO_ENCONTRADO/)
+  })
+})
+

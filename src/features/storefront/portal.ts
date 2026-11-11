@@ -133,6 +133,15 @@ async function rpc<T>(name: string, params: Record<string, unknown> = {}): Promi
   return data as T
 }
 
+/**
+ * El enlace (token) de un pedido, solo para SU comprador (20261111130000).
+ * Con él se abre la página del pedido: seguimiento y devoluciones.
+ */
+export const MY_ORDER_TOKEN_RPC = 'my_order_token'
+export async function fetchMyOrderToken(storeSlug: string, orderNumber: string): Promise<string> {
+  return rpc<string>(MY_ORDER_TOKEN_RPC, { p_store_slug: storeSlug, p_order_number: orderNumber })
+}
+
 export async function fetchMyOrders(limit = 50): Promise<MyOrder[]> {
   return rpc<MyOrder[]>(MY_ORDERS_RPC, { p_only_pending: false, p_limit: limit })
 }
