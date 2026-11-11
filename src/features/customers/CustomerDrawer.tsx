@@ -67,12 +67,15 @@ export function CustomerDrawer({
   canWrite,
   scope,
   onClose,
+  onCreated,
 }: {
   open: boolean
   customer: Customer | null
   canWrite: boolean
   scope: TenantScope | null
   onClose: () => void
+  /** Alta hecha: el cajón pasa a editar la ficha (contactos, direcciones…). */
+  onCreated?: (customerId: string) => void
 }) {
   const { t, locale } = useI18n()
   // El Copilot sabe qué cliente está abierto (tipo + id; la RLS decide).
@@ -121,9 +124,10 @@ export function CustomerDrawer({
     if (!scope) return
     setServerError(null)
     try {
-      await save.mutateAsync({ id: customer?.id ?? null, scope, values })
+      const savedId = await save.mutateAsync({ id: customer?.id ?? null, scope, values })
       notify(t('customers.toast.saved'))
       if (customer) onClose()
+      else onCreated?.(savedId)
     } catch (error) {
       setServerError(error instanceof CustomersError ? error.key : 'customers.error.generic')
     }

@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '@/test/render'
@@ -205,6 +205,23 @@ describe('Clientes — la pantalla', () => {
     expect(dialog).toBeInTheDocument()
   })
 
+  it('al crear un cliente, el cajón pasa a su ficha con contactos y direcciones', async () => {
+    // Antes se quedaba en «Nuevo cliente», sin las pestañas que su subtítulo promete.
+    const user = userEvent.setup()
+    const fake = backend()
+    renderCustomers(fake)
+    await screen.findByText('Acme')
+
+    await user.click(screen.getByRole('button', { name: 'Nuevo cliente' }))
+    const drawer = await screen.findByRole('dialog')
+    await user.type(within(drawer).getByLabelText('Nombre'), 'Ferretería Sol')
+    await user.click(within(drawer).getByRole('button', { name: 'Guardar' }))
+
+    expect(await screen.findByRole('dialog', { name: 'Ferretería Sol' })).toBeInTheDocument()
+    expect(await screen.findByRole('tab', { name: 'Contactos' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Direcciones' })).toBeInTheDocument()
+  })
+
   it('la ficha dice si el cliente ya tiene cuenta B2B, para no mentir por omisión', async () => {
     const user = userEvent.setup()
     renderCustomers(backend())
@@ -231,6 +248,37 @@ describe('Clientes — la ficha es baseline y la cuenta B2B se vende', () => {
     expect(await screen.findByText('Este módulo no está en tu plan')).toBeInTheDocument()
     // No es un error: nada falló.
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('al crear una cuenta B2B, el cajón pasa a editarla (sedes, compradores, reglas)', async () => {
+    const user = userEvent.setup()
+    const fake = backend()
+    fake.state.tables.customers?.push({
+      id: '99999999-9999-4999-8999-0000000000c1',
+      organization_id: ORG,
+      company_id: COMPANY_A,
+      kind: 'company',
+      code: 'CLI-SOL',
+      name: 'Ferretería Sol',
+      legal_name: null,
+      tax_id: null,
+      email: null,
+      phone: null,
+      segment_id: null,
+      is_active: true,
+      notes: null,
+    })
+    renderCustomers(fake)
+    await screen.findByText('Acme')
+    await user.click(screen.getByRole('tab', { name: 'Cuentas B2B' }))
+    await user.click(await screen.findByRole('button', { name: 'Nueva cuenta' }))
+    const drawer = await screen.findByRole('dialog')
+    await user.type(within(drawer).getByRole('combobox', { name: 'Cliente' }), 'Sol')
+    await user.click(await screen.findByRole('option', { name: /Ferretería Sol/ }))
+    await user.click(within(drawer).getByRole('button', { name: 'Guardar' }))
+
+    await waitFor(() => expect(fake.state.tables.business_accounts).toHaveLength(2))
+    expect(await screen.findByRole('dialog', { name: 'Ferretería Sol' })).toBeInTheDocument()
   })
 
   it('con el addon, las cuentas se abren y dicen desde qué importe hace falta aprobar', async () => {

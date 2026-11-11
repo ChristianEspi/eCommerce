@@ -49,12 +49,15 @@ export function BusinessAccountDrawer({
   canWrite,
   scope,
   onClose,
+  onCreated,
 }: {
   open: boolean
   account: BusinessAccount | null
   canWrite: boolean
   scope: TenantScope | null
   onClose: () => void
+  /** Alta hecha: el cajón pasa a editar la cuenta (sedes, compradores…). */
+  onCreated?: (account: BusinessAccount) => void
 }) {
   const { t } = useI18n()
   const { notify } = useFeedback()
@@ -112,7 +115,7 @@ export function BusinessAccountDrawer({
     }
     setServerError(null)
     try {
-      await save.mutateAsync({
+      const saved = await save.mutateAsync({
         id: account?.id ?? null,
         scope,
         customerId: account?.customer_id ?? customerId,
@@ -120,6 +123,7 @@ export function BusinessAccountDrawer({
       })
       notify(t('customers.toast.saved'))
       if (account) onClose()
+      else onCreated?.(saved)
     } catch (error) {
       setServerError(error instanceof CustomersError ? error.key : 'customers.error.generic')
     }

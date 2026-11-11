@@ -323,3 +323,14 @@ describe('formulario de cuenta B2B y de sus reglas', () => {
     expect(approvalRuleFormSchema.safeParse({ ...base, min_amount: '-10' }).success).toBe(false)
   })
 })
+
+describe('customersErrorFromDb — una cuenta B2B por empresa', () => {
+  it('el duplicado de cuenta dice que el cliente ya tiene una', async () => {
+    const { customersErrorFromDb } = await import('./errors')
+    const error = customersErrorFromDb({
+      code: '23505',
+      message: 'duplicate key value violates unique constraint "business_accounts_one_per_customer"',
+    })
+    expect(error.key).toBe('customers.error.accountExists')
+  })
+})

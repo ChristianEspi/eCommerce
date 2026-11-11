@@ -165,6 +165,7 @@ export function BusinessAccountsSection() {
             : null
         }
         onClose={() => setDrawer({ open: false, account: null })}
+        onCreated={(created) => setDrawer({ open: true, account: created })}
       />
     </Stack>
   )

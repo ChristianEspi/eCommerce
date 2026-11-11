@@ -66,6 +66,12 @@ export function QuotesPage() {
   const [recienCreada, setRecienCreada] = useState<string | null>(null)
 
   const query = useQuotes()
+  // El cajón lee SIEMPRE la versión fresca del listado: con la copia tomada al
+  // abrir, tras añadir líneas el total seguía en 0 y tras «Aceptada» el estado
+  // seguía en «Borrador» (y ofrecía editar una cotización ya cerrada).
+  const abiertaActual = abierta
+    ? ((query.data ?? []).find((q) => q.id === abierta.id) ?? abierta)
+    : null
 
   // La cotización creada desde el borrador se abre en cuanto llega al listado.
   useEffect(() => {
@@ -292,7 +298,7 @@ export function QuotesPage() {
 
       <QuoteDrawer
         open={creando || abierta !== null}
-        quote={abierta}
+        quote={abiertaActual}
         scope={scope}
         currency={activeStore?.currency ?? 'PEN'}
         canWrite={canWrite}

@@ -61,5 +61,10 @@ export function mapCustomersCode(code: string): MessageKey {
 
 export function customersErrorFromDb(error: PostgrestLike): CustomersError {
   const code = codeFromDbError(error)
+  // Una empresa, una cuenta B2B. «Ya existe un registro con ese dato» no dice
+  // cuál: el selector deja elegir un cliente que ya tiene la suya.
+  if (code === '23505' && /business_accounts_one_per_customer/.test(error?.message ?? '')) {
+    return new CustomersError('customers.error.accountExists', code)
+  }
   return new CustomersError(mapCustomersCode(code), code)
 }

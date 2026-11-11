@@ -2325,6 +2325,7 @@ export const es = {
     'customers.error.termsNeedLine': 'Fija primero la línea de crédito',
     'customers.error.customerRequired': 'Elige el cliente empresa de esta cuenta',
     'customers.error.duplicate': 'Ya existe un registro con ese dato.',
+    'customers.error.accountExists': 'Ese cliente ya tiene una cuenta B2B. Ábrela desde el listado para editarla.',
     'customers.error.forbidden': 'Tu rol no puede hacer este cambio.',
     'customers.error.notFound': 'No encontramos ese registro.',
     'customers.error.invalid': 'Revisa los datos: algo no tiene el formato esperado.',

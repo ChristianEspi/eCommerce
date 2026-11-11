@@ -2698,6 +2698,7 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'customers.error.termsNeedLine': 'Set the credit line first',
     'customers.error.customerRequired': 'Pick the company customer for this account',
     'customers.error.duplicate': 'A record with that value already exists.',
+    'customers.error.accountExists': 'That customer already has a B2B account. Open it from the list to edit it.',
     'customers.error.forbidden': 'Your role cannot make this change.',
     'customers.error.notFound': 'We could not find that record.',
     'customers.error.invalid': 'Check the details: something does not match the expected format.',

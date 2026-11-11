@@ -220,6 +220,23 @@ describe('el cajón de una cotización', () => {
     // De `sent` NO se vuelve a borrador: el cliente ya lo vio.
     expect(screen.queryByRole('button', { name: 'Borrador' })).not.toBeInTheDocument()
   })
+
+  it('tras «Aceptada» el cajón se pone al día: estado nuevo y ya no se edita', async () => {
+    // Antes leía la copia tomada al abrir: seguía en «Enviada» y editable.
+    const user = userEvent.setup()
+    const fake = backend()
+    pintar(fake, 'trade.quotes')
+    await screen.findByText('COT-001')
+
+    const filas = screen.getAllByRole('row')
+    const fila = filas.find((row) => row.textContent?.includes('COT-001'))!
+    await user.click(within_(fila, 'Abrir'))
+    await user.click(await screen.findByRole('button', { name: 'Aceptada' }))
+
+    await screen.findByText(/ya está cerrada/)
+    expect(screen.queryByRole('button', { name: 'Rechazada' })).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: /Número/ })).toBeDisabled()
+  })
 })
 
 describe('los surtidos', () => {

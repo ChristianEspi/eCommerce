@@ -30,6 +30,7 @@ import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState, ErrorState } from '@/shared/ui/states'
 import { CustomerDrawer } from './CustomerDrawer'
+import { fetchCustomer } from './api'
 import { CustomersError } from './errors'
 import { useCustomerUsage, useCustomers, useDeleteCustomer, useSaveCustomer } from './hooks'
 import { customerToForm, type Customer } from './types'
@@ -229,6 +230,13 @@ export function CustomersSection() {
             : null
         }
         onClose={() => setDrawer({ open: false, customer: null })}
+        // Antes el alta se quedaba en «Nuevo cliente», sin las pestañas de
+        // contactos y direcciones que su propio subtítulo promete.
+        onCreated={(id) => {
+          void fetchCustomer(id)
+            .then((created) => setDrawer({ open: true, customer: created }))
+            .catch(() => setDrawer({ open: false, customer: null }))
+        }}
       />
 
       {/* El conteo es REAL y sale del servidor (contrato §4.2). Los pedidos se

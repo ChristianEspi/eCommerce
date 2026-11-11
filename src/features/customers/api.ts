@@ -125,6 +125,13 @@ export async function fetchCustomers(input: {
   return { rows: customerSchema.array().parse(data ?? []), total: count ?? 0 }
 }
 
+/** Un cliente por id: tras el alta, el cajón pasa a editarlo. */
+export async function fetchCustomer(id: string): Promise<Customer> {
+  const { data, error } = await client().from(CUSTOMERS_TABLE).select(CUSTOMER_SELECT).eq('id', id).single()
+  if (error) throw customersErrorFromDb(error)
+  return customerSchema.parse(data)
+}
+
 /**
  * Selector de cliente: búsqueda EN EL SERVIDOR con límite 20.
  *
@@ -388,7 +395,7 @@ export async function saveBusinessAccount(input: {
   scope: TenantScope
   customerId: string
   values: AccountFormValues
-}): Promise<void> {
+}): Promise<BusinessAccount> {
   const supabase = client()
   const fields = {
     code: input.values.code,
@@ -402,16 +409,23 @@ export async function saveBusinessAccount(input: {
     payment_terms_days: Number(input.values.payment_terms_days || 0),
   }
 
-  const { error } = input.id
-    ? await supabase.from(BUSINESS_ACCOUNTS_TABLE).update(fields).eq('id', input.id)
-    : await supabase.from(BUSINESS_ACCOUNTS_TABLE).insert({
-        organization_id: input.scope.organizationId,
-        company_id: input.scope.companyId,
-        customer_id: input.customerId,
-        ...fields,
-      })
+  // Devuelve la fila: tras el alta, el cajón pasa a editarla para añadir
+  // sedes, compradores y reglas de aprobación.
+  const { data, error } = input.id
+    ? await supabase.from(BUSINESS_ACCOUNTS_TABLE).update(fields).eq('id', input.id).select(ACCOUNT_SELECT).single()
+    : await supabase
+        .from(BUSINESS_ACCOUNTS_TABLE)
+        .insert({
+          organization_id: input.scope.organizationId,
+          company_id: input.scope.companyId,
+          customer_id: input.customerId,
+          ...fields,
+        })
+        .select(ACCOUNT_SELECT)
+        .single()
 
   if (error) throw customersErrorFromDb(error)
+  return businessAccountSchema.parse(data)
 }
 
 export async function deleteBusinessAccount(id: string): Promise<void> {
