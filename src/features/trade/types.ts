@@ -120,6 +120,16 @@ export const quoteFormSchema = z
   })
 export type QuoteFormValues = z.infer<typeof quoteFormSchema>
 
+/**
+ * Número sugerido para una cotización nueva: COT-AAAAMMDD-HHMMSS. Solo
+ * sugiere —se puede cambiar por el del ERP—; antes el campo nacía vacío y era
+ * obligatorio, y en Clientes el código sí se sugería.
+ */
+export function suggestQuoteNumber(now: Date = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `COT-${now.getFullYear()}${p(now.getMonth() + 1)}${p(now.getDate())}-${p(now.getHours())}${p(now.getMinutes())}${p(now.getSeconds())}`
+}
+
 export function emptyQuoteForm(currency: string): QuoteFormValues {
   const hoy = new Date()
   const dentroDeQuince = new Date(hoy)

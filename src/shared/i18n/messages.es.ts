@@ -133,6 +133,7 @@ export const es = {
     'settings.help.addSocial': 'Agregar red',
     'settings.help.removeSocial': 'Quitar',
     'settings.help.save': 'Guardar datos de atención',
+    'settings.help.unsaved': 'Tienes cambios sin guardar en esta sección. Se guardan con «Guardar datos de atención», no con el «Guardar» de la página.',
     'settings.help.saved': 'Datos de atención guardados',
     'settings.help.error': 'No se pudieron guardar. Revisa los datos marcados.',
     'common.save': 'Guardar',
@@ -189,8 +190,8 @@ export const es = {
       'Estas personas pueden entrar. El rol decide qué ven y qué pueden cambiar.',
     'settings.members.add': 'Dar acceso',
     'settings.members.addHelp':
-      'Esta pantalla no crea cuentas: da acceso a alguien que ya tiene una. Si todavía no la tiene, primero se crea en la plataforma y luego se le da acceso aquí.',
-    'settings.members.added': 'Acceso concedido',
+      'Aquí decides qué puede hacer en esta tienda. Para entrar al backoffice, la persona necesita además eCommerce habilitado en su usuario de EBIM: eso se activa en la consola de EBIM, no aquí.',
+    'settings.members.added': 'Acceso registrado. Si al entrar ve «Tu cuenta no está habilitada», falta habilitarle eCommerce en la consola de EBIM.',
     'settings.members.empty': 'Todavía no hay nadie con acceso',
     'settings.members.email': 'Correo',
     'settings.members.userId': 'Identificador de usuario',

@@ -152,7 +152,12 @@ export function ReconciliationSection() {
             />
             <Alert severity="info">{t('payments.reconciliation.idempotent')}</Alert>
             <Box>
-              <Button variant="contained" disabled={load.isPending} onClick={() => void submit()}>
+              {/* Sin proveedor el botón no hacía nada y no decía por qué. */}
+              <Button
+                variant="contained"
+                disabled={load.isPending || !providerCode || csv.trim() === ''}
+                onClick={() => void submit()}
+              >
                 {t('payments.reconciliation.run')}
               </Button>
             </Box>

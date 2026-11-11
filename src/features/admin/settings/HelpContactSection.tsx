@@ -43,6 +43,18 @@ export function HelpContactSection({ storeId, canManage }: { storeId: string | n
     if (actual.data) setV(actual.data)
   }, [actual.data])
 
+  // Esta sección se guarda con SU botón, no con el «Guardar» de la página. Si
+  // alguien edita el RUC y pulsa el de abajo, el aviso «Configuración guardada»
+  // le hacía creer que también se guardó esto. Ahora se avisa en la propia
+  // sección y el navegador pregunta antes de salir con cambios pendientes.
+  const pendiente = JSON.stringify(v) !== JSON.stringify(actual.data ?? VACIO)
+  useEffect(() => {
+    if (!pendiente) return
+    const aviso = (event: BeforeUnloadEvent) => event.preventDefault()
+    window.addEventListener('beforeunload', aviso)
+    return () => window.removeEventListener('beforeunload', aviso)
+  }, [pendiente])
+
   if (actual.isPending) return <LoadingState />
 
   const check = helpContactSchema.safeParse(v)
@@ -101,6 +113,7 @@ export function HelpContactSection({ storeId, canManage }: { storeId: string | n
       </Box>
 
       {guardar.isError ? <Alert severity="error">{t('settings.help.error')}</Alert> : null}
+      {pendiente && canManage ? <Alert severity="warning">{t('settings.help.unsaved')}</Alert> : null}
 
       {canManage ? (
         <Button variant="contained" sx={{ alignSelf: 'flex-start' }} disabled={!check.success || guardar.isPending}

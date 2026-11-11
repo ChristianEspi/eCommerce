@@ -49,7 +49,11 @@ const EMPTY: AccountUserFormValues = {
   email: '',
   role: 'buyer',
   spending_limit: '',
-  status: 'invited',
+  // Activo por defecto: quien lo añade es el comercio, que ya decidió darle
+  // acceso. Con «Invitado» el aviso decía «acceso concedido» y el comprador
+  // veía «pendiente de activación» hasta que alguien volvía a editarlo.
+  // «Invitado» sigue disponible para quien quiera dejarlo en espera.
+  status: 'active',
   default_location_id: '',
 }
 

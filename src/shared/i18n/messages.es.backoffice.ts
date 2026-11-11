@@ -632,6 +632,7 @@ export const esBackoffice = {
   'promotions.field.subtotal': 'Subtotal',
   'promotions.field.tax': 'Impuesto',
   'promotions.status.live': 'Descontando',
+  'promotions.status.noScope': 'Sin alcance: no descuenta',
   'promotions.status.scheduled': 'Programada',
   'promotions.status.expired': 'Caducada',
   'promotions.status.exhausted': 'Agotada',

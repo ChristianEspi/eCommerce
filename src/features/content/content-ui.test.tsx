@@ -323,7 +323,8 @@ describe('el listado de páginas', () => {
     // El campo es obligatorio, así que MUI le añade un asterisco a la etiqueta.
     // Se busca por ROL y nombre accesible, que ignora ese asterisco decorativo.
     await user.type(screen.getByRole('textbox', { name: 'Título' }), 'Rebajas')
-    await user.type(screen.getByRole('textbox', { name: 'Dirección' }), 'rebajas')
+    // 2026-11-11 · La dirección se sugiere del título, como en Productos.
+    expect(screen.getByRole('textbox', { name: 'Dirección' })).toHaveValue('rebajas')
     await user.click(screen.getByRole('button', { name: 'Guardar' }))
 
     const inserted = fake.state.tables.content_pages?.find(

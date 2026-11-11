@@ -326,6 +326,13 @@ export const movementFormSchema = z
       .refine((value) => value !== 0, 'inventory.error.quantity'),
     reason: z.string().trim().max(500).optional().default(''),
   })
+  // «Traslado enviado: 5» quiere decir que salen cinco. Pedir que se escriba
+  // «−5» era un error de formulario que nadie entendía («el signo no
+  // coincide»): el motivo ya dice la dirección, así que el signo se pone solo.
+  // Una ENTRADA negativa sí sigue siendo un error: ahí el signo contradice.
+  .transform((v) =>
+    requiredSign(v.kind) === 'negative' && v.quantity > 0 ? { ...v, quantity: -v.quantity } : v,
+  )
   .refine((v) => signMatches(v.kind, v.quantity), {
     path: ['quantity'],
     message: 'inventory.error.sign',

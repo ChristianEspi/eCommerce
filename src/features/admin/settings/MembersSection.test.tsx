@@ -158,7 +158,7 @@ describe('quien entra al backoffice', () => {
    * una invitación. Esta pantalla administra la MEMBRESÍA, no la identidad, y
    * callarlo dejaría a alguien rellenando un formulario que no hace lo que cree.
    */
-  it('el alta avisa de que no crea cuentas y solo pide el correo', async () => {
+  it('el alta avisa del paso que falta en EBIM y solo pide el correo', async () => {
     /**
      * Antes esta prueba escribía un identificador de usuario y comprobaba que se
      * validara su forma. Ese campo ya no existe: era un uuid que no se enseña en
@@ -172,7 +172,9 @@ describe('quien entra al backoffice', () => {
     await screen.findByText('otro@negocio.com')
 
     await user.click(screen.getByRole('button', { name: 'Dar acceso' }))
-    expect(await screen.findByText(/no crea cuentas/i)).toBeInTheDocument()
+    // 2026-11-11 · Antes decía «no crea cuentas» y debajo ofrecía crearla. Lo
+    // que de verdad falta para entrar es habilitar eCommerce en EBIM.
+    expect(await screen.findByText(/consola de EBIM/i)).toBeInTheDocument()
 
     // Ya no hay dónde pegar un identificador.
     expect(screen.queryByLabelText('Identificador de usuario')).not.toBeInTheDocument()

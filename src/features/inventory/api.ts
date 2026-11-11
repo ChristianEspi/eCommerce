@@ -211,14 +211,23 @@ export async function fetchLevels(input: {
 
   const serving = await servingWarehouseIds(input.storeId)
   if (serving !== null && serving.length === 0) return []
-  let query = supabase.from(INVENTORY_LEVELS_TABLE).select(LEVEL_SELECT)
-  if (serving !== null) query = query.in('warehouse_id', serving)
-  if (input.warehouseId) query = query.eq('warehouse_id', input.warehouseId)
+  // Por páginas de 1000 (el máximo de PostgREST). Antes era un `limit(500)`
+  // a secas: FerroMax ya tenía 404 filas y al crecer la tabla se habría
+  // cortado SIN AVISO, con existencias que «no están» porque no se trajeron.
+  const PAGE = 1000
+  const MAX_ROWS = 20000
+  const data: unknown[] = []
+  for (let from = 0; from < MAX_ROWS; from += PAGE) {
+    let query = supabase.from(INVENTORY_LEVELS_TABLE).select(LEVEL_SELECT)
+    if (serving !== null) query = query.in('warehouse_id', serving)
+    if (input.warehouseId) query = query.eq('warehouse_id', input.warehouseId)
+    const { data: page, error } = await query.order('id').range(from, from + PAGE - 1)
+    if (error) throw inventoryErrorFromDb(error)
+    data.push(...(page ?? []))
+    if ((page ?? []).length < PAGE) break
+  }
 
-  const { data, error } = await query.limit(500)
-  if (error) throw inventoryErrorFromDb(error)
-
-  const levels: InventoryLevel[] = inventoryLevelSchema.array().parse(data ?? [])
+  const levels: InventoryLevel[] = inventoryLevelSchema.array().parse(data)
   if (levels.length === 0) return []
 
   const warehouses = await fetchWarehouses()
@@ -227,14 +236,20 @@ export async function fetchLevels(input: {
   const productIds = [...new Set(levels.map((l) => l.product_id))]
   const variantIds = [...new Set(levels.map((l) => l.variant_id).filter((v): v is string => !!v))]
 
+  // Por tandas: un `in` con miles de ids no cabe en la URL de un GET.
+  const porTandas = async (table: string, ids: string[]) => {
+    const rows: Array<Record<string, unknown>> = []
+    for (let i = 0; i < ids.length; i += 200) {
+      const { data: tanda, error } = await supabase.from(table).select('id, sku, name').in('id', ids.slice(i, i + 200))
+      if (error) throw inventoryErrorFromDb(error)
+      rows.push(...((tanda ?? []) as Array<Record<string, unknown>>))
+    }
+    return { data: rows }
+  }
   const [products, variants] = await Promise.all([
-    supabase.from(PRODUCTS_TABLE).select('id, sku, name').in('id', productIds),
-    variantIds.length
-      ? supabase.from(PRODUCT_VARIANTS_TABLE).select('id, sku, name').in('id', variantIds)
-      : Promise.resolve({ data: [], error: null }),
+    porTandas(PRODUCTS_TABLE, productIds),
+    porTandas(PRODUCT_VARIANTS_TABLE, variantIds),
   ])
-  if (products.error) throw inventoryErrorFromDb(products.error)
-  if (variants.error) throw inventoryErrorFromDb(variants.error)
 
   const productById = new Map(
     (products.data ?? []).map((p) => [p.id as string, p as { sku: string; name: string }]),

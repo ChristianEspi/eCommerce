@@ -36,6 +36,7 @@ import {
 } from './hooks'
 import {
   emptyQuoteForm,
+  suggestQuoteNumber,
   isQuoteEditable,
   lineTotal,
   nextStatuses,
@@ -146,7 +147,7 @@ export function QuoteDrawer({
             valid_until: quote.valid_until,
             notes: quote.notes ?? '',
           }
-        : emptyQuoteForm(currency),
+        : { ...emptyQuoteForm(currency), quote_number: suggestQuoteNumber() },
     )
     setCustomerSearch('')
     setProductSearch('')

@@ -131,6 +131,7 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'settings.help.addSocial': 'Add network',
     'settings.help.removeSocial': 'Remove',
     'settings.help.save': 'Save support details',
+    'settings.help.unsaved': 'You have unsaved changes in this section. They are saved with “Save support details”, not with the page’s “Save”.',
     'settings.help.saved': 'Support details saved',
     'settings.help.error': 'Could not save. Check the highlighted fields.',
     'common.save': 'Save',
@@ -210,8 +211,8 @@ export const en: Readonly<Record<MessageKey, string>> = {
       'These people can sign in. The role decides what they see and what they may change.',
     'settings.members.add': 'Grant access',
     'settings.members.addHelp':
-      'This screen does not create accounts: it grants access to someone who already has one. If they do not, create the account in the platform first.',
-    'settings.members.added': 'Access granted',
+      'Here you decide what they can do in this store. To sign in to the back office they also need eCommerce enabled on their EBIM user: that is turned on in the EBIM console, not here.',
+    'settings.members.added': 'Access recorded. If they see “Your account is not enabled” when signing in, eCommerce still has to be enabled for them in the EBIM console.',
     'settings.members.empty': 'Nobody has access yet',
     'settings.members.email': 'Email',
     'settings.members.userId': 'User identifier',
@@ -3356,6 +3357,8 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'promotions.field.tax': 'Tax',
 
     'promotions.status.live': 'Discounting',
+
+    'promotions.status.noScope': 'No scope: not discounting',
     'promotions.status.scheduled': 'Scheduled',
     'promotions.status.expired': 'Expired',
     'promotions.status.exhausted': 'Used up',

@@ -261,12 +261,18 @@ export function CampaignsSection() {
                       {promotion.discount_granted} {activeStore?.currency}
                     </TableCell>
                     <TableCell>
-                      <StatusChip
-                        tone={STATUS_COLOR[promotion.effective_status] ?? 'default'}
-                        label={t(
-                          `promotions.status.${promotion.effective_status}` as MessageKey,
-                        )}
-                      />
+                      {/* «Descontando» sin alcance era mentira: el motor no la
+                          aplica a ninguna línea. Se dice lo que de verdad pasa. */}
+                      {promotion.effective_status === 'live' && promotion.scope_count === 0 ? (
+                        <StatusChip tone="warning" label={t('promotions.status.noScope')} />
+                      ) : (
+                        <StatusChip
+                          tone={STATUS_COLOR[promotion.effective_status] ?? 'default'}
+                          label={t(
+                            `promotions.status.${promotion.effective_status}` as MessageKey,
+                          )}
+                        />
+                      )}
                     </TableCell>
                   </TableRow>
                 )

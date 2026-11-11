@@ -27,6 +27,7 @@ import {
 } from '@mui/material'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useTenant } from '@/features/tenant/tenant-context'
+import { useDebouncedValue } from '@/shared/lib/useDebouncedValue'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { ConfirmDeleteDialog } from '@/shared/ui/ConfirmDeleteDialog'
@@ -175,6 +176,16 @@ export function ProductsPage() {
     setAplicados(borrador)
     setPage(0)
   }
+
+  // El TEXTO se aplica solo, tras una pausa al teclear: en el resto del
+  // backoffice el buscador filtra mientras se escribe, y aquí parecía roto
+  // hasta pulsar «Filtrar». La pausa mantiene lo que buscaba el botón —no una
+  // petición por tecla—; categoría, marca y stock siguen esperando al botón.
+  const terminoEscrito = useDebouncedValue(borrador.search, 400)
+  useEffect(() => {
+    setAplicados((actual) => (actual.search === terminoEscrito ? actual : { ...actual, search: terminoEscrito }))
+    setPage(0)
+  }, [terminoEscrito])
 
   function limpiar() {
     setBorrador(SIN_FILTROS)

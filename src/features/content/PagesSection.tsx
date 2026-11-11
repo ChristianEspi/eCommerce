@@ -34,6 +34,7 @@ import { SearchField } from '@/shared/ui/SearchField'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState, ErrorState, UnauthorizedState } from '@/shared/ui/states'
+import { slugify } from '@/shared/lib/slug'
 import { ContentError } from './errors'
 import { useDeletePage, usePages, useSavePage } from './hooks'
 import { pageFormSchema, type ContentPageRow, type PageFormValues } from './types'
@@ -337,7 +338,13 @@ export function PagesSection({
           <TextField
             label={t('content.pages.title')}
             value={form.title}
-            onChange={(event) => setForm({ ...form, title: event.target.value })}
+            onChange={(event) => {
+              const title = event.target.value
+              // En el alta la dirección se sugiere del título, como en Productos
+              // y Categorías; en cuanto alguien la toca, manda lo que escribió.
+              const sugerida = !editing && (form.slug === '' || form.slug === slugify(form.title))
+              setForm({ ...form, title, ...(sugerida ? { slug: slugify(title) } : {}) })
+            }}
             required
           />
           <TextField

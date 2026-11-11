@@ -245,3 +245,19 @@ describe('inventoryErrorFromDb — físico bajo cero', () => {
   })
 })
 
+describe('movimiento: el signo lo pone el motivo', () => {
+  const base = {
+    warehouse_id: '99999999-9999-4999-8999-000000000001',
+    product_id: '99999999-9999-4999-8999-000000000002',
+    variant_id: null,
+    reason: '',
+  }
+  it('«Traslado enviado: 5» se guarda como −5', () => {
+    const r = movementFormSchema.safeParse({ ...base, kind: 'transfer_out', quantity: 5 })
+    expect(r.success && r.data.quantity).toBe(-5)
+  })
+  it('una entrada negativa sigue siendo un error', () => {
+    expect(movementFormSchema.safeParse({ ...base, kind: 'receipt', quantity: -5 }).success).toBe(false)
+  })
+})
+
