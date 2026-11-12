@@ -222,6 +222,26 @@ describe('Clientes — la pantalla', () => {
     expect(screen.getByRole('tab', { name: 'Direcciones' })).toBeInTheDocument()
   })
 
+  it('una persona no pide razón social y su documento es el de identidad', async () => {
+    const user = userEvent.setup()
+    renderCustomers(backend())
+    await screen.findByText('Acme')
+
+    await user.click(screen.getByRole('button', { name: 'Nuevo cliente' }))
+    const drawer = await screen.findByRole('dialog')
+    // Por defecto es empresa: razón social y documento fiscal.
+    expect(within(drawer).getByLabelText('Razón social')).toBeInTheDocument()
+    expect(within(drawer).getByLabelText('Documento fiscal')).toBeInTheDocument()
+
+    await user.click(within(drawer).getByLabelText('Tipo'))
+    await user.click(await screen.findByRole('option', { name: 'Persona' }))
+
+    expect(within(drawer).queryByLabelText('Razón social')).not.toBeInTheDocument()
+    expect(within(drawer).getByLabelText('Nombre completo')).toBeInTheDocument()
+    expect(within(drawer).getByLabelText('Documento de identidad')).toBeInTheDocument()
+    expect(within(drawer).getByText('DNI, carné de extranjería o pasaporte.')).toBeInTheDocument()
+  })
+
   it('la ficha dice si el cliente ya tiene cuenta B2B, para no mentir por omisión', async () => {
     const user = userEvent.setup()
     renderCustomers(backend())

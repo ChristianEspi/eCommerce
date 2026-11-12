@@ -107,6 +107,8 @@ export function CustomerDrawer({
     resolver: zodResolver(customerFormSchema),
     defaultValues: customerToForm(customer),
   })
+  // Persona y empresa no piden lo mismo: cambian etiquetas y la razón social.
+  const isPerson = watch('kind') === 'person'
 
   useEffect(() => {
     if (!open) return
@@ -189,9 +191,13 @@ export function CustomerDrawer({
                 fullWidth
                 disabled={!canWrite || Boolean(customer)}
                 value={watch('kind')}
-                onChange={(event) =>
-                  setValue('kind', event.target.value as CustomerFormValues['kind'])
-                }
+                onChange={(event) => {
+                  const next = event.target.value as CustomerFormValues['kind']
+                  setValue('kind', next)
+                  // Una persona no tiene razón social: si se escribió como
+                  // empresa y luego se cambió, no se guarda a escondidas.
+                  if (next === 'person') setValue('legal_name', '')
+                }}
                 helperText={t('customers.field.kindHint')}
               >
                 {CUSTOMER_KINDS.map((kind) => (
@@ -202,7 +208,7 @@ export function CustomerDrawer({
               </SelectField>
 
               <TextField
-                label={t('customers.field.name')}
+                label={t(isPerson ? 'customers.field.personName' : 'customers.field.name')}
                 fullWidth
                 autoFocus
                 disabled={!canWrite}
@@ -226,23 +232,30 @@ export function CustomerDrawer({
                   {...register('code', { onChange: () => setCodeEdited(true) })}
                 />
                 <TextField
-                  label={t('customers.field.taxId')}
+                  label={t(isPerson ? 'customers.field.personDoc' : 'customers.field.taxId')}
                   fullWidth
                   disabled={!canWrite}
                   error={Boolean(errors.tax_id)}
-                  helperText={fieldError('tax_id') ?? t('customers.field.taxIdHint')}
+                  helperText={
+                    fieldError('tax_id') ??
+                    t(isPerson ? 'customers.field.personDocHint' : 'customers.field.taxIdHint')
+                  }
                   {...register('tax_id')}
                 />
               </Stack>
 
-              <TextField
-                label={t('customers.field.legalName')}
-                fullWidth
-                disabled={!canWrite}
-                error={Boolean(errors.legal_name)}
-                helperText={fieldError('legal_name') ?? t('customers.field.legalNameHint')}
-                {...register('legal_name')}
-              />
+              {/* La razón social es de empresa. En una persona el nombre ya es
+                  el legal: pedirla duplica el dato y confunde. */}
+              {!isPerson && (
+                <TextField
+                  label={t('customers.field.legalName')}
+                  fullWidth
+                  disabled={!canWrite}
+                  error={Boolean(errors.legal_name)}
+                  helperText={fieldError('legal_name') ?? t('customers.field.legalNameHint')}
+                  {...register('legal_name')}
+                />
+              )}
 
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <TextField
