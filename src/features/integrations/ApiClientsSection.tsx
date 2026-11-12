@@ -26,7 +26,8 @@ import { useI18n } from '@/shared/i18n/i18n-context'
 import { formatDateTime } from '@/shared/lib/format'
 import { EmptyState, ErrorState, UnauthorizedState } from '@/shared/ui/states'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
-import { isForbidden, isMissingModule } from './errors'
+import { IntegrationsError, isForbidden, isMissingModule } from './errors'
+import { useCapabilities } from '@/features/capabilities/capabilities-context'
 import {
   useApiClients,
   useCreateApiClient,
@@ -97,6 +98,12 @@ export function ApiClientsSection() {
   const rotate = useRotateApiClientSecret()
   const setActive = useSetApiClientActive()
 
+  // Leer credenciales no exige el módulo; crearlas sí (la base responde
+  // SIN_MODULO). Sin mirar la capacidad aquí, el aviso de «no contratado» no
+  // salía nunca y el formulario fallaba en silencio (403 solo en consola).
+  const { has } = useCapabilities()
+  const contratado = has('integrations.enterprise')
+
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
   const [scopes, setScopes] = useState<string[]>([])
@@ -131,11 +138,23 @@ export function ApiClientsSection() {
         {t('integrations.api.docs').replace('{version}', API_VERSION)}
       </Alert>
 
-      <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
-        <Button variant="contained" onClick={() => setCreating(true)}>
-          {t('integrations.api.new')}
-        </Button>
-      </Stack>
+      {contratado ? (
+        <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
+          <Button
+            variant="contained"
+            onClick={() => {
+              create.reset()
+              setCreating(true)
+            }}
+          >
+            {t('integrations.api.new')}
+          </Button>
+        </Stack>
+      ) : (
+        <Alert severity="warning">
+          <strong>{t('integrations.error.noModule')}.</strong> {t('integrations.noModuleBody')}
+        </Alert>
+      )}
 
       <Card>
         {clients.isPending ? (
@@ -217,6 +236,11 @@ export function ApiClientsSection() {
         <DialogTitle>{t('integrations.api.newTitle')}</DialogTitle>
         <DialogContent>
           <Stack sx={{ gap: 2, pt: 1 }}>
+            {create.isError && (
+              <Alert severity="error">
+                {t(create.error instanceof IntegrationsError ? create.error.key : 'integrations.error.generic')}
+              </Alert>
+            )}
             <TextField
               label={t('integrations.api.name')}
               value={name}

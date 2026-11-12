@@ -3,6 +3,7 @@ import { TablePager } from '@/shared/ui/TablePager'
 import { FilterBar } from '@/shared/ui/FilterBar'
 import { StatusChip } from '@/shared/ui/StatusChip'
 import {
+  Alert,
   Box,
   Button,
   Card,
@@ -29,7 +30,8 @@ import { EmptyState, ErrorState, UnauthorizedState } from '@/shared/ui/states'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { useDebouncedValue } from '@/shared/lib/useDebouncedValue'
 import { ReasonDialog } from './ReasonDialog'
-import { isForbidden, isMissingModule } from './errors'
+import { IntegrationsError, isForbidden, isMissingModule } from './errors'
+import { useCapabilities } from '@/features/capabilities/capabilities-context'
 import {
   useCreateEndpoint,
   useDeliveries,
@@ -101,6 +103,11 @@ function NewEndpointDialog({ open, onClose }: { open: boolean; onClose: () => vo
       <DialogTitle>{t('integrations.webhooks.newTitle')}</DialogTitle>
       <DialogContent>
         <Stack sx={{ gap: 2, pt: 1 }}>
+          {create.isError && (
+            <Alert severity="error">
+              {t(create.error instanceof IntegrationsError ? create.error.key : 'integrations.error.generic')}
+            </Alert>
+          )}
           <TextField
             label={t('integrations.webhooks.name')}
             value={name}
@@ -199,6 +206,9 @@ export function WebhooksSection() {
   const deliveries = useDeliveries(debounced)
   const [creating, setCreating] = useState(false)
   const [replayId, setReplayId] = useState<string | null>(null)
+  // Mismo criterio que la pestaña API: leer no exige el módulo, publicar sí.
+  const { has } = useCapabilities()
+  const contratado = has('integrations.enterprise')
 
   // Pagina lo que YA esta cargado: es para poder leer la tabla, no para
   // aligerar la consulta. Va ANTES de la primera guarda con retorno,
@@ -232,11 +242,17 @@ export function WebhooksSection() {
 
   return (
     <Stack sx={{ gap: 2 }}>
-      <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
-        <Button variant="contained" onClick={() => setCreating(true)}>
-          {t('integrations.webhooks.new')}
-        </Button>
-      </Stack>
+      {contratado ? (
+        <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
+          <Button variant="contained" onClick={() => setCreating(true)}>
+            {t('integrations.webhooks.new')}
+          </Button>
+        </Stack>
+      ) : (
+        <Alert severity="warning">
+          <strong>{t('integrations.error.noModule')}.</strong> {t('integrations.noModuleBody')}
+        </Alert>
+      )}
 
       <Card>
         {endpoints.isPending ? (

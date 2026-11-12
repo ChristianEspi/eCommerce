@@ -510,6 +510,30 @@ describe('Integraciones — credenciales de la API', () => {
     expect(JSON.stringify(llamada?.args)).not.toContain('organization_id')
   })
 
+  it('sin el módulo, aunque el listado SÍ se lea, avisa y no ofrece crear (2026-11-12)', async () => {
+    // Visto en Porta (QAS): leer credenciales no exige el módulo, así que la
+    // pestaña se pintaba normal, dejaba abrir el alta y el Guardar fallaba con
+    // un 403 que solo salía en la consola.
+    await abrirApi(backend({ noModule: true }))
+    expect(await screen.findByText(new RegExp(API_CLIENT.client_id))).toBeInTheDocument()
+    expect(screen.getByText(/Este módulo no está contratado/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Nueva credencial' })).not.toBeInTheDocument()
+  })
+
+  it('si el servidor rechaza el alta, el formulario dice por qué', async () => {
+    const fake = backend()
+    fake.state.rpc.api_client_create = () => {
+      throw new SinModulo()
+    }
+    await abrirApi(fake)
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Nueva credencial' }))
+    await user.type(await screen.findByLabelText('Nombre'), 'erp-nuevo')
+    await user.click(await screen.findByLabelText('order.read'))
+    await user.click(await screen.findByRole('button', { name: 'Guardar' }))
+    expect(await screen.findByText('Este módulo no está contratado')).toBeInTheDocument()
+  })
+
   it('sin el modulo contratado, la pestaña lo dice y no finge un listado vacio', async () => {
     const fake = backend({ noModule: true })
     // La base responde `SIN_MODULO` al listar credenciales sin el addon. Se
