@@ -2298,6 +2298,275 @@ export type Database = {
           },
         ]
       }
+      connector_feeds: {
+        Row: {
+          company_id: string
+          consecutive_failures: number
+          created_at: string
+          default_warehouse_id: string | null
+          id: string
+          interval_minutes: number
+          is_active: boolean
+          last_error_code: string | null
+          last_run_at: string | null
+          last_status: string | null
+          lease_until: string | null
+          next_run_at: string
+          organization_id: string
+          page_size: number
+          path: string
+          price_list_id: string | null
+          resource: string
+          run_requested: boolean
+          source_id: string
+          updated_at: string
+          watermark: string | null
+        }
+        Insert: {
+          company_id: string
+          consecutive_failures?: number
+          created_at?: string
+          default_warehouse_id?: string | null
+          id?: string
+          interval_minutes?: number
+          is_active?: boolean
+          last_error_code?: string | null
+          last_run_at?: string | null
+          last_status?: string | null
+          lease_until?: string | null
+          next_run_at?: string
+          organization_id: string
+          page_size?: number
+          path: string
+          price_list_id?: string | null
+          resource: string
+          run_requested?: boolean
+          source_id: string
+          updated_at?: string
+          watermark?: string | null
+        }
+        Update: {
+          company_id?: string
+          consecutive_failures?: number
+          created_at?: string
+          default_warehouse_id?: string | null
+          id?: string
+          interval_minutes?: number
+          is_active?: boolean
+          last_error_code?: string | null
+          last_run_at?: string | null
+          last_status?: string | null
+          lease_until?: string | null
+          next_run_at?: string
+          organization_id?: string
+          page_size?: number
+          path?: string
+          price_list_id?: string | null
+          resource?: string
+          run_requested?: boolean
+          source_id?: string
+          updated_at?: string
+          watermark?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "connector_feeds_price_list_fk"
+            columns: ["price_list_id", "organization_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "price_lists"
+            referencedColumns: ["id", "organization_id", "company_id"]
+          },
+          {
+            foreignKeyName: "connector_feeds_source_fk"
+            columns: ["source_id", "organization_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "connector_sources"
+            referencedColumns: ["id", "organization_id", "company_id"]
+          },
+          {
+            foreignKeyName: "connector_feeds_warehouse_fk"
+            columns: ["default_warehouse_id", "organization_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id", "organization_id", "company_id"]
+          },
+        ]
+      }
+      connector_rejects: {
+        Row: {
+          company_id: string
+          created_at: string
+          detail: string | null
+          id: string
+          organization_id: string
+          reason: string
+          row_index: number
+          run_id: string
+          sku: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          detail?: string | null
+          id?: string
+          organization_id: string
+          reason: string
+          row_index: number
+          run_id: string
+          sku?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          detail?: string | null
+          id?: string
+          organization_id?: string
+          reason?: string
+          row_index?: number
+          run_id?: string
+          sku?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "connector_rejects_run_fk"
+            columns: ["run_id", "organization_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "connector_runs"
+            referencedColumns: ["id", "organization_id", "company_id"]
+          },
+        ]
+      }
+      connector_runs: {
+        Row: {
+          applied: number
+          company_id: string
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          feed_id: string
+          finished_at: string | null
+          id: string
+          organization_id: string
+          pages: number
+          received: number
+          rejected: number
+          started_at: string
+          status: string
+          trigger: string
+          unchanged: number
+          watermark_after: string | null
+        }
+        Insert: {
+          applied?: number
+          company_id: string
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          feed_id: string
+          finished_at?: string | null
+          id?: string
+          organization_id: string
+          pages?: number
+          received?: number
+          rejected?: number
+          started_at?: string
+          status?: string
+          trigger?: string
+          unchanged?: number
+          watermark_after?: string | null
+        }
+        Update: {
+          applied?: number
+          company_id?: string
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          feed_id?: string
+          finished_at?: string | null
+          id?: string
+          organization_id?: string
+          pages?: number
+          received?: number
+          rejected?: number
+          started_at?: string
+          status?: string
+          trigger?: string
+          unchanged?: number
+          watermark_after?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "connector_runs_feed_fk"
+            columns: ["feed_id", "organization_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "connector_feeds"
+            referencedColumns: ["id", "organization_id", "company_id"]
+          },
+        ]
+      }
+      connector_sources: {
+        Row: {
+          auth_header: string | null
+          auth_type: string
+          auth_username: string | null
+          base_url: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          has_secret: boolean
+          id: string
+          is_active: boolean
+          name: string
+          oauth_scope: string | null
+          oauth_token_url: string | null
+          organization_id: string
+          secret_set_at: string | null
+          timeout_seconds: number
+          updated_at: string
+        }
+        Insert: {
+          auth_header?: string | null
+          auth_type?: string
+          auth_username?: string | null
+          base_url: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          has_secret?: boolean
+          id?: string
+          is_active?: boolean
+          name: string
+          oauth_scope?: string | null
+          oauth_token_url?: string | null
+          organization_id: string
+          secret_set_at?: string | null
+          timeout_seconds?: number
+          updated_at?: string
+        }
+        Update: {
+          auth_header?: string | null
+          auth_type?: string
+          auth_username?: string | null
+          base_url?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          has_secret?: boolean
+          id?: string
+          is_active?: boolean
+          name?: string
+          oauth_scope?: string | null
+          oauth_token_url?: string | null
+          organization_id?: string
+          secret_set_at?: string | null
+          timeout_seconds?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       consumer_addresses: {
         Row: {
           address: string
@@ -13052,6 +13321,10 @@ export type Database = {
         }
         Returns: Json
       }
+      bundle_components_for_slug: {
+        Args: { p_product_ids: string[]; p_store_slug: string }
+        Returns: Json
+      }
       cart_abandon: {
         Args: { p_store_slug: string; p_token: string }
         Returns: Json
@@ -13211,6 +13484,34 @@ export type Database = {
       complete_domain_event: {
         Args: { p_event_id: string }
         Returns: undefined
+      }
+      connector_apply_prices: {
+        Args: { p_offset?: number; p_rows: Json; p_run_id: string }
+        Returns: Json
+      }
+      connector_apply_stock: {
+        Args: { p_offset?: number; p_rows: Json; p_run_id: string }
+        Returns: Json
+      }
+      connector_claim: { Args: { p_limit?: number }; Returns: Json }
+      connector_feed_run_now: {
+        Args: { p_feed_id: string; p_full?: boolean }
+        Returns: undefined
+      }
+      connector_finish: {
+        Args: {
+          p_error_code?: string
+          p_error_message?: string
+          p_run_id: string
+          p_status: string
+          p_watermark?: string
+        }
+        Returns: undefined
+      }
+      connector_secret: { Args: { p_source_id: string }; Returns: string }
+      connector_source_set_secret: {
+        Args: { p_secret: string; p_source_id: string }
+        Returns: Json
       }
       content_preview: {
         Args: {

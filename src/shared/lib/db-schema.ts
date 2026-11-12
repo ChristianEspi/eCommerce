@@ -384,6 +384,16 @@ export const API_CLIENTS_TABLE = 'api_clients'
 export const INTEGRATION_MONITOR_VIEW = 'integration_monitor'
 export const WEBHOOK_MONITOR_VIEW = 'webhook_monitor'
 
+// Fuentes de lectura (20261112120000): eCommerce consulta la API del ERP. El
+// navegador escribe fuente y flujo; ejecuciones y rechazados solo los lee. La
+// credencial va por `connector_source_set_secret` a Vault y no vuelve.
+export const CONNECTOR_SOURCES_TABLE = 'connector_sources' satisfies TableName
+export const CONNECTOR_FEEDS_TABLE = 'connector_feeds' satisfies TableName
+export const CONNECTOR_RUNS_TABLE = 'connector_runs' satisfies TableName
+export const CONNECTOR_REJECTS_TABLE = 'connector_rejects' satisfies TableName
+export const CONNECTOR_SET_SECRET_RPC = 'connector_source_set_secret' satisfies FunctionName
+export const CONNECTOR_RUN_NOW_RPC = 'connector_feed_run_now' satisfies FunctionName
+
 // --- Vistas del modelo de lectura público ----------------------------------
 // `security_invoker` sobre policies `to anon`: filtran filas, y el GRANT por
 // columna es lo que evita que `anon` vea `stock` o `config` (P02, §4.3).

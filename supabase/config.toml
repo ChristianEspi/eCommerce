@@ -99,6 +99,12 @@ verify_jwt = false
 [functions.usage-outbox-worker]
 verify_jwt = false
 
+# Fuentes de lectura (2026-11-12): consulta la API del ERP. La llama el
+# planificador de la base cada minuto con EBIM_CONNECTOR_PULL_KEY en cabecera,
+# sin usuario: mismo patron que integration-worker.
+[functions.connector-pull]
+verify_jwt = false
+
 # Correos de Supabase Auth por Microsoft Graph (contrato §14). La llama Auth, no
 # un usuario: la autenticacion es la firma Standard Webhooks del hook, y el flag
 # de la plataforma pediria un token que Auth no manda.

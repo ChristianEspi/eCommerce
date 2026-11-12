@@ -290,14 +290,15 @@ beforeEach(() => {
 })
 
 describe('Integraciones — la pantalla', () => {
-  it('es UNA pantalla con cuatro pestañas centradas', async () => {
+  it('es UNA pantalla con cinco pestañas centradas', async () => {
     renderPage(backend())
     const tabs = await screen.findAllByRole('tab')
-    expect(tabs.slice(0, 4).map((tab) => tab.textContent)).toEqual([
+    expect(tabs.slice(0, 5).map((tab) => tab.textContent)).toEqual([
       'Salud',
       'Cola',
       'Webhooks',
       'API',
+      'Fuentes',
     ])
   })
 
@@ -309,7 +310,7 @@ describe('Integraciones — la pantalla', () => {
   it('se puede entrar sin ningun modulo contratado', async () => {
     renderPage(backend({ noModule: true }))
     expect(await screen.findByRole('heading', { name: 'Integraciones' })).toBeInTheDocument()
-    expect(await screen.findAllByRole('tab')).toHaveLength(4)
+    expect(await screen.findAllByRole('tab')).toHaveLength(5)
   })
 
   it('un 403 se lee «no tienes permiso», no «no hay datos»', async () => {

@@ -33,6 +33,8 @@ export function mapIntegrationsCode(code: string): MessageKey {
     case 'ENTREGA_NO_ENCONTRADA':
     case 'CIRCUITO_NO_ENCONTRADO':
     case 'CREDENCIAL_NO_ENCONTRADA':
+    case 'FUENTE_NO_ENCONTRADA':
+    case 'FLUJO_NO_ENCONTRADO':
     case 'PGRST116':
       return 'integrations.error.notFound'
     case 'MOTIVO_REQUERIDO':
@@ -52,6 +54,8 @@ export function mapIntegrationsCode(code: string): MessageKey {
     case 'DATOS_INVALIDOS':
     case '23514':
       return 'integrations.error.invalid'
+    case 'ALMACEN_NO_ERP':
+      return 'integrations.sources.error.warehouseNotErp'
     case 'CONFIG_INCOMPLETA':
       return 'auth.notConfigured'
     default:

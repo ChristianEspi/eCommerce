@@ -429,7 +429,7 @@ describe('lo que NO se audita, y esta escrito', () => {
     expect(rows).toEqual([])
   })
 
-  it('las catorce tablas auditadas son exactamente las declaradas', async () => {
+  it('las dieciseis tablas auditadas son exactamente las declaradas', async () => {
     const rows = await sql(`
       select c.relname as tabla
         from pg_trigger t
@@ -441,9 +441,13 @@ describe('lo que NO se audita, y esta escrito', () => {
     // P14-SaaS anade tres, y las tres son de la misma clase que las once
     // anteriores: dar de alta una credencial de API o un destino al que salen
     // datos de negocio —y cambiarle la URL o el secreto— son las acciones mas
-    // sensibles de esa fase.
+    // sensibles de esa fase. Las fuentes de lectura (2026-11-12) anaden dos
+    // de la misma clase: a que servidor se llama con una credencial y que se
+    // trae de el (la credencial misma vive en Vault, no en la fila).
     expect(rows.map((r) => r.tabla)).toEqual([
       'api_clients',
+      'connector_feeds',
+      'connector_sources',
       'customers',
       'delivery_rates',
       'gift_cards',

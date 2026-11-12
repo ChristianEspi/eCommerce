@@ -13,6 +13,7 @@ import { ApiClientsSection } from './ApiClientsSection'
 import { HealthSection } from './HealthSection'
 import { QueueSection } from './QueueSection'
 import { WebhooksSection } from './WebhooksSection'
+import { SourcesSection } from './sources/SourcesSection'
 import { IntegrationsAiSection } from './ai/IntegrationsAiSection'
 
 /**
@@ -52,6 +53,7 @@ export function IntegrationsPage() {
       { id: 'cola', label: t('integrations.tab.queue'), content: <QueueSection /> },
       { id: 'webhooks', label: t('integrations.tab.webhooks'), content: <WebhooksSection /> },
       { id: 'api', label: t('integrations.tab.api'), content: <ApiClientsSection /> },
+      { id: 'fuentes', label: t('integrations.tab.sources'), content: <SourcesSection /> },
       ...(conIA ? [{ id: 'analisis-ia', label: t('aiIntegrations.tab'), content: <IntegrationsAiSection /> }] : []),
     ],
     [t, conIA],
