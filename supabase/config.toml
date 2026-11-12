@@ -50,6 +50,15 @@ verify_jwt = false
 [functions.platform-provisioning]
 verify_jwt = false
 
+# API de socio (/v1, ERP y sistemas externos). La autentica el token OAuth
+# client_credentials que emite la propia API en /v1/oauth/token, NO un JWT de
+# Supabase: con el flag puesto el gateway rechaza la peticion (401
+# UNAUTHORIZED_NO_AUTH_HEADER / token no es JWT) antes de llegar, y ningun ERP
+# puede ni pedir su token. La funcion verifica el hash del token y el scope en
+# `api_authenticate` en cada ruta salvo /oauth/token y /openapi.json.
+[functions.api]
+verify_jwt = false
+
 [functions.catalog-product]
 verify_jwt = true
 
