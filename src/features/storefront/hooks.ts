@@ -13,6 +13,7 @@ import { useOutletContext } from 'react-router-dom'
 import type { SearchQuery, SearchResult, Suggestion } from '@/domain'
 import {
   fetchBestSellers,
+  fetchBundleComponents,
   fetchPriceTiers,
   fetchGallery,
   fetchPublicBrands,
@@ -534,6 +535,21 @@ export function usePrefetchProduct(storeId: string | null): (slug: string) => vo
     },
     [client, storeId],
   )
+}
+
+/**
+ * Qué trae cada kit del carrito. La clave lleva los ids ORDENADOS: cambiar la
+ * cantidad de una línea no vuelve a pedir nada; añadir o quitar un producto sí.
+ */
+export function useBundleComponents(storeSlug: string | undefined, productIds: readonly string[]) {
+  const ids = [...new Set(productIds)].sort()
+  return useQuery({
+    queryKey: ['storefront', 'bundle-components', storeSlug ?? '', ids.join(',')] as const,
+    queryFn: () => fetchBundleComponents(storeSlug, ids),
+    enabled: Boolean(storeSlug) && ids.length > 0,
+    staleTime: 5 * 60_000,
+    retry: false,
+  })
 }
 
 /**

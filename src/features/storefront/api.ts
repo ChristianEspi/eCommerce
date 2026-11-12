@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { AppError } from '@/domain/errors'
 import { codeFromDbError, type PostgrestLike } from '@/shared/lib/appError'
 import {
+  BUNDLE_COMPONENTS_PUBLIC_RPC,
   ORDER_BY_TOKEN_RPC,
   PRODUCT_PRICE_TIERS_PUBLIC_RPC,
   STORE_BEST_SELLERS_PUBLIC_RPC,
@@ -613,6 +614,59 @@ export async function fetchOrderByToken(input: {
 
   if (error) throw new OrderNotFoundError()
   return trackedOrderSchema.parse(data)
+}
+
+/** Un producto que trae un kit, tal como lo ve el comprador. */
+export interface BundleComponent {
+  readonly name: string
+  readonly variantName: string | null
+  readonly quantity: number
+  /** `null` = unidades base («2 ×»); si no, la unidad («2 caja»). */
+  readonly unit: string | null
+}
+
+const bundleComponentsSchema = z.array(
+  z.object({
+    bundle_product_id: z.string().uuid(),
+    name: z.string(),
+    variant_name: z.string().nullable().default(null),
+    quantity: z.string(),
+    unit: z.string().nullable().default(null),
+  }),
+)
+
+/**
+ * Los componentes de los kits de una lista de productos, agrupados por kit.
+ *
+ * Una sola consulta para todo el carrito: los productos que no son kit (o no
+ * están publicados en la tienda) simplemente no aparecen en el resultado.
+ * Ante cualquier fallo devuelve un objeto vacío: el desglose es una ayuda, y
+ * un carrito que no lo carga tiene que seguir vendiendo.
+ */
+export async function fetchBundleComponents(
+  storeSlug: string | undefined,
+  productIds: readonly string[],
+): Promise<Record<string, BundleComponent[]>> {
+  if (!storeSlug || productIds.length === 0) return {}
+  const { data, error } = await storefront().rpc(BUNDLE_COMPONENTS_PUBLIC_RPC, {
+    p_store_slug: storeSlug,
+    p_product_ids: [...productIds],
+  })
+  if (error) return {}
+  const parsed = bundleComponentsSchema.safeParse(data)
+  if (!parsed.success) return {}
+  const byBundle: Record<string, BundleComponent[]> = {}
+  for (const row of parsed.data) {
+    const quantity = Number(row.quantity)
+    if (!Number.isFinite(quantity)) continue
+    ;(byBundle[row.bundle_product_id] ??= []).push({
+      name: row.name,
+      variantName: row.variant_name,
+      quantity,
+      unit: row.unit,
+    })
+  }
+  return byBundle
 }
 
 /** Una escala de precio: desde `minQuantity` unidades, `unitPrice` cada una. */

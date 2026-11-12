@@ -665,6 +665,11 @@ export const STORE_BEST_SELLERS_PUBLIC_RPC = 'store_best_sellers_for_slug'
  * tienda o del canal público: las de segmento o cliente son privadas.
  */
 export const PRODUCT_PRICE_TIERS_PUBLIC_RPC = 'product_price_tiers_for_slug'
+/**
+ * Qué trae cada kit del carrito: nombre, variante, cantidad y unidad de sus
+ * componentes. Solo kits publicados en la tienda activa; sin precios ni stock.
+ */
+export const BUNDLE_COMPONENTS_PUBLIC_RPC = 'bundle_components_for_slug'
 export const CATALOG_SUGGEST_PUBLIC_RPC = 'catalog_suggest_for_slug'
 export const CONTENT_PREVIEW_RPC = 'content_preview'
 export const CATALOG_SEARCH_RPC = 'catalog_search'

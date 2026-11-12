@@ -680,6 +680,8 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.cart.each': 'each',
     'store.cart.quantity': 'Quantity',
     'store.cart.agreementTag': 'Agreement',
+    'store.cart.bundleShow': 'See what is included ({n})',
+    'store.cart.bundleHide': 'Hide what is included',
     'store.cart.agreementActive': 'Agreement price',
     'store.cart.shippingNote': 'Shipping is chosen at checkout.',
     'store.terms.credit': 'Company credit · {n} days',

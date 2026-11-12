@@ -1,14 +1,17 @@
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded'
+import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded'
 import FavoriteBorderRoundedIcon from '@mui/icons-material/FavoriteBorderRounded'
 import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded'
-import { Box, IconButton, Stack, Typography } from '@mui/material'
+import { Box, ButtonBase, Collapse, IconButton, Stack, Typography } from '@mui/material'
+import { useId, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { formatMoney } from '@/shared/lib/format'
 import { R, TS } from '@/theme/tokens'
 import { ProductMedia } from '../components/ProductMedia'
 import { QuantityStepper } from '../components/QuantityStepper'
-import { useSignedThumbnails } from '../hooks'
+import type { BundleComponent } from '../api'
+import { useBundleComponents, useSignedThumbnails } from '../hooks'
 import { useFavorites } from '../useFavorites'
 import type { PriceQuote } from '@/domain'
 import { esAcuerdoDelComprador } from './agreement'
@@ -48,6 +51,11 @@ export function CartLineList({
   const thumbs = useSignedThumbnails(cart.lines.map((line) => line.image_path))
   // Una lectura para todas las líneas: el corazón de cada una sale del mismo conjunto.
   const favorites = useFavorites(cart.store_id)
+  // Una consulta para todo el carrito: las líneas que no son kit no traen nada.
+  const bundles = useBundleComponents(
+    storeSlug,
+    cart.lines.map((line) => line.product_id),
+  )
 
   return (
     <Stack component="ul" sx={{ listStyle: 'none', m: 0, p: 0, gap: compact ? 1.5 : 2 }}>
@@ -62,6 +70,7 @@ export function CartLineList({
           precio={precioDe(line, quoted)}
           favorite={favorites.isFavorite(line.product_id)}
           onToggleFavorite={() => void favorites.toggle(line.product_id)}
+          components={bundles.data?.[line.product_id] ?? null}
         />
       ))}
     </Stack>
@@ -111,6 +120,7 @@ function CartLineRow({
   precio,
   favorite,
   onToggleFavorite,
+  components,
 }: {
   line: CartLine
   storeSlug: string
@@ -120,6 +130,8 @@ function CartLineRow({
   precio: PrecioLinea
   favorite: boolean
   onToggleFavorite: () => void
+  /** Lo que trae el kit; `null` si la línea no es un kit. */
+  components: BundleComponent[] | null
 }) {
   const { t, locale } = useI18n()
   const { setQuantity, remove } = useCart()
@@ -215,6 +227,10 @@ function CartLineRow({
           ) : null}
         </Stack>
 
+        {components && components.length > 0 ? (
+          <BundleContents components={components} kits={line.quantity} />
+        ) : null}
+
         <Stack direction="row" sx={{ alignItems: 'center', gap: 0.5, mt: 0.5 }}>
           {/* El MISMO selector que la ficha y la vista rapida. Con `min` a
               cero: aqui bajar desde uno quita la linea, que es lo que ya
@@ -272,5 +288,86 @@ function CartLineRow({
         </Stack>
       </Stack>
     </Stack>
+  )
+}
+
+/**
+ * El desplegable «Ver qué incluye» de una línea de kit.
+ *
+ * Las cantidades son las TOTALES de la línea (receta × kits): con 2 kits el
+ * comprador se lleva 2 mochilas, y eso es lo que tiene que leer. Cerrado por
+ * defecto: el carrito sigue siendo una lista corta.
+ */
+export function BundleContents({
+  components,
+  kits,
+}: {
+  components: BundleComponent[]
+  kits: number
+}) {
+  const { t, locale } = useI18n()
+  const [open, setOpen] = useState(false)
+  const listId = useId()
+  const number = new Intl.NumberFormat(locale, { maximumFractionDigits: 3 })
+
+  return (
+    <Box>
+      <ButtonBase
+        aria-expanded={open}
+        aria-controls={listId}
+        onClick={() => setOpen((value) => !value)}
+        sx={{
+          gap: 0.25,
+          fontSize: TS.label,
+          fontWeight: 700,
+          color: 'var(--accent-deep)',
+          borderRadius: `${R.sm}px`,
+          '&:focus-visible': { outline: '2px solid var(--accent-deep)', outlineOffset: 2 },
+        }}
+      >
+        {open
+          ? t('store.cart.bundleHide')
+          : t('store.cart.bundleShow').replace('{n}', String(components.length))}
+        <ExpandMoreRoundedIcon
+          fontSize="small"
+          sx={{
+            transition: 'transform 160ms ease',
+            transform: open ? 'rotate(180deg)' : 'none',
+            '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
+          }}
+        />
+      </ButtonBase>
+      <Collapse in={open} timeout="auto">
+        <Box
+          component="ul"
+          id={listId}
+          sx={{
+            listStyle: 'none',
+            m: 0,
+            mt: 0.5,
+            p: 0,
+            pl: 1.25,
+            borderLeft: '2px solid var(--border)',
+            display: 'grid',
+            gap: 0.25,
+          }}
+        >
+          {components.map((component, index) => (
+            <Typography
+              key={`${component.name}|${component.variantName ?? ''}|${index}`}
+              component="li"
+              sx={{ fontSize: TS.label, color: 'var(--muted)', lineHeight: 1.4 }}
+            >
+              <Box component="span" className="tnum" sx={{ fontWeight: 800, color: 'var(--text)' }}>
+                {number.format(component.quantity * kits)}
+                {component.unit ? ` ${component.unit}` : ' ×'}
+              </Box>{' '}
+              {component.name}
+              {component.variantName ? ` · ${component.variantName}` : ''}
+            </Typography>
+          ))}
+        </Box>
+      </Collapse>
+    </Box>
   )
 }

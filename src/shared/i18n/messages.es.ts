@@ -643,6 +643,8 @@ export const es = {
     'store.cart.each': 'c/u',
     'store.cart.quantity': 'Cantidad',
     'store.cart.agreementTag': 'Convenio',
+    'store.cart.bundleShow': 'Ver qué incluye ({n})',
+    'store.cart.bundleHide': 'Ocultar lo que incluye',
     'store.cart.agreementActive': 'Precio convenio',
     'store.cart.shippingNote': 'El envío se elige al pagar.',
     'store.terms.credit': 'Crédito empresa · {n} días',

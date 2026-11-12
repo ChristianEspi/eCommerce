@@ -165,6 +165,12 @@ const ANON_SURFACE: Record<
     clase: 'publicado',
     porque: 'escalas de precio público por cantidad de un producto publicado; sin listas privadas',
   },
+  // Carrito · qué trae un kit publicado: nombre, variante, cantidad y unidad
+  // de cada componente. Ni precio, ni stock, ni ids internos, ni tenant.
+  bundle_components_for_slug: {
+    clase: 'publicado',
+    porque: 'componentes (nombre, variante, cantidad, unidad) de kits publicados en la tienda activa; sin precio ni stock',
+  },
   product_detail_for_slug: {
     clase: 'publicado',
     porque: 'SKU, destacados, especificaciones, estado (no cantidad) por tienda física y resumen de entrega de un producto publicado',
@@ -222,10 +228,10 @@ describe('la superficie anónima es una lista cerrada', () => {
    * publica esta tabla; sin este test, el documento y el código se separan en la
    * primera función nueva y nadie se entera hasta la siguiente auditoría.
    */
-  it('el reparto por clase es 15 publicado · 9 secreto · 3 techo · 1 recogido', () => {
+  it('el reparto por clase es 16 publicado · 9 secreto · 3 techo · 1 recogido', () => {
     const cuenta = { publicado: 0, secreto: 0, techo: 0, recogido: 0 }
     for (const entry of Object.values(ANON_SURFACE)) cuenta[entry.clase] += 1
-    expect(cuenta).toEqual({ publicado: 15, secreto: 9, techo: 3, recogido: 1 })
+    expect(cuenta).toEqual({ publicado: 16, secreto: 9, techo: 3, recogido: 1 })
   })
 
   /**
