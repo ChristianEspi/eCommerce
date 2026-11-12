@@ -37,6 +37,7 @@ import {
 } from './hooks'
 import { formatGiftCardCode, type GiftCard } from './types'
 import type { IssuedGiftCard } from './api'
+import { SelectField } from '@/shared/ui/SelectField'
 
 const STATUS_TABS = ['active', 'depleted', 'expired', 'cancelled', 'all'] as const
 
@@ -159,8 +160,7 @@ export function GiftCardsSection() {
             placeholder={t('promotions.giftCards.search')}
           />
         </Box>
-        <TextField
-          select
+        <SelectField
           size="small"
           label={t('common.status')}
           value={status}
@@ -173,7 +173,7 @@ export function GiftCardsSection() {
               {t(`promotions.giftStatus.${value}` as MessageKey)}
             </option>
           ))}
-        </TextField>
+        </SelectField>
       </FilterBar>
 
       {issued && (

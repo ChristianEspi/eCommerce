@@ -49,6 +49,7 @@ import {
   type PromotionKind,
   type ScopeKind,
 } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /** Una campaña nueva nace en BORRADOR. Encenderla es una decisión, no el efecto
  *  secundario de crearla — la misma regla que P09 aplicó a los medios de pago. */
@@ -443,8 +444,7 @@ export function PromotionDrawer({
         )}
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-          <TextField
-            select
+          <SelectField
             label={t('promotions.field.kind')}
             value={values.kind}
             onChange={(event) => set('kind', event.target.value as PromotionKind)}
@@ -458,9 +458,8 @@ export function PromotionDrawer({
                 {t(`promotions.kind.${kind}` as MessageKey)}
               </MenuItem>
             ))}
-          </TextField>
-          <TextField
-            select
+          </SelectField>
+          <SelectField
             label={t('common.status')}
             value={values.status}
             onChange={(event) => set('status', event.target.value as PromotionFormValues['status'])}
@@ -472,7 +471,7 @@ export function PromotionDrawer({
                 {t(`promotions.status.${status}` as MessageKey)}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
         </Stack>
 
         {/* Los campos del descuento dependen del TIPO. Ver la decisión 1. */}
@@ -715,8 +714,7 @@ export function PromotionDrawer({
                 alignItems: 'start',
               }}
             >
-              <TextField
-                select
+              <SelectField
                 size="small"
                 label={t('promotions.field.scope')}
                 value={scopeKind}
@@ -735,7 +733,7 @@ export function PromotionDrawer({
                     {t(`promotions.scope.${kind}` as MessageKey)}
                   </MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
               {/* Se ELIGE, no se teclea.
                   La tabla guarda uuids —`product_id`, `category_id`,
                   `brand_id`— y aquí había un campo de texto libre llamado
@@ -776,8 +774,7 @@ export function PromotionDrawer({
                 </Box>
               )}
               {scopeKind === 'variant' && (
-                <TextField
-                  select
+                <SelectField
                   size="small"
                   label={t('promotions.field.variant')}
                   value={scopeVariant}
@@ -791,7 +788,7 @@ export function PromotionDrawer({
                       {variante.code ? ` · ${variante.code}` : ''}
                     </MenuItem>
                   ))}
-                </TextField>
+                </SelectField>
               )}
               {promotion.kind === 'bundle' && (
                 <TextField

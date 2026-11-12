@@ -13,7 +13,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useMemo, useState } from 'react'
@@ -32,6 +31,7 @@ import {
   useWarehouses,
 } from './hooks'
 import { formatQuantity } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * El libro mayor y lo comprometido, uno debajo del otro.
@@ -79,8 +79,7 @@ export function MovementsSection() {
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
           <Box sx={{ flex: 1 }} />
-          <TextField
-            select
+          <SelectField
             size="small"
             label={t('inventory.field.warehouse')}
             value={warehouseId}
@@ -93,7 +92,7 @@ export function MovementsSection() {
                 {warehouse.code} · {warehouse.name}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
         </Stack>
 
         <Card>

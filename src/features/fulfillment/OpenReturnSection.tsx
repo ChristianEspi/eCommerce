@@ -5,6 +5,7 @@ import type { MessageKey } from '@/shared/i18n/messages'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { FulfillmentError } from './errors'
 import { useOpenReturn, useReturnReasons } from './hooks'
+import { SelectField } from '@/shared/ui/SelectField'
 
 export interface ReturnableLine {
   id: string
@@ -97,8 +98,7 @@ export function OpenReturnSection({
                 label={`${line.name}${line.variant_label ? ` · ${line.variant_label}` : ''}`}
               />
               {qty > 0 && line.quantity > 1 && (
-                <TextField
-                  select
+                <SelectField
                   size="small"
                   label={t('returns.open.quantity')}
                   value={qty}
@@ -109,18 +109,18 @@ export function OpenReturnSection({
                       {n}
                     </MenuItem>
                   ))}
-                </TextField>
+                </SelectField>
               )}
             </Stack>
           )
         })}
-        <TextField select label={t('returns.open.reason')} value={reason} onChange={(event) => setReason(event.target.value)}>
+        <SelectField label={t('returns.open.reason')} value={reason} onChange={(event) => setReason(event.target.value)}>
           {activos.map((r) => (
             <MenuItem key={r.code} value={r.code}>
               {r.label}
             </MenuItem>
           ))}
-        </TextField>
+        </SelectField>
         <TextField label={t('returns.open.note')} multiline minRows={2} value={note} onChange={(event) => setNote(event.target.value)} />
         <Stack direction="row" sx={{ gap: 1, justifyContent: 'flex-end' }}>
           <Button onClick={() => setAbierto(false)} disabled={open.isPending}>

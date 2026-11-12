@@ -48,6 +48,7 @@ import {
   type ResolvedPriceRow,
 } from './importCsv'
 import type { PriceList, PriceListItem, PricedProduct } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Los precios de una lista.
@@ -278,8 +279,7 @@ export function PriceItemsPanel({ list, canWrite }: { list: PriceList; canWrite:
           />
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-            <TextField
-              select
+            <SelectField
               size="small"
               fullWidth
               label={t('pricing.field.variant')}
@@ -294,10 +294,9 @@ export function PriceItemsPanel({ list, canWrite }: { list: PriceList; canWrite:
                   {variant.name}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
 
-            <TextField
-              select
+            <SelectField
               size="small"
               fullWidth
               label={t('pricing.field.uom')}
@@ -312,7 +311,7 @@ export function PriceItemsPanel({ list, canWrite }: { list: PriceList; canWrite:
                   {uom.code} (× {uom.factor})
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
           </Stack>
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>

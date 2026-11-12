@@ -7,6 +7,7 @@ import { useI18n } from '@/shared/i18n/i18n-context'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { LoadingState } from '@/shared/ui/states'
 import { helpContactSchema, useHelpContact, useSaveHelpContact, type HelpContact } from './helpContact'
+import { SelectField } from '@/shared/ui/SelectField'
 
 const VACIO: HelpContact = {
   legal_name: '',
@@ -88,12 +89,12 @@ export function HelpContactSection({ storeId, canManage }: { storeId: string | n
         <Stack sx={{ gap: 1.25 }}>
           {v.social_links.map((link, i) => (
             <Stack key={link.network} direction="row" sx={{ gap: 1, alignItems: 'center' }}>
-              <TextField select size="small" sx={{ width: 160 }} value={link.network} disabled={!canManage}
+              <SelectField size="small" sx={{ width: 160 }} value={link.network} disabled={!canManage}
                 onChange={(e) => set('social_links', v.social_links.map((l, j) => (j === i ? { ...l, network: e.target.value as SocialNetwork } : l)))}>
                 {[link.network, ...libres].map((n) => (
                   <MenuItem key={n} value={n}>{NOMBRE_RED[n]}</MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
               <TextField size="small" fullWidth placeholder="https://" value={link.url} disabled={!canManage}
                 error={!/^https:\/\/\S+$/.test(link.url)}
                 onChange={(e) => set('social_links', v.social_links.map((l, j) => (j === i ? { ...l, url: e.target.value } : l)))} />

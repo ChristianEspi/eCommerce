@@ -22,6 +22,7 @@ import { PricingError } from './errors'
 import { simulatePrice } from './api'
 import { useChannels, useProductSearch, useProductVariants, useSegments } from './hooks'
 import type { PriceQuoteResult, PricedProduct } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Simulador: «¿cuánto le costaría esto a este cliente, por este canal?».
@@ -133,8 +134,7 @@ export function SimulatorSection() {
               )}
             />
 
-            <TextField
-              select
+            <SelectField
               size="small"
               label={t('pricing.field.variant')}
               value={variantId}
@@ -148,13 +148,12 @@ export function SimulatorSection() {
                   {variant.name}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
           </Stack>
 
           {/* PARA QUIÉN se cotiza: los tres ejes con los que el motor decide. */}
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-            <TextField
-              select
+            <SelectField
               size="small"
               fullWidth
               label={t('pricing.field.channel')}
@@ -167,10 +166,9 @@ export function SimulatorSection() {
                   {channel.code} · {channel.name}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
 
-            <TextField
-              select
+            <SelectField
               size="small"
               fullWidth
               label={t('pricing.field.segment')}
@@ -183,14 +181,13 @@ export function SimulatorSection() {
                   {segment.name}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
 
             {/* Desde P05-SaaS: elegir un cliente basta. Si no se declara
                 segmento, el servidor toma el de su ficha —así el simulador
                 responde lo que de verdad le van a cobrar—. Declarar los dos
                 sigue valiendo, para responder «¿y si lo pasamos a mayorista?». */}
-            <TextField
-              select
+            <SelectField
               size="small"
               fullWidth
               label={t('pricing.field.customer')}
@@ -203,7 +200,7 @@ export function SimulatorSection() {
                   {customer.code} · {customer.name}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
           </Stack>
 
           {/* CUÁNTO, y la pregunta. `flexShrink: 0` y ancho fijo: «Cantidad» es

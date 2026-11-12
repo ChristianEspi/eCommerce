@@ -31,6 +31,7 @@ import {
   bootstrapTenant,
   slugify,
 } from './bootstrapTenant'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * La lista de monedas vive en `public.currencies`, no aquí: cablearla obligaba
@@ -190,8 +191,7 @@ export function OnboardingPage() {
                   {...register('storeSlug', { onChange: () => setSlugEdited(true) })}
                 />
 
-                <TextField
-                  select
+                <SelectField
                   label={t('onboarding.currency')}
                   fullWidth
                   error={Boolean(errors.currency)}
@@ -203,7 +203,7 @@ export function OnboardingPage() {
                       {currency.code} — {currency.name}
                     </MenuItem>
                   ))}
-                </TextField>
+                </SelectField>
 
                 <Alert severity="info" icon={false} sx={{ borderRadius: `${R.md}px` }}>
                   {t('onboarding.owner')}{' '}

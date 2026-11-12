@@ -38,6 +38,7 @@ import {
   type ProductUomFormValues,
 } from './types'
 import type { PimProduct } from '../types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Unidades de venta del producto.
@@ -271,8 +272,7 @@ function UomForm({
         {serverError && <Alert severity="error">{t(serverError)}</Alert>}
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-          <TextField
-            select
+          <SelectField
             size="small"
             fullWidth
             label={t('pim.tab.units')}
@@ -287,7 +287,7 @@ function UomForm({
                 {unit.label}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
 
           <TextField
             size="small"

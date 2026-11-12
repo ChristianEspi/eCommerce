@@ -1,4 +1,4 @@
-import { Button, MenuItem, Popover, Stack, TextField, Typography } from '@mui/material'
+import { Button, MenuItem, Popover, Stack, Typography } from '@mui/material'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import {
@@ -15,6 +15,7 @@ import type {
 import { TS } from '@/theme/tokens'
 import type { ReactNode } from 'react'
 import { ETIQUETA_VALOR, HEREDAR } from './styleLabels'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Cómo se enseña UNA sección de la portada (Storefront V3 · P12).
@@ -168,9 +169,8 @@ export function SectionPresentationPopover({
 
         {extra}
         {campos.map((campo) => (
-          <TextField
+          <SelectField
             key={campo.clave}
-            select
             fullWidth
             size="small"
             label={t(campo.label)}
@@ -187,7 +187,7 @@ export function SectionPresentationPopover({
                 {etiqueta(valor)}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
         ))}
 
         <Button

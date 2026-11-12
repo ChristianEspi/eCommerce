@@ -84,6 +84,7 @@ import {
 import { parseRichText } from '@/domain/content'
 import { isSafeHref } from '@/domain/href'
 import { useMoveBlockItem, useRemoveBlockItem } from './hooks'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * La etiqueta se sube siempre.
@@ -472,8 +473,7 @@ export function BlocksSection({ pageId }: { pageId: string | null }) {
         }
       >
         <Stack spacing={2}>
-          <TextField
-            select
+          <SelectField
             label={t('content.blocks.type')}
             value={form.block_type}
             onChange={(event) =>
@@ -494,7 +494,7 @@ export function BlocksSection({ pageId }: { pageId: string | null }) {
                 {t(`content.block.${type}` as MessageKey)}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
 
           {blockUsesMediaItems(form.block_type) && (
             <Typography sx={{ color: 'var(--muted)', fontSize: 13 }}>
@@ -516,8 +516,7 @@ export function BlocksSection({ pageId }: { pageId: string | null }) {
            * comercio no tiene por qué leer `photo-grid`.
            */}
           {opcionesDeComposicion !== null && (
-            <TextField
-              select
+            <SelectField
               label={t('content.blocks.layout')}
               value={form.layout}
               helperText={t('content.blocks.layoutHelp')}
@@ -532,7 +531,7 @@ export function BlocksSection({ pageId }: { pageId: string | null }) {
                   )}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
           )}
 
           {/* Cuántas imágenes por fila, solo en el mosaico de un carrusel de
@@ -596,8 +595,7 @@ export function BlocksSection({ pageId }: { pageId: string | null }) {
               desplegable es donde se ve. Lo que NUNCA sale a la vitrina es el
               código del cupón: eso sería regalar el folleto. */}
           {rules.promotion !== 'unused' && (
-            <TextField
-              select
+            <SelectField
               label={t('content.blocks.promotion')}
               value={form.promotion_id ?? ''}
               helperText={t('content.blocks.promotionHelp')}
@@ -613,7 +611,7 @@ export function BlocksSection({ pageId }: { pageId: string | null }) {
                   )}`}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
           )}
           {rules.body !== 'unused' && (
             <Suspense fallback={<Skeleton variant="rounded" height={260} />}>

@@ -9,7 +9,6 @@ import {
   MenuItem,
   MenuList,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useState } from 'react'
@@ -17,6 +16,7 @@ import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { AppIcon } from '@/shared/ui/AppIcon'
 import { R, T } from '@/theme/tokens'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Selector de tienda.
@@ -142,8 +142,7 @@ export function CompanySwitcher() {
   if (companies.length <= 1) return null
 
   return (
-    <TextField
-      select
+    <SelectField
       size="small"
       value={activeCompanyId ?? ''}
       onChange={(event) => setActiveCompany(event.target.value)}
@@ -158,6 +157,6 @@ export function CompanySwitcher() {
           </MenuItem>
         )
       })}
-    </TextField>
+    </SelectField>
   )
 }

@@ -43,6 +43,7 @@ import {
   type BusinessAccount,
   type BusinessAccountUser,
 } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 const EMPTY: AccountUserFormValues = {
   user_id: '',
@@ -222,8 +223,7 @@ export function AccountUsersPanel({
           </Stack>
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-            <TextField
-              select
+            <SelectField
               size="small"
               fullWidth
               label={t('customers.field.role')}
@@ -235,7 +235,7 @@ export function AccountUsersPanel({
                   {t(`customers.role.${role}`)}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
 
             <TextField
               size="small"
@@ -247,8 +247,7 @@ export function AccountUsersPanel({
               inputProps={{ inputMode: 'decimal' }}
             />
 
-            <TextField
-              select
+            <SelectField
               size="small"
               fullWidth
               label={t('common.status')}
@@ -260,12 +259,11 @@ export function AccountUsersPanel({
                   {t(`customers.status.${status}`)}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
           </Stack>
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-            <TextField
-              select
+            <SelectField
               size="small"
               fullWidth
               label={t('customers.field.defaultLocation')}
@@ -278,7 +276,7 @@ export function AccountUsersPanel({
                   {location.code} · {location.name}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
             <Button variant="contained" onClick={() => void submit()} disabled={save.isPending}>
               {editing ? t('common.save') : t('common.add')}
             </Button>

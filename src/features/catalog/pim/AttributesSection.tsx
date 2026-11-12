@@ -52,6 +52,7 @@ import {
   type AttributeValue,
   type AttributeValueFormValues,
 } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 const DATA_TYPE_LABEL: Record<AttributeDataType, MessageKey> = {
   text: 'pim.type.text',
@@ -342,8 +343,7 @@ function AttributeDrawer({
             {...register('code')}
           />
 
-          <TextField
-            select
+          <SelectField
             label={t('pim.field.type')}
             fullWidth
             disabled={!canWrite}
@@ -357,7 +357,7 @@ function AttributeDrawer({
                 {t(DATA_TYPE_LABEL[type])}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
 
           <TextField
             label={t('pim.field.unit')}

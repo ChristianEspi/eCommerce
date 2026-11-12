@@ -13,7 +13,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useMemo, useState } from 'react'
@@ -26,6 +25,7 @@ import { EmptyState } from '@/shared/ui/states'
 import { PricingError } from './errors'
 import { useAddAssignment, useAssignments, useChannels, useDeleteAssignment, useSegments } from './hooks'
 import { PRICE_SCOPES, SCOPE_RANK, assignmentFormSchema, type PriceList, type PriceScope } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * A quién se le aplica esta lista.
@@ -115,8 +115,7 @@ export function AssignmentsPanel({ list, canWrite }: { list: PriceList; canWrite
           {error && <Alert severity="error">{t(error)}</Alert>}
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-            <TextField
-              select
+            <SelectField
               size="small"
               fullWidth
               label={t('pricing.field.scope')}
@@ -128,11 +127,10 @@ export function AssignmentsPanel({ list, canWrite }: { list: PriceList; canWrite
                   {t(`pricing.scope.${option}`)} ({SCOPE_RANK[option]})
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
 
             {scope === 'channel' && (
-              <TextField
-                select
+              <SelectField
                 size="small"
                 fullWidth
                 label={t('pricing.field.channel')}
@@ -144,12 +142,11 @@ export function AssignmentsPanel({ list, canWrite }: { list: PriceList; canWrite
                     {channel.code} · {channel.name}
                   </MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
             )}
 
             {scope === 'segment' && (
-              <TextField
-                select
+              <SelectField
                 size="small"
                 fullWidth
                 label={t('pricing.field.segment')}
@@ -161,12 +158,11 @@ export function AssignmentsPanel({ list, canWrite }: { list: PriceList; canWrite
                     {segment.name}
                   </MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
             )}
 
             {scope === 'customer' && (
-              <TextField
-                select
+              <SelectField
                 size="small"
                 fullWidth
                 label={t('pricing.field.customer')}
@@ -179,7 +175,7 @@ export function AssignmentsPanel({ list, canWrite }: { list: PriceList; canWrite
                     {customer.code} · {customer.name}
                   </MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
             )}
 
             <Button variant="contained" onClick={() => void submit()} disabled={add.isPending}>

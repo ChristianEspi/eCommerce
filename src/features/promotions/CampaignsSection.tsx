@@ -14,7 +14,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useEffect, useMemo, useState } from 'react'
@@ -30,6 +29,7 @@ import { PromotionDrawer } from './PromotionDrawer'
 import { PromotionsError } from './errors'
 import { useDeletePromotion, usePromotions, useSetPromotionStatus } from './hooks'
 import { combinationLabel, promotionSummary, type Promotion } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Interpolación de parámetros. `t()` devuelve el texto de la clave tal cual —el
@@ -172,8 +172,7 @@ export function CampaignsSection() {
             placeholder={t('promotions.campaigns.search')}
           />
         </Box>
-        <TextField
-          select
+        <SelectField
           size="small"
           label={t('common.status')}
           value={status}
@@ -186,7 +185,7 @@ export function CampaignsSection() {
               {t(`promotions.status.${value}` as MessageKey)}
             </option>
           ))}
-        </TextField>
+        </SelectField>
       </FilterBar>
 
       <Card>

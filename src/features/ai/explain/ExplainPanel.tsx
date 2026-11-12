@@ -43,6 +43,7 @@ import {
   type ExplainSystem,
 } from './explainAi'
 import { useExplainDraft, useExplainInsight, useExplainSignals } from './useExplain'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /** Namespace i18n de cada superficie (claves `<ns>.signal.*`, `<ns>.metric.*`…). */
 export type ExplainNamespace = 'aiCredit' | 'aiPayments' | 'aiFulfillment' | 'aiOps' | 'aiIntegrations'
@@ -460,8 +461,7 @@ function DraftSection({
       <Typography sx={{ fontSize: 12, color: 'var(--muted)' }}>{t(`${ns}.draft.help` as MessageKey)}</Typography>
       {canAsk && (
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-          <TextField
-            select
+          <SelectField
             size="small"
             label={t('aiExplain.draft.tone')}
             value={tone}
@@ -473,7 +473,7 @@ function DraftSection({
                 {t(`aiExplain.draft.tone.${tn}` as MessageKey)}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
           <TextField
             fullWidth
             size="small"

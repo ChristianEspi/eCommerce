@@ -43,6 +43,7 @@ import {
   type Route,
   type RouteFormValues,
 } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * La ruta: cabecera y paradas en orden.
@@ -225,8 +226,7 @@ export function RouteDrawer({
               control={control}
               name="sales_rep_id"
               render={({ field }) => (
-                <TextField
-                  select
+                <SelectField
                   fullWidth
                   required
                   label={t('sales.field.rep')}
@@ -248,15 +248,14 @@ export function RouteDrawer({
                         {`${rep.employee_code} · ${rep.full_name}`}
                       </MenuItem>
                     ))}
-                </TextField>
+                </SelectField>
               )}
             />
             <Controller
               control={control}
               name="territory_id"
               render={({ field }) => (
-                <TextField
-                  select
+                <SelectField
                   fullWidth
                   label={t('sales.field.territory')}
                   disabled={!canWrite}
@@ -271,7 +270,7 @@ export function RouteDrawer({
                       {`${territory.code} · ${territory.name}`}
                     </MenuItem>
                   ))}
-                </TextField>
+                </SelectField>
               )}
             />
           </FieldRow>
@@ -281,8 +280,7 @@ export function RouteDrawer({
               control={control}
               name="weekday"
               render={({ field }) => (
-                <TextField
-                  select
+                <SelectField
                   fullWidth
                   label={t('sales.field.weekday')}
                   disabled={!canWrite}
@@ -295,15 +293,14 @@ export function RouteDrawer({
                       {t(`sales.weekday.${day}` as MessageKey)}
                     </MenuItem>
                   ))}
-                </TextField>
+                </SelectField>
               )}
             />
             <Controller
               control={control}
               name="frequency_weeks"
               render={({ field }) => (
-                <TextField
-                  select
+                <SelectField
                   fullWidth
                   label={t('sales.field.frequency')}
                   disabled={!canWrite}
@@ -319,7 +316,7 @@ export function RouteDrawer({
                         : t('sales.frequency.every').replace('{n}', String(weeks))}
                     </MenuItem>
                   ))}
-                </TextField>
+                </SelectField>
               )}
             />
           </FieldRow>

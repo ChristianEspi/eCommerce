@@ -55,6 +55,7 @@ import {
   type ProductStatus,
 } from './types'
 import { useProductCandidates, useProductPublications, useSaveProduct } from './useProducts'
+import { SelectField } from '@/shared/ui/SelectField'
 
 const STATUS_LABEL: Record<ProductStatus, MessageKey> = {
   draft: 'catalog.status.draft',
@@ -424,8 +425,7 @@ export function ProductDrawer({
 
           {advanced && (
             <>
-              <TextField
-                select
+              <SelectField
                 label={t('catalog.field.kind')}
                 fullWidth
                 disabled={!canWrite}
@@ -439,11 +439,10 @@ export function ProductDrawer({
                     {t(KIND_LABEL[value])}
                   </MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
 
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                <TextField
-                  select
+                <SelectField
                   label={t('catalog.field.brand')}
                   fullWidth
                   disabled={!canWrite}
@@ -458,10 +457,9 @@ export function ProductDrawer({
                         {brand.name}
                       </MenuItem>
                     ))}
-                </TextField>
+                </SelectField>
 
-                <TextField
-                  select
+                <SelectField
                   label={t('catalog.field.family')}
                   fullWidth
                   disabled={!canWrite}
@@ -476,7 +474,7 @@ export function ProductDrawer({
                         {family.name}
                       </MenuItem>
                     ))}
-                </TextField>
+                </SelectField>
               </Stack>
             </>
           )}
@@ -520,8 +518,7 @@ export function ProductDrawer({
               Vacío NO es «sin impuesto», es «la de siempre», y el texto de
               ayuda lo dice con el nombre de la que se aplicaría: dejar que
               alguien lo lea como exento sería la peor forma de equivocarse. */}
-          <TextField
-            select
+          <SelectField
             label={t('catalog.field.taxCategory')}
             fullWidth
             disabled={!canWrite}
@@ -544,13 +541,12 @@ export function ProductDrawer({
                 {categoria.name}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
 
           {/* En qué almacén entra. Solo al dar de alta: después, la existencia
               se mueve desde Inventario con su movimiento y su motivo. */}
           {pideExistencia && kind === 'simple' && (
-            <TextField
-              select
+            <SelectField
               label={t('catalog.stock.warehouse')}
               fullWidth
               disabled={!canWrite}
@@ -563,7 +559,7 @@ export function ProductDrawer({
                   {almacen.code} · {almacen.name}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
           )}
 
           {/* La publicación INICIAL, solo en el alta y en la tienda activa. Es
@@ -630,8 +626,7 @@ export function ProductDrawer({
                         inputProps={{ inputMode: 'decimal' }}
                         {...register('price')}
                       />
-                      <TextField
-                        select
+                      <SelectField
                         label={t('catalog.field.status')}
                         fullWidth
                         disabled={!canWrite}
@@ -645,7 +640,7 @@ export function ProductDrawer({
                             {t(STATUS_LABEL[status])}
                           </MenuItem>
                         ))}
-                      </TextField>
+                      </SelectField>
                     </Stack>
                   </>
                 ) : (

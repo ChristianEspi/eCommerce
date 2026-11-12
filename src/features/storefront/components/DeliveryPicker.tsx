@@ -7,13 +7,13 @@ import {
   Radio,
   RadioGroup,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { formatMoney } from '@/shared/lib/format'
 import { TS } from '@/theme/tokens'
 import type { DeliveryOption } from '../delivery'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Cómo quiere el comprador recibir su pedido.
@@ -131,8 +131,7 @@ export function DeliveryPicker({
           base lo exija con un CHECK y aquí aparezca solo entonces es la misma
           regla vista desde los dos lados. */}
       {selected?.strategy === 'pickup' && (
-        <TextField
-          select
+        <SelectField
           label={t('store.delivery.pickupPoint')}
           value={selectedPickupPointId}
           onChange={(event) => onSelectPickupPoint(event.target.value)}
@@ -144,7 +143,7 @@ export function DeliveryPicker({
               {typeof point.address.address === 'string' ? ` · ${point.address.address}` : ''}
             </MenuItem>
           ))}
-        </TextField>
+        </SelectField>
       )}
 
       {error && <Alert severity="error">{error}</Alert>}

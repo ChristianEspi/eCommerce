@@ -42,6 +42,7 @@ import {
   useUnpublishProduct,
   useUpdatePublication,
 } from './useProducts'
+import { SelectField } from '@/shared/ui/SelectField'
 
 const STATUS_LABEL: Record<ProductStatus, MessageKey> = {
   draft: 'catalog.status.draft',
@@ -381,8 +382,7 @@ function PublicationCard({
               }}
               inputProps={{ inputMode: 'decimal' }}
             />
-            <TextField
-              select
+            <SelectField
               label={t('catalog.field.status')}
               fullWidth
               value={values.status}
@@ -393,7 +393,7 @@ function PublicationCard({
                   {t(STATUS_LABEL[value])}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
           </Stack>
 
           <Stack direction="row" sx={{ gap: 1, justifyContent: 'flex-end' }}>

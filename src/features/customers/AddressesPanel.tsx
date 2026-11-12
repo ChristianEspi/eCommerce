@@ -35,6 +35,7 @@ import {
   type AddressFormValues,
   type CustomerAddress,
 } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 const VERIFICATION_COLOR: Record<string, 'default' | 'success' | 'warning' | 'error'> = {
   unverified: 'default',
@@ -217,8 +218,7 @@ export function AddressesPanel({
               value={values.phone}
               onChange={(event) => set('phone', event.target.value)}
             />
-            <TextField
-              select
+            <SelectField
               size="small"
               fullWidth
               label={t('customers.field.verification')}
@@ -233,7 +233,7 @@ export function AddressesPanel({
                   {t(`customers.verification.${state}`)}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
           </Stack>
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>

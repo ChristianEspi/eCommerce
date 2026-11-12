@@ -34,6 +34,7 @@ import {
   type BusinessLocation,
   type LocationFormValues,
 } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 const EMPTY: LocationFormValues = {
   code: '',
@@ -146,8 +147,7 @@ export function LocationsPanel({
           </Stack>
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: 'center' }}>
-            <TextField
-              select
+            <SelectField
               size="small"
               fullWidth
               label={t('customers.field.address')}
@@ -161,7 +161,7 @@ export function LocationsPanel({
                   {address.label} · {formatAddress(address)}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
             <FormControlLabel
               control={
                 <Switch

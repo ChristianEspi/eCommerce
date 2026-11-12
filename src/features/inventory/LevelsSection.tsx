@@ -51,6 +51,7 @@ import {
   type MovementFormValues,
   type PolicyFormValues,
 } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Existencias por almacén.
@@ -110,8 +111,7 @@ export function LevelsSection() {
         <Box sx={{ minWidth: { xs: '100%', sm: 280 } }}>
           <SearchField value={search} onChange={setSearch} placeholder={t('inventory.levels.search')} />
         </Box>
-        <TextField
-          select
+        <SelectField
           size="small"
           label={t('inventory.field.warehouse')}
           value={warehouseId}
@@ -124,7 +124,7 @@ export function LevelsSection() {
               {warehouse.code} · {warehouse.name}
             </MenuItem>
           ))}
-        </TextField>
+        </SelectField>
       </FilterBar>
 
       <Card>
@@ -334,8 +334,7 @@ function MovementDrawer({
       <Stack spacing={2}>
         {serverError && <Alert severity="error">{t(serverError)}</Alert>}
 
-        <TextField
-          select
+        <SelectField
           label={t('inventory.field.warehouse')}
           value={watch('warehouse_id')}
           onChange={(event) => setValue('warehouse_id', event.target.value)}
@@ -348,7 +347,7 @@ function MovementDrawer({
               {warehouse.code} · {warehouse.name}
             </MenuItem>
           ))}
-        </TextField>
+        </SelectField>
 
         {/* Existencias (y la vitrina) solo cuentan los almacenes que abastecen a
             la tienda. Sin este aviso, una entrada en un almacén sin vincular
@@ -390,8 +389,7 @@ function MovementDrawer({
         />
 
         {picked?.kind === 'variant' && (
-          <TextField
-            select
+          <SelectField
             label={t('inventory.field.variant')}
             value={watch('variant_id') ?? ''}
             onChange={(event) => setValue('variant_id', event.target.value || null)}
@@ -402,11 +400,10 @@ function MovementDrawer({
                 {variant.sku} · {variant.name}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
         )}
 
-        <TextField
-          select
+        <SelectField
           label={t('inventory.field.movementKind')}
           value={kind}
           onChange={(event) =>
@@ -420,7 +417,7 @@ function MovementDrawer({
               {t(`inventory.movement.${value}` as MessageKey)}
             </MenuItem>
           ))}
-        </TextField>
+        </SelectField>
 
         <TextField
           label={t('inventory.field.quantity')}

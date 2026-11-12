@@ -19,6 +19,8 @@ export const es = {
     'common.empty.title': 'Nada por aquí todavía',
     'common.empty.body': 'Cuando haya datos los verás en esta pantalla.',
     'common.search': 'Buscar',
+    'common.searchOption': 'Buscar en la lista…',
+    'common.noMatches': 'Ninguna opción coincide',
     'search.open': 'Buscar en todo',
     'search.placeholder': 'Buscar pedidos, productos o secciones…',
     'search.empty': 'Sin resultados.',

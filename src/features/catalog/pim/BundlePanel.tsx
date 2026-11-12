@@ -34,6 +34,7 @@ import {
   type BundleItemFormValues,
 } from './types'
 import type { PimProduct, ProductCandidate } from '../types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Componentes del kit.
@@ -311,8 +312,7 @@ function BundleItemForm({
         {serverError && <Alert severity="error">{t(serverError)}</Alert>}
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-          <TextField
-            select
+          <SelectField
             size="small"
             fullWidth
             label={t('pim.field.component')}
@@ -332,11 +332,10 @@ function BundleItemForm({
                 {candidate.sku} · {candidate.name}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
 
           {needsVariant && (
-            <TextField
-              select
+            <SelectField
               size="small"
               fullWidth
               label={t('pim.field.variant')}
@@ -349,7 +348,7 @@ function BundleItemForm({
                   {variant.sku} · {variant.name}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
           )}
 
           <TextField
@@ -362,8 +361,7 @@ function BundleItemForm({
             {...register('quantity')}
           />
 
-          <TextField
-            select
+          <SelectField
             size="small"
             fullWidth
             label={t('pim.tab.units')}
@@ -377,7 +375,7 @@ function BundleItemForm({
                 {unit.code} · {unit.name}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
         </Stack>
 
         <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>

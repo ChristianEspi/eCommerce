@@ -33,6 +33,7 @@ import {
 } from './complaints/api'
 import { useStorefront } from './hooks'
 import { privateMeta } from './seo'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Libro de Reclamaciones virtual de la tienda (2026-10-02).
@@ -183,13 +184,13 @@ export function StoreComplaintsPage() {
             control={control}
             name="doc_type"
             render={({ field }) => (
-              <TextField select label={t('store.complaints.field.docType')} sx={{ minWidth: 180 }} {...field}>
+              <SelectField label={t('store.complaints.field.docType')} sx={{ minWidth: 180 }} {...field}>
                 {DOC_TYPES.map((d) => (
                   <MenuItem key={d} value={d}>
                     {t(`store.complaints.doc.${d}` as MessageKey)}
                   </MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
             )}
           />
           <TextField label={t('store.complaints.field.docNumber')} required fullWidth {...register('doc_number')} error={!!e.doc_number} helperText={err('doc_number')} />

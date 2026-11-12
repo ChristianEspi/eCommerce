@@ -16,6 +16,7 @@ import {
   type Goal,
   type GoalFormValues,
 } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Alta y edición de una meta.
@@ -139,8 +140,7 @@ export function GoalDrawer({
               control={control}
               name="sales_rep_id"
               render={({ field }) => (
-                <TextField
-                  select
+                <SelectField
                   fullWidth
                   label={t('sales.field.rep')}
                   // Elegir uno apaga el otro: la base rechaza los dos llenos,
@@ -160,15 +160,14 @@ export function GoalDrawer({
                       {`${rep.employee_code} · ${rep.full_name}`}
                     </MenuItem>
                   ))}
-                </TextField>
+                </SelectField>
               )}
             />
             <Controller
               control={control}
               name="territory_id"
               render={({ field }) => (
-                <TextField
-                  select
+                <SelectField
                   fullWidth
                   label={t('sales.field.territory')}
                   disabled={!canWrite || repId !== ''}
@@ -182,7 +181,7 @@ export function GoalDrawer({
                       {`${territory.code} · ${territory.name}`}
                     </MenuItem>
                   ))}
-                </TextField>
+                </SelectField>
               )}
             />
           </FieldRow>
@@ -192,8 +191,7 @@ export function GoalDrawer({
               control={control}
               name="metric"
               render={({ field }) => (
-                <TextField
-                  select
+                <SelectField
                   fullWidth
                   label={t('sales.field.metric')}
                   disabled={!canWrite}
@@ -206,7 +204,7 @@ export function GoalDrawer({
                       {t(`sales.metric.${option}` as MessageKey)}
                     </MenuItem>
                   ))}
-                </TextField>
+                </SelectField>
               )}
             />
 

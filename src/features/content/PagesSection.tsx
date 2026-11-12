@@ -38,6 +38,7 @@ import { slugify } from '@/shared/lib/slug'
 import { ContentError } from './errors'
 import { useDeletePage, usePages, useSavePage } from './hooks'
 import { pageFormSchema, type ContentPageRow, type PageFormValues } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /** Estados EFECTIVOS que la vista deriva del reloj. Son tabs, no un panel. */
 const STATUS_TABS = ['all', 'live', 'scheduled', 'expired', 'draft', 'archived'] as const
@@ -354,8 +355,7 @@ export function PagesSection({
             helperText={t('content.pages.slugHelp')}
             required
           />
-          <TextField
-            select
+          <SelectField
             label={t('content.pages.kind')}
             value={form.kind}
             onChange={(event) =>
@@ -367,9 +367,8 @@ export function PagesSection({
                 {t(`content.kind.${kind}` as MessageKey)}
               </MenuItem>
             ))}
-          </TextField>
-          <TextField
-            select
+          </SelectField>
+          <SelectField
             label={t('content.pages.statusField')}
             value={form.status}
             onChange={(event) =>
@@ -381,7 +380,7 @@ export function PagesSection({
                 {t(`content.status.${value}` as MessageKey)}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
           <TextField
             type="datetime-local"
             label={t('content.pages.from')}

@@ -82,6 +82,7 @@ import {
   useSaveStoreSettings,
   useStoreSettings,
 } from './settings/useStoreSettings'
+import { SelectField } from '@/shared/ui/SelectField'
 
 function errorKeyOf(error: unknown): MessageKey {
   return error instanceof SettingsError ? error.key : 'settings.error.generic'
@@ -766,8 +767,7 @@ export function SettingsPage() {
                             control={form.control}
                             name="ui_radius"
                             render={({ field }) => (
-                              <TextField
-                                select
+                              <SelectField
                                 fullWidth
                                 slotProps={SHRINK}
                                 label={t('settings.radius')}
@@ -782,7 +782,7 @@ export function SettingsPage() {
                                     {t(`settings.radius.${value}` as MessageKey)}
                                   </MenuItem>
                                 ))}
-                              </TextField>
+                              </SelectField>
                             )}
                           />
                         </Grid>
@@ -792,8 +792,7 @@ export function SettingsPage() {
                             control={form.control}
                             name="ui_density"
                             render={({ field }) => (
-                              <TextField
-                                select
+                              <SelectField
                                 fullWidth
                                 slotProps={SHRINK}
                                 label={t('settings.density')}
@@ -808,7 +807,7 @@ export function SettingsPage() {
                                     {t(`appearance.density.${value}` as MessageKey)}
                                   </MenuItem>
                                 ))}
-                              </TextField>
+                              </SelectField>
                             )}
                           />
                         </Grid>
@@ -820,8 +819,7 @@ export function SettingsPage() {
                             control={form.control}
                             name="font_family"
                             render={({ field }) => (
-                              <TextField
-                                select
+                              <SelectField
                                 fullWidth
                                 slotProps={SHRINK}
                                 label={t('settings.font')}
@@ -841,7 +839,7 @@ export function SettingsPage() {
                                     {t(`settings.font.${value}` as MessageKey)}
                                   </MenuItem>
                                 ))}
-                              </TextField>
+                              </SelectField>
                             )}
                           />
                         </Grid>

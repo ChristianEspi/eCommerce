@@ -52,6 +52,7 @@ import {
   type RateFormValues,
   type ZoneFormValues,
 } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 const EMPTY_ZONE: ZoneFormValues = {
   code: '',
@@ -585,8 +586,7 @@ export function NetworkSection() {
               setMethodValues((v) => ({ ...v, displayName: event.target.value }))
             }
           />
-          <TextField
-            select
+          <SelectField
             label={t('fulfillment.field.strategy')}
             value={methodValues.strategy}
             onChange={(event) =>
@@ -604,10 +604,9 @@ export function NetworkSection() {
                 {t(`fulfillment.strategy.${strategy}` as MessageKey)}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
           {carrierAllowed ? (
-            <TextField
-              select
+            <SelectField
               label={t('fulfillment.field.carrier')}
               value={methodValues.providerCode}
               onChange={(event) =>
@@ -621,12 +620,11 @@ export function NetworkSection() {
                   {carrier.name}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
           ) : (
             <Alert severity="info">{t('fulfillment.field.noCarrierHelp')}</Alert>
           )}
-          <TextField
-            select
+          <SelectField
             label={t('fulfillment.field.sourcing')}
             value={methodValues.sourcing}
             onChange={(event) =>
@@ -639,7 +637,7 @@ export function NetworkSection() {
                 {t(`fulfillment.sourcing.${entry}` as MessageKey)}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
           <Stack direction="row" spacing={2}>
             <TextField
               label={t('fulfillment.field.leadMin')}
@@ -795,8 +793,7 @@ export function NetworkSection() {
         }
       >
         <Stack spacing={2}>
-          <TextField
-            select
+          <SelectField
             label={t('fulfillment.field.method')}
             value={rateValues.deliveryMethodId}
             onChange={(event) =>
@@ -808,9 +805,8 @@ export function NetworkSection() {
                 {method.display_name}
               </MenuItem>
             ))}
-          </TextField>
-          <TextField
-            select
+          </SelectField>
+          <SelectField
             label={t('fulfillment.field.zone')}
             value={rateValues.zoneId}
             onChange={(event) => setRateValues((v) => ({ ...v, zoneId: event.target.value }))}
@@ -822,7 +818,7 @@ export function NetworkSection() {
                 {zone.name}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
           <TextField
             label={t('fulfillment.field.base')}
             value={rateValues.baseAmount}

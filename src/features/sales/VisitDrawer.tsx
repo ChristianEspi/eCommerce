@@ -12,6 +12,7 @@ import type { SalesScope } from './api'
 import { SalesError } from './errors'
 import { useRoutes, useSalesReps, useSaveVisit } from './hooks'
 import { emptyVisitForm, visitFormSchema, type VisitFormValues } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Agendar una visita.
@@ -121,8 +122,7 @@ export function VisitDrawer({
               control={control}
               name="sales_rep_id"
               render={({ field }) => (
-                <TextField
-                  select
+                <SelectField
                   fullWidth
                   required
                   label={t('sales.field.rep')}
@@ -142,7 +142,7 @@ export function VisitDrawer({
                         {`${rep.employee_code} · ${rep.full_name}`}
                       </MenuItem>
                     ))}
-                </TextField>
+                </SelectField>
               )}
             />
             <TextField
@@ -161,8 +161,7 @@ export function VisitDrawer({
             control={control}
             name="route_id"
             render={({ field }) => (
-              <TextField
-                select
+              <SelectField
                 fullWidth
                 label={t('sales.field.route')}
                 disabled={!canWrite}
@@ -177,7 +176,7 @@ export function VisitDrawer({
                     {`${route.code} · ${route.name}`}
                   </MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
             )}
           />
 

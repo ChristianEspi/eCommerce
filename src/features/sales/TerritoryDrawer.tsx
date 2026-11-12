@@ -25,6 +25,7 @@ import {
   type Territory,
   type TerritoryFormValues,
 } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Alta y edición de un territorio.
@@ -154,8 +155,7 @@ export function TerritoryDrawer({
             control={control}
             name="parent_id"
             render={({ field }) => (
-              <TextField
-                select
+              <SelectField
                 fullWidth
                 label={t('sales.field.parent')}
                 disabled={!canWrite}
@@ -170,7 +170,7 @@ export function TerritoryDrawer({
                     {`${option.code} · ${option.name}`}
                   </MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
             )}
           />
 

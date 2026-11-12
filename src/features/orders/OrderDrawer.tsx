@@ -72,6 +72,7 @@ import {
   useOrderTags,
   useTransitionOrder,
 } from './useOrders'
+import { SelectField } from '@/shared/ui/SelectField'
 
 function errorKeyOf(error: unknown): MessageKey {
   return error instanceof OrderError ? error.key : 'orders.error.generic'
@@ -683,8 +684,7 @@ export function OrderDrawer({
                       estado» en una lista sin contexto: los valores cambian al
                       cambiar de eje —cada uno tiene su vocabulario— y sin el
                       punto de partida no hay forma de saber por qué. */}
-                  <TextField
-                    select
+                  <SelectField
                     size="small"
                     label={t('orders.axis')}
                     value={axis}
@@ -696,11 +696,10 @@ export function OrderDrawer({
                         {t(AXIS_LABEL[value])}
                       </MenuItem>
                     ))}
-                  </TextField>
+                  </SelectField>
 
                   {allowed.length > 0 && (
-                    <TextField
-                      select
+                    <SelectField
                       size="small"
                       label={t('orders.newStatus')}
                       value={nextValue}
@@ -712,7 +711,7 @@ export function OrderDrawer({
                           {t(valueLabel(axis, value) as MessageKey)}
                         </MenuItem>
                       ))}
-                    </TextField>
+                    </SelectField>
                   )}
                 </Stack>
 

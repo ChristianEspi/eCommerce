@@ -22,6 +22,7 @@ import { aiEntitlementKey, useAiFeature } from '@/features/ai/hooks'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { MAX_REPLY_NOTES, REPLY_TONES, requestReviewReply, type ReplyTone, type ReviewReply } from './reviewsAi'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Borrador de respuesta a UNA reseña (fase 09).
@@ -66,8 +67,7 @@ export function ReviewReplyDialog({
           {availability === 'quota_exhausted' && <ContentMotivoNotice motivo="sin_cuota" />}
           {availability === 'available' && (
             <>
-              <TextField
-                select
+              <SelectField
                 size="small"
                 label={t('aiContent.tone')}
                 value={tone}
@@ -78,7 +78,7 @@ export function ReviewReplyDialog({
                     {t(`aiReviews.reply.tone.${value}` as MessageKey)}
                   </MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
               <TextField
                 size="small"
                 multiline

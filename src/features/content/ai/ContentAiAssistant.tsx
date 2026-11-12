@@ -20,6 +20,7 @@ import {
   type CmsTask,
   type CmsTone,
 } from './contentAi'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Borradores del CMS con IA (fase 09): banner, landing, SEO y traducción.
@@ -144,8 +145,7 @@ function Body({
       {canAsk && (
         <Stack spacing={1.25}>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-            <TextField
-              select
+            <SelectField
               size="small"
               label={t('aiCms.task')}
               value={task}
@@ -160,10 +160,9 @@ function Body({
                   {t(`aiCms.task.${value}` as MessageKey)}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
             {task === 'translate' ? (
-              <TextField
-                select
+              <SelectField
                 size="small"
                 label={t('aiCms.sourceLocale')}
                 value={sourceLocale}
@@ -176,10 +175,9 @@ function Body({
                     {t(`aiCms.locale.${value}` as MessageKey)}
                   </MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
             ) : (
-              <TextField
-                select
+              <SelectField
                 size="small"
                 label={t('aiContent.tone')}
                 value={tone}
@@ -191,7 +189,7 @@ function Body({
                     {t(`aiContent.tone.${value}` as MessageKey)}
                   </MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
             )}
           </Stack>
           {task !== 'translate' && (

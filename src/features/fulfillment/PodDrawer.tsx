@@ -15,6 +15,7 @@ import {
   podFormSchema,
   type PodFormValues,
 } from './routing-types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Firmar una entrega.
@@ -123,8 +124,7 @@ export function PodDrawer({
             control={control}
             name="outcome"
             render={({ field }) => (
-              <TextField
-                select
+              <SelectField
                 fullWidth
                 label={t('fulfillment.field.outcome')}
                 disabled={!canWrite}
@@ -137,7 +137,7 @@ export function PodDrawer({
                     {t(`fulfillment.outcome.${option}` as MessageKey)}
                   </MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
             )}
           />
 

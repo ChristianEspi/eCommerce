@@ -14,7 +14,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useMemo, useState } from 'react'
@@ -28,6 +27,7 @@ import { PanelHint } from './VariantsPanel'
 import { useAddRelation, useDeleteRelation, useRelations, useReorderRelations } from './hooks'
 import { PRODUCT_RELATION_KINDS, type ProductRelationKind } from './types'
 import type { PimProduct, ProductCandidate } from '../types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 const RELATION_LABEL: Record<ProductRelationKind, MessageKey> = {
   related: 'pim.relation.related',
@@ -152,8 +152,7 @@ export function RelationsPanel({
 
       {canWrite && candidates.length > 0 && (
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-          <TextField
-            select
+          <SelectField
             size="small"
             fullWidth
             label={t('pim.field.product')}
@@ -166,10 +165,9 @@ export function RelationsPanel({
                 {candidate.sku} · {candidate.name}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
 
-          <TextField
-            select
+          <SelectField
             size="small"
             fullWidth
             label={t('pim.field.relationKind')}
@@ -181,7 +179,7 @@ export function RelationsPanel({
                 {t(RELATION_LABEL[value])}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
 
           <Button variant="outlined" disabled={!target || busy} onClick={() => void onAdd()}>
             {t('common.add')}

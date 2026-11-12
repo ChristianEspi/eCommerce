@@ -17,6 +17,7 @@ import type { MessageKey } from '@/shared/i18n/messages'
 import { TS } from '@/theme/tokens'
 import { BRAND_LOCKUPS, IDENTITY_LIMITS, type BrandLockup } from '@/features/storefront/identity'
 import type { StoreFormValues } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Identidad de la cabecera y barra de avisos (Storefront V3 · P01).
@@ -67,8 +68,7 @@ export function StoreIdentitySection({
   return (
     <Stack spacing={2.5}>
       <Stack spacing={1.5}>
-        <TextField
-          select
+        <SelectField
           fullWidth
           size="small"
           slotProps={{ inputLabel: { shrink: true } }}
@@ -88,7 +88,7 @@ export function StoreIdentitySection({
               {t(ETIQUETA_LOCKUP[valor])}
             </MenuItem>
           ))}
-        </TextField>
+        </SelectField>
 
         <Controller
           control={form.control}

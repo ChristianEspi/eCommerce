@@ -34,6 +34,7 @@ import {
   type VisitPrep,
 } from './salesAi'
 import { useFollowUp, useVisitPrep, useVisitSignals } from './useSalesAi'
+import { SelectField } from '@/shared/ui/SelectField'
 
 function PrepView({ data }: { data: VisitPrep }) {
   const { t } = useI18n()
@@ -324,8 +325,7 @@ export function VisitAiDrawer({
                   inputProps={{ maxLength: MAX_FOLLOW_UP_NOTES + 50 }}
                 />
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' } }}>
-                  <TextField
-                    select
+                  <SelectField
                     size="small"
                     label={t('aiSales.followUp.tone')}
                     value={tone}
@@ -337,7 +337,7 @@ export function VisitAiDrawer({
                         {t(`aiSales.tone.${option}` as MessageKey)}
                       </MenuItem>
                     ))}
-                  </TextField>
+                  </SelectField>
                   <Button
                     variant="contained"
                     startIcon={<EditNoteRoundedIcon />}

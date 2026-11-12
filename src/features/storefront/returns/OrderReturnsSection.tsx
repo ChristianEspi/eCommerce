@@ -19,6 +19,7 @@ import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { TS } from '@/theme/tokens'
 import { fetchReturnOptions, requestReturn, type OrderRef } from './api'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * «Solicitar devolución» en la página del pedido.
@@ -136,8 +137,7 @@ export function OrderReturnsSection({ storeSlug, orderNumber, token }: OrderRef)
                     label={`${item.name}${item.variant_label ? ` · ${item.variant_label}` : ''}`}
                   />
                   {qty > 0 && item.available > 1 && (
-                    <TextField
-                      select
+                    <SelectField
                       size="small"
                       label={t('store.returns.quantity')}
                       value={qty}
@@ -150,7 +150,7 @@ export function OrderReturnsSection({ storeSlug, orderNumber, token }: OrderRef)
                           {n}
                         </MenuItem>
                       ))}
-                    </TextField>
+                    </SelectField>
                   )}
                 </Stack>
               )

@@ -27,6 +27,7 @@ import {
   type Channel,
   type ChannelFormValues,
 } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Alta y edicion de un canal.
@@ -161,8 +162,7 @@ export function ChannelDrawer({
             control={control}
             name="kind"
             render={({ field }) => (
-              <TextField
-                select
+              <SelectField
                 label={t('channels.field.kind')}
                 value={field.value}
                 onChange={(event) => field.onChange(event.target.value)}
@@ -180,7 +180,7 @@ export function ChannelDrawer({
                     {t(`channels.kind.${option}` as MessageKey)}
                   </MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
             )}
           />
 

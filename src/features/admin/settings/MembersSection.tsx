@@ -40,6 +40,7 @@ import {
   useRevokeMember,
   type MemberRole,
 } from './members'
+import { SelectField } from '@/shared/ui/SelectField'
 
 const ROL_LABEL: Record<string, MessageKey> = {
   owner: 'settings.members.role.owner',
@@ -221,8 +222,7 @@ export function MembersSection({
                     <TableCell sx={{ fontWeight: 600 }}>{fila.email}</TableCell>
                     <TableCell>
                       {editable ? (
-                        <TextField
-                          select
+                        <SelectField
                           size="small"
                           value={fila.role}
                           onChange={(event) =>
@@ -237,7 +237,7 @@ export function MembersSection({
                               {t(ROL_LABEL[valor] as MessageKey)}
                             </MenuItem>
                           ))}
-                        </TextField>
+                        </SelectField>
                       ) : (
                         t(ROL_LABEL[fila.role] as MessageKey)
                       )}
@@ -346,8 +346,7 @@ export function MembersSection({
                 aplicación, así que la única forma de rellenarlo era entrar al
                 panel de Supabase. La pantalla existía y no se podía usar.
                 Ahora basta el correo: lo resuelve el servidor. */}
-            <TextField
-              select
+            <SelectField
               label={t('settings.members.role')}
               fullWidth
               value={rol}
@@ -358,7 +357,7 @@ export function MembersSection({
                   {t(ROL_LABEL[valor] as MessageKey)}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
           </Stack>
           )}
         </DialogContent>

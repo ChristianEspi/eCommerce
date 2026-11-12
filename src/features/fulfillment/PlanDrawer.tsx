@@ -43,6 +43,7 @@ import {
   type PlanFormValues,
   type PlanStop,
 } from './routing-types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * La hoja de ruta: cabecera, paradas y firma de cada entrega.
@@ -263,8 +264,7 @@ export function PlanDrawer({
               control={control}
               name="vehicle_id"
               render={({ field }) => (
-                <TextField
-                  select
+                <SelectField
                   fullWidth
                   label={t('fulfillment.field.vehicle')}
                   disabled={!puedeEditar}
@@ -280,7 +280,7 @@ export function PlanDrawer({
                         {vehicle.plate ? `${vehicle.code} · ${vehicle.plate}` : vehicle.code}
                       </MenuItem>
                     ))}
-                </TextField>
+                </SelectField>
               )}
             />
             <TextField

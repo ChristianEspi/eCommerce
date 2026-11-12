@@ -42,6 +42,7 @@ import {
   type PaymentMethod,
   type PaymentMethodFormValues,
 } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 const EMPTY: PaymentMethodFormValues = {
   code: '',
@@ -307,8 +308,7 @@ export function MethodsSection() {
             value={values.displayName}
             onChange={(event) => setValues((v) => ({ ...v, displayName: event.target.value }))}
           />
-          <TextField
-            select
+          <SelectField
             label={t('payments.field.kind')}
             value={values.kind}
             onChange={(event) =>
@@ -320,9 +320,8 @@ export function MethodsSection() {
                 {t(`payments.kind.${kind}` as MessageKey)}
               </MenuItem>
             ))}
-          </TextField>
-          <TextField
-            select
+          </SelectField>
+          <SelectField
             label={t('payments.field.provider')}
             value={values.providerCode}
             onChange={(event) => setValues((v) => ({ ...v, providerCode: event.target.value }))}
@@ -334,9 +333,8 @@ export function MethodsSection() {
                 {provider.name}
               </MenuItem>
             ))}
-          </TextField>
-          <TextField
-            select
+          </SelectField>
+          <SelectField
             label={t('payments.field.captureMode')}
             value={offline ? 'manual' : values.captureMode}
             disabled={offline}
@@ -349,7 +347,7 @@ export function MethodsSection() {
           >
             <MenuItem value="automatic">{t('payments.capture.automatic')}</MenuItem>
             <MenuItem value="manual">{t('payments.capture.manual')}</MenuItem>
-          </TextField>
+          </SelectField>
           {offline && <Alert severity="info">{t('payments.field.offlineHelp')}</Alert>}
           <TextField
             label={t('payments.field.instructions')}

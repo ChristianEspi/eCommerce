@@ -54,6 +54,7 @@ import { CatalogImportAction } from './import/CatalogImportAction'
 import { useCategories } from './useCategories'
 import { useBrands } from './pim/hooks'
 import { useDeleteProduct, useProductUsage, useProducts } from './useProducts'
+import { SelectField } from '@/shared/ui/SelectField'
 
 const STATUS_LABEL: Record<ProductStatus, MessageKey> = {
   draft: 'catalog.status.draft',
@@ -430,8 +431,7 @@ export function ProductsPage() {
               />
             </Box>
 
-            <TextField
-              select
+            <SelectField
               size="small"
               label={t('catalog.field.brand')}
               value={borrador.brandId}
@@ -444,15 +444,14 @@ export function ProductsPage() {
                   {brand.name}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
 
             {/* La lista es el maestro de la SOCIEDAD y se queda así: este
                 filtro solo responde «de todo esto, qué se vende en tal
                 tienda». Con una sola tienda no se enseña, porque entonces
                 elegir no cambia nada. */}
             {stores.length > 1 && (
-              <TextField
-                select
+              <SelectField
                 size="small"
                 label={t('catalog.products.filter.store')}
                 value={borrador.storeId}
@@ -465,7 +464,7 @@ export function ProductsPage() {
                     {store.name}
                   </MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
             )}
 
             <TextField

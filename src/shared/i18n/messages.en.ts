@@ -17,6 +17,8 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'common.empty.title': 'Nothing here yet',
     'common.empty.body': 'Once there is data, it will show up on this screen.',
     'common.search': 'Search',
+    'common.searchOption': 'Search the list…',
+    'common.noMatches': 'No option matches',
     'search.open': 'Search everything',
     'search.placeholder': 'Search orders, products or sections…',
     'search.empty': 'No results.',

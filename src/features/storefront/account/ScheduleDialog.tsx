@@ -13,6 +13,7 @@ import { useState, type ReactNode } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { SCHEDULE_INTERVALS, isoDateFromToday, scheduleFormError } from '../scheduledOrders'
+import { SelectField } from '@/shared/ui/SelectField'
 
 export interface ScheduleFormValues {
   readonly name: string
@@ -109,8 +110,7 @@ export function ScheduleDialog({
             helperText={touched && error === 'name' ? t(FIELD_ERROR.name) : undefined}
             slotProps={{ htmlInput: { maxLength: 120 }, inputLabel: { shrink: true } }}
           />
-          <TextField
-            select
+          <SelectField
             label={t('account.schedules.form.interval')}
             value={intervalDays}
             onChange={(event) => setIntervalDays(Number(event.target.value))}
@@ -122,7 +122,7 @@ export function ScheduleDialog({
                 {t('account.schedules.every').replace('{days}', String(days))}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <TextField
               type="date"

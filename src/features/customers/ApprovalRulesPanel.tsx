@@ -39,6 +39,7 @@ import {
   type ApprovalRuleFormValues,
   type BusinessAccount,
 } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 const EMPTY: ApprovalRuleFormValues = {
   name: '',
@@ -161,8 +162,7 @@ export function ApprovalRulesPanel({
               onChange={(event) => set('min_amount', event.target.value)}
               inputProps={{ inputMode: 'decimal' }}
             />
-            <TextField
-              select
+            <SelectField
               size="small"
               fullWidth
               label={t('customers.field.approverRole')}
@@ -176,7 +176,7 @@ export function ApprovalRulesPanel({
                   {t(`customers.role.${role}`)}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
             <Button variant="contained" onClick={() => void submit()} disabled={save.isPending}>
               {editing ? t('common.save') : t('common.add')}
             </Button>

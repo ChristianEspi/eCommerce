@@ -39,6 +39,7 @@ import {
   type FulfillmentRow,
 } from './types'
 import { FulfillmentAiToggle } from './ai/FulfillmentAiSection'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * De la clave de un hecho a su nombre.
@@ -247,8 +248,7 @@ export function FulfillmentDrawer({
               <Alert severity="info">{t('fulfillment.detail.terminal')}</Alert>
             ) : (
               <Stack spacing={1}>
-                <TextField
-                  select
+                <SelectField
                   size="small"
                   label={t('fulfillment.field.moveTo')}
                   value={target}
@@ -261,7 +261,7 @@ export function FulfillmentDrawer({
                       {t(`fulfillment.state.${state}` as MessageKey)}
                     </MenuItem>
                   ))}
-                </TextField>
+                </SelectField>
                 {needsReason && (
                   <TextField
                     size="small"
@@ -291,8 +291,7 @@ export function FulfillmentDrawer({
 
             {fulfillment.warehouse_id === null && (
               <Stack direction="row" spacing={1} alignItems="center">
-                <TextField
-                  select
+                <SelectField
                   size="small"
                   fullWidth
                   label={t('fulfillment.field.warehouse')}
@@ -319,7 +318,7 @@ export function FulfillmentDrawer({
                       {warehouse.code} · {warehouse.name}
                     </MenuItem>
                   ))}
-                </TextField>
+                </SelectField>
               </Stack>
             )}
 
@@ -406,8 +405,7 @@ export function FulfillmentDrawer({
                   {t('fulfillment.detail.noteHelp')}
                 </Typography>
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                  <TextField
-                    select
+                  <SelectField
                     size="small"
                     label={t('fulfillment.field.trackingStatus')}
                     value={noteStatus}
@@ -420,7 +418,7 @@ export function FulfillmentDrawer({
                         {t(`fulfillment.tracking.${status}` as MessageKey)}
                       </MenuItem>
                     ))}
-                  </TextField>
+                  </SelectField>
                   <TextField
                     size="small"
                     fullWidth

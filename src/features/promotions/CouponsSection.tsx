@@ -38,6 +38,7 @@ import {
   useSetCouponActive,
 } from './hooks'
 import { normalizeCouponCode } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Los cupones: el código que el comprador teclea.
@@ -279,8 +280,7 @@ export function CouponsSection() {
         }
       >
         <Stack spacing={2.5}>
-          <TextField
-            select
+          <SelectField
             label={t('promotions.field.campaign')}
             value={promotionId}
             onChange={(event) => setPromotionId(event.target.value)}
@@ -293,7 +293,7 @@ export function CouponsSection() {
                 {promotion.name}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
 
           <TextField
             label={t('promotions.field.code')}

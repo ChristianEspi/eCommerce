@@ -24,6 +24,7 @@ import {
   type ValuePropIconKey,
 } from '@/features/storefront/valueProps'
 import type { StoreFormValues } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Las propuestas de valor de la tienda: hasta cuatro promesas cortas.
@@ -174,8 +175,7 @@ export function ValuePropsSection({
                 alignItems: 'start',
               }}
             >
-              <TextField
-                select
+              <SelectField
                 fullWidth
                 size="small"
                 label={t('settings.valueProps.icon')}
@@ -193,7 +193,7 @@ export function ValuePropsSection({
                     {t(VALUE_PROP_COPY[clave].title)}
                   </MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
 
               <Stack spacing={1.25} sx={{ minWidth: 0 }}>
                 <TextField

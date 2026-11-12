@@ -27,6 +27,7 @@ import { EmptyState, ErrorState } from '@/shared/ui/states'
 import type { StatementRow } from './api'
 import { PaymentsError } from './errors'
 import { useImportReconciliation, usePaymentProviders, useReconciliation } from './hooks'
+import { SelectField } from '@/shared/ui/SelectField'
 
 const RECONCILIATION_STATUSES = ['unmatched', 'matched', 'discrepancy', 'ignored'] as const
 
@@ -127,8 +128,7 @@ export function ReconciliationSection() {
         <Card sx={{ p: 2 }}>
           <Stack spacing={2}>
             <Typography variant="subtitle2">{t('payments.reconciliation.import')}</Typography>
-            <TextField
-              select
+            <SelectField
               size="small"
               label={t('payments.field.provider')}
               value={providerCode}
@@ -141,7 +141,7 @@ export function ReconciliationSection() {
                   {provider.name}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
             <TextField
               label={t('payments.reconciliation.paste')}
               value={csv}
@@ -167,8 +167,7 @@ export function ReconciliationSection() {
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
         <Box sx={{ flex: 1 }} />
-        <TextField
-          select
+        <SelectField
           size="small"
           label={t('common.status')}
           value={status}
@@ -181,7 +180,7 @@ export function ReconciliationSection() {
               {t(`payments.reconciliation.${value}` as MessageKey)}
             </MenuItem>
           ))}
-        </TextField>
+        </SelectField>
       </Stack>
 
       <Card>

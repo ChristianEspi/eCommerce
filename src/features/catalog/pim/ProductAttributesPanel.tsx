@@ -23,6 +23,7 @@ import {
 import type { ProductAttributeInput } from './api'
 import type { AttributeValue, ProductAttributeValue } from './types'
 import type { PimProduct } from '../types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Ficha técnica del producto: un valor por atributo declarado.
@@ -142,9 +143,8 @@ export function ProductAttributesPanel({
 
             if (attribute.data_type === 'option') {
               return (
-                <TextField
+                <SelectField
                   key={attribute.id}
-                  select
                   size="small"
                   fullWidth
                   label={label}
@@ -166,7 +166,7 @@ export function ProductAttributesPanel({
                         {option.label}
                       </MenuItem>
                     ))}
-                </TextField>
+                </SelectField>
               )
             }
 

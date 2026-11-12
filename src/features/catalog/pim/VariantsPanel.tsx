@@ -49,6 +49,7 @@ import {
   type VariantFormValues,
 } from './types'
 import type { PimProduct } from '../types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Variantes del producto.
@@ -382,9 +383,8 @@ function VariantForm({
         {axisAttributes.length > 0 && (
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             {axisAttributes.map((attribute) => (
-              <TextField
+              <SelectField
                 key={attribute.id}
-                select
                 size="small"
                 fullWidth
                 label={attribute.name}
@@ -401,7 +401,7 @@ function VariantForm({
                       {value.label}
                     </MenuItem>
                   ))}
-              </TextField>
+              </SelectField>
             ))}
           </Stack>
         )}

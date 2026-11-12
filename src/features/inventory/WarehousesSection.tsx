@@ -52,6 +52,7 @@ import {
   type Warehouse,
   type WarehouseFormValues,
 } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Almacenes de la sociedad y qué tienda se sirve de cuáles.
@@ -392,8 +393,7 @@ function WarehouseDrawer({
           fullWidth
         />
 
-        <TextField
-          select
+        <SelectField
           label={t('inventory.field.kind')}
           value={watch('kind')}
           onChange={(event) => setValue('kind', event.target.value as WarehouseFormValues['kind'])}
@@ -404,10 +404,9 @@ function WarehouseDrawer({
               {t(`inventory.kind.${kind}` as MessageKey)}
             </MenuItem>
           ))}
-        </TextField>
+        </SelectField>
 
-        <TextField
-          select
+        <SelectField
           label={t('inventory.field.source')}
           value={source}
           onChange={(event) =>
@@ -421,7 +420,7 @@ function WarehouseDrawer({
               {t(`inventory.source.${value}` as MessageKey)}
             </MenuItem>
           ))}
-        </TextField>
+        </SelectField>
 
         {source === 'erp' && (
           <>
@@ -437,8 +436,7 @@ function WarehouseDrawer({
               }
               fullWidth
             />
-            <TextField
-              select
+            <SelectField
               label={t('inventory.field.stalePolicy')}
               value={watch('stale_policy')}
               onChange={(event) =>
@@ -452,7 +450,7 @@ function WarehouseDrawer({
                   {t(`inventory.stale.${value}` as MessageKey)}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
           </>
         )}
 

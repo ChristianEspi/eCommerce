@@ -17,6 +17,7 @@ import {
   type ManagedStore,
   type StoreFormValues,
 } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Alta y edición de una tienda.
@@ -160,8 +161,7 @@ export function StoreFormDrawer({
               control={control}
               name="currency"
               render={({ field }) => (
-                <TextField
-                  select
+                <SelectField
                   label={t('storesAdmin.field.currency')}
                   value={field.value}
                   onChange={(event) => field.onChange(event.target.value)}
@@ -175,7 +175,7 @@ export function StoreFormDrawer({
                       {currency.code} · {currency.name}
                     </MenuItem>
                   ))}
-                </TextField>
+                </SelectField>
               )}
             />
           </FieldRow>

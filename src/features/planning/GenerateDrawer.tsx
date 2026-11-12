@@ -1,4 +1,4 @@
-import { Alert, Box, Button, MenuItem, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, MenuItem, Stack, Typography } from '@mui/material'
 import { useEffect, useMemo, useState } from 'react'
 import { useCustomerOptions } from '@/features/customers/hooks'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -18,6 +18,7 @@ import {
   modelOf,
   type SuggestedLine,
 } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Generar un sugerido: dos pasos, y el segundo lo da una persona.
@@ -162,8 +163,7 @@ export function GenerateDrawer({
         />
 
         <Stack direction="row" spacing={1.5} alignItems="flex-start">
-          <TextField
-            select
+          <SelectField
             label={t('planning.field.window')}
             value={days}
             onChange={(event) => {
@@ -179,7 +179,7 @@ export function GenerateDrawer({
                 {t('planning.field.days').replace('{n}', String(option))}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
 
           <Button
             variant="outlined"

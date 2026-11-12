@@ -36,6 +36,7 @@ import {
   type ReturnCondition,
   type ReturnRow,
 } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 interface LineDraft {
   condition: ReturnCondition
@@ -190,8 +191,7 @@ export function ReturnDrawer({
                         {line.received_quantity}/{line.quantity}
                       </TableCell>
                       <TableCell>
-                        <TextField
-                          select
+                        <SelectField
                           size="small"
                           value={draft.condition}
                           disabled={!editable}
@@ -217,7 +217,7 @@ export function ReturnDrawer({
                               {t(`returns.condition.${condition}` as MessageKey)}
                             </MenuItem>
                           ))}
-                        </TextField>
+                        </SelectField>
                       </TableCell>
                       <TableCell>
                         <Switch
@@ -369,8 +369,7 @@ export function ReturnDrawer({
 
             {state === 'inspected' && (
               <Stack spacing={1}>
-                <TextField
-                  select
+                <SelectField
                   size="small"
                   label={t('returns.field.resolution')}
                   value={resolution}
@@ -383,7 +382,7 @@ export function ReturnDrawer({
                       {t(`returns.resolution.${entry}` as MessageKey)}
                     </MenuItem>
                   ))}
-                </TextField>
+                </SelectField>
                 <Alert severity="info">{t('returns.detail.noAutoRefund')}</Alert>
                 <Stack direction="row" justifyContent="flex-end">
                   <Button

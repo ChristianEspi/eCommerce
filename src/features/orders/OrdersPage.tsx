@@ -18,7 +18,6 @@ import {
   TableHead,
   TableRow,
   Tabs,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useEffect, useMemo, useState } from 'react'
@@ -60,6 +59,7 @@ import {
   type OrderStatusFilter,
 } from './types'
 import { useOrders } from './useOrders'
+import { SelectField } from '@/shared/ui/SelectField'
 
 const TABS: Array<{ value: OrderStatusFilter; label: MessageKey }> = [
   { value: 'all', label: 'common.all' },
@@ -290,8 +290,7 @@ export function OrdersPage() {
           <Box sx={{ minWidth: { xs: '100%', sm: 280 } }}>
             <SearchField value={search} onChange={setSearch} placeholder={t('admin.orders.search')} />
           </Box>
-          <TextField
-            select
+          <SelectField
             size="small"
             label={t('orders.range')}
             value={range}
@@ -303,7 +302,7 @@ export function OrdersPage() {
                 {t(RANGE_LABEL[value])}
               </MenuItem>
             ))}
-          </TextField>
+          </SelectField>
         </FilterBar>
 
         <Card>

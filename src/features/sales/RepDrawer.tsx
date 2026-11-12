@@ -19,6 +19,7 @@ import {
   type SalesRep,
   type SalesRepFormValues,
 } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Alta y edición de un vendedor, con su cartera.
@@ -191,8 +192,7 @@ export function RepDrawer({
 
               {/* El jefe va solo en su fila: las opciones son «código · nombre
                   completo» y a media fila se cortan justo por el nombre. */}
-              <TextField
-                select
+              <SelectField
                 fullWidth
                 label={t('sales.field.manager')}
                 disabled={!canWrite}
@@ -207,13 +207,12 @@ export function RepDrawer({
                     {`${option.employee_code} · ${option.full_name}`}
                   </MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
 
               {/* Estado y fecha a mitad y mitad: el input nativo de fecha no
                   baja de ~140 px y a un cuarto de fila se recortaba. */}
               <FieldRow>
-                <TextField
-                  select
+                <SelectField
                   fullWidth
                   label={t('common.status')}
                   disabled={!canWrite}
@@ -226,7 +225,7 @@ export function RepDrawer({
                       {t(`sales.status.${value}` as MessageKey)}
                     </MenuItem>
                   ))}
-                </TextField>
+                </SelectField>
                 <TextField
                   fullWidth
                   type="date"

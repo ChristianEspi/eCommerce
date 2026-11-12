@@ -40,6 +40,7 @@ import {
   useRequestRefund,
 } from './hooks'
 import { INTENT_STATUSES, newIdempotencyKey, type PaymentIntent } from './types'
+import { SelectField } from '@/shared/ui/SelectField'
 
 const STATUS_COLOR: Record<string, 'default' | 'success' | 'warning' | 'error' | 'info'> = {
   open: 'default',
@@ -140,8 +141,7 @@ export function IntentsSection() {
             placeholder={t('payments.intents.search')}
           />
         </Box>
-        <TextField
-          select
+        <SelectField
           size="small"
           label={t('common.status')}
           value={status}
@@ -155,7 +155,7 @@ export function IntentsSection() {
               {t(`payments.status.${value}` as MessageKey)}
             </option>
           ))}
-        </TextField>
+        </SelectField>
       </FilterBar>
 
       <Card>

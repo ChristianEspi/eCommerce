@@ -45,6 +45,7 @@ import {
   type CustomerFormValues,
 } from './types'
 import type { TenantScope } from './api'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /**
  * Ficha de cliente, por pestañas.
@@ -183,8 +184,7 @@ export function CustomerDrawer({
             <Stack spacing={2.5}>
               {serverError && <Alert severity="error">{t(serverError)}</Alert>}
 
-              <TextField
-                select
+              <SelectField
                 label={t('customers.field.kind')}
                 fullWidth
                 disabled={!canWrite || Boolean(customer)}
@@ -199,7 +199,7 @@ export function CustomerDrawer({
                     {t(`customers.kind.${kind}`)}
                   </MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
 
               <TextField
                 label={t('customers.field.name')}
@@ -264,8 +264,7 @@ export function CustomerDrawer({
                 />
               </Stack>
 
-              <TextField
-                select
+              <SelectField
                 label={t('customers.field.segment')}
                 fullWidth
                 disabled={!canWrite}
@@ -279,7 +278,7 @@ export function CustomerDrawer({
                     {segment.name}
                   </MenuItem>
                 ))}
-              </TextField>
+              </SelectField>
 
               <TextField
                 label={t('customers.field.notes')}

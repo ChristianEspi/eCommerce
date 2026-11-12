@@ -33,6 +33,7 @@ import {
   type PromoTextField,
   type PromoTone,
 } from './promotionsAi'
+import { SelectField } from '@/shared/ui/SelectField'
 
 /** Campos del formulario de la promoción que un borrador puede rellenar. */
 export type PromoApplicableField = 'name' | 'description'
@@ -158,8 +159,7 @@ function AssistantBody({
             inputProps={{ maxLength: MAX_PROMO_BRIEF }}
           />
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' } }}>
-            <TextField
-              select
+            <SelectField
               size="small"
               label={t('aiContent.tone')}
               value={tone}
@@ -171,7 +171,7 @@ function AssistantBody({
                   {t(`aiContent.tone.${value}` as MessageKey)}
                 </MenuItem>
               ))}
-            </TextField>
+            </SelectField>
             <Button
               variant="contained"
               startIcon={<AutoAwesomeRoundedIcon />}
