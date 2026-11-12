@@ -70,17 +70,30 @@ import {
 
 /** Espejo del vocabulario de hechos que publica el dominio. Cerrado a propósito. */
 const EVENT_TYPES = [
+  // 2026-11-12 · Solo lo que `domain_events` publica de verdad (comprobado en
+  // QAS). Antes ofrecía `shipment.dispatched` y `shipment.delivered`, que no se
+  // emiten nunca: un destino suscrito a ellos no recibía nada y nadie sabía por qué.
   'order.*',
   'order.created',
   'order.status_changed',
-  'order.cancelled',
+  'order.payment_status_changed',
+  'order.fulfillment_status_changed',
+  'order.approval_requested',
+  'order.approval_decided',
   'payment.*',
   'payment.captured',
   'payment.failed',
   'fulfillment.*',
-  'shipment.dispatched',
-  'shipment.delivered',
+  'fulfillment.created',
+  'fulfillment.delivered',
+  'return.*',
+  'return.requested',
+  'return.approved',
   'return.completed',
+  'quote.*',
+  'quote.requested',
+  'quote.accepted',
+  'quote.converted',
 ] as const
 
 function NewEndpointDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
