@@ -30,6 +30,7 @@ export const serverPricing: PricingPort = {
       storeSlug: context.storeSlug,
       items: lines.map(toItem),
       couponCodes: context.couponCodes,
+      customerEmail: context.customerEmail ?? null,
     })
 
     const priced: PricedLine[] = result.lines.map((line) => ({

@@ -54,6 +54,13 @@ export interface PriceContext {
    * decide si vale, cuánto rebaja y si queda saldo sigue siendo la base.
    */
   readonly couponCodes?: readonly string[]
+  /**
+   * El correo que el comprador ya tecleó en la caja. Solo sirve para los topes
+   * de uso POR CLIENTE de un cupón: sin él, la cotización negaba un cupón que el
+   * pedido sí aplicaba (2026-11-12). No es identidad comercial —precio,
+   * segmento y cuenta siguen saliendo de la sesión—.
+   */
+  readonly customerEmail?: string | null
 }
 
 export interface PriceRequest {

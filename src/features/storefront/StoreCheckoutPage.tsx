@@ -60,6 +60,7 @@ import { addressBookKey, checkoutProfileKey, consumerOrdersKey, formatSavedAddre
 import { useStorefront } from './hooks'
 import { privateMeta } from './seo'
 import { useCheckoutPrefill } from './useCheckoutPrefill'
+import { GiftCardField } from './GiftCardField'
 
 /**
  * Checkout: nombre, correo, teléfono, dirección y una referencia opcional.
@@ -138,7 +139,7 @@ const CAMPOS: ReadonlyArray<ReadonlyArray<keyof CheckoutValues>> = [
   ['customerName', 'customerEmail', 'customerPhone'],
   ['address', 'city', 'region', 'postalCode', 'country', 'reference'],
   // Resumen v2 · El cupón vive en el paso de PAGO, junto al total que cambia.
-  ['paymentMethodCode', 'purchaseOrderNumber', 'invoiceType', 'taxId', 'legalName', 'costCenter', 'couponCode'],
+  ['paymentMethodCode', 'purchaseOrderNumber', 'invoiceType', 'taxId', 'legalName', 'costCenter', 'couponCode', 'giftCardCode'],
 ]
 
 export function StoreCheckoutPage() {
@@ -186,7 +187,10 @@ export function StoreCheckoutPage() {
 
   /** Cupón ya confirmado por el comprador. Ver `irA`. */
   const [cuponCotizado, setCuponCotizado] = useState<readonly string[]>(SIN_CUPONES)
-  const { quote, quoted } = useQuotedCart(storeSlug, cuponCotizado)
+  // El correo con el que se cotiza el cupón: el MISMO que recibirá el pedido,
+  // para que un cupón «uno por cliente» diga en la caja lo que dirá al cobrar.
+  const [correoCotizado, setCorreoCotizado] = useState('')
+  const { quote, quoted } = useQuotedCart(storeSlug, cuponCotizado, correoCotizado)
 
   const {
     register,
@@ -205,6 +209,7 @@ export function StoreCheckoutPage() {
       address: '',
       reference: '',
       couponCode: '',
+      giftCardCode: '',
       city: '',
       region: '',
       postalCode: '',
@@ -438,6 +443,7 @@ export function StoreCheckoutPage() {
     // el comprador ya dijo que había terminado.
     const cupon = (getValues('couponCode') ?? '').trim()
     setCuponCotizado(cupon === '' ? SIN_CUPONES : [cupon])
+    setCorreoCotizado((getValues('customerEmail') ?? '').trim())
   }
 
   /** La línea de un paso plegado: lo que se eligió en él, o qué se hará. */
@@ -1048,12 +1054,24 @@ export function StoreCheckoutPage() {
                     onClick={() => {
                       const cupon = (getValues('couponCode') ?? '').trim()
                       setCuponCotizado(cupon === '' ? SIN_CUPONES : [cupon])
+                      setCorreoCotizado((getValues('customerEmail') ?? '').trim())
                     }}
                     sx={{ fontWeight: 800, flexShrink: 0, px: 2.5 }}
                   >
                     {t('store.checkout.couponApply')}
                   </Button>
                 </Stack>
+
+                {/* 2026-11-12 · La tarjeta de regalo. El checkout la aceptaba
+                    desde P10, pero aquí no había dónde escribirla. */}
+                {storeSlug && (
+                  <GiftCardField
+                    storeSlug={storeSlug}
+                    registration={register('giftCardCode')}
+                    readCode={() => getValues('giftCardCode') ?? ''}
+                    errorKey={errors.giftCardCode ? (errors.giftCardCode.message as MessageKey) : null}
+                  />
+                )}
               </>
             )}
           </Stack>

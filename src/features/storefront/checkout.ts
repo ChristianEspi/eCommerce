@@ -107,6 +107,12 @@ export const checkoutSchema = z.object({
    */
   couponCode: z.string().trim().max(40, 'store.checkout.error.coupon').optional(),
   /**
+   * El código de una tarjeta de regalo (2026-11-12). Es un MEDIO de pago: el
+   * checkout gasta como mucho el total y pide el resto al medio elegido. Viaja
+   * el texto; el saldo lo decide el servidor al cobrar.
+   */
+  giftCardCode: z.string().trim().max(40, 'store.checkout.error.giftCard').optional(),
+  /**
    * N05 · El número de orden de compra, cuando la cuenta de empresa la exige.
    * Una REFERENCIA del comprador: ni identidad ni importe. Que sea obligatoria
    * lo decide la cuenta en el servidor; la pantalla solo lo avisa antes.
@@ -510,6 +516,8 @@ export async function startCheckout(input: StartCheckoutInput): Promise<OrderRes
       // P10. La lista viaja vacía cuando no se tecleó nada: un `[]` es «no hay
       // cupón», que es distinto de «no se preguntó».
       coupon_codes: input.couponCode ? [input.couponCode] : [],
+      // La tarjeta de regalo, como el cupón: texto, una sola, y vacía si no hay.
+      gift_card_codes: input.giftCardCode ? [input.giftCardCode] : [],
       // N05. Solo viaja si se tecleó: vacía y ausente son la MISMA petición.
       ...(input.purchaseOrderNumber?.trim() ? { purchase_order_number: input.purchaseOrderNumber.trim() } : {}),
     },

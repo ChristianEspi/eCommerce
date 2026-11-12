@@ -346,6 +346,10 @@ export function createDbPorts(options: DbPortOptions): CheckoutPorts {
           p_store_slug: input.context.storeSlug,
           p_items: itemPayload(input.items),
           p_coupon_codes: input.couponCodes.length > 0 ? input.couponCodes : null,
+          // El correo tecleado: los topes de uso POR CLIENTE se deciden con él.
+          // Sin él la cotización negaba un cupón que `create_order` sí aplicaba,
+          // y el cobro salía por el total sin descuento (2026-11-12).
+          p_customer_email: input.customerEmail,
         }),
       )
       return toPromotionResult(raw)
@@ -544,6 +548,9 @@ export function createDbPorts(options: DbPortOptions): CheckoutPorts {
           // N05 · la orden de compra tecleada. `create_order` la valida y, si la
           // cuenta la exige y no llegó, no crea el pedido.
           p_purchase_order_number: input.request.purchaseOrderNumber ?? null,
+          // Lo que se cobró. Si `create_order` suma otra cosa, la base aborta
+          // y el pipeline anula el cobro y devuelve saldo y existencias.
+          p_expected_total: input.expectedTotal ?? null,
         }),
       )
       const orderId = text(raw, 'order_id')

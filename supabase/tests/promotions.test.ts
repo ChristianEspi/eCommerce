@@ -995,6 +995,56 @@ describe('limites de uso', () => {
     expect(coupons(result)['SIMGASTADA']).toBe('agotado_para_ti')
     expect(result.discount_total).toBe('0.00')
   })
+
+  /**
+   * Compra real en QAS (2026-11-12): el cupón de bienvenida salía
+   * `sin_identidad` en la caja y en el cobro, y `create_order` sí lo aplicaba
+   * con el correo. Se cobraba el total sin descuento. Con el correo tecleado,
+   * la cotización decide el tope con el MISMO dato que el pedido.
+   */
+  it('la cotización con el correo tecleado decide el tope igual que el pedido', async () => {
+    const promo = await createPromotion({ code: 'bienvenida-caja', percent: '10', requiresCoupon: true })
+    await addScope({ promotion: promo, kind: 'all' })
+    const cupon = await addCoupon({ promotion: promo, code: 'CAJABIENVENIDA', usageLimitPerCustomer: 1 })
+
+    const conCorreo = async (email: string | null) => {
+      const rows = await svc(
+        `select public.promotion_quote_for_slug($1, $2::jsonb, $3::text[], $4) as q`,
+        [STORE_A_SLUG, payload([{ product: toalla, quantity: 1 }]), ['CAJABIENVENIDA'], email],
+      )
+      return rows[0]?.q as Json
+    }
+
+    // Sin correo, o con algo que no es un correo: como antes.
+    expect(coupons(await conCorreo(null))['CAJABIENVENIDA']).toBe('sin_identidad')
+    expect(coupons(await conCorreo('no-es-un-correo'))['CAJABIENVENIDA']).toBe('sin_identidad')
+
+    // Con el correo de alguien que no lo usó: entra, y en mayúsculas también.
+    const nuevo = await conCorreo('Nueva@Cliente.demo')
+    expect(coupons(nuevo)['CAJABIENVENIDA']).toBe('aplicado')
+    expect(nuevo.discount_total).toBe('2.50')
+
+    // Si ese correo ya lo canjeó, la caja lo dice ANTES de cobrar.
+    const pedido = await id(
+      `insert into public.orders
+         (organization_id, company_id, store_id, channel_id, order_number, status,
+          currency, customer_email, subtotal, discount_total, tax_total, grand_total)
+       values ($1, $2, $3, $4, 'SIM-0002', 'pending', 'PEN',
+               'nueva@cliente.demo', '25.00', '2.50', '0.00', '22.50')
+       returning id`,
+      [TENANT_A.organizationId, TENANT_A.companyId, storeA, channelB2b],
+    )
+    await svc(
+      `insert into public.promotion_redemptions
+         (organization_id, company_id, store_id, promotion_id, coupon_id, order_id,
+          customer_email, discount_amount, currency)
+       values ($1, $2, $3, $4, $5, $6, 'nueva@cliente.demo', '2.50', 'PEN')`,
+      [TENANT_A.organizationId, TENANT_A.companyId, storeA, promo, cupon, pedido],
+    )
+    const repetido = await conCorreo('nueva@cliente.demo')
+    expect(coupons(repetido)['CAJABIENVENIDA']).toBe('agotado_para_ti')
+    expect(repetido.discount_total).toBe('0.00')
+  })
 })
 
 // ===========================================================================

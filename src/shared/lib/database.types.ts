@@ -13435,6 +13435,7 @@ export type Database = {
           p_customer_name?: string
           p_customer_phone?: string
           p_delivery?: Json
+          p_expected_total?: number
           p_intent_id: string
           p_items: Json
           p_notes?: string
@@ -14086,7 +14087,12 @@ export type Database = {
         }[]
       }
       promotion_quote_for_slug: {
-        Args: { p_coupon_codes?: string[]; p_items: Json; p_store_slug: string }
+        Args: {
+          p_coupon_codes?: string[]
+          p_customer_email?: string
+          p_items: Json
+          p_store_slug: string
+        }
         Returns: Json
       }
       promotion_simulate: {

@@ -451,6 +451,47 @@ describe('ajuste y anulación', () => {
 })
 
 // ===========================================================================
+describe('cancelar el pedido', () => {
+  /**
+   * Compra real en QAS (2026-11-12): un pedido pagado en parte con tarjeta
+   * regalo se cancelaba y la tarjeta seguía gastada.
+   */
+  it('devuelve a la tarjeta lo que el pedido gastó, una sola vez', async () => {
+    const card = await issue('30.00')
+    const id = String(card.gift_card_id)
+    await redeem(String(card.code), '30.00', 'intento-1:gc:0')
+    expect(await statusOf(id)).toBe('depleted')
+
+    const [channel] = await svc(`select id from public.channels where store_id = $1 and is_default`, [storeA])
+    const [order] = await svc(
+      `insert into public.orders
+         (organization_id, company_id, store_id, channel_id, order_number, status,
+          currency, customer_email, subtotal, discount_total, tax_total, grand_total)
+       values ($1, $2, $3, $4, 'GC-0001', 'pending', 'PEN', 'ana@compradora.com',
+               '50.00', '0.00', '0.00', '50.00')
+       returning id`,
+      [TENANT_A.organizationId, TENANT_A.companyId, storeA, channel?.id],
+    )
+    await svc(`select public.gift_card_attach_order($1, 'intento-1:gc:0', $2)`, [id, order?.id])
+
+    await svc(`update public.orders set status = 'cancelled' where id = $1`, [order?.id])
+    expect(await balance(id)).toBe('30.00')
+    expect(await statusOf(id)).toBe('active')
+
+    // Cancelado es final; volver a escribirlo no devuelve otra vez.
+    await svc(`update public.orders set status = 'cancelled' where id = $1`, [order?.id])
+    expect(await balance(id)).toBe('30.00')
+
+    const movimientos = await svc(
+      `select kind::text, amount::text from public.gift_card_transactions
+        where gift_card_id = $1 order by created_at, kind`,
+      [id],
+    )
+    expect(movimientos.map((m) => m.kind)).toEqual(['issue', 'redeem', 'refund'])
+  })
+})
+
+// ===========================================================================
 describe('aislamiento', () => {
   it('el código de A no se puede canjear en la tienda de B', async () => {
     const card = await issue('50.00')

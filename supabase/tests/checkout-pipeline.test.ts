@@ -352,6 +352,37 @@ describe('la transaccion que cierra la compra', () => {
   })
 
   /**
+   * Compra real en QAS (2026-11-12): el cobro salió por un total y el pedido
+   * por otro. Con el total cobrado delante, la base no crea un pedido que
+   * sume distinto: aborta TODO (ni pedido, ni intento cerrado) y el pipeline
+   * anula el cobro.
+   */
+  it('si el pedido no suma lo cobrado, no se crea', async () => {
+    const claim = await begin(STORE_A_SLUG, newKey())
+    const items = JSON.stringify([{ product_id: silla, quantity: 2 }])
+    const call = (expected: string) =>
+      svc(
+        `select public.checkout_place_order(
+            $1, 'ana@compradora.com', $2::jsonb, 'Ana Compradora', null,
+            '{"address": "Av. Primavera 120"}'::jsonb,
+            p_expected_total => $3::numeric) as result`,
+        [claim.intent_id, items, expected],
+      )
+
+    const message = await expectFailure(() => call('250.00'))
+    expect(message).toMatch(/TOTAL_DESCUADRADO/)
+
+    const [intent] = await svc(`select status, order_id from public.checkout_intents where id = $1`, [
+      claim.intent_id,
+    ])
+    expect(intent).toEqual({ status: 'running', order_id: null })
+
+    // Con lo que de verdad suma (200 + 18 %), entra.
+    const [ok] = await call('236.00')
+    expect((ok?.result as Row).grand_total).toBe('236.00')
+  })
+
+  /**
    * LA propiedad de la fase. Se llama dos veces a la funcion que crea el pedido
    * con el mismo intento: la segunda devuelve el primero.
    */

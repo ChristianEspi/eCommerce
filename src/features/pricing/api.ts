@@ -610,6 +610,7 @@ export async function quotePublicCart(input: {
   storeSlug: string
   items: readonly PublicQuoteItem[]
   couponCodes?: readonly string[]
+  customerEmail?: string | null
 }): Promise<PromotionQuoteResult> {
   const supabase = tryGetStorefrontRpcClient()
   if (!supabase) throw new PricingError('auth.notConfigured', 'CONFIG_INCOMPLETA')
@@ -628,11 +629,14 @@ export async function quotePublicCart(input: {
   // el comprador y los valida el servidor. El canal, el segmento y el cliente
   // siguen saliendo de la sesión.
   const codes = (input.couponCodes ?? []).map((code) => code.trim()).filter((code) => code !== '')
+  const email = (input.customerEmail ?? '').trim().toLowerCase()
 
   const { data, error } = await supabase.rpc(PROMOTION_QUOTE_PUBLIC_RPC, {
     p_store_slug: input.storeSlug,
     p_items: input.items,
     ...(codes.length > 0 ? { p_coupon_codes: codes } : {}),
+    // Solo con cupón: el correo únicamente decide topes de uso por cliente.
+    ...(codes.length > 0 && email !== '' ? { p_customer_email: email } : {}),
   })
   if (error) throw pricingErrorFromDb(error)
   return promotionQuoteSchema.parse(data)

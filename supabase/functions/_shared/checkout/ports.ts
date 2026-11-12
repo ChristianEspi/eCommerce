@@ -562,6 +562,12 @@ export interface CheckoutPorts {
     approval: PurchaseApproval | null
     /** P10. `null` = no se canjeó ninguna; el pedido no cambia por ello. */
     giftCards: GiftCardTender | null
+    /**
+     * El total que se cobró (tarjeta regalo + pasarela). La base aborta el
+     * pedido si suma otra cosa (TOTAL_DESCUADRADO, 2026-11-12): un pedido no
+     * puede decir una cifra y el cobro otra.
+     */
+    expectedTotal?: MoneyText
   }): Promise<PlacedOrder>
 
   // Compensaciones. Existen porque las etapas 6 y 8 dejan rastro fuera de la

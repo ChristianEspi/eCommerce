@@ -280,12 +280,22 @@ describe('a quién NO le llega', () => {
 })
 
 describe('la superficie no cambia', () => {
-  it('la cotización pública sigue sin dónde recibir una identidad', async () => {
+  /**
+   * Cliente, segmento y cuenta salen SIEMPRE de la sesión. Desde 2026-11-12 la
+   * firma admite además el correo tecleado en la caja, y solo para contar los
+   * usos de un cupón por cliente: es el mismo dato con el que `create_order`
+   * decide ese tope, así que no da ningún poder que el pedido no dé ya. Sin él,
+   * la caja cobraba sin un descuento que el pedido sí aplicaba.
+   */
+  it('la cotización pública sigue sin dónde recibir una identidad comercial', async () => {
     const [row] = await svc<{ args: string }>(
       `select pg_get_function_identity_arguments(p.oid) as args
          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
         where n.nspname = 'public' and p.proname = 'promotion_quote_for_slug'`,
     )
-    expect(row?.args).toBe('p_store_slug text, p_items jsonb, p_coupon_codes text[]')
+    expect(row?.args).toBe(
+      'p_store_slug text, p_items jsonb, p_coupon_codes text[], p_customer_email text',
+    )
+    expect(row?.args).not.toMatch(/customer_id|segment|account/)
   })
 })

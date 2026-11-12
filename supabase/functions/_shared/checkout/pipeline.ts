@@ -529,6 +529,7 @@ export async function runCheckout(
         account,
         approval,
         giftCards,
+        expectedTotal: payableTotal,
       })
       // A partir de aquí no se compensa: el pedido existe y deshacerlo no es
       // «soltar una reserva», es cancelar una venta. Eso lo decide una persona

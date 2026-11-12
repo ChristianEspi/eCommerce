@@ -27,7 +27,8 @@ export const cartQuoteKey = (
   storeSlug: string,
   lines: readonly PriceRequest[],
   coupons: readonly string[] = [],
-) => ['pricing', 'cart-quote', storeSlug, lines, coupons] as const
+  customerEmail = '',
+) => ['pricing', 'cart-quote', storeSlug, lines, coupons, customerEmail] as const
 
 export function useCartQuote(
   storeSlug: string | undefined,
@@ -38,12 +39,14 @@ export function useCartQuote(
    * distinto es una clave distinta y por tanto una llamada al servidor.
    */
   coupons: readonly string[] = [],
+  /** Correo ya confirmado en la caja: decide los topes de uso por cliente. */
+  customerEmail = '',
 ) {
   return useQuery<PriceQuote>({
-    queryKey: cartQuoteKey(storeSlug ?? '', lines, coupons),
+    queryKey: cartQuoteKey(storeSlug ?? '', lines, coupons, customerEmail),
     queryFn: () =>
       serverPricing.quote(
-        { storeSlug: storeSlug as string, currency, couponCodes: coupons },
+        { storeSlug: storeSlug as string, currency, couponCodes: coupons, customerEmail },
         lines,
       ),
     enabled: Boolean(storeSlug) && lines.length > 0,

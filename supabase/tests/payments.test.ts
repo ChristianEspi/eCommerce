@@ -600,6 +600,36 @@ describe('las tres reglas del comando', () => {
 })
 
 // ===========================================================================
+describe('cancelar el pedido', () => {
+  /**
+   * Compra real en QAS (2026-11-12): pedidos cancelados con su transferencia
+   * todavía «pendiente de pago». Lo que no movió dinero se anula; lo
+   * autorizado o cobrado lo deshace una persona.
+   */
+  it('anula el cobro pendiente y no toca el que ya movió dinero', async () => {
+    const pendiente = await place(TENANT_A, productA, 1)
+    const abierto = await openIntent(TENANT_A, 'transferencia', '100.00', 'cancel-open-key-000001')
+    await svc(`select public.payment_intent_attach_order($1, $2)`, [abierto.intent_id, pendiente.order_id])
+
+    const autorizado = await place(TENANT_A, productA, 1)
+    const retenido = await openIntent(TENANT_A, 'tarjeta', '100.00', 'cancel-auth-key-000001')
+    await svc(`select public.payment_intent_attach_order($1, $2)`, [retenido.intent_id, autorizado.order_id])
+    await svc(`update public.payment_intents set status = 'authorized' where id = $1`, [retenido.intent_id])
+
+    await svc(`update public.orders set status = 'cancelled' where id = any($1::uuid[])`, [
+      [pendiente.order_id, autorizado.order_id],
+    ])
+
+    const rows = await svc<{ id: string; status: string; last_error_code: string | null }>(
+      `select id, status::text, last_error_code from public.payment_intents where id = any($1::uuid[])`,
+      [[abierto.intent_id, retenido.intent_id]],
+    )
+    const porId = Object.fromEntries(rows.map((row) => [row.id, row]))
+    expect(porId[String(abierto.intent_id)]).toMatchObject({ status: 'cancelled', last_error_code: 'PEDIDO_CANCELADO' })
+    expect(porId[String(retenido.intent_id)]?.status).toBe('authorized')
+  })
+})
+
 describe('el cobro y el eje del pedido', () => {
   let orderId: string
   let intentId: string

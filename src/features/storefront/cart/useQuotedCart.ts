@@ -25,6 +25,8 @@ export function useQuotedCart(
   storeSlug: string | undefined,
   /** Cupones confirmados. El carrito no los pide; el checkout sí. */
   coupons: readonly string[] = SIN_CUPONES,
+  /** Correo confirmado en la caja (topes de uso de un cupón por cliente). */
+  customerEmail = '',
 ): {
   quote: ReturnType<typeof useCartQuote>
   quoted: PriceQuote | null
@@ -47,7 +49,7 @@ export function useQuotedCart(
     [cart.lines],
   )
 
-  const quote = useCartQuote(storeSlug, currency, requests, coupons)
+  const quote = useCartQuote(storeSlug, currency, requests, coupons, customerEmail)
   const quoted = quote.data ?? null
 
   return {
