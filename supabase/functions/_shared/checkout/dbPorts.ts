@@ -121,7 +121,10 @@ export interface DbPortOptions {
    * Sin ella, cada adaptador decide: el que tiene simulacro simula, el que no,
    * rechaza. Ninguno finge un cobro.
    */
-  readonly secretFor?: (providerCode: string) => string | null
+  readonly secretFor?: (
+    providerCode: string,
+    intentId: string,
+  ) => Promise<string | null> | string | null
   /** Ver `PaymentGatewayOptions.allowSimulation`. `false` si no se dice. */
   readonly allowSimulation?: boolean
 }

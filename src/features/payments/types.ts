@@ -23,6 +23,7 @@ export {
   PAYMENT_ATTEMPTS_TABLE,
   PAYMENT_EVENTS_TABLE,
   PAYMENT_METHODS_TABLE,
+  PAYMENT_METHOD_SET_SECRET_RPC,
   PAYMENT_OVERVIEW_VIEW,
   RECONCILIATION_IMPORT_RPC,
   RECONCILIATION_MATCH_RPC,
@@ -64,6 +65,12 @@ export const paymentMethodSchema = z.object({
   is_active: z.boolean(),
   position: z.number(),
   instructions: z.string().nullable(),
+  /** Llave PÚBLICA de la pasarela (Culqi `pk_…`). La secreta nunca se lee. */
+  checkout_public_key: z.string().nullable().default(null),
+  /** Hay llave secreta en Vault. Solo se sabe que existe y su pista. */
+  has_secret: z.boolean().default(false),
+  secret_hint: z.string().nullable().default(null),
+  secret_set_at: z.string().nullable().default(null),
 })
 export type PaymentMethod = z.infer<typeof paymentMethodSchema>
 
@@ -181,6 +188,15 @@ export interface PaymentMethodFormValues {
   isActive: boolean
   position: number
   instructions: string
+  /** Llave pública de Culqi. Vacía = sin llave. */
+  publicKey: string
+  /**
+   * Llave secreta NUEVA tecleada en este guardado. Vacía = no se toca la que
+   * hubiera. Nunca se rellena desde la base: la secreta no se lee.
+   */
+  secretKey: string
+  /** Quitar la llave secreta guardada. */
+  clearSecret: boolean
 }
 
 /**

@@ -1,5 +1,5 @@
 import type { MessageKey } from '@/shared/i18n/messages'
-import { UiError, codeFromDbError, type PostgrestLike } from '@/shared/lib/appError'
+import { UiError, codeFromDbError, dbErrorMentions, type PostgrestLike } from '@/shared/lib/appError'
 
 /**
  * Error de pagos con su clave de i18n ya resuelta.
@@ -57,12 +57,29 @@ export function mapPaymentsCode(code: string): MessageKey {
       return 'payments.error.untrusted'
     case 'CONFIG_INCOMPLETA':
       return 'auth.notConfigured'
+    case 'LLAVE_NO_VALIDA':
+      return 'payments.culqi.error.secretKey'
+    case 'LLAVES_DE_DISTINTO_ENTORNO':
+      return 'payments.culqi.error.sameEnv'
+    case 'SIN_PASARELA':
+      return 'payments.culqi.error.noProvider'
     default:
       return 'payments.error.generic'
   }
 }
 
+/**
+ * Los CHECK de las llaves de la pasarela llegan como un 23514 genérico; el
+ * nombre de la restricción es lo único que dice cuál falló.
+ */
+const CONSTRAINTS: ReadonlyArray<readonly [RegExp, MessageKey]> = [
+  [/payment_methods_public_key_fmt/, 'payments.culqi.error.publicKey'],
+  [/payment_methods_keys_same_env/, 'payments.culqi.error.sameEnv'],
+]
+
 export function paymentsErrorFromDb(error: PostgrestLike): PaymentsError {
   const code = codeFromDbError(error)
+  const constraint = CONSTRAINTS.find(([name]) => dbErrorMentions(error, name))
+  if (constraint) return new PaymentsError(constraint[1], code)
   return new PaymentsError(mapPaymentsCode(code), code)
 }

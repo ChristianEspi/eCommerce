@@ -73,21 +73,24 @@ function securityHeadersPlugin(env: Record<string, string>): Plugin {
   const hubOrigin = originOf(env.VITE_EBIM_HUB_URL)
 
   /**
-   * Los origenes de Culqi, y SOLO si hay clave publica configurada.
+   * Los origenes de Culqi.
    *
-   * La clave es el interruptor de la pasarela en el navegador: sin ella no se
-   * carga su script ni se abre su iframe, asi que abrirle la politica seria
-   * pagar el riesgo sin usar la funcion. Un despliegue sin Culqi conserva
-   * `script-src 'self'` y `frame-src 'none'` intactos.
+   * Desde 2026-11-13 la llave publica es DE CADA TIENDA (Pagos → Medios de
+   * pago) y se conoce en ejecucion, no al compilar: el build no puede saber si
+   * alguna tienda cobra con Culqi, asi que los abre siempre. Solo los de Culqi,
+   * y el script se sigue cargando bajo demanda (solo en el checkout de una
+   * tienda con llave). `VITE_PAYMENTS_DISABLE_CULQI=true` los cierra para un
+   * despliegue que no la ofrezca: vuelve a `script-src 'self'` y `frame-src 'none'`.
    *
    * Son tres cosas y cada una tiene su motivo: `checkout.culqi.com` sirve el
    * script y el iframe donde se teclea la tarjeta —ese aislamiento es lo que
    * mantiene el numero fuera de esta aplicacion— y `api.culqi.com` es a donde
    * el propio script envia los datos para devolver el token.
    */
-  const paymentGatewayOrigins = env.VITE_CULQI_PUBLIC_KEY
-    ? ['https://checkout.culqi.com', 'https://api.culqi.com', 'https://3ds.culqi.com']
-    : []
+  const paymentGatewayOrigins =
+    env.VITE_PAYMENTS_DISABLE_CULQI === 'true'
+      ? []
+      : ['https://checkout.culqi.com', 'https://api.culqi.com', 'https://3ds.culqi.com']
   const inlineScriptHashes: string[] = []
   let outDir = 'dist'
 

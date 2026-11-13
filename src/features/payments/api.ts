@@ -7,6 +7,7 @@ import {
   PAYMENT_ATTEMPTS_TABLE,
   PAYMENT_EVENTS_TABLE,
   PAYMENT_METHODS_TABLE,
+  PAYMENT_METHOD_SET_SECRET_RPC,
   PAYMENT_OVERVIEW_VIEW,
   RECONCILIATION_IMPORT_RPC,
   RECONCILIATION_MATCH_RPC,
@@ -60,7 +61,10 @@ function client(): SupabaseClient {
 // ---------------------------------------------------------------------------
 
 const METHOD_SELECT =
-  'id, store_id, code, kind, display_name, provider_code, capture_mode, is_active, position, instructions'
+  'id, store_id, code, kind, display_name, provider_code, capture_mode, is_active, position, instructions, checkout_public_key, has_secret, secret_hint, secret_set_at'
+
+/** Pasarelas que piden llaves de la tienda en este formulario. */
+export const PROVIDERS_WITH_KEYS = new Set(['culqi'])
 
 export async function fetchPaymentMethods(storeId: string | null): Promise<PaymentMethod[]> {
   if (!storeId) return []
@@ -107,27 +111,49 @@ export async function savePaymentMethod(
     is_active: values.isActive,
     position: values.position,
     instructions: values.instructions.trim() === '' ? null : values.instructions.trim(),
+    // La pública viaja con el medio (la base valida el formato `pk_`).
+    checkout_public_key: PROVIDERS_WITH_KEYS.has(values.providerCode)
+      ? values.publicKey.trim() || null
+      : null,
   }
 
-  if (values.id) {
-    const { error } = await client()
-      .from(PAYMENT_METHODS_TABLE)
-      .update(payload)
-      .eq('id', values.id)
+  let id = values.id ?? null
+  if (id) {
+    const { error } = await client().from(PAYMENT_METHODS_TABLE).update(payload).eq('id', id)
     if (error) throw paymentsErrorFromDb(error)
-    return
+  } else {
+    // El tenant se escribe porque las columnas son NOT NULL, pero sale del
+    // contexto derivado del JWT y quien decide si vale es la policy de `insert`.
+    const { data, error } = await client()
+      .from(PAYMENT_METHODS_TABLE)
+      .insert({
+        ...payload,
+        organization_id: scope.organizationId,
+        company_id: scope.companyId,
+        store_id: scope.storeId,
+      })
+      .select('id')
+      .single()
+    if (error) throw paymentsErrorFromDb(error)
+    id = String((data as { id: unknown }).id)
   }
 
-  // El tenant se escribe porque las columnas son NOT NULL, pero sale del
-  // contexto derivado del JWT y quien decide si vale es la policy de `insert`.
-  const { error } = await client()
-    .from(PAYMENT_METHODS_TABLE)
-    .insert({
-      ...payload,
-      organization_id: scope.organizationId,
-      company_id: scope.companyId,
-      store_id: scope.storeId,
-    })
+  // La SECRETA no se escribe en la tabla: va a Vault por la función, y solo si
+  // se tecleó una nueva (o se pidió quitarla). La pantalla nunca la lee.
+  if (PROVIDERS_WITH_KEYS.has(values.providerCode)) {
+    const secret = values.secretKey.trim()
+    if (secret !== '' || values.clearSecret) {
+      await setPaymentMethodSecret(id, values.clearSecret ? null : secret)
+    }
+  }
+}
+
+/** Guarda (o quita, con `null`) la llave secreta del medio en Vault. */
+export async function setPaymentMethodSecret(methodId: string, secret: string | null): Promise<void> {
+  const { error } = await client().rpc(PAYMENT_METHOD_SET_SECRET_RPC, {
+    p_method_id: methodId,
+    p_secret: secret ?? '',
+  })
   if (error) throw paymentsErrorFromDb(error)
 }
 

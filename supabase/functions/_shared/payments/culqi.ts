@@ -24,27 +24,20 @@
  * Determinista de verdad: sin reloj, sin azar y sin estado entre llamadas. Una
  * demo tiene que poder enseñar el rechazo cuando quiere, no cuando toca.
  *
- * ## Qué falta EXACTAMENTE para cobrar de verdad
+ * ## Cómo se pasa a cobrar de verdad (2026-11-13)
  *
- * Dos cosas, y ninguna es «poner la clave y ya»:
+ * Las llaves son DE CADA TIENDA, no del despliegue: el comercio las pega en
+ * Backoffice → Pagos → Medios de pago, en el medio de tarjeta con pasarela
+ * Culqi.
  *
- * 1. **Hacer llegar el secreto hasta aquí.** Los adaptadores de esta carpeta son
- *    PUROS —ninguno lee `Deno.env`— porque así se prueban en Node con el resto
- *    de la suite. El secreto tiene que entrar por `ProviderResolveOptions`, que
- *    hoy solo transporta `captureMode` y `returnUrl`: hay que añadir el campo y
- *    que `gateway.ts` lo reciba de quien sí puede leer el entorno.
+ *   · llave pública (`pk_…`) → `payment_methods.checkout_public_key`; la vitrina
+ *     la usa para que Culqi.js tokenice la tarjeta en el navegador.
+ *   · llave secreta (`sk_…`) → Vault; la función `checkout` la descifra por
+ *     intento (`payment_secret_for_intent`) y llega aquí como `secret`.
  *
- * 2. **Hacer llegar el token de la tarjeta.** Culqi cobra contra un `source_id`
- *    que su JavaScript crea en el navegador a cambio de la tarjeta —el número
- *    nunca toca este servidor, y eso es lo que mantiene el cumplimiento PCI
- *    fuera del proyecto—. `PaymentAuthorizeInput` no lo lleva todavía.
- *
- * Con las dos, `authorize` pasa a hacer un `POST` a `https://api.culqi.com/v2/charges`
- * con `{ amount, currency_code, email, source_id }` y a mapear la respuesta a
- * `captured` o `declined`. El resto de este archivo no cambia.
- *
- * Está escrito aquí y no en un ticket porque el día que lleguen las claves, esto
- * es lo primero que alguien va a abrir.
+ * Con las dos, `authorize` hace el `POST` a `/v2/charges` con el `source_id`
+ * (`providerToken`). Sin secreta, simula; la pasarela solo deja simular con
+ * `EBIM_PAYMENTS_ALLOW_SIMULATION=true` (DEV/QAS).
  */
 import type {
   PaymentAuthorizeInput,

@@ -1387,8 +1387,20 @@ describe('RLS: quien ve y quien escribe', () => {
     )
     expect(filas.length).toBeGreaterThan(0)
     for (const fila of filas) {
+      // `checkout_public_key` (2026-11-13): la llave PÚBLICA de la pasarela de
+      // la tienda (Culqi pk_…), publicable por diseño. Nada del proveedor, la
+      // captura, la config ni la secreta.
       expect(Object.keys(fila).sort()).toEqual(
-        ['code', 'display_name', 'instructions', 'kind', 'payment_method_id', 'position', 'store_id'].sort(),
+        [
+          'checkout_public_key',
+          'code',
+          'display_name',
+          'instructions',
+          'kind',
+          'payment_method_id',
+          'position',
+          'store_id',
+        ].sort(),
       )
     }
   })

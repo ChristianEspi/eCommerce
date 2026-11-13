@@ -3394,6 +3394,29 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'payments.field.offlineHelp':
       'With no gateway there is no automatic capture: a person confirms the money when it lands.',
 
+    'payments.culqi.title': 'Culqi connection',
+    'payments.culqi.help':
+      'These are YOUR Culqi account keys: the money lands there. Find them in CulqiPanel → Development → API Keys.',
+    'payments.culqi.publicKey': 'Public key',
+    'payments.culqi.publicKeyHelp':
+      'Starts with pk_test_ (test) or pk_live_ (production). Used in the browser to protect the card.',
+    'payments.culqi.secretKey': 'Secret key',
+    'payments.culqi.secretKeyHelp':
+      'Starts with sk_test_ or sk_live_. Stored encrypted and never shown again.',
+    'payments.culqi.secretReplace': 'Type a new one only to replace it.',
+    'payments.culqi.secretSaved': 'Secret key saved: {hint}',
+    'payments.culqi.secretMissing':
+      'No secret key: card payments are simulated and charge nothing (allowed in testing only).',
+    'payments.culqi.clearSecret': 'Remove the secret key on save',
+    'payments.culqi.env.test': 'Test mode',
+    'payments.culqi.env.live': 'Production',
+    'payments.culqi.env.none': 'Not connected',
+    'payments.culqi.mismatch': 'The public and secret keys must both be test keys or both production keys.',
+    'payments.culqi.error.publicKey': 'The Culqi public key starts with pk_test_ or pk_live_.',
+    'payments.culqi.error.secretKey': 'The Culqi secret key starts with sk_test_ or sk_live_.',
+    'payments.culqi.error.sameEnv': 'The public and secret keys must both be test keys or both production keys.',
+    'payments.culqi.error.noProvider': 'Choose the Culqi gateway before saving its keys.',
+
     'payments.capture.automatic': 'Automatic',
     'payments.capture.manual': 'Manual',
     'payments.kind.card': 'Card',

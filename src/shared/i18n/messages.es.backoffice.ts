@@ -604,6 +604,30 @@ export const esBackoffice = {
   'payments.field.active': 'Publicado en el checkout',
   'payments.field.offlineHelp':
       'Sin pasarela no hay captura automática: el cobro lo confirma una persona cuando ve el dinero.',
+  'payments.culqi.title': 'Conexión con Culqi',
+  'payments.culqi.help':
+      'Las llaves son de TU cuenta Culqi: lo cobrado cae en ella. Las encuentras en CulqiPanel → Desarrollo → API Keys.',
+  'payments.culqi.publicKey': 'Llave pública',
+  'payments.culqi.publicKeyHelp':
+      'Empieza por pk_test_ (pruebas) o pk_live_ (producción). Se usa en el navegador para proteger la tarjeta.',
+  'payments.culqi.secretKey': 'Llave secreta',
+  'payments.culqi.secretKeyHelp':
+      'Empieza por sk_test_ o sk_live_. Se guarda cifrada y no se vuelve a mostrar.',
+  'payments.culqi.secretReplace': 'Escribe una nueva solo si quieres reemplazarla.',
+  'payments.culqi.secretSaved': 'Llave secreta guardada: {hint}',
+  'payments.culqi.secretMissing':
+      'Sin llave secreta: el pago con tarjeta se simula y no cobra nada (solo se permite en pruebas).',
+  'payments.culqi.clearSecret': 'Quitar la llave secreta al guardar',
+  'payments.culqi.env.test': 'Modo pruebas',
+  'payments.culqi.env.live': 'Producción',
+  'payments.culqi.env.none': 'Sin conectar',
+  'payments.culqi.mismatch':
+      'La llave pública y la secreta deben ser las dos de pruebas o las dos de producción.',
+  'payments.culqi.error.publicKey': 'La llave pública de Culqi empieza por pk_test_ o pk_live_.',
+  'payments.culqi.error.secretKey': 'La llave secreta de Culqi empieza por sk_test_ o sk_live_.',
+  'payments.culqi.error.sameEnv':
+      'La llave pública y la secreta deben ser las dos de pruebas o las dos de producción.',
+  'payments.culqi.error.noProvider': 'Elige la pasarela Culqi antes de guardar sus llaves.',
   'payments.capture.automatic': 'Automática',
   'payments.capture.manual': 'Manual',
   'payments.kind.card': 'Tarjeta',

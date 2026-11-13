@@ -11,6 +11,31 @@ el recorrido SaaS P00–P17 queda cerrado)
 > (`claude-saas-opus/config/phases.json`), que se identifica siempre como «P0x-SaaS». No son la misma
 > serie: el P12 histórico es el framework de integraciones; el P12-SaaS es fulfillment y devoluciones.
 
+## Culqi con las llaves de cada tienda (2026-11-13)
+
+Antes el cobro con tarjeta usaba UNA llave secreta del despliegue (`EBIM_PAYMENT_SECRET_CULQI`) y UNA
+pública del bundle (`VITE_CULQI_PUBLIC_KEY`): todos los comercios habrían cobrado en la cuenta Culqi de
+la plataforma. Ahora las llaves son del **medio de pago de la tienda** y se configuran en
+**Backoffice → Pagos → Medios de pago → (medio de tarjeta, pasarela Culqi) → «Conexión con Culqi»**:
+
+- **Pública** (`pk_test_`/`pk_live_`) → `payment_methods.checkout_public_key`, visible para `anon` en
+  `public_payment_methods`; la vitrina tokeniza con ella (`cardToken.ts`).
+- **Secreta** (`sk_test_`/`sk_live_`) → Supabase Vault por `payment_method_set_secret` (owner/admin);
+  la pantalla solo ve `has_secret` y la pista `sk_live_…a1b2`. La descifra
+  `payment_secret_for_intent` (solo `service_role`), que usa la función `checkout` por intento.
+  Para Culqi no hay respaldo de variable de entorno: sin llave de la tienda, simula (y fuera de DEV/QAS
+  se bloquea con `PAGO_NO_DISPONIBLE`).
+- La base impide pegar una secreta en el campo público, mezclar pruebas y producción, marcar
+  `has_secret` a mano y dejar la llave viva al cambiar de pasarela o borrar el medio.
+- La CSP abre siempre los orígenes de Culqi (la llave ya no se conoce al compilar);
+  `VITE_PAYMENTS_DISABLE_CULQI=true` los cierra.
+
+Migración `20261113140000_culqi_credenciales_por_tienda.sql` (también registra `culqi` en
+`integration_providers`). **No aplicada en QAS** y función `checkout` **sin desplegar**: hasta
+aplicarla, la vitrina local contra QAS falla al leer los medios de pago (pide `checkout_public_key`).
+Tests: 11 de base (`supabase/tests/payment-method-secrets.test.ts`, aislamiento incluido) y 5 de
+pantalla.
+
 ## Resumen v2 (2026-09-26)
 
 Rediseño del dashboard a partir del diseño en pen.dev (`design/storefront.pen`, frame «Resumen —

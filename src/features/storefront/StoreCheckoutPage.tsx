@@ -483,7 +483,10 @@ export function StoreCheckoutPage() {
        * fuera de todo el backend y, con el, el alcance de PCI.
        */
       const paymentToken = pideTarjeta
-        ? await tokenizarTarjeta({ ...tarjeta, email: input.values.customerEmail })
+        ? await tokenizarTarjeta(
+            { ...tarjeta, email: input.values.customerEmail },
+            medioElegido?.checkout_public_key ?? null,
+          )
         : null
 
       writePendingAttempt(storeSlug, { key: idempotencyKey, startedAt: Date.now() })
@@ -939,7 +942,14 @@ export function StoreCheckoutPage() {
                 {/* Los datos de la tarjeta solo cuando se ha elegido una: pedir
                     un numero de tarjeta a quien va a pagar por transferencia es
                     pedir un dato que nadie va a usar. */}
-                {pideTarjeta && <CardFields datos={tarjeta} onCambio={setTarjeta} error={null} />}
+                {pideTarjeta && (
+                  <CardFields
+                    datos={tarjeta}
+                    onCambio={setTarjeta}
+                    error={null}
+                    llavePublica={medioElegido?.checkout_public_key ?? null}
+                  />
+                )}
 
                 {/* Resumen v2 · El comprobante, en UNA fila: tipo, RUC y razón
                     social. Boleta no pide nada más; factura pide RUC y razón

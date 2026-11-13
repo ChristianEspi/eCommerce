@@ -16,6 +16,13 @@ const holder = vi.hoisted(() => ({
   save: { mutateAsync: vi.fn(async () => undefined), isPending: false },
 }))
 
+const SIN_LLAVES = {
+  checkout_public_key: null,
+  has_secret: false,
+  secret_hint: null,
+  secret_set_at: null,
+}
+
 const METODOS: PaymentMethod[] = [
   {
     id: 'm-yape',
@@ -28,6 +35,7 @@ const METODOS: PaymentMethod[] = [
     is_active: true,
     position: 10,
     instructions: null,
+    ...SIN_LLAVES,
   },
   {
     id: 'm-credito',
@@ -40,12 +48,29 @@ const METODOS: PaymentMethod[] = [
     is_active: false,
     position: 50,
     instructions: null,
+    ...SIN_LLAVES,
+  },
+  {
+    id: 'm-tarjeta',
+    store_id: 's1',
+    code: 'tarjeta',
+    kind: 'card',
+    display_name: 'Tarjeta',
+    provider_code: 'culqi',
+    capture_mode: 'automatic',
+    is_active: true,
+    position: 5,
+    instructions: null,
+    checkout_public_key: 'pk_test_abcdefgh1234',
+    has_secret: true,
+    secret_hint: 'sk_test_…ab12',
+    secret_set_at: '2026-11-13T10:00:00Z',
   },
 ]
 
 vi.mock('./hooks', () => ({
   usePaymentMethods: () => ({ data: METODOS, isPending: false, isError: false }),
-  usePaymentProviders: () => ({ data: [] }),
+  usePaymentProviders: () => ({ data: [{ code: 'culqi', name: 'Culqi' }] }),
   useSavePaymentMethod: () => holder.save,
   useDeletePaymentMethod: () => holder.remove,
 }))
@@ -106,5 +131,53 @@ describe('borrar un medio de pago', () => {
     renderWithProviders(<MethodsSection />)
     await userEvent.click(screen.getByRole('button', { name: 'Eliminar: Credito empresa' }))
     expect(screen.queryByRole('button', { name: 'Ocultar del checkout' })).not.toBeInTheDocument()
+  })
+})
+
+describe('llaves de Culqi en el medio de tarjeta', () => {
+  it('un medio sin pasarela no pide llaves', async () => {
+    renderWithProviders(<MethodsSection />)
+    await userEvent.click(screen.getByRole('button', { name: 'Editar: Yape' }))
+    expect(screen.queryByRole('region', { name: 'Conexión con Culqi' })).not.toBeInTheDocument()
+  })
+
+  it('con Culqi enseña la pública, la PISTA de la secreta y nunca la secreta', async () => {
+    renderWithProviders(<MethodsSection />)
+    await userEvent.click(screen.getByRole('button', { name: 'Editar: Tarjeta' }))
+
+    const bloque = screen.getByRole('region', { name: 'Conexión con Culqi' })
+    expect(within(bloque).getByLabelText('Llave pública')).toHaveValue('pk_test_abcdefgh1234')
+    // La secreta empieza vacía siempre: no se lee de la base.
+    expect(within(bloque).getByLabelText('Llave secreta')).toHaveValue('')
+    expect(within(bloque).getByText('Llave secreta guardada: sk_test_…ab12')).toBeInTheDocument()
+    expect(within(bloque).getByText('Modo pruebas')).toBeInTheDocument()
+  })
+
+  it('mezclar una pública de pruebas con una secreta de producción no deja guardar', async () => {
+    renderWithProviders(<MethodsSection />)
+    await userEvent.click(screen.getByRole('button', { name: 'Editar: Tarjeta' }))
+    await userEvent.type(screen.getByLabelText('Llave secreta'), 'sk_live_zzzzzzzz9999')
+
+    expect(
+      screen.getByText('La llave pública y la secreta deben ser las dos de pruebas o las dos de producción.'),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Guardar' })).toBeDisabled()
+  })
+
+  it('una secreta nueva viaja al guardar (y la pública con el medio)', async () => {
+    renderWithProviders(<MethodsSection />)
+    await userEvent.click(screen.getByRole('button', { name: 'Editar: Tarjeta' }))
+    await userEvent.type(screen.getByLabelText('Llave secreta'), 'sk_test_nuevanueva5678')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+
+    expect(holder.save.mutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'm-tarjeta',
+        providerCode: 'culqi',
+        publicKey: 'pk_test_abcdefgh1234',
+        secretKey: 'sk_test_nuevanueva5678',
+        clearSecret: false,
+      }),
+    )
   })
 })

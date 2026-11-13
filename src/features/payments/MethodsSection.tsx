@@ -30,6 +30,7 @@ import { FormDrawer } from '@/shared/ui/FormDrawer'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState, ErrorState } from '@/shared/ui/states'
+import { PROVIDERS_WITH_KEYS } from './api'
 import { PaymentsError } from './errors'
 import {
   useDeletePaymentMethod,
@@ -53,6 +54,9 @@ const EMPTY: PaymentMethodFormValues = {
   isActive: false,
   position: 100,
   instructions: '',
+  publicKey: '',
+  secretKey: '',
+  clearSecret: false,
 }
 
 function toForm(method: PaymentMethod): PaymentMethodFormValues {
@@ -66,7 +70,17 @@ function toForm(method: PaymentMethod): PaymentMethodFormValues {
     isActive: method.is_active,
     position: method.position,
     instructions: method.instructions ?? '',
+    publicKey: method.checkout_public_key ?? '',
+    // La secreta NUNCA se rellena: no se lee de la base. Vacía = no se toca.
+    secretKey: '',
+    clearSecret: false,
   }
+}
+
+/** `test` o `live` según el prefijo de una llave de Culqi (pk_/sk_). */
+function entornoDe(llave: string | null | undefined): 'test' | 'live' | null {
+  const m = /^(?:pk|sk)_(test|live)_/.exec((llave ?? '').trim())
+  return m ? (m[1] as 'test' | 'live') : null
 }
 
 /**
@@ -84,9 +98,17 @@ function toForm(method: PaymentMethod): PaymentMethodFormValues {
  *  · **Un medio nace apagado.** Publicar un medio de pago es una decisión, no
  *    el efecto secundario de crearlo.
  *
- * Aquí no se pide ni se enseña una credencial. Las del proveedor viven en el
- * vault y en la base solo está su referencia; si esta pantalla tuviera un campo
- * de contraseña, esa promesa dejaría de ser cierta el primer día.
+ * ## Las llaves de la pasarela (Culqi), y dónde vive cada una
+ *
+ * Con una pasarela que cobra en la cuenta DEL COMERCIO (Culqi), el medio pide
+ * sus llaves aquí, en el mismo cajón donde se elige la pasarela:
+ *
+ *  · la **pública** (`pk_…`) se guarda con el medio: la usa la vitrina.
+ *  · la **secreta** (`sk_…`) se escribe UNA vez y va a Vault por
+ *    `payment_method_set_secret`. Esta pantalla nunca la lee: solo sabe si
+ *    existe y su pista (`sk_live_…a1b2`) para reconocerla.
+ *
+ * El campo de la secreta empieza vacío siempre; vacío al guardar = no se toca.
  */
 export function MethodsSection() {
   const { t } = useI18n()
@@ -123,6 +145,18 @@ export function MethodsSection() {
   }, [drawer])
 
   const offline = values.providerCode === ''
+  const conLlaves = PROVIDERS_WITH_KEYS.has(values.providerCode)
+  // Solo cuenta la secreta guardada si sigue siendo de la MISMA pasarela: al
+  // cambiar de pasarela la base la borra.
+  const secretaGuardada =
+    Boolean(drawer.method?.has_secret) &&
+    drawer.method?.provider_code === values.providerCode &&
+    !values.clearSecret
+  const entornoPublica = entornoDe(values.publicKey)
+  const entornoSecreta =
+    entornoDe(values.secretKey) ?? (secretaGuardada ? entornoDe(drawer.method?.secret_hint) : null)
+  const entorno = entornoPublica ?? entornoSecreta
+  const mezcla = entornoPublica !== null && entornoSecreta !== null && entornoPublica !== entornoSecreta
   const list = methods.data ?? []
   const isEmpty = !methods.isPending && !methods.isError && list.length === 0
 
@@ -289,7 +323,11 @@ export function MethodsSection() {
             <Button onClick={() => setDrawer({ open: false, method: null })}>
               {t('common.cancel')}
             </Button>
-            <Button variant="contained" disabled={save.isPending} onClick={() => void submit()}>
+            <Button
+              variant="contained"
+              disabled={save.isPending || (conLlaves && mezcla)}
+              onClick={() => void submit()}
+            >
               {t('common.save')}
             </Button>
           </>
@@ -349,6 +387,70 @@ export function MethodsSection() {
             <MenuItem value="manual">{t('payments.capture.manual')}</MenuItem>
           </SelectField>
           {offline && <Alert severity="info">{t('payments.field.offlineHelp')}</Alert>}
+          {conLlaves && (
+            <Stack
+              spacing={1.5}
+              component="section"
+              aria-label={t('payments.culqi.title')}
+              sx={{ p: 2, border: '1px solid var(--border)', borderRadius: 2 }}
+            >
+              <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                <Typography sx={{ fontWeight: 800 }}>{t('payments.culqi.title')}</Typography>
+                <StatusChip
+                  tone={entorno === 'live' ? 'success' : entorno === 'test' ? 'warning' : 'default'}
+                  label={t(`payments.culqi.env.${entorno ?? 'none'}` as MessageKey)}
+                />
+              </Stack>
+              <Typography variant="body2" sx={{ color: 'var(--muted)' }}>
+                {t('payments.culqi.help')}
+              </Typography>
+              <TextField
+                label={t('payments.culqi.publicKey')}
+                value={values.publicKey}
+                onChange={(event) => setValues((v) => ({ ...v, publicKey: event.target.value }))}
+                helperText={t('payments.culqi.publicKeyHelp')}
+                autoComplete="off"
+                inputProps={{ spellCheck: false }}
+              />
+              {secretaGuardada ? (
+                <Alert severity="success">
+                  {t('payments.culqi.secretSaved').replace('{hint}', drawer.method?.secret_hint ?? '')}
+                </Alert>
+              ) : (
+                values.secretKey.trim() === '' && (
+                  <Alert severity="warning">{t('payments.culqi.secretMissing')}</Alert>
+                )
+              )}
+              <TextField
+                label={t('payments.culqi.secretKey')}
+                type="password"
+                value={values.secretKey}
+                disabled={values.clearSecret}
+                onChange={(event) => setValues((v) => ({ ...v, secretKey: event.target.value }))}
+                helperText={
+                  secretaGuardada ? t('payments.culqi.secretReplace') : t('payments.culqi.secretKeyHelp')
+                }
+                // `new-password`: que el navegador no ofrezca autocompletar una
+                // contraseña guardada en el campo de una llave de cobro.
+                autoComplete="new-password"
+                inputProps={{ spellCheck: false }}
+              />
+              {Boolean(drawer.method?.has_secret) && drawer.method?.provider_code === values.providerCode && (
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={values.clearSecret}
+                      onChange={(event) =>
+                        setValues((v) => ({ ...v, clearSecret: event.target.checked, secretKey: '' }))
+                      }
+                    />
+                  }
+                  label={t('payments.culqi.clearSecret')}
+                />
+              )}
+              {mezcla && <Alert severity="error">{t('payments.culqi.mismatch')}</Alert>}
+            </Stack>
+          )}
           <TextField
             label={t('payments.field.instructions')}
             value={values.instructions}

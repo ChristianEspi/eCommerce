@@ -87,7 +87,15 @@ export interface PaymentGatewayOptions {
    * compartida que la suite ejecuta en Node. Un adaptador sin credencial no
    * finge un cobro: simula si sabe, y rechaza si no.
    */
-  readonly secretFor?: (providerCode: string) => string | null
+  /**
+   * Recibe el intento porque la llave es DE LA TIENDA que cobra (está en
+   * Vault, atada a su medio de pago): con solo el código de la pasarela todos
+   * los comercios cobrarían en la misma cuenta.
+   */
+  readonly secretFor?: (
+    providerCode: string,
+    intentId: string,
+  ) => Promise<string | null> | string | null
   /**
    * ¿Puede un adaptador SIMULADO (`provider.simulated`) resolver un cobro?
    *
@@ -169,7 +177,7 @@ export function createPaymentGateway(options: PaymentGatewayOptions): PaymentGat
       const provider: PaymentProvider = resolvePaymentProvider(providerCode, {
         captureMode: text(intent, 'capture_mode', 'automatic') === 'manual' ? 'manual' : 'automatic',
         returnUrl: options.returnUrl?.(request.storeSlug) ?? null,
-        secret: options.secretFor?.(providerCode) ?? null,
+        secret: (await options.secretFor?.(providerCode, intentId)) ?? null,
       })
       const authorize = requireOperation(provider, 'authorize', provider.authorize)
 

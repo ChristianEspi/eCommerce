@@ -96,6 +96,9 @@ function looksLikeUserSession(request: Request): boolean {
   }
 }
 
+/** Pasarelas cuya llave es SIEMPRE de la tienda (Vault), nunca del despliegue. */
+const POR_TIENDA = new Set(['culqi'])
+
 const handler = serveJson(
   // Storefront público: cualquier origen, igual que `create-order`.
   {
@@ -107,25 +110,33 @@ const handler = serveJson(
     const parsed = await parseCheckoutBody(body)
 
     const hasSession = looksLikeUserSession(request)
+    const service = rpcCaller(serviceClient(trace))
     const ports = createDbPorts({
-      service: rpcCaller(serviceClient(trace)),
+      service,
       caller: rpcCaller(hasSession ? userClient(request, trace) : anonClient(trace)),
       hasSession,
       /**
-       * La credencial de cada pasarela, una variable por `provider_code`.
+       * La credencial de la pasarela para ESTE cobro.
+       *
+       * Primero la de la tienda: la configura el comercio en Pagos → Medios de
+       * pago, vive en Vault y solo esta función (service_role) la descifra, por
+       * intento. Así cada comercio cobra en SU cuenta.
+       *
+       * Las pasarelas de `POR_TIENDA` no tienen respaldo: sin llave de la tienda
+       * el conector simula (y la pasarela lo bloquea fuera de DEV/QAS). Usar
+       * una variable del despliegue cobraría en la cuenta de la plataforma el
+       * dinero de un comercio. El resto conserva su variable por
+       * `provider_code` hasta que pase al mismo esquema.
        *
        * Se lee AQUÍ y no dentro del adaptador: este es el borde, el único sitio
-       * del repositorio con entorno. Los adaptadores de `_shared/payments` son
-       * puros para que la suite los ejecute en Node junto al resto.
-       *
-       * Una variable por pasarela y no un objeto con todas: así ninguna ve la
-       * credencial de otra, y dar de alta una nueva no obliga a tocar el
-       * despliegue de las que ya cobran.
-       *
-       * Sin variable, el conector simula (si sabe) o rechaza. Nunca finge.
+       * con entorno; los adaptadores son puros para que la suite los corra en Node.
        */
-      secretFor: (providerCode) =>
-        Deno.env.get(`EBIM_PAYMENT_SECRET_${providerCode.toUpperCase()}`) ?? null,
+      secretFor: async (providerCode, intentId) => {
+        const propia = await service('payment_secret_for_intent', { p_intent_id: intentId })
+        if (typeof propia === 'string' && propia.trim() !== '') return propia
+        if (POR_TIENDA.has(providerCode)) return null
+        return Deno.env.get(`EBIM_PAYMENT_SECRET_${providerCode.toUpperCase()}`) ?? null
+      },
       // Solo el literal `true` enciende el simulacro. En producción no se define.
       allowSimulation: Deno.env.get('EBIM_PAYMENTS_ALLOW_SIMULATION') === 'true',
     })

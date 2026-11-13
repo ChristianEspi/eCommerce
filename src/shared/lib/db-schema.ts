@@ -637,6 +637,8 @@ export const CART_RECOVERY_UNSUBSCRIBE_RPC = 'cart_recovery_unsubscribe'
 export const REFUND_REQUEST_RPC = 'payment_refund_request'
 export const RECONCILIATION_IMPORT_RPC = 'payment_reconciliation_import'
 export const RECONCILIATION_MATCH_RPC = 'payment_reconciliation_match'
+/** Escribe (o quita) la llave secreta de la pasarela del medio en Vault. Nunca la lee. */
+export const PAYMENT_METHOD_SET_SECRET_RPC = 'payment_method_set_secret'
 
 // Promociones (P10-SaaS). `promotion_quote_for_slug` y
 // `gift_card_balance_for_slug` las llama el comprador ANÓNIMO desde la vitrina;

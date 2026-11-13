@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
+  PAYMENT_METHOD_SET_SECRET_RPC,
   RECONCILIATION_IMPORT_RPC,
   REFUND_REQUEST_RPC,
 } from '@/shared/lib/db-schema'
@@ -39,6 +40,14 @@ describe('el backoffice no mueve dinero por PostgREST', () => {
     // Y los nombres salen del vocabulario de persistencia, no de un literal.
     expect(REFUND_REQUEST_RPC).toBe('payment_refund_request')
     expect(RECONCILIATION_IMPORT_RPC).toBe('payment_reconciliation_import')
+  })
+
+  it('la llave secreta de la pasarela va a Vault por comando, nunca a la tabla', () => {
+    expect(apiSource).toMatch(/rpc\(PAYMENT_METHOD_SET_SECRET_RPC/)
+    expect(PAYMENT_METHOD_SET_SECRET_RPC).toBe('payment_method_set_secret')
+    // Ninguna columna de la tabla lleva la secreta: solo la pública y la pista.
+    expect(apiSource).not.toMatch(/secret_key\s*:/)
+    expect(apiSource).not.toMatch(/checkout_secret/)
   })
 
   it('ninguna consulta declara el tenant: la RLS decide', () => {

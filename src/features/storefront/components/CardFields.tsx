@@ -31,13 +31,16 @@ export function CardFields({
   datos,
   onCambio,
   error,
+  llavePublica,
 }: {
   datos: DatosTarjeta
   onCambio: (datos: DatosTarjeta) => void
   error: string | null
+  /** La llave pública de Culqi del medio elegido (de la tienda). Sin ella, simulacro. */
+  llavePublica: string | null
 }) {
   const { t } = useI18n()
-  const simulado = esSimulacroDePago()
+  const simulado = esSimulacroDePago(llavePublica)
   const numeroDigitos = soloDigitos(datos.numero)
   const numeroMal = numeroDigitos.length >= 13 && !pareceTarjeta(datos.numero)
 

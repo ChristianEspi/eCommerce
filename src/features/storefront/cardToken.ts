@@ -10,19 +10,17 @@
  *
  * ## Los dos modos, y cómo se pasa de uno al otro
  *
- * `VITE_CULQI_PUBLIC_KEY` es el interruptor, y es una clave PÚBLICA por diseño
- * —Culqi la publica en el navegador, igual que la clave publicable de Supabase—,
- * así que vivir en el bundle es su sitio y no una filtración.
+ * La llave PÚBLICA de Culqi es de cada tienda: el comercio la pega en
+ * Backoffice → Pagos → Medios de pago y llega con el medio elegido
+ * (`public_payment_methods.checkout_public_key`). Es pública por diseño
+ * —Culqi la publica en el navegador—, así que viajar a la vitrina no es una
+ * filtración. La SECRETA nunca sale del servidor (Vault).
  *
- *   sin clave  → se fabrica un token local. NO se cobra nada.
- *   con clave  → `Culqi.js` tokeniza de verdad contra Culqi.
+ *   sin llave  → se fabrica un token local. NO se cobra nada.
+ *   con llave  → `Culqi.js` tokeniza de verdad contra la cuenta de ESA tienda.
  *
  * El resto del camino —el checkout, el pipeline, el conector, la máquina de
- * estados— es exactamente el mismo en los dos casos. Por eso el día que llegue
- * la clave no hay nada que reescribir: se rellenan dos variables.
- *
- *   VITE_CULQI_PUBLIC_KEY            en el front
- *   EBIM_PAYMENT_SECRET_CULQI        en los secretos de la Edge Function
+ * estados— es exactamente el mismo en los dos casos.
  *
  * ## El simulacro NO se parece a un cobro
  *
@@ -32,15 +30,14 @@
  * en una demo sin depender del azar.
  */
 
-/** La clave pública de Culqi, si el despliegue la tiene. */
-export function clavePublicaCulqi(): string | null {
-  const clave = import.meta.env.VITE_CULQI_PUBLIC_KEY
-  return typeof clave === 'string' && clave.trim() !== '' ? clave.trim() : null
+/** La llave pública de Culqi del medio elegido, si la tienda la configuró. */
+export function clavePublicaCulqi(llave: string | null | undefined): string | null {
+  return typeof llave === 'string' && llave.trim() !== '' ? llave.trim() : null
 }
 
-/** Sin clave pública no hay pasarela: la pantalla trabaja en simulacro. */
-export function esSimulacroDePago(): boolean {
-  return clavePublicaCulqi() === null
+/** Sin llave pública no hay pasarela: la pantalla trabaja en simulacro. */
+export function esSimulacroDePago(llave: string | null | undefined): boolean {
+  return clavePublicaCulqi(llave) === null
 }
 
 export interface DatosTarjeta {
@@ -122,8 +119,11 @@ function cargarCulqi(): Promise<void> {
  * En modo real, los datos van directos a Culqi desde el navegador. Ni este
  * archivo ni ningún servidor de EBIM los guarda, los registra ni los reenvía.
  */
-export async function tokenizarTarjeta(datos: DatosTarjeta): Promise<string> {
-  const clave = clavePublicaCulqi()
+export async function tokenizarTarjeta(
+  datos: DatosTarjeta,
+  llavePublica: string | null | undefined,
+): Promise<string> {
+  const clave = clavePublicaCulqi(llavePublica)
   if (!clave) return tokenSimulado(datos.numero)
 
   await cargarCulqi()

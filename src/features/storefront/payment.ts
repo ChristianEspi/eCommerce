@@ -9,8 +9,9 @@ import { storefrontClient } from './api'
  * ## Qué se lee, y por qué esa vista y no la tabla
  *
  * `public_payment_methods` es una vista `security_invoker` sobre
- * `payment_methods` que expone SIETE columnas y ni una más: id, tienda, código,
- * familia, nombre, orden e instrucciones. Lo que deliberadamente NO sale de ahí
+ * `payment_methods` que expone OCHO columnas y ni una más: id, tienda, código,
+ * familia, nombre, orden, instrucciones y la llave PÚBLICA de la pasarela
+ * (publicable por diseño). Lo que deliberadamente NO sale de ahí
  * es el proveedor, su configuración y el modo de captura — es decir, todo lo que
  * convierte un medio de pago en una credencial. La tabla existe, pero leerla
  * desde el navegador sería pedirle al comprador que tenga delante la pasarela.
@@ -45,6 +46,11 @@ export const paymentMethodSchema = z.object({
   position: z.number().int().default(0),
   /** Qué hacer después de pedir: número de Yape, cuenta bancaria, etc. */
   instructions: z.string().nullable().default(null),
+  /**
+   * Llave PÚBLICA de la pasarela de la tienda (Culqi `pk_…`), para tokenizar la
+   * tarjeta en el navegador. Pública por diseño; la secreta nunca sale de Vault.
+   */
+  checkout_public_key: z.string().nullable().default(null),
 })
 export type StorePaymentMethod = z.infer<typeof paymentMethodSchema>
 
@@ -54,7 +60,7 @@ export const paymentMethodsKey = (storeId: string) =>
 export async function fetchPaymentMethods(storeId: string): Promise<StorePaymentMethod[]> {
   const { data, error } = await storefrontClient()
     .from(PUBLIC_PAYMENT_METHODS_VIEW)
-    .select('payment_method_id, code, kind, display_name, position, instructions')
+    .select('payment_method_id, code, kind, display_name, position, instructions, checkout_public_key')
     .eq('store_id', storeId)
     .order('position', { ascending: true })
 
