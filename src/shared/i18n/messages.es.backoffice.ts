@@ -11,7 +11,7 @@
  * de imports de la vitrina y falla si algún archivo que un visitante puede
  * cargar usa uno de estos namespaces.
  *
- * Namespaces: nav, admin, exports, taxes, diagnostics, onboarding, picker, pim, mail, payments, promotions, appearance, returns, ops, catalogImport, storesAdmin, aiAnalyst, aiPim, aiOrders, aiQuotes, aiExplain, aiCredit, aiPayments, aiFulfillment, aiContent, aiPromotions, aiCms, aiReviews, aiOps, aiIntegrations, copilot.
+ * Namespaces: nav, admin, exports, taxes, diagnostics, onboarding, picker, pim, mail, payments, promotions, appearance, returns, ops, catalogImport, customersImport, storesAdmin, aiAnalyst, aiPim, aiOrders, aiQuotes, aiExplain, aiCredit, aiPayments, aiFulfillment, aiContent, aiPromotions, aiCms, aiReviews, aiOps, aiIntegrations, copilot.
  */
 export const esBackoffice = {
   'nav.dashboard': 'Inicio',
@@ -2550,6 +2550,38 @@ export const esBackoffice = {
   'watch.finding.credit.overdue.body': '{count} documentos están vencidos. El más antiguo, {days_overdue} días.',
   'watch.finding.catalog.unpublished.title': 'Catálogo sin publicar',
   'watch.finding.catalog.unpublished.body': '{count} productos de esta tienda no se ven en la vitrina.',
+  'customersImport.action.users': 'Importar usuarios',
+  'customersImport.title.customers': 'Importar clientes',
+  'customersImport.title.users': 'Importar usuarios de cuentas B2B',
+  'customersImport.title.usersOf': 'Importar usuarios de {name}',
+  'customersImport.help.customers': 'Una fila por cliente. El Código es la clave: si ya existe se actualiza y si no se crea. Puedes incluir el código con el que el cliente existe en tu ERP.',
+  'customersImport.help.users': 'Una fila por persona: la columna Cuenta B2B dice a qué empresa compra. Las cuentas tienen que existir antes. Por defecto quedan activas y como compradores.',
+  'customersImport.help.usersOf': 'Una fila por persona que compra a nombre de esta empresa. Por defecto quedan activas y como compradores.',
+  'customersImport.error.forbidden': 'Tu rol no permite esta importación.',
+  'customersImport.error.module': 'Las cuentas B2B no están contratadas para esta empresa.',
+  'customersImport.reason.CODIGO_CLIENTE_INVALIDO': 'Código no válido: letras, números, punto, guion o guion bajo, sin espacios',
+  'customersImport.reason.CODIGO_REPETIDO': 'Código repetido en el archivo',
+  'customersImport.reason.SEGMENTO_NO_ENCONTRADO': 'Ese segmento no existe: créalo en Precios → Segmentos o corrige el nombre',
+  'customersImport.reason.CORREO_INVALIDO': 'Correo no válido',
+  'customersImport.reason.CORREO_REPETIDO': 'Esa persona ya aparece en otra fila para la misma cuenta',
+  'customersImport.reason.CODIGO_ERP_EN_USO': 'Ese código de ERP ya lo tiene otro cliente',
+  'customersImport.reason.SIN_PERMISO_ERP': 'Solo owner o admin pueden cargar el código del ERP',
+  'customersImport.reason.CUENTA_NO_ENCONTRADA': 'No existe una cuenta B2B con ese código',
+  'customersImport.reason.OTRA_CUENTA': 'La fila es de otra cuenta B2B',
+  'customersImport.reason.SIN_CUENTA': 'Ese correo todavía no tiene usuario',
+  'customersImport.reason.CORREO_DE_SUITE': 'Un correo de la suite no puede comprar a nombre de un cliente',
+  'customersImport.reason.SUCURSAL_NO_ENCONTRADA': 'Esa sucursal no existe en la cuenta',
+  'customersImport.reason.SIN_PERMISO': 'Tu rol no permite este cambio',
+  'customersImport.missing.body': '{count} correos todavía no tienen usuario. Puedes crearlos ahora: se genera una contraseña para cada uno y se vuelve a revisar el archivo.',
+  'customersImport.missing.create': 'Crear los usuarios que faltan ({count})',
+  'customersImport.missing.creating': 'Creando usuarios… {done} de {total}',
+  'customersImport.missing.failed': 'No se pudieron crear:',
+  'customersImport.created.title': 'Usuarios creados',
+  'customersImport.created.body': 'Anota o descarga las contraseñas ahora: no se vuelven a mostrar. Entrégaselas a cada persona; si una se pierde, se usa «¿Olvidaste tu contraseña?».',
+  'customersImport.created.download': 'Descargar contraseñas',
+  'customersImport.created.sheet': 'Usuarios creados',
+  'customersImport.col.email': 'Correo',
+  'customersImport.col.password': 'Contraseña temporal',
   'watch.finding.integrations.circuit_open.title': "Integración detenida",
   'watch.finding.integrations.circuit_open.body': "{count} conexiones tienen el disyuntor abierto: nada sale hacia el otro sistema hasta cerrarlo.",
   'watch.finding.ops.critical_events.title': "Incidentes críticos",

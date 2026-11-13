@@ -30,6 +30,7 @@ import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState, ErrorState } from '@/shared/ui/states'
 import { CustomerDrawer } from './CustomerDrawer'
+import { CustomersImportButton } from './import/CustomersImportDialog'
 import { fetchCustomer } from './api'
 import { CustomersError } from './errors'
 import { useCustomerUsage, useCustomers, useDeleteCustomer, useSaveCustomer } from './hooks'
@@ -125,9 +126,12 @@ export function CustomersSection() {
       <FilterBar
         actions={
           canWrite && (
-            <Button variant="contained" onClick={() => setDrawer({ open: true, customer: null })}>
-              {t('customers.new')}
-            </Button>
+            <Stack direction="row" spacing={1}>
+              <CustomersImportButton target={{ kind: 'customers' }} />
+              <Button variant="contained" onClick={() => setDrawer({ open: true, customer: null })}>
+                {t('customers.new')}
+              </Button>
+            </Stack>
           )
         }
       >

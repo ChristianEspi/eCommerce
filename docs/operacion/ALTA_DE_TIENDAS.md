@@ -100,6 +100,8 @@ Entra al backoffice como el dueño, con la tienda nueva elegida.
 5. **Catálogo**: crea los productos o impórtalos desde Excel (**Productos → Importar**), con sus categorías.
 6. **Publicar**: en cada producto, pestaña **Tiendas** → precio y estado **Publicado**. Sin publicar, no se ve.
 7. Opcional: **Promociones**, **Precios** (listas por segmento) y **Clientes**.
+   - La cartera se carga desde Excel: **Clientes → Importar** (plantilla con guía; el Código es la clave y admite el código del ERP).
+   - Los compradores B2B, desde **Cuentas B2B → Importar usuarios** (una hoja para todas las cuentas) o desde la pestaña **Usuarios** de cada cuenta. Los correos sin usuario se crean desde la misma revisión, y las contraseñas se ven una sola vez.
 8. **Tiendas** → activa la tienda.
 9. Verifica:
    - Abre `/s/<slug>` como visitante.

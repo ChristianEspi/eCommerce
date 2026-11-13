@@ -602,6 +602,11 @@ export const DELETE_PRODUCT_MASTER_RPC = 'delete_product_master'
 export const IMPORT_CATALOG_VOCABULARY_RPC = 'import_catalog_vocabulary'
 export const IMPORT_CATALOG_CATEGORIES_RPC = 'import_catalog_categories'
 export const IMPORT_CATALOG_PRODUCTS_RPC = 'import_catalog_products'
+// Importación de clientes y de usuarios B2B desde Excel (20261113120000). Mismo
+// contrato: simulan con `p_dry_run = true` y aplican todo o nada. Red de
+// seguridad: `supabase/tests/customers-import.test.ts`.
+export const IMPORT_CUSTOMERS_RPC = 'import_customers'
+export const IMPORT_BUSINESS_ACCOUNT_USERS_RPC = 'import_business_account_users'
 /** Pausar o reanudar. */
 export const SET_MY_ORDER_SCHEDULE_STATUS_RPC = 'set_my_order_schedule_status'
 export const ARCHIVE_MY_ORDER_SCHEDULE_RPC = 'archive_my_order_schedule'

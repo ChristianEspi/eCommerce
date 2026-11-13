@@ -31,6 +31,9 @@ export type SheetId =
   | 'attribute_values'
   | 'categories'
   | 'products'
+  // Clientes y usuarios B2B (`features/customers/import`) usan la misma lectura.
+  | 'customers'
+  | 'account_users'
 
 export interface SheetSpec {
   readonly id: SheetId

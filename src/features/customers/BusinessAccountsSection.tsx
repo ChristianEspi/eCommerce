@@ -19,6 +19,7 @@ import {
 } from '@mui/material'
 import { useMemo, useState } from 'react'
 import { useTenant } from '@/features/tenant/tenant-context'
+import { CustomersImportButton } from './import/CustomersImportDialog'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { SearchField } from '@/shared/ui/SearchField'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
@@ -74,9 +75,15 @@ export function BusinessAccountsSection() {
       <FilterBar
         actions={
           canWrite && (
-            <Button variant="contained" onClick={() => setDrawer({ open: true, account: null })}>
-              {t('customers.accounts.new')}
-            </Button>
+            <Stack direction="row" spacing={1}>
+              <CustomersImportButton
+                target={{ kind: 'accountUsers', account: null }}
+                label="customersImport.action.users"
+              />
+              <Button variant="contained" onClick={() => setDrawer({ open: true, account: null })}>
+                {t('customers.accounts.new')}
+              </Button>
+            </Stack>
           )
         }
       >

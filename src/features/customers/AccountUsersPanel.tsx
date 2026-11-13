@@ -44,6 +44,7 @@ import {
   type BusinessAccountUser,
 } from './types'
 import { SelectField } from '@/shared/ui/SelectField'
+import { CustomersImportButton } from './import/CustomersImportDialog'
 
 const EMPTY: AccountUserFormValues = {
   user_id: '',
@@ -175,7 +176,15 @@ export function AccountUsersPanel({
 
   return (
     <Stack spacing={2}>
-      <Typography sx={{ color: 'var(--muted)' }}>{t('customers.users.help')}</Typography>
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { sm: 'flex-start' } }}>
+        <Typography sx={{ color: 'var(--muted)', flex: 1 }}>{t('customers.users.help')}</Typography>
+        {canWrite && (
+          <CustomersImportButton
+            target={{ kind: 'accountUsers', account: { id: account.id, name: account.name } }}
+            label="customersImport.action.users"
+          />
+        )}
+      </Stack>
 
       {canWrite && (
         <Stack spacing={1.5}>
