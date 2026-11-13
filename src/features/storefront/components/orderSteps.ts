@@ -47,3 +47,20 @@ export function orderSteps(input: OrderTimelineInput): Array<{ key: string; esta
   if (cancelado) return pasos.map((paso) => (paso.estado === 'current' ? { ...paso, estado: 'pending' } : paso))
   return pasos
 }
+
+/**
+ * Un pedido que ya no va a moverse: cancelado, reembolsado, o pagado y
+ * entregado. Decide si la confirmación sigue consultando el estado. Sin datos
+ * todavía, se sigue consultando.
+ */
+export function pedidoTerminado(
+  data:
+    | { status: string; payment_status?: string | null; fulfillment_status?: string | null }
+    | undefined,
+): boolean {
+  if (!data) return false
+  if (data.status === 'cancelled' || data.status === 'refunded') return true
+  const entregado = data.status === 'fulfilled' || data.fulfillment_status === 'fulfilled'
+  const pagado = data.payment_status === 'paid' || data.status === 'paid' || data.status === 'fulfilled'
+  return entregado && pagado
+}

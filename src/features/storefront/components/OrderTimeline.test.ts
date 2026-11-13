@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { orderSteps } from './orderSteps'
+import { orderSteps, pedidoTerminado } from './orderSteps'
 
 const estados = (input: Parameters<typeof orderSteps>[0]) =>
   Object.fromEntries(orderSteps(input).map((paso) => [paso.key, paso.estado]))
@@ -45,5 +45,22 @@ describe('línea de tiempo del pedido', () => {
   it('un pedido anulado no deja nada «en curso»', () => {
     const pasos = orderSteps({ status: 'cancelled', paid: false, approvalStatus: null, fulfillmentStatus: null })
     expect(pasos.some((paso) => paso.estado === 'current')).toBe(false)
+  })
+})
+
+describe('pedidoTerminado: cuándo la confirmación deja de consultar', () => {
+  it('sin datos o en curso, sigue consultando', () => {
+    expect(pedidoTerminado(undefined)).toBe(false)
+    expect(pedidoTerminado({ status: 'pending', payment_status: 'pending', fulfillment_status: 'unfulfilled' })).toBe(false)
+    // Cobrado pero sin entregar: falta que la tienda despache.
+    expect(pedidoTerminado({ status: 'paid', payment_status: 'paid', fulfillment_status: 'in_progress' })).toBe(false)
+    // Entregado pero sin cobrar (pago contra entrega aún no registrado).
+    expect(pedidoTerminado({ status: 'pending', payment_status: 'pending', fulfillment_status: 'fulfilled' })).toBe(false)
+  })
+
+  it('pagado y entregado, cancelado o reembolsado: ya no se mueve', () => {
+    expect(pedidoTerminado({ status: 'fulfilled', payment_status: 'paid', fulfillment_status: 'fulfilled' })).toBe(true)
+    expect(pedidoTerminado({ status: 'cancelled' })).toBe(true)
+    expect(pedidoTerminado({ status: 'refunded' })).toBe(true)
   })
 })

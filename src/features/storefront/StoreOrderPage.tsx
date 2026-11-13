@@ -15,10 +15,14 @@ import { fetchOrderByToken } from './api'
 import { addLinesToCart } from './cart/addLinesToCart'
 import { useCart } from './cart/cart-context'
 import { OrderTimeline } from './components/OrderTimeline'
+import { pedidoTerminado } from './components/orderSteps'
 import { orderResultSchema, type OrderResult } from './checkout'
 import { useStorefront } from './hooks'
 import { usePaymentMethods } from './payment'
 import { privateMeta } from './seo'
+
+/** Cada cuánto se vuelve a mirar un pedido en curso con la página abierta. */
+const ORDER_REFRESH_MS = 30_000
 
 /**
  * Confirmación del pedido.
@@ -32,8 +36,10 @@ import { privateMeta } from './seo'
  * otro dispositivo funciona. `orders` sigue cerrada a `anon`: quien responde es
  * `order_by_token`, que exige tienda activa + número + token.
  *
- * El estado del router se sigue prefiriendo cuando existe, porque evita un ida
- * y vuelta al servidor justo después de comprar.
+ * El estado del router pinta al instante justo después de comprar, pero el
+ * estado del pedido (pago, envío, entrega) sale SIEMPRE del servidor y se
+ * refresca mientras el pedido siga en curso: lo mueve la tienda, no el
+ * comprador.
  */
 export function StoreOrderPage() {
   const { t, locale } = useI18n()
@@ -77,8 +83,12 @@ export function StoreOrderPage() {
       ? ((metodosPago.data ?? []).find((metodo) => metodo.code === codigoPago) ?? null)
       : null
 
-  // Solo se consulta si NO hay estado de navegación: venir de comprar no debe
-  // costar una petición más.
+  // Se consulta SIEMPRE que haya token, también recién comprado. Antes, con
+  // estado de navegación no se consultaba nunca, y como el navegador conserva
+  // ese estado al recargar, la pantalla se quedaba en «Pago: en curso» aunque
+  // la tienda ya hubiera cobrado y entregado (EC-20261113-00044, 2026-11-13).
+  // El estado de navegación sigue sirviendo para pintar al instante y para lo
+  // que el enlace no trae (ids para repetir, cupones de esa compra).
   const tracked = useQuery({
     queryKey: ['tracked-order', storeSlug, orderNumber, token],
     queryFn: () =>
@@ -87,13 +97,20 @@ export function StoreOrderPage() {
         orderNumber: orderNumber as string,
         token,
       }),
-    enabled: !fromState && Boolean(storeSlug && orderNumber && token),
+    enabled: Boolean(storeSlug && orderNumber && token),
     retry: false,
+    // El pedido lo mueve la TIENDA (cobro, despacho, entrega): mientras siga en
+    // curso se vuelve a mirar al volver a la pestaña y cada 30 s. Terminado
+    // —entregado y pagado, cancelado o reembolsado— ya no cambia.
+    refetchOnWindowFocus: true,
+    refetchInterval: (query) => (pedidoTerminado(query.state.data) ? false : ORDER_REFRESH_MS),
   })
 
-  const order: OrderResult | null =
-    fromState ??
-    (tracked.data
+  const order: OrderResult | null = fromState
+    ? // Lo que pinta el paso y el chip es el estado VIGENTE del servidor; el
+      // resto (importes, líneas, cupones) es el de la compra y no cambia.
+      { ...fromState, status: tracked.data?.status ?? fromState.status }
+    : (tracked.data
       ? {
           // El pedido recuperado no trae `order_id` ni los ids de producto: la
           // función los recorta a propósito. Se rellenan con lo que la pantalla

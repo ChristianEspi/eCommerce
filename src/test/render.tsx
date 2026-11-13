@@ -12,7 +12,8 @@ import { DEFAULT_APPEARANCE } from '@/theme/appearance'
 
 interface Options extends Omit<RenderOptions, 'wrapper'> {
   locale?: Locale
-  route?: string
+  /** Texto, o con `state` para simular una navegación (venir del checkout). */
+  route?: string | { pathname: string; search?: string; state?: unknown }
   tenantAccent?: string | null
   /** Sesión ya resuelta: evita que los tests dependan de la red. */
   session?: Session | null

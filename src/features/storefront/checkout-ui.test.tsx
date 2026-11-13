@@ -1727,6 +1727,69 @@ describe('botón flotante del asistente (N07)', () => {
 })
 
 /**
+ * 2026-11-13 · La confirmación recién comprada se quedaba congelada.
+ *
+ * Con estado de navegación no se consultaba nunca el servidor, y el navegador
+ * conserva ese estado al recargar: la tienda cobraba y entregaba, y el
+ * comprador seguía viendo «Pago: en curso».
+ */
+describe('la confirmación sigue el estado real del pedido', () => {
+  const TOKEN = 'b'.repeat(64)
+  const RECIEN_COMPRADO = {
+    order_id: '99999999-9999-4999-8999-0000000000a1',
+    order_number: 'EC-2',
+    access_token: TOKEN,
+    status: 'pending',
+    payment_status: 'pending',
+    currency: 'PEN',
+    subtotal: '200.00',
+    tax_total: '0.00',
+    grand_total: '200.00',
+    items: [{ product_id: P_SILLA, sku: 'SILLA', name: 'Silla de roble', unit_price: '100.00', quantity: 2 }],
+  }
+
+  it('recién comprado y ya cobrado y entregado por la tienda: lo muestra sin que el comprador haga nada', async () => {
+    const { orderResultSchema } = await import('./checkout')
+    // Si el estado de navegación no fuera válido, la página consultaría igual
+    // que antes y este test no probaría nada.
+    expect(orderResultSchema.safeParse(RECIEN_COMPRADO).success).toBe(true)
+
+    const fake = backend()
+    let consultas = 0
+    fake.state.rpc.order_by_token = () => {
+      consultas += 1
+      return {
+        order_number: 'EC-2', status: 'fulfilled', payment_status: 'paid', approval_status: null,
+        fulfillment_status: 'fulfilled', currency: 'PEN', placed_at: '2026-11-13T10:00:00Z', customer_name: 'Ana',
+        subtotal: '200.00', tax_total: '0.00', discount_total: '0.00', shipping_total: '0.00', grand_total: '200.00',
+        shipping_address: {}, deliveries: [], items: [{ sku: 'SILLA', name: 'Silla de roble', unit_price: '100.00', quantity: 2 }],
+      }
+    }
+    holder.client = fake
+    renderWithProviders(
+      <Routes>
+        <Route path="/s/:storeSlug" element={<StorefrontLayout />}>
+          <Route path="order/:orderNumber" element={<StoreOrderPage />} />
+        </Route>
+      </Routes>,
+      {
+        route: {
+          pathname: '/s/casa-nordica/order/EC-2',
+          search: `?t=${TOKEN}`,
+          state: { order: RECIEN_COMPRADO },
+        },
+      },
+    )
+
+    await waitFor(() =>
+      expect(document.querySelector('[data-step="delivered"]')).toHaveAttribute('data-state', 'done'),
+    )
+    expect(document.querySelector('[data-step="payment"]')).toHaveAttribute('data-state', 'done')
+    expect(consultas).toBeGreaterThan(0)
+  })
+})
+
+/**
  * 2026-11-11 · Devoluciones desde la página del pedido (20261111130000).
  */
 describe('devoluciones desde la página del pedido', () => {
