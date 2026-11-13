@@ -79,12 +79,18 @@ export function InventoryPage() {
 
   return (
     <>
-      <PageHeader
-        icon={<WarehouseRoundedIcon />}
-        title={t('inventory.title')}
-        subtitle={activeStore?.name ?? t('inventory.subtitle')}
+      <SectionTabs
+        items={items}
+        ariaLabel={t('inventory.title')}
+        header={(tabs) => (
+          <PageHeader
+            icon={<WarehouseRoundedIcon />}
+            title={t('inventory.title')}
+            subtitle={activeStore?.name ?? t('inventory.subtitle')}
+            center={tabs}
+          />
+        )}
       />
-      <SectionTabs items={items} ariaLabel={t('inventory.title')} />
     </>
   )
 }

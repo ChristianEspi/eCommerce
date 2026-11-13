@@ -87,12 +87,18 @@ export function CreditPage() {
 
   return (
     <>
-      <PageHeader
-        icon={<AccountBalanceRoundedIcon />}
-        title={t('credit.title')}
-        subtitle={activeStore?.name ?? t('credit.subtitle')}
+      <SectionTabs
+        items={items}
+        ariaLabel={t('credit.title')}
+        header={(tabs) => (
+          <PageHeader
+            icon={<AccountBalanceRoundedIcon />}
+            title={t('credit.title')}
+            subtitle={activeStore?.name ?? t('credit.subtitle')}
+            center={tabs}
+          />
+        )}
       />
-      <SectionTabs items={items} ariaLabel={t('credit.title')} />
     </>
   )
 }

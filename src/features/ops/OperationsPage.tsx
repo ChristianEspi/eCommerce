@@ -104,8 +104,13 @@ export function OperationsPage() {
 
   return (
     <>
-      <PageHeader icon={<HealthAndSafetyRoundedIcon />} title={t('ops.title')} subtitle={activeStore?.name ?? t('ops.subtitle')} />
-      <SectionTabs items={items} ariaLabel={t('ops.title')} />
+      <SectionTabs
+        items={items}
+        ariaLabel={t('ops.title')}
+        header={(tabs) => (
+          <PageHeader icon={<HealthAndSafetyRoundedIcon />} title={t('ops.title')} subtitle={activeStore?.name ?? t('ops.subtitle')} center={tabs} />
+        )}
+      />
     </>
   )
 }

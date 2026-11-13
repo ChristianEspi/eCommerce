@@ -76,12 +76,18 @@ export function CustomersPage() {
 
   return (
     <>
-      <PageHeader
-        icon={<PeopleAltRoundedIcon />}
-        title={t('customers.title')}
-        subtitle={activeStore?.name ?? t('customers.subtitle')}
+      <SectionTabs
+        items={items}
+        ariaLabel={t('customers.title')}
+        header={(tabs) => (
+          <PageHeader
+            icon={<PeopleAltRoundedIcon />}
+            title={t('customers.title')}
+            subtitle={activeStore?.name ?? t('customers.subtitle')}
+            center={tabs}
+          />
+        )}
       />
-      <SectionTabs items={items} ariaLabel={t('customers.title')} />
     </>
   )
 }

@@ -85,12 +85,18 @@ export function AnalyticsPage() {
 
   return (
     <>
-      <PageHeader
-        icon={<InsightsRoundedIcon />}
-        title={t('analytics.title')}
-        subtitle={activeStore?.name ?? t('analytics.subtitle')}
+      <SectionTabs
+        items={items}
+        ariaLabel={t('analytics.title')}
+        header={(tabs) => (
+          <PageHeader
+            icon={<InsightsRoundedIcon />}
+            title={t('analytics.title')}
+            subtitle={activeStore?.name ?? t('analytics.subtitle')}
+            center={tabs}
+          />
+        )}
       />
-      <SectionTabs items={items} ariaLabel={t('analytics.title')} />
     </>
   )
 }

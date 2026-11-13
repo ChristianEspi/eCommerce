@@ -84,12 +84,18 @@ export function ContentPage() {
 
   return (
     <>
-      <PageHeader
-        icon={<ArticleRoundedIcon />}
-        title={t('content.title')}
-        subtitle={activeStore?.name ?? t('content.subtitle')}
+      <SectionTabs
+        items={items}
+        ariaLabel={t('content.title')}
+        header={(tabs) => (
+          <PageHeader
+            icon={<ArticleRoundedIcon />}
+            title={t('content.title')}
+            subtitle={activeStore?.name ?? t('content.subtitle')}
+            center={tabs}
+          />
+        )}
       />
-      <SectionTabs items={items} ariaLabel={t('content.title')} />
     </>
   )
 }

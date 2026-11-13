@@ -87,12 +87,18 @@ export function IntegrationsPage() {
 
   return (
     <>
-      <PageHeader
-        icon={<HubRoundedIcon />}
-        title={t('integrations.title')}
-        subtitle={activeStore?.name ?? t('integrations.subtitle')}
+      <SectionTabs
+        items={items}
+        ariaLabel={t('integrations.title')}
+        header={(tabs) => (
+          <PageHeader
+            icon={<HubRoundedIcon />}
+            title={t('integrations.title')}
+            subtitle={activeStore?.name ?? t('integrations.subtitle')}
+            center={tabs}
+          />
+        )}
       />
-      <SectionTabs items={items} ariaLabel={t('integrations.title')} />
     </>
   )
 }

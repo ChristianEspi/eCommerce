@@ -72,8 +72,13 @@ export function PricingPage() {
 
   return (
     <>
-      <PageHeader icon={<PriceChangeRoundedIcon />} title={t('pricing.title')} subtitle={activeStore?.name ?? t('pricing.subtitle')} />
-      <SectionTabs items={items} ariaLabel={t('pricing.title')} />
+      <SectionTabs
+        items={items}
+        ariaLabel={t('pricing.title')}
+        header={(tabs) => (
+          <PageHeader icon={<PriceChangeRoundedIcon />} title={t('pricing.title')} subtitle={activeStore?.name ?? t('pricing.subtitle')} center={tabs} />
+        )}
+      />
     </>
   )
 }

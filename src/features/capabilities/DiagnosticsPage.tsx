@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { StatusChip } from '@/shared/ui/StatusChip'
 import MonitorHeartRoundedIcon from '@mui/icons-material/MonitorHeartRounded'
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded'
@@ -318,15 +319,30 @@ export function DiagnosticsPage() {
     )
   }
 
+  const header = (tabs?: ReactNode) => (
+    <PageHeader
+      icon={<MonitorHeartRoundedIcon />}
+      title={t('diagnostics.title')}
+      subtitle={t('diagnostics.subtitle')}
+      center={tabs}
+    />
+  )
+
   return (
     <>
-      <PageHeader icon={<MonitorHeartRoundedIcon />} title={t('diagnostics.title')} subtitle={t('diagnostics.subtitle')} />
       {status === 'loading' ? (
-        <LoadingState />
+        <>
+          {header()}
+          <LoadingState />
+        </>
       ) : status === 'error' || !context ? (
-        <ErrorState error={error} onRetry={refetch} />
+        <>
+          {header()}
+          <ErrorState error={error} onRetry={refetch} />
+        </>
       ) : (
         <SectionTabs
+          header={header}
           ariaLabel={t('diagnostics.title')}
           items={[
             {

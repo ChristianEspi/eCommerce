@@ -76,12 +76,18 @@ export function PlanningPage() {
 
   return (
     <>
-      <PageHeader
-        icon={<InsightsRoundedIcon />}
-        title={t('planning.title')}
-        subtitle={activeStore?.name ?? t('planning.subtitle')}
+      <SectionTabs
+        items={items}
+        ariaLabel={t('planning.title')}
+        header={(tabs) => (
+          <PageHeader
+            icon={<InsightsRoundedIcon />}
+            title={t('planning.title')}
+            subtitle={activeStore?.name ?? t('planning.subtitle')}
+            center={tabs}
+          />
+        )}
       />
-      <SectionTabs items={items} ariaLabel={t('planning.title')} />
     </>
   )
 }

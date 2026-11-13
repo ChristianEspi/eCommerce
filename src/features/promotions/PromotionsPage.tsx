@@ -74,12 +74,18 @@ export function PromotionsPage() {
 
   return (
     <>
-      <PageHeader
-        icon={<LocalOfferRoundedIcon />}
-        title={t('promotions.title')}
-        subtitle={activeStore?.name ?? t('promotions.subtitle')}
+      <SectionTabs
+        items={items}
+        ariaLabel={t('promotions.title')}
+        header={(tabs) => (
+          <PageHeader
+            icon={<LocalOfferRoundedIcon />}
+            title={t('promotions.title')}
+            subtitle={activeStore?.name ?? t('promotions.subtitle')}
+            center={tabs}
+          />
+        )}
       />
-      <SectionTabs items={items} ariaLabel={t('promotions.title')} />
     </>
   )
 }

@@ -80,12 +80,18 @@ export function PaymentsPage() {
 
   return (
     <>
-      <PageHeader
-        icon={<PaymentsRoundedIcon />}
-        title={t('payments.title')}
-        subtitle={activeStore?.name ?? t('payments.subtitle')}
+      <SectionTabs
+        items={items}
+        ariaLabel={t('payments.title')}
+        header={(tabs) => (
+          <PageHeader
+            icon={<PaymentsRoundedIcon />}
+            title={t('payments.title')}
+            subtitle={activeStore?.name ?? t('payments.subtitle')}
+            center={tabs}
+          />
+        )}
       />
-      <SectionTabs items={items} ariaLabel={t('payments.title')} />
     </>
   )
 }

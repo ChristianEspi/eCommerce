@@ -106,12 +106,18 @@ export function SalesPage() {
 
   return (
     <>
-      <PageHeader
-        icon={<BadgeRoundedIcon />}
-        title={t('sales.title')}
-        subtitle={activeStore?.name ?? t('sales.subtitle')}
+      <SectionTabs
+        items={items}
+        ariaLabel={t('sales.title')}
+        header={(tabs) => (
+          <PageHeader
+            icon={<BadgeRoundedIcon />}
+            title={t('sales.title')}
+            subtitle={activeStore?.name ?? t('sales.subtitle')}
+            center={tabs}
+          />
+        )}
       />
-      <SectionTabs items={items} ariaLabel={t('sales.title')} />
     </>
   )
 }

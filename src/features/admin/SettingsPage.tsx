@@ -309,26 +309,29 @@ export function SettingsPage() {
 
   return (
     <Box component="form" onSubmit={form.handleSubmit(onSubmit)} noValidate>
-      <PageHeader
-        icon={<SettingsRoundedIcon />}
-        title={t('admin.settings.title')}
-        subtitle={activeStore?.name}
-        actions={
-          storeUrl && (
-            <Button
-              component={MuiLink}
-              href={storeUrl}
-              target="_blank"
-              rel="noreferrer"
-              variant="outlined"
-              endIcon={<LaunchRoundedIcon fontSize="small" />}
-            >
-              {t('settings.viewStore')}
-            </Button>
-          )
-        }
-      />
       <SectionTabs
+        header={(tabs) => (
+          <PageHeader
+            icon={<SettingsRoundedIcon />}
+            title={t('admin.settings.title')}
+            subtitle={activeStore?.name}
+            center={tabs}
+            actions={
+              storeUrl && (
+                <Button
+                  component={MuiLink}
+                  href={storeUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  variant="outlined"
+                  endIcon={<LaunchRoundedIcon fontSize="small" />}
+                >
+                  {t('settings.viewStore')}
+                </Button>
+              )
+            }
+          />
+        )}
         ariaLabel={t('admin.settings.title')}
         items={[
           {

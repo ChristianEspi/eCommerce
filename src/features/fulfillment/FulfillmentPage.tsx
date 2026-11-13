@@ -91,12 +91,18 @@ export function FulfillmentPage() {
 
   return (
     <>
-      <PageHeader
-        icon={<LocalShippingRoundedIcon />}
-        title={t('fulfillment.title')}
-        subtitle={activeStore?.name ?? t('fulfillment.subtitle')}
+      <SectionTabs
+        items={items}
+        ariaLabel={t('fulfillment.title')}
+        header={(tabs) => (
+          <PageHeader
+            icon={<LocalShippingRoundedIcon />}
+            title={t('fulfillment.title')}
+            subtitle={activeStore?.name ?? t('fulfillment.subtitle')}
+            center={tabs}
+          />
+        )}
       />
-      <SectionTabs items={items} ariaLabel={t('fulfillment.title')} />
     </>
   )
 }
