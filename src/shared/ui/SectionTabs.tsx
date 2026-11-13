@@ -12,7 +12,20 @@ export interface SectionTabItem {
  * Tabs centrados para pantallas largas/densas (contrato §8, regla gmao-025).
  * Deep-link por `#hash`: la pestaña abierta es compartible y sobrevive al refresco.
  */
-export function SectionTabs({ items, ariaLabel }: { items: SectionTabItem[]; ariaLabel: string }) {
+export function SectionTabs({
+  items,
+  ariaLabel,
+  header,
+}: {
+  items: SectionTabItem[]
+  ariaLabel: string
+  /**
+   * Para subir las pestañas a la cabecera de la pantalla (p. ej. al `center`
+   * de `PageHeader`): recibe las pestañas ya montadas y devuelve la cabecera.
+   * Sin él, las pestañas van solas encima del panel, como siempre.
+   */
+  header?: (tabs: ReactNode) => ReactNode
+}) {
   const fallback = items[0]?.id ?? ''
   const [active, setActive] = useState<string>(() => {
     const hash = typeof window === 'undefined' ? '' : window.location.hash.replace('#', '')
@@ -35,6 +48,28 @@ export function SectionTabs({ items, ariaLabel }: { items: SectionTabItem[]; ari
 
   const current = items.find((i) => i.id === active) ?? items[0]
 
+  const tabs = (
+    <Tabs
+      value={current?.id ?? false}
+      onChange={(_, value: string) => select(value)}
+      variant="scrollable"
+      scrollButtons="auto"
+      allowScrollButtonsMobile
+      aria-label={ariaLabel}
+      sx={{
+        borderBottom: header ? 'none' : '1px solid var(--border)',
+        maxWidth: '100%',
+        '& .MuiTab-root': { fontWeight: 700, textTransform: 'none', minHeight: 44 },
+        '& .MuiTabs-flexContainer > :first-of-type': { ml: 'auto' },
+        '& .MuiTabs-flexContainer > :last-of-type': { mr: 'auto' },
+      }}
+    >
+      {items.map((item) => (
+        <Tab key={item.id} value={item.id} label={item.label} id={`tab-${item.id}`} aria-controls={`panel-${item.id}`} />
+      ))}
+    </Tabs>
+  )
+
   return (
     <Box>
       {/* Centradas cuando caben y desplazables cuando no.
@@ -44,26 +79,9 @@ export function SectionTabs({ items, ariaLabel }: { items: SectionTabItem[]; ari
           `scrollable` y márgenes automáticos en la primera y la última, el
           grupo se centra mientras sobra sitio y, cuando falta, los márgenes
           valen cero y todo se alcanza deslizando. */}
-      <Tabs
-        value={current?.id ?? false}
-        onChange={(_, value: string) => select(value)}
-        variant="scrollable"
-        scrollButtons="auto"
-        allowScrollButtonsMobile
-        aria-label={ariaLabel}
-        sx={{
-          borderBottom: '1px solid var(--border)',
-          '& .MuiTab-root': { fontWeight: 700, textTransform: 'none', minHeight: 44 },
-          '& .MuiTabs-flexContainer > :first-of-type': { ml: 'auto' },
-          '& .MuiTabs-flexContainer > :last-of-type': { mr: 'auto' },
-        }}
-      >
-        {items.map((item) => (
-          <Tab key={item.id} value={item.id} label={item.label} id={`tab-${item.id}`} aria-controls={`panel-${item.id}`} />
-        ))}
-      </Tabs>
+      {header ? header(tabs) : tabs}
       {current && (
-        <Box role="tabpanel" id={`panel-${current.id}`} aria-labelledby={`tab-${current.id}`} sx={{ pt: 3 }}>
+        <Box role="tabpanel" id={`panel-${current.id}`} aria-labelledby={`tab-${current.id}`} sx={{ pt: header ? 0 : 3 }}>
           {current.content}
         </Box>
       )}

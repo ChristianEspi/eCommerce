@@ -31,19 +31,27 @@ export function PimPage() {
   const { t } = useI18n()
   const { activeStore, activeCompanyId, tenant, status, can } = useTenant()
 
-  const items = useMemo(
-    () => [
-      { id: 'marcas', label: t('pim.tab.brands'), content: <CatalogEntrySection kind="brands" /> },
+  // Importar va en la barra de cada pestaña, junto a actualizar: es una
+  // acción sobre el listado, no sobre la pantalla. Es la MISMA importación
+  // (el libro trae las cuatro hojas) desde cualquiera de las cuatro.
+  const canWrite = can('catalog.write')
+  const items = useMemo(() => {
+    const tools = canWrite ? <CatalogImportAction kind="vocabulary" /> : undefined
+    return [
+      {
+        id: 'marcas',
+        label: t('pim.tab.brands'),
+        content: <CatalogEntrySection kind="brands" tools={tools} />,
+      },
       {
         id: 'familias',
         label: t('pim.tab.families'),
-        content: <CatalogEntrySection kind="families" />,
+        content: <CatalogEntrySection kind="families" tools={tools} />,
       },
-      { id: 'atributos', label: t('pim.tab.attributes'), content: <AttributesSection /> },
-      { id: 'unidades', label: t('pim.tab.units'), content: <UnitsSection /> },
-    ],
-    [t],
-  )
+      { id: 'atributos', label: t('pim.tab.attributes'), content: <AttributesSection tools={tools} /> },
+      { id: 'unidades', label: t('pim.tab.units'), content: <UnitsSection tools={tools} /> },
+    ]
+  }, [t, canWrite])
 
   // Mismo criterio que el listado de productos: mientras el espacio de trabajo
   // se resuelve NO se afirma que no hay tiendas.
@@ -75,13 +83,20 @@ export function PimPage() {
 
   return (
     <>
-      <PageHeader
-        icon={<TuneRoundedIcon />}
-        title={t('pim.title')}
-        subtitle={activeStore?.name ?? t('pim.subtitle')}
-        actions={can('catalog.write') ? <CatalogImportAction kind="vocabulary" /> : undefined}
+      {/* Las pestañas suben a la fila del título: ahorran una franja entera
+          antes de la tabla, que es lo que se viene a mirar. */}
+      <SectionTabs
+        items={items}
+        ariaLabel={t('pim.title')}
+        header={(tabs) => (
+          <PageHeader
+            icon={<TuneRoundedIcon />}
+            title={t('pim.title')}
+            subtitle={activeStore?.name ?? t('pim.subtitle')}
+            center={tabs}
+          />
+        )}
       />
-      <SectionTabs items={items} ariaLabel={t('pim.title')} />
     </>
   )
 }

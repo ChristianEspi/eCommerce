@@ -22,7 +22,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -43,7 +43,7 @@ import { unitFormSchema, unitToForm, type UnitFormValues, type UnitOfMeasure } f
  * DE ESTE producto es otra cosa y vive en la pestaña Unidades del producto —
  * porque una caja de jabón y una de televisores no traen lo mismo.
  */
-export function UnitsSection() {
+export function UnitsSection({ tools }: { tools?: ReactNode } = {}) {
   const { t } = useI18n()
   const { notify } = useFeedback()
   const { tenant, activeCompanyId, can } = useTenant()
@@ -80,6 +80,7 @@ export function UnitsSection() {
       <Typography sx={{ color: 'var(--muted)' }}>{t('pim.units.help')}</Typography>
 
       <FilterBar
+        tools={tools}
         actions={
           canWrite && (
             <Button variant="contained" onClick={() => setEditing({ open: true, unit: null })}>

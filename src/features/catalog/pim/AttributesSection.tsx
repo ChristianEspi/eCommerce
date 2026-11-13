@@ -24,7 +24,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -73,7 +73,7 @@ const DATA_TYPE_LABEL: Record<AttributeDataType, MessageKey> = {
  * impide con una FK y aquí se dice antes, en vez de dejar que el usuario
  * escriba y luego se coma un error.
  */
-export function AttributesSection() {
+export function AttributesSection({ tools }: { tools?: ReactNode } = {}) {
   const { t } = useI18n()
   const { notify } = useFeedback()
   const { tenant, activeCompanyId, can } = useTenant()
@@ -122,6 +122,7 @@ export function AttributesSection() {
       <Typography sx={{ color: 'var(--muted)' }}>{t('pim.attributes.help')}</Typography>
 
       <FilterBar
+        tools={tools}
         actions={
           canWrite && (
             <Button variant="contained" onClick={() => setEditing({ open: true, attribute: null })}>

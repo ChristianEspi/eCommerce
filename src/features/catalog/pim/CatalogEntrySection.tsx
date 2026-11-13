@@ -22,7 +22,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -78,7 +78,7 @@ const COPY: Record<EntryKind, { help: MessageKey; empty: MessageKey; create: Mes
   },
 }
 
-export function CatalogEntrySection({ kind }: { kind: EntryKind }) {
+export function CatalogEntrySection({ kind, tools }: { kind: EntryKind; tools?: ReactNode }) {
   const { t } = useI18n()
   const { notify } = useFeedback()
   const { tenant, activeCompanyId, can } = useTenant()
@@ -134,6 +134,7 @@ export function CatalogEntrySection({ kind }: { kind: EntryKind }) {
       <Typography sx={{ color: 'var(--muted)' }}>{t(copy.help)}</Typography>
 
       <FilterBar
+        tools={tools}
         actions={
           canWrite && (
             <Button variant="contained" onClick={() => setEditing({ open: true, entry: null })}>

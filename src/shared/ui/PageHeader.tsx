@@ -17,11 +17,15 @@ export function PageHeader({
   title,
   subtitle,
   icon,
+  center,
   actions,
 }: {
   title: string
   subtitle?: string
   icon?: ReactNode
+  /** Navegación de la pantalla (tabs) en la misma fila del título: ocupa el
+   *  hueco libre y se centra en él. En móvil baja debajo del título. */
+  center?: ReactNode
   actions?: ReactNode
 }) {
   return (
@@ -64,6 +68,7 @@ export function PageHeader({
           )}
         </Box>
       </Stack>
+      {center && <Box sx={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'center' }}>{center}</Box>}
       {actions && (
         <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
           {actions}

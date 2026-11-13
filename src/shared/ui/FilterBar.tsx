@@ -53,12 +53,16 @@ import { useI18n } from '@/shared/i18n/i18n-context'
 export function FilterBar({
   children,
   actions,
+  tools,
   onClear,
   disableGutter = false,
 }: {
   children: ReactNode
   /** Crear, exportar y demas: ancladas a la derecha, separadas de los filtros. */
   actions?: ReactNode
+  /** Acciones secundarias (importar…): van ANTES de actualizar, a la izquierda
+   *  del primario, para que el botón lleno siga cerrando la barra. */
+  tools?: ReactNode
   onClear?: () => void
   /** Cuando quien llama ya separa sus bloques (un `Stack` con `gap`): sin él,
    *  el margen propio se suma al del contenedor y la barra queda flotando. */
@@ -90,6 +94,7 @@ export function FilterBar({
           {children}
         </Stack>
         <Stack direction="row" sx={{ alignItems: 'center', gap: 1, flexShrink: 0, ml: 'auto' }}>
+          {tools}
           {/* El giro es la única señal de que pulsar hizo algo: los datos suelen
               volver iguales, y sin movimiento el botón parece roto. */}
           <Tooltip title={t('common.refresh')}>
