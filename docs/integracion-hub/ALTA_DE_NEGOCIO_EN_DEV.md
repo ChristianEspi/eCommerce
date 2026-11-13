@@ -1,5 +1,9 @@
 # Dar de alta un negocio nuevo en DEV, paso a paso
 
+> **Desde 2026-11-13 el alta se hace con un comando:** `node scripts/alta-negocio.mjs` (ver
+> [`docs/operacion/ALTA_DE_TIENDAS.md`](../operacion/ALTA_DE_TIENDAS.md)). Esta guía queda como referencia de lo que
+> hace por dentro y para ajustar los módulos de una sociedad (paso 5).
+
 Guía para el operador del proyecto. Cubre lo único que hoy **no** tiene pantalla: crear la cuenta del
 owner con su organización y activarle los módulos. Todo lo demás —usuarios, clientes, catálogo, marca— se
 hace desde el admin de eCommerce.
