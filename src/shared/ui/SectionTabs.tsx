@@ -63,7 +63,11 @@ export function SectionTabs({
         width: header ? '100%' : undefined,
         '& .MuiTab-root': { fontWeight: 700, textTransform: 'none', minHeight: 44 },
         '& .MuiTabs-flexContainer > :first-of-type': { ml: 'auto' },
-        '& .MuiTabs-flexContainer > :last-of-type': { mr: 'auto' },
+        // En la cabecera van pegadas a la DERECHA, al final de la fila del
+        // título (lo pidió el operador, 2026-11-13): centradas en el hueco
+        // dejaban un vacío a su derecha que se leía como algo que falta.
+        // Fuera de la cabecera siguen centradas.
+        '& .MuiTabs-flexContainer > :last-of-type': { mr: header ? 0 : 'auto' },
       }}
     >
       {items.map((item) => (
