@@ -111,12 +111,16 @@ function IndicatorCard({
         overflow: 'hidden',
         width: '100%',
         height: '100%',
+        // En fila: ícono a la izquierda, número y texto al lado. Apilados
+        // dejaban tres cuartos de la tarjeta en blanco (visto 2026-11-13).
         display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'stretch',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-start',
         textAlign: 'left',
-        gap: 1.25,
-        p: 1.75,
+        gap: 1.5,
+        py: 1.25,
+        px: 1.75,
         pl: 2,
         borderRadius: 3,
         bgcolor: selected ? tone.soft : C.card,
@@ -140,8 +144,9 @@ function IndicatorCard({
       <Box
         aria-hidden
         sx={{
-          width: 32,
-          height: 32,
+          width: 36,
+          height: 36,
+          flexShrink: 0,
           borderRadius: '50%',
           display: 'grid',
           placeItems: 'center',
@@ -160,7 +165,7 @@ function IndicatorCard({
             {count ?? '—'}
           </Typography>
         )}
-        <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: C.muted, lineHeight: 1.3, mt: 0.5 }}>{label}</Typography>
+        <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: C.muted, lineHeight: 1.3, mt: 0.25 }}>{label}</Typography>
       </Box>
     </ButtonBase>
   )
