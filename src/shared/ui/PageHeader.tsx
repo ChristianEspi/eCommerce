@@ -68,7 +68,7 @@ export function PageHeader({
           )}
         </Box>
       </Stack>
-      {center && <Box sx={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'center' }}>{center}</Box>}
+      {center && <Box sx={{ flex: 1, minWidth: 0 }}>{center}</Box>}
       {actions && (
         <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
           {actions}

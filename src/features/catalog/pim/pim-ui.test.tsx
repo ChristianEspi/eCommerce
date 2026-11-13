@@ -279,6 +279,8 @@ describe('Catálogo avanzado — vocabulario de la sociedad', () => {
       'Atributos',
       'Unidades',
     ])
+    // Importar vive en la barra del listado, junto a actualizar.
+    expect(await screen.findByRole('button', { name: /importar/i })).toBeInTheDocument()
   })
 
   it('lista las marcas de la sociedad con un único buscador general', async () => {

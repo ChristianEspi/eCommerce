@@ -58,7 +58,9 @@ export function SectionTabs({
       aria-label={ariaLabel}
       sx={{
         borderBottom: header ? 'none' : '1px solid var(--border)',
-        maxWidth: '100%',
+        // En la cabecera ocupan todo el hueco: un scroller sin ancho propio
+        // puede encogerse a cero dentro de una fila flex.
+        width: header ? '100%' : undefined,
         '& .MuiTab-root': { fontWeight: 700, textTransform: 'none', minHeight: 44 },
         '& .MuiTabs-flexContainer > :first-of-type': { ml: 'auto' },
         '& .MuiTabs-flexContainer > :last-of-type': { mr: 'auto' },
