@@ -24,7 +24,7 @@ import { useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
-import { downloadCsv, toCsv } from '@/shared/lib/csv'
+import { IMPORT_ACCEPT, WorkbookReadError, downloadWorkbook, readImportText } from '@/shared/lib/excel'
 import { useDebouncedValue } from '@/shared/lib/useDebouncedValue'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState, ErrorState } from '@/shared/ui/states'
@@ -41,12 +41,12 @@ import {
   useSavePriceItem,
 } from './hooks'
 import {
-  PRICE_CSV_HEADERS,
   parsePriceCsv,
   resolvePriceCsv,
   type CsvIssue,
   type ResolvedPriceRow,
 } from './importCsv'
+import { priceImportColumns, priceTemplateBook } from './priceTemplate'
 import type { PriceList, PriceListItem, PricedProduct } from './types'
 import { SelectField } from '@/shared/ui/SelectField'
 
@@ -487,7 +487,15 @@ function ImportPanel({ list, canWrite }: { list: PriceList; canWrite: boolean })
     const data = catalog.data ?? (await catalog.refetch()).data
     if (!data) return
 
-    const text = await file.text()
+    let text: string
+    try {
+      // Excel o CSV: el libro se traduce a las cabeceras técnicas y pasa por el
+      // MISMO validador que el CSV de siempre.
+      text = await readImportText(file, priceImportColumns(t))
+    } catch (error) {
+      notify(t(error instanceof WorkbookReadError ? `excel.error.${error.reason}` : 'excel.error.unreadable'), 'error')
+      return
+    }
     const parsed = parsePriceCsv(text)
     const resolved = resolvePriceCsv(parsed.rows, data)
     setPending({ rows: resolved.resolved, issues: [...parsed.issues, ...resolved.issues] })
@@ -524,9 +532,8 @@ function ImportPanel({ list, canWrite }: { list: PriceList; canWrite: boolean })
           <Button
             size="small"
             onClick={() =>
-              downloadCsv(
-                `plantilla-precios-${list.code}.csv`,
-                toCsv([...PRICE_CSV_HEADERS], [['SKU-EJEMPLO', '', '', '1', '0.00', '']]),
+              void downloadWorkbook(priceTemplateBook(list.code, t), t).catch(() =>
+                notify(t('excel.error.download'), 'error'),
               )
             }
           >
@@ -538,7 +545,7 @@ function ImportPanel({ list, canWrite }: { list: PriceList; canWrite: boolean })
           <input
             ref={fileRef}
             type="file"
-            accept=".csv,text/csv"
+            accept={IMPORT_ACCEPT}
             hidden
             aria-label={t('pricing.import.choose')}
             onChange={(event) => void onFile(event)}

@@ -45,7 +45,8 @@ import {
 } from './api/products'
 import { CatalogError } from './api/errors'
 import { ProductDrawer } from './ProductDrawer'
-import { downloadCsv, productsToCsv } from './exportCsv'
+import { downloadWorkbook } from '@/shared/lib/excel'
+import { productsBook } from './exportExcel'
 import { categoryDescendants, categoryTree } from './types'
 import type { ProductKind, ProductMaster, ProductStatus } from './types'
 import { CategoryPicker } from './CategoryPicker'
@@ -331,9 +332,8 @@ export function ProductsPage() {
               variant="outlined"
               disabled={list.length === 0}
               onClick={() =>
-                downloadCsv(
-                  'productos.csv',
-                  productsToCsv(list),
+                void downloadWorkbook(productsBook(list, t), t).catch(() =>
+                  notify(t('excel.error.download'), 'error'),
                 )
               }
             >

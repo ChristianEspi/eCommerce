@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { MessageKey } from '@/shared/i18n/messages'
 import type { PublicProduct, PublicVariant } from '../types'
 
 /**
@@ -51,9 +52,12 @@ const {
   draftsFromEditor,
   parseOrderCsv,
   parsePastedLines,
-  quickOrderCsvTemplate,
+  quickOrderImportColumns,
+  quickOrderTemplateBook,
   splitDelimited,
 } = await import('./lines')
+const { MESSAGES } = await import('@/shared/i18n/messages.all')
+const { buildGuide, findImportTable, tableToCsv } = await import('@/shared/lib/excel')
 const { importIntoCart, planCartImport } = await import('./importToCart')
 
 /** BOM de Excel, construido: un U+FEFF literal en el fuente es invisible. */
@@ -131,8 +135,18 @@ describe('separador y campos', () => {
 })
 
 describe('CSV', () => {
-  it('lee la plantilla que se descarga', () => {
-    const parsed = parseOrderCsv(quickOrderCsvTemplate())
+  it('lee la plantilla Excel que se descarga (cabeceras claras, guía delante)', () => {
+    const t = (key: MessageKey) => MESSAGES.es[key] ?? key
+    const book = quickOrderTemplateBook(t)
+    const [sheet] = book.sheets
+    const table = findImportTable(
+      [
+        { data: buildGuide(book, t).rows.map((row) => [...row]) },
+        { data: [sheet!.columns.map((column) => column.header), ...sheet!.rows.map((row) => [...row])] },
+      ],
+      quickOrderImportColumns(t),
+    )
+    const parsed = parseOrderCsv(tableToCsv(table!))
     expect(parsed).toEqual({ fileIssue: null, lines: [{ row: 2, sku: 'SKU-EJEMPLO', quantityText: '1' }] })
   })
 

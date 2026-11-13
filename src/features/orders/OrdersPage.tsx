@@ -41,7 +41,8 @@ import { OrderDrawer } from './OrderDrawer'
 import { OrdersAiBar } from './ai/OrdersAiBar'
 import type { OrderDrawerTab } from './ai/ordersAi'
 import { fetchOrder, fetchOrdersForExport } from './api'
-import { downloadCsv, ordersToCsv } from './exportCsv'
+import { downloadWorkbook } from '@/shared/lib/excel'
+import { ordersBook } from './exportExcel'
 import {
   FULFILLMENT_COLOR,
   FULFILLMENT_LABEL,
@@ -195,7 +196,7 @@ export function OrdersPage() {
     setPage(0)
   }, [termino, status, range, storeId])
 
-  async function exportCsv() {
+  async function exportExcel() {
     setExporting(true)
     try {
       // Se exporta LO FILTRADO, no la página. La consulta se repite sin
@@ -206,7 +207,7 @@ export function OrdersPage() {
         notify(t('orders.export.empty'), 'error')
         return
       }
-      downloadCsv(`pedidos-${today}.csv`, ordersToCsv(all))
+      await downloadWorkbook(ordersBook(all, t, `${t('exports.orders.sheet').toLowerCase()}-${today}`), t)
     } catch {
       notify(t('orders.error.generic'), 'error')
     } finally {
@@ -253,7 +254,7 @@ export function OrdersPage() {
             <Button
               variant="outlined"
               startIcon={<FileDownloadRoundedIcon />}
-              onClick={() => void exportCsv()}
+              onClick={() => void exportExcel()}
               disabled={exporting}
             >
               {t('common.export')}

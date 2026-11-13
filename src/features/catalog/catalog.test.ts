@@ -8,7 +8,10 @@ import {
   moveImage,
   validateImageFile,
 } from './api/images'
-import { escapeCsvField, productsToCsv } from './exportCsv'
+import { MESSAGES } from '@/shared/i18n/messages.all'
+import type { MessageKey } from '@/shared/i18n/messages'
+import { sheetCells } from '@/shared/lib/excel'
+import { productsBook } from './exportExcel'
 import {
   categoryFormSchema,
   moneyText,
@@ -303,7 +306,7 @@ describe('traduccion de errores', () => {
   })
 })
 
-describe('exportar a CSV', () => {
+describe('exportar a Excel', () => {
   const product = (over: Partial<ProductMaster>): ProductMaster => ({
     id: PRODUCT,
     organization_id: ORG,
@@ -330,29 +333,34 @@ describe('exportar a CSV', () => {
     ...over,
   })
 
-  it('neutraliza las celdas que Excel interpretaria como formula', () => {
-    expect(escapeCsvField('=1+1')).toBe(`"'=1+1"`)
-    expect(escapeCsvField('@SUM(A1)')).toBe(`"'@SUM(A1)"`)
-    expect(escapeCsvField('Silla')).toBe('"Silla"')
+  const t = (key: MessageKey) => MESSAGES.es[key] ?? key
+
+  it('un nombre que parece fórmula se escribe como TEXTO, nunca como fórmula', () => {
+    const [sheet] = productsBook([product({ name: '=1+1' })], t).sheets
+    const cell = sheetCells(sheet!)[1]?.[1]
+    expect(cell).toMatchObject({ value: '=1+1', type: String })
   })
 
-  it('escapa las comillas duplicandolas', () => {
-    expect(escapeCsvField('Silla "premium"')).toBe('"Silla ""premium"""')
+  it('exporta maestros con sus tiendas, con cabeceras claras y SIN un precio global', () => {
+    const [sheet] = productsBook(
+      [product({ published_count: 2, published_store_names: ['Tienda A1', 'Tienda A2'], publication_state: 'published' })],
+      t,
+    ).sheets
+    const headers = sheet!.columns.map((column) => column.header)
+    expect(headers).toEqual(['SKU', 'Nombre', 'Tipo', 'Marca', 'Familia', 'Stock', 'Publicado en (tiendas)', 'Tiendas', 'Estado'])
+    expect(headers.join(' ').toLowerCase()).not.toContain('precio')
+    expect(sheet!.rows[0]).toEqual(['A-1', 'Silla', t('catalog.kind.simple'), null, null, 4, 2, 'Tienda A1 | Tienda A2', t('catalog.status.published')])
   })
 
-  it('exporta maestros con sus tiendas y SIN un precio global', () => {
-    const csv = productsToCsv([
-      product({ published_count: 2, published_store_names: ['Tienda A1', 'Tienda A2'], publication_state: 'published' }),
-    ])
-    const [header, row] = csv.split('\r\n')
-    expect(header).toBe('sku,name,kind,brand,family,stock,published_stores,stores,state')
-    expect(header).not.toContain('price')
-    expect(row).toContain('"Tienda A1 | Tienda A2"')
-    expect(row).toContain('"published"')
+  it('sin marca la celda queda vacía, no «null»; y el stock solo va en el producto simple', () => {
+    const book = productsBook([product({}), product({ kind: 'variant', stock: 0 }), product({ kind: 'bundle', stock: 0 })], t)
+    const rows = book.sheets[0]!.rows
+    expect(rows[0]?.[3]).toBeNull()
+    expect(rows.map((row) => row[5])).toEqual([4, null, null])
   })
 
-  it('un producto sin marca deja la celda vacia, no un "null"', () => {
-    const csv = productsToCsv([product({})])
-    expect(csv.split('\r\n')[1]).toContain('"simple","","",')
+  it('cada columna se explica en la guía', () => {
+    const book = productsBook([], t)
+    expect(book.sheets[0]!.columns.every((column) => column.description.length > 10)).toBe(true)
   })
 })

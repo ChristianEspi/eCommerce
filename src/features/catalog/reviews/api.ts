@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { codeFromDbError } from '@/shared/lib/appError'
-import { toCsv } from '@/shared/lib/csv'
+import { excelDate, type ExcelBook, type Translate } from '@/shared/lib/excel'
 import { MODERATE_PRODUCT_REVIEW_RPC, PRODUCT_REVIEWS_TABLE, PRODUCTS_TABLE } from '@/shared/lib/db-schema'
 import { catalogClient } from '../api/client'
 import { CatalogError } from '../api/errors'
@@ -119,20 +119,50 @@ export function filterQueue(rows: readonly QueueReview[], status: ReviewStatus, 
   )
 }
 
-const CSV_HEADERS = ['product', 'rating', 'title', 'body', 'author', 'verified_purchase', 'status', 'created_at'] as const
+/** El estado de moderación con el mismo nombre que la pestaña del listado. */
+const REVIEW_STATUS_LABEL: Record<ReviewStatus, MessageKey> = {
+  pending: 'admin.reviews.tab.pending',
+  published: 'admin.reviews.tab.published',
+  rejected: 'admin.reviews.tab.rejected',
+}
 
-export function reviewsToCsv(rows: readonly QueueReview[]): string {
-  return toCsv(
-    CSV_HEADERS,
-    rows.map((row) => [
-      row.product_name ?? row.product_id,
-      String(row.rating),
-      row.title ?? '',
-      row.body,
-      row.display_name ?? '',
-      String(row.verified_purchase),
-      row.status,
-      row.created_at,
-    ]),
-  )
+type ReviewColumn = 'product' | 'rating' | 'title' | 'body' | 'author' | 'verified' | 'status' | 'date'
+
+/** Las reseñas de la pestaña a Excel (antes CSV), con su guía. */
+export function reviewsBook(rows: readonly QueueReview[], t: Translate, fileName: string): ExcelBook {
+  const col = (id: ReviewColumn, format: 'text' | 'integer' | 'datetime', width?: number) => ({
+    header: t(`admin.reviews.xlsx.col.${id}`),
+    description: t(`admin.reviews.xlsx.desc.${id}`),
+    format,
+    ...(width ? { width } : {}),
+  })
+  return {
+    fileName,
+    guide: { title: t('admin.reviews.xlsx.title'), paragraphs: [t('admin.reviews.xlsx.intro')] },
+    sheets: [
+      {
+        name: t('admin.reviews.xlsx.sheet'),
+        columns: [
+          col('product', 'text', 32),
+          col('rating', 'integer', 12),
+          col('title', 'text', 30),
+          col('body', 'text', 60),
+          col('author', 'text'),
+          col('verified', 'text'),
+          col('status', 'text'),
+          col('date', 'datetime', 18),
+        ],
+        rows: rows.map((row) => [
+          row.product_name ?? row.product_id,
+          row.rating,
+          row.title ?? null,
+          row.body,
+          row.display_name ?? null,
+          t(row.verified_purchase ? 'common.yes' : 'common.no'),
+          t(REVIEW_STATUS_LABEL[row.status]),
+          excelDate(row.created_at),
+        ]),
+      },
+    ],
+  }
 }

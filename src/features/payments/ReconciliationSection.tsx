@@ -17,16 +17,25 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { useState } from 'react'
+import { useRef, useState, type ChangeEvent } from 'react'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
+import {
+  IMPORT_ACCEPT,
+  WorkbookReadError,
+  downloadWorkbook,
+  isCsvFile,
+  readFileText,
+  readImportTable,
+} from '@/shared/lib/excel'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState, ErrorState } from '@/shared/ui/states'
 import type { StatementRow } from './api'
 import { PaymentsError } from './errors'
 import { useImportReconciliation, usePaymentProviders, useReconciliation } from './hooks'
+import { statementImportColumns, statementTemplateBook, statementText } from './statementTemplate'
 import { SelectField } from '@/shared/ui/SelectField'
 
 const RECONCILIATION_STATUSES = ['unmatched', 'matched', 'discrepancy', 'ignored'] as const
@@ -44,6 +53,9 @@ const RECONCILIATION_STATUSES = ['unmatched', 'matched', 'discrepancy', 'ignored
  * resuelve hoy el caso real —cuadrar un día— sin comprometer el diseño del día
  * que se conecte el fichero del proveedor por integración.
  *
+ * Desde 2026-11-13 hay plantilla Excel y «Subir Excel», pero el archivo NO se
+ * sube: se lee en el navegador y rellena el mismo cuadro. Sigue sin bucket.
+ *
  * Reimportar es seguro: la clave `(tenant, proveedor, referencia)` es única y
  * la segunda carga sale como «repetidas», no como un cuadre doble.
  */
@@ -56,6 +68,7 @@ export function ReconciliationSection() {
   const [status, setStatus] = useState('unmatched')
   const [providerCode, setProviderCode] = useState('')
   const [csv, setCsv] = useState('')
+  const fileRef = useRef<HTMLInputElement | null>(null)
 
   const records = useReconciliation(status)
   const providers = usePaymentProviders()
@@ -89,6 +102,26 @@ export function ReconciliationSection() {
       })
     }
     return rows
+  }
+
+  /**
+   * Excel (o CSV) → el cuadro del extracto. No se sube nada: se lee en el
+   * navegador y el operador revisa las líneas antes de cuadrar.
+   */
+  async function onFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    try {
+      const text = isCsvFile(file)
+        ? await readFileText(file)
+        : statementText(await readImportTable(file, statementImportColumns(t)))
+      setCsv(text)
+      const count = text.split(/\r?\n/).filter((line) => line.trim() !== '').length
+      notify(t('payments.reconciliation.xlsx.loaded').replace('{n}', String(count)))
+    } catch (error) {
+      notify(t(error instanceof WorkbookReadError ? `excel.error.${error.reason}` : 'excel.error.unreadable'), 'error')
+    }
   }
 
   async function submit() {
@@ -142,6 +175,30 @@ export function ReconciliationSection() {
                 </MenuItem>
               ))}
             </SelectField>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() =>
+                  void downloadWorkbook(statementTemplateBook(t), t).catch(() =>
+                    notify(t('excel.error.download'), 'error'),
+                  )
+                }
+              >
+                {t('excel.template')}
+              </Button>
+              <Button size="small" variant="outlined" onClick={() => fileRef.current?.click()}>
+                {t('payments.reconciliation.xlsx.upload')}
+              </Button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept={IMPORT_ACCEPT}
+                hidden
+                aria-label={t('payments.reconciliation.xlsx.upload')}
+                onChange={(event) => void onFile(event)}
+              />
+            </Stack>
             <TextField
               label={t('payments.reconciliation.paste')}
               value={csv}

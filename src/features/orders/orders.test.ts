@@ -16,7 +16,11 @@ import {
 import { ORDER_TRANSITION_RPC } from '@/shared/lib/db-schema'
 import { UPDATE_ORDER_STATUS_FUNCTION } from './api'
 import { mapOrderCode } from './errors'
-import { ordersToCsv } from './exportCsv'
+import { MESSAGES } from '@/shared/i18n/messages.all'
+import type { MessageKey } from '@/shared/i18n/messages'
+import { sheetCells } from '@/shared/lib/excel'
+import { ordersBook } from './exportExcel'
+import { PAYMENT_LABEL } from './status'
 import {
   FULFILLMENT_STATUSES,
   FULFILLMENT_TRANSITIONS,
@@ -246,20 +250,40 @@ describe('filtro de fecha', () => {
   })
 })
 
-describe('exportacion CSV', () => {
-  it('lleva los importes como texto decimal, sin simbolo ni separador de miles', () => {
-    const csv = ordersToCsv([order()])
-    expect(csv.split('\r\n')[1]).toContain('"236.00"')
-    expect(csv).not.toContain('S/')
+describe('exportacion a Excel', () => {
+  const t = (key: MessageKey) => MESSAGES.es[key] ?? key
+  const sheetOf = (orders: Order[]) => ordersBook(orders, t, 'pedidos').sheets[0]!
+  const valueAt = (orders: Order[], header: string) => {
+    const sheet = sheetOf(orders)
+    return sheet.rows[0]?.[sheet.columns.findIndex((column) => column.header === header)]
+  }
+
+  it('lleva los importes como NUMERO, sin simbolo de moneda en la celda', () => {
+    expect(valueAt([order()], 'Total')).toBe(236)
+    const sheet = sheetOf([order()])
+    expect(sheet.rows[0]?.some((cell) => typeof cell === 'string' && cell.includes('S/'))).toBe(false)
   })
 
-  it('neutraliza una formula escondida en el nombre del comprador', () => {
-    const csv = ordersToCsv([order({ customer_name: '=1+1' })])
-    expect(csv).toContain(`"'=1+1"`)
+  it('cabeceras claras y estados traducidos, no las claves internas', () => {
+    const headers = sheetOf([order()]).columns.map((column) => column.header)
+    expect(headers).toContain('N.º de pedido')
+    expect(headers).toContain('Pago')
+    expect(headers).not.toContain('payment_status')
+    expect(valueAt([order()], 'Pago')).toBe(t(PAYMENT_LABEL[order().payment_status]))
+  })
+
+  it('un nombre con forma de formula se escribe como texto, nunca como formula', () => {
+    const sheet = sheetOf([order({ customer_name: '=1+1' })])
+    const at = sheet.columns.findIndex((column) => column.header === 'Cliente')
+    expect(sheetCells(sheet)[1]?.[at]).toMatchObject({ value: '=1+1', type: String })
   })
 
   it('junta direccion y referencia en una sola celda', () => {
-    expect(ordersToCsv([order()])).toContain('"Av. Primavera 120 — Portón verde"')
+    expect(valueAt([order()], 'Dirección de envío')).toBe('Av. Primavera 120 — Portón verde')
+  })
+
+  it('la fecha es fecha de Excel, no el texto ISO', () => {
+    expect(valueAt([order()], 'Fecha')).toBeInstanceOf(Date)
   })
 })
 

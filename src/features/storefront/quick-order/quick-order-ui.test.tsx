@@ -259,14 +259,14 @@ describe('CSV', () => {
   it('subir DOS veces el mismo archivo deja la cantidad del archivo, no el doble', async () => {
     const user = userEvent.setup({ delay: null })
     const { cart } = pintar()
-    await user.click(screen.getByRole('tab', { name: 'Subir CSV' }))
+    await user.click(screen.getByRole('tab', { name: 'Subir Excel' }))
 
     for (const vuelta of [1, 2]) {
       // Con el BOM que escribe Excel, construido para que se vea en el fuente.
       const csv = new File([`${String.fromCharCode(0xfeff)}sku,cantidad\r\nQO-JABON,4\r\n`], 'pedido.csv', {
         type: 'text/csv',
       })
-      await user.upload(screen.getByLabelText('Elegir archivo CSV', { selector: 'input' }), csv)
+      await user.upload(screen.getByLabelText('Elegir archivo (Excel o CSV)', { selector: 'input' }), csv)
       await user.click(await screen.findByRole('button', { name: 'Añadir 1 al carrito' }))
       await screen.findByText(vuelta === 1 ? /1 nuevos/ : /1 sin cambios/)
     }
@@ -278,11 +278,11 @@ describe('CSV', () => {
     const user = userEvent.setup({ delay: null })
     const { fake, cart } = pintar()
 
-    await user.click(screen.getByRole('tab', { name: 'Subir CSV' }))
+    await user.click(screen.getByRole('tab', { name: 'Subir Excel' }))
     const csv = new File(['sku;cantidad\r\nQO-JABON;4\r\nNO-EXISTE;1\r\nQO-JABON;2\r\n'], 'pedido.csv', {
       type: 'text/csv',
     })
-    await user.upload(screen.getByLabelText('Elegir archivo CSV', { selector: 'input' }), csv)
+    await user.upload(screen.getByLabelText('Elegir archivo (Excel o CSV)', { selector: 'input' }), csv)
 
     // Duplicado: el navegador lo rechaza en las dos filas y ni pregunta por él.
     expect(await screen.findByText('0 aceptadas · 3 rechazadas')).toBeInTheDocument()
@@ -295,11 +295,11 @@ describe('CSV', () => {
   it('una cabecera que no es la plantilla rechaza el archivo entero', async () => {
     const user = userEvent.setup({ delay: null })
     const { fake } = pintar()
-    await user.click(screen.getByRole('tab', { name: 'Subir CSV' }))
+    await user.click(screen.getByRole('tab', { name: 'Subir Excel' }))
     const csv = new File(['codigo,unidades\nQO-JABON,1\n'], 'otro.csv', { type: 'text/csv' })
-    await user.upload(screen.getByLabelText('Elegir archivo CSV', { selector: 'input' }), csv)
+    await user.upload(screen.getByLabelText('Elegir archivo (Excel o CSV)', { selector: 'input' }), csv)
 
-    expect(await screen.findByText(/tiene que tener las columnas sku y cantidad/)).toBeInTheDocument()
+    expect(await screen.findByText(/tiene que tener las columnas SKU y Cantidad/)).toBeInTheDocument()
     expect(fake.state.rpcCalls.filter((c) => c.name === 'resolve_order_lines_for_slug')).toEqual([])
   })
 })

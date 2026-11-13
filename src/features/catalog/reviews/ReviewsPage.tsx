@@ -27,7 +27,7 @@ import { useMemo, useState } from 'react'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
-import { downloadCsv } from '@/shared/lib/csv'
+import { downloadWorkbook } from '@/shared/lib/excel'
 import { PageHeader } from '@/shared/ui/PageHeader'
 import { SearchField } from '@/shared/ui/SearchField'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
@@ -38,7 +38,7 @@ import {
   REASON_MAX,
   REASON_MIN,
   filterQueue,
-  reviewsToCsv,
+  reviewsBook,
   type QueueReview,
   type ReviewStatus,
 } from './api'
@@ -95,7 +95,12 @@ export function ReviewsPage() {
           <Button
             variant="outlined"
             disabled={rows.length === 0}
-            onClick={() => downloadCsv(`resenas-${activeStore?.slug ?? 'tienda'}.csv`, reviewsToCsv(rows))}
+            onClick={() =>
+              void downloadWorkbook(
+                reviewsBook(rows, t, `${t('admin.reviews.xlsx.sheet').toLowerCase()}-${activeStore?.slug ?? 'tienda'}`),
+                t,
+              ).catch(() => notify(t('excel.error.download'), 'error'))
+            }
           >
             {t('common.export')}
           </Button>

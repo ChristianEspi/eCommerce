@@ -21,7 +21,8 @@ import ShowChartRoundedIcon from '@mui/icons-material/ShowChartRounded'
 import StorefrontRoundedIcon from '@mui/icons-material/StorefrontRounded'
 import TrendingUpRoundedIcon from '@mui/icons-material/TrendingUpRounded'
 import { useI18n } from '@/shared/i18n/i18n-context'
-import { downloadCsv, toCsv } from '@/shared/lib/csv'
+import { downloadWorkbook } from '@/shared/lib/excel'
+import { useFeedback } from '@/shared/ui/feedback-context'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import { FilterBar } from '@/shared/ui/FilterBar'
 import { MetricCard } from '@/shared/ui/MetricCard'
@@ -32,6 +33,7 @@ import { StatusChip } from '@/shared/ui/StatusChip'
 import { EmptyState, ErrorState } from '@/shared/ui/states'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { T } from '@/theme/tokens'
+import { analyticsBook } from './exportExcel'
 import { TrendChart, type TrendPoint } from './TrendChart'
 import {
   useAnalyticsWindow,
@@ -93,6 +95,7 @@ export function OverviewSection({
   onDaysChange: (next: AnalyticsRange) => void
 }) {
   const { t, locale } = useI18n()
+  const { notify } = useFeedback()
   const window = useAnalyticsWindow(storeId, days)
   const kpis = useAnalyticsKpis(window)
   const top = useTopProducts(window)
@@ -107,32 +110,15 @@ export function OverviewSection({
   /**
    * La exportación es la SERIE DIARIA, no la foto.
    *
-   * Un CSV con cuatro totales no se puede cruzar con nada; uno con una fila por
-   * día se pega en una hoja de cálculo al lado de las cifras del ERP. Por eso
-   * `analytics_timeseries` devuelve filas y no un jsonb: la exportación es la
-   * misma consulta que pinta el listado, sin una segunda ruta que se
-   * desincronice.
+   * Un libro con cuatro totales no se puede cruzar con nada; uno con una fila
+   * por día se pega en una hoja de cálculo al lado de las cifras del ERP. Por
+   * eso `analytics_timeseries` devuelve filas y no un jsonb: la exportación es
+   * la misma consulta que pinta el listado, sin una segunda ruta que se
+   * desincronice. Excel desde 2026-11-13: día como fecha e importe como número.
    */
-  function exportCsv(): void {
-    const rows = (series.data ?? []).map((row) => [
-      row.day,
-      String(row.orders),
-      String(row.units),
-      row.revenue ?? '',
-      row.currency ?? '',
-    ])
-    downloadCsv(
-      `analytics-${days}d.csv`,
-      toCsv(
-        [
-          t('analytics.csv.day'),
-          t('analytics.csv.orders'),
-          t('analytics.csv.units'),
-          t('analytics.csv.revenue'),
-          t('analytics.csv.currency'),
-        ],
-        rows,
-      ),
+  function exportExcel(): void {
+    void downloadWorkbook(analyticsBook(series.data ?? [], days, t), t).catch(() =>
+      notify(t('excel.error.download'), 'error'),
     )
   }
 
@@ -247,7 +233,7 @@ export function OverviewSection({
           <SecondaryButton
             size="small"
             startIcon={<FileDownloadRoundedIcon />}
-            onClick={exportCsv}
+            onClick={exportExcel}
             disabled={rows.length === 0}
           >
             {t('common.export')}

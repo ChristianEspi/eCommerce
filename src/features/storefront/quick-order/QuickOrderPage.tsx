@@ -25,7 +25,7 @@ import { isAppError } from '@/domain/errors'
 import { useSessionContext } from '@/features/auth/session-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
-import { downloadCsv } from '@/shared/lib/csv'
+import { IMPORT_ACCEPT, WorkbookReadError, downloadWorkbook, readImportText } from '@/shared/lib/excel'
 import { useDocumentMeta } from '@/shared/seo/useDocumentMeta'
 import { SectionTabs } from '@/shared/ui/SectionTabs'
 import { EmptyState, LoadingState } from '@/shared/ui/states'
@@ -42,7 +42,8 @@ import {
   draftsFromEditor,
   parseOrderCsv,
   parsePastedLines,
-  quickOrderCsvTemplate,
+  quickOrderImportColumns,
+  quickOrderTemplateBook,
   type AcceptedLine,
   type FileIssue,
   type ParsedLines,
@@ -103,20 +104,6 @@ interface EditorRow {
 }
 
 const EMPTY_ROWS = 5
-
-/**
- * El texto de un archivo con `FileReader` y no con `Blob.text()`: hace lo
- * mismo, y además existe en todos los navegadores que la vitrina soporta y en
- * el entorno de pruebas.
- */
-function readText(file: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
-    reader.onerror = () => reject(reader.error ?? new Error('LECTURA_FALLIDA'))
-    reader.readAsText(file)
-  })
-}
 
 /** Clave de i18n de un código de error del servidor. Nunca su texto. */
 function errorKey(error: unknown): MessageKey {
@@ -225,12 +212,18 @@ export function QuickOrderView({ storeId, storeSlug }: { storeId: string; storeS
     if (!file) return
     setFileName(file.name)
     try {
-      run(parseOrderCsv(await readText(file)))
-    } catch {
-      // Un archivo que el navegador no puede leer es, para el comprador, un
-      // archivo sin filas: se le dice eso y se deja cargar otro.
+      // Excel o CSV: el libro se traduce a las cabeceras técnicas y pasa por el
+      // MISMO lector que el CSV de siempre.
+      run(parseOrderCsv(await readImportText(file, quickOrderImportColumns(t))))
+    } catch (error) {
+      // Sin las columnas de la plantilla se dice eso; un archivo que no se
+      // puede leer, que se guarde como .xlsx o CSV. Y se deja cargar otro.
       resetOutcome()
-      setIssue('ARCHIVO_VACIO')
+      setIssue(
+        error instanceof WorkbookReadError && error.reason === 'noHeader'
+          ? 'CABECERA_INVALIDA'
+          : 'ARCHIVO_ILEGIBLE',
+      )
     }
   }
 
@@ -336,7 +329,7 @@ export function QuickOrderView({ storeId, storeSlug }: { storeId: string; storeS
         <Button
           size="small"
           variant="outlined"
-          onClick={() => downloadCsv('plantilla-pedido-rapido.csv', quickOrderCsvTemplate())}
+          onClick={() => void downloadWorkbook(quickOrderTemplateBook(t), t).catch(() => setIssue('ARCHIVO_ILEGIBLE'))}
         >
           {t('store.quickOrder.csv.template')}
         </Button>
@@ -346,7 +339,7 @@ export function QuickOrderView({ storeId, storeSlug }: { storeId: string; storeS
         <input
           ref={fileRef}
           type="file"
-          accept=".csv,text/csv"
+          accept={IMPORT_ACCEPT}
           hidden
           aria-label={t('store.quickOrder.csv.choose')}
           onChange={(event) => void onFile(event)}

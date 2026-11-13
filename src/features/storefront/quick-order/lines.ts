@@ -1,4 +1,4 @@
-import { toCsv } from '@/shared/lib/csv'
+import type { ExcelBook, ImportColumn, Translate } from '@/shared/lib/excel'
 import { MAX_LINE_QUANTITY } from '../cart/cart'
 
 /**
@@ -60,7 +60,7 @@ export type ServerRejectReason = (typeof SERVER_REJECT_REASONS)[number]
 export type RejectReason = ClientRejectReason | ServerRejectReason | 'DESCONOCIDO'
 
 /** Problemas del ARCHIVO entero: con ellos no se resuelve ninguna fila. */
-export type FileIssue = 'ARCHIVO_VACIO' | 'CABECERA_INVALIDA' | 'LIMITE_FILAS'
+export type FileIssue = 'ARCHIVO_VACIO' | 'CABECERA_INVALIDA' | 'LIMITE_FILAS' | 'ARCHIVO_ILEGIBLE'
 
 /** Una fila tal como se leyó: texto, sin validar. */
 export interface DraftLine {
@@ -248,9 +248,56 @@ export function draftsFromEditor(
   return { lines, fileIssue: null }
 }
 
-/** La plantilla descargable. Una fila de ejemplo para que se vea el formato. */
-export function quickOrderCsvTemplate(): string {
-  return toCsv([...QUICK_ORDER_CSV_HEADERS], [['SKU-EJEMPLO', '1']])
+/**
+ * Las columnas que entiende la carga: clave técnica (la del CSV de siempre) y
+ * cabecera clara del libro. La lectura traduce la clara a la técnica antes de
+ * `parseOrderCsv`, así que la validación sigue siendo una sola.
+ */
+export function quickOrderImportColumns(t: Translate): ImportColumn[] {
+  return [
+    { key: 'sku', header: t('store.quickOrder.xlsx.col.sku') },
+    { key: 'cantidad', header: t('store.quickOrder.xlsx.col.quantity') },
+  ]
+}
+
+/** La plantilla descargable (Excel, con guía). Una fila de ejemplo para que se vea el formato. */
+export function quickOrderTemplateBook(t: Translate): ExcelBook {
+  return {
+    fileName: 'plantilla-pedido-rapido',
+    template: true,
+    guide: {
+      title: t('store.quickOrder.xlsx.title'),
+      paragraphs: [
+        t('store.quickOrder.xlsx.p1'),
+        t('store.quickOrder.xlsx.p2'),
+        t('store.quickOrder.xlsx.p3'),
+        t('excel.guide.templateFormats'),
+        t('excel.guide.leadingZeros'),
+      ],
+    },
+    sheets: [
+      {
+        name: t('store.quickOrder.xlsx.sheet'),
+        columns: [
+          {
+            header: t('store.quickOrder.xlsx.col.sku'),
+            description: t('store.quickOrder.xlsx.desc.sku'),
+            format: 'text',
+            required: true,
+            width: 24,
+          },
+          {
+            header: t('store.quickOrder.xlsx.col.quantity'),
+            description: t('store.quickOrder.xlsx.desc.quantity'),
+            format: 'integer',
+            required: true,
+            width: 12,
+          },
+        ],
+        rows: [['SKU-EJEMPLO', 1]],
+      },
+    ],
+  }
 }
 
 // ---------------------------------------------------------------------------

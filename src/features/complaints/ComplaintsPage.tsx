@@ -25,7 +25,8 @@ import { useMemo, useState } from 'react'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
-import { downloadCsv, toCsv } from '@/shared/lib/csv'
+import { downloadWorkbook } from '@/shared/lib/excel'
+import { complaintsBook } from './exportExcel'
 import { formatDate, formatDateTime } from '@/shared/lib/format'
 import { PageHeader } from '@/shared/ui/PageHeader'
 import { SearchField } from '@/shared/ui/SearchField'
@@ -85,26 +86,10 @@ export function ComplaintsPage() {
           variant="outlined"
           disabled={filas.length === 0}
           onClick={() =>
-            downloadCsv(
-              `libro-reclamaciones-${activeStore?.slug ?? 'tienda'}.csv`,
-              toCsv(
-                ['Hoja', 'Fecha', 'Tipo', 'Estado', 'Consumidor', 'Documento', 'Correo', 'Bien', 'Monto', 'Detalle', 'Pedido', 'Respuesta'],
-                filas.map((c) => [
-                  c.code,
-                  c.created_at,
-                  c.kind,
-                  c.status,
-                  c.consumer_name,
-                  `${c.doc_type.toUpperCase()} ${c.doc_number}`,
-                  c.consumer_email,
-                  c.item_description,
-                  c.amount === null ? '' : String(c.amount),
-                  c.detail,
-                  c.request,
-                  c.response ?? '',
-                ]),
-              ),
-            )
+            void downloadWorkbook(
+              complaintsBook(filas, t, `libro-reclamaciones-${activeStore?.slug ?? 'tienda'}`),
+              t,
+            ).catch(() => notify(t('excel.error.download'), 'error'))
           }
         >
           {t('common.export')}
