@@ -31,8 +31,9 @@ la plataforma. Ahora las llaves son del **medio de pago de la tienda** y se conf
   `VITE_PAYMENTS_DISABLE_CULQI=true` los cierra.
 
 Migración `20261113140000_culqi_credenciales_por_tienda.sql` (también registra `culqi` en
-`integration_providers`). **No aplicada en QAS** y función `checkout` **sin desplegar**: hasta
-aplicarla, la vitrina local contra QAS falla al leer los medios de pago (pide `checkout_public_key`).
+`integration_providers`). **Aplicada en QAS** (2026-11-13, a pedido del operador). La función
+`checkout` sigue **sin desplegar**: hasta desplegarla, QAS cobra con la versión anterior (llave del
+despliegue, hoy ninguna → simulacro), aunque la tienda ya tenga su llave secreta en Vault.
 Tests: 11 de base (`supabase/tests/payment-method-secrets.test.ts`, aislamiento incluido) y 5 de
 pantalla.
 
