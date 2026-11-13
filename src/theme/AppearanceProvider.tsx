@@ -1,5 +1,5 @@
 import { CssBaseline, ThemeProvider } from '@mui/material'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { AppearanceContext, type AppearanceContextValue } from './appearance-context'
 import { DEFAULT_APPEARANCE, applyAppearanceToDom, applyTenantAccentToDom, hasStoredDensity, persistAppearance, readStoredAppearance, type Appearance } from './appearance'
 import { createEbimTheme } from './createEbimTheme'
@@ -57,10 +57,22 @@ export function AppearanceProvider({
   // que se pinta con `var(--accent)` —píldoras, estados, enlaces— del verde de
   // suite. Se retira al desmontar para que salir al backoffice devuelva el
   // acento de casa sin recargar.
+  //
+  // 2026-11-13 · El backoffice también es del tenant: el layout del panel pone
+  // aquí el `accent_color` de la tienda activa (`setTenantAccent`). La prop
+  // —la que usa la vitrina— manda sobre él.
+  const [runtimeAccent, setRuntimeAccent] = useState<string | null>(null)
+  const accent = tenantAccent ?? runtimeAccent
+  // Estable: quien lo llama lo pone en las dependencias de un efecto.
+  const setTenantAccent = useCallback(
+    (hex: string | null) => setRuntimeAccent(hex && /^#[0-9a-fA-F]{6}$/.test(hex) ? hex : null),
+    [],
+  )
+
   useEffect(() => {
-    applyTenantAccentToDom(tenantAccent ?? null, effective.mode)
+    applyTenantAccentToDom(accent, effective.mode)
     return () => applyTenantAccentToDom(null, effective.mode)
-  }, [tenantAccent, effective.mode])
+  }, [accent, effective.mode])
 
   const value = useMemo<AppearanceContextValue>(
     () => ({
@@ -72,8 +84,9 @@ export function AppearanceProvider({
         setAppearance((prev) => ({ ...prev, mode: prev.mode === 'dark' ? 'light' : 'dark' })),
       /** Hidratación desde `profiles.settings.appearance` al login (cross-device). */
       hydrate: (next) => setAppearance((prev) => ({ ...prev, ...next })),
+      setTenantAccent,
     }),
-    [appearance],
+    [appearance, setTenantAccent],
   )
 
   const theme = useMemo(
@@ -82,11 +95,11 @@ export function AppearanceProvider({
         mode: effective.mode,
         accent: effective.accent,
         density: effective.density,
-        tenantAccent,
+        tenantAccent: accent,
         tenantFont,
         tenantRadius,
       }),
-    [effective, tenantAccent, tenantFont, tenantRadius],
+    [effective, accent, tenantFont, tenantRadius],
   )
 
   return (

@@ -112,6 +112,7 @@ const TENANT_ACCENT_VARS = [
   '--accent2',
   '--hero-grad',
   '--badge-grad',
+  '--sidebar',
 ] as const
 
 /**
@@ -144,6 +145,15 @@ export function tenantAccentVars(hex: string, mode: ColorMode): Record<(typeof T
       `linear-gradient(135deg, color-mix(in srgb, ${hex} 30%, #06120f) 0%, ` +
       `color-mix(in srgb, ${hex} 70%, #000) 55%, ${hex} 100%)`,
     '--badge-grad': `linear-gradient(135deg, ${hex} 0%, color-mix(in srgb, ${hex} 68%, #000) 100%)`,
+    // La barra lateral del backoffice (2026-11-13). Texto blanco encima, así
+    // que va del acento MUY oscurecido al acento oscurecido: con una marca
+    // clara (amarillo, celeste) el blanco sigue leyéndose.
+    '--sidebar':
+      mode === 'dark'
+        ? `linear-gradient(180deg, color-mix(in srgb, ${hex} 30%, #050807) 0%, ` +
+          `color-mix(in srgb, ${hex} 45%, #050807) 100%)`
+        : `linear-gradient(180deg, color-mix(in srgb, ${hex} 45%, #06120f) 0%, ` +
+          `color-mix(in srgb, ${hex} 70%, #06120f) 100%)`,
   }
 }
 

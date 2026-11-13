@@ -22,7 +22,7 @@ import {
   useMediaQuery,
   useTheme,
 } from '@mui/material'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { ErrorBoundary } from '@/app/ErrorBoundary'
 import { useSessionContext } from '@/features/auth/session-context'
@@ -41,6 +41,7 @@ import { useI18n } from '@/shared/i18n/i18n-context'
 import { AppBreadcrumbs } from '@/shared/ui/AppBreadcrumbs'
 import { BrandLockup } from '@/shared/ui/BrandLockup'
 import { useAppearance } from '@/theme/appearance-context'
+import { useStoreSettings } from './settings/useStoreSettings'
 import { NAV_ITEMS, crumbsForPath, groupNavItems, visibleNavItems } from './navigation'
 import { CompanySwitcher, StoreSwitcher } from './StoreSwitcher'
 
@@ -303,27 +304,38 @@ function AccountMenu() {
             <Switch checked={appearance.mode === 'dark'} onChange={toggleMode} />
           </Stack>
 
-          <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
-            <AppIcon tone="neutral" size="sm"><DensityMediumRoundedIcon /></AppIcon>
-            <Typography sx={{ fontSize: T.body, fontWeight: 600, flex: 1 }}>
-              {t('admin.account.density')}
-            </Typography>
+          {/* Tres opciones con nombre largo no caben al lado de la etiqueta en
+              un menú de 300 px («Compacta» quedaba cortada): la etiqueta va
+              arriba y el selector debajo, a todo el ancho y en tres columnas
+              iguales. */}
+          <Stack sx={{ gap: 1 }}>
+            <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+              <AppIcon tone="neutral" size="sm"><DensityMediumRoundedIcon /></AppIcon>
+              <Typography sx={{ fontSize: T.body, fontWeight: 600, flex: 1 }}>
+                {t('admin.account.density')}
+              </Typography>
+            </Stack>
             <ToggleButtonGroup
               size="small"
               exclusive
+              fullWidth
               value={appearance.density}
               onChange={(_, next) => next && setDensity(next as typeof appearance.density)}
               aria-label={t('admin.account.density')}
+              sx={{
+                '& .MuiToggleButton-root': {
+                  flex: 1,
+                  px: 0.5,
+                  py: 0.75,
+                  fontSize: 13,
+                  textTransform: 'none',
+                  whiteSpace: 'nowrap',
+                },
+              }}
             >
-              <ToggleButton value="comoda" sx={{ px: 1, textTransform: 'none' }}>
-                {t('appearance.density.comoda')}
-              </ToggleButton>
-              <ToggleButton value="equilibrada" sx={{ px: 1, textTransform: 'none' }}>
-                {t('appearance.density.equilibrada')}
-              </ToggleButton>
-              <ToggleButton value="compacta" sx={{ px: 1, textTransform: 'none' }}>
-                {t('appearance.density.compacta')}
-              </ToggleButton>
+              <ToggleButton value="comoda">{t('appearance.density.comoda')}</ToggleButton>
+              <ToggleButton value="equilibrada">{t('appearance.density.equilibrada')}</ToggleButton>
+              <ToggleButton value="compacta">{t('appearance.density.compacta')}</ToggleButton>
             </ToggleButtonGroup>
           </Stack>
         </Stack>
@@ -472,8 +484,29 @@ function AdminChrome() {
  * de sociedad reinicia la conversación al cambiar de sociedad: lo que se
  * habló con los datos de una no puede seguir de contexto en otra.
  */
+/**
+ * El acento del backoffice es el de la MARCA de la tienda activa (2026-11-13).
+ * Antes el panel se quedaba en el verde de suite aunque la tienda fuera roja:
+ * botones, pestañas y estados no se parecían a la marca que el comercio eligió
+ * en Configuración › Marca. Al guardar la marca, la consulta se invalida y el
+ * panel cambia de color sin recargar. Al salir del panel se retira.
+ */
+function useStoreAccent() {
+  const { activeStore } = useTenant()
+  const { setTenantAccent } = useAppearance()
+  const settings = useStoreSettings(activeStore?.id ?? null)
+  const accent = settings.data?.accent_color ?? null
+
+  useEffect(() => {
+    setTenantAccent(accent)
+  }, [accent, setTenantAccent])
+
+  useEffect(() => () => setTenantAccent(null), [setTenantAccent])
+}
+
 function AdminChromeWithCopilot() {
   const { activeCompanyId } = useTenant()
+  useStoreAccent()
   return (
     <CopilotProvider key={activeCompanyId ?? 'sin-sociedad'}>
       <AdminChrome />
