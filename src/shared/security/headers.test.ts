@@ -109,14 +109,28 @@ describe('contentSecurityPolicy', () => {
         inlineScriptHashes: [],
       }),
     )
-    expect(same.get('connect-src')).toEqual(["'self'", SUPABASE, 'wss://proyecto.supabase.co'])
+    expect(same.get('connect-src')).toEqual([
+      "'self'",
+      SUPABASE,
+      'wss://proyecto.supabase.co',
+      'https://nominatim.openstreetmap.org',
+    ])
+  })
+
+  it('el mapa abre SOLO sus dos orígenes: teselas como imagen y Nominatim como petición', () => {
+    expect(parsed.get('img-src')).toContain('https://tile.openstreetmap.org')
+    expect(parsed.get('connect-src')).toContain('https://nominatim.openstreetmap.org')
+    expect(parsed.get('script-src')?.some((origen) => origen.includes('openstreetmap'))).toBe(false)
+    expect(parsed.get('img-src')).not.toContain('https:')
   })
 
   it('solo marcos propios (la vista previa del taller), ni objetos ni base reescribible', () => {
     expect(parsed.get('frame-src')).toEqual(["'self'"])
     expect(parsed.get('object-src')).toEqual(["'none'"])
     // Los videos de la portada: solo del Storage del proyecto (y la vista previa local).
-    expect(parsed.get('media-src')).toEqual(parsed.get('img-src')?.filter((origen) => origen !== 'data:'))
+    expect(parsed.get('media-src')).toEqual(
+      parsed.get('img-src')?.filter((origen) => origen !== 'data:' && origen !== 'https://tile.openstreetmap.org'),
+    )
     expect(parsed.get('media-src')).toContain(SUPABASE)
     expect(parsed.get('base-uri')).toEqual(["'self'"])
     expect(parsed.get('form-action')).toEqual(["'self'"])

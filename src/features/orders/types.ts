@@ -134,6 +134,9 @@ export const shippingAddressSchema = z
   .object({
     address: z.string().nullable().default(null),
     reference: z.string().nullable().default(null),
+    /** El punto del mapa del checkout (2026-11-15). Pedidos anteriores no lo traen. */
+    latitude: z.coerce.number().nullable().default(null),
+    longitude: z.coerce.number().nullable().default(null),
   })
   .partial()
   .catch({})

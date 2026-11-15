@@ -1,7 +1,9 @@
+import MyLocationRoundedIcon from '@mui/icons-material/MyLocationRounded'
 import StorefrontRoundedIcon from '@mui/icons-material/StorefrontRounded'
 import {
   Alert,
   Box,
+  Button,
   CircularProgress,
   Radio,
   Stack,
@@ -10,6 +12,8 @@ import {
 } from '@mui/material'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
+import { formatDistance, type LatLng } from '@/shared/lib/geo'
+import { MapView } from '@/shared/ui/map/MapView'
 import { StatusChip } from '@/shared/ui/StatusChip'
 import { TS } from '@/theme/tokens'
 import type { StorePickupPoint } from '../delivery'
@@ -19,8 +23,9 @@ import type { StorePickupPoint } from '../delivery'
  * primero (2026-11-15).
  *
  * El orden lo decide el SERVIDOR (`ebim.delivery_options`): con stock primero,
- * luego la más cercana, luego el orden de la tienda. Aquí solo se pinta y se
- * elige. Cercanía por distrito, sin mapas: lo que el comprador escribe.
+ * luego la más cercana (por km si el comprador compartió su ubicación; si no,
+ * por distrito), luego el orden de la tienda. Aquí solo se pinta y se elige,
+ * en la lista o tocando la tienda en el mapa (OpenStreetMap, 2026-11-15).
  *
  * Una tienda sin el carrito se ve —saber que existe y qué le falta es
  * información— pero no se puede elegir; el servidor tampoco la aceptaría
@@ -36,6 +41,10 @@ export function PickupStorePicker({
   selectedId,
   onSelect,
   error,
+  buyerPoint,
+  onUseMyLocation,
+  locating,
+  messageKey,
 }: {
   district: string
   onDistrictChange: (value: string) => void
@@ -47,8 +56,14 @@ export function PickupStorePicker({
   selectedId: string
   onSelect: (point: StorePickupPoint) => void
   error: string | null
+  /** Dónde está el comprador, si pulsó «Usar mi ubicación». */
+  buyerPoint: LatLng | null
+  onUseMyLocation: () => void
+  locating: boolean
+  messageKey: MessageKey | null
 }) {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
+  const enMapa = points.filter((punto) => punto.location)
 
   return (
     <Stack sx={{ gap: 1.5 }}>
@@ -60,6 +75,38 @@ export function PickupStorePicker({
         autoComplete="address-level3"
         slotProps={{ htmlInput: { maxLength: 80 } }}
       />
+      <Box>
+        <Button
+          size="small"
+          variant="outlined"
+          onClick={onUseMyLocation}
+          disabled={locating}
+          startIcon={locating ? <CircularProgress size={14} /> : <MyLocationRoundedIcon fontSize="small" />}
+          sx={{ textTransform: 'none', fontWeight: 700 }}
+        >
+          {locating ? t('store.map.locating') : t('store.map.useMyLocation')}
+        </Button>
+      </Box>
+      {messageKey && <Alert severity="info">{t(messageKey)}</Alert>}
+      {enMapa.length > 0 && (
+        <MapView
+          ariaLabel={t('store.map.pickupLabel')}
+          height={240}
+          zoom={13}
+          pin={buyerPoint ? { position: buyerPoint, label: t('store.map.you') } : undefined}
+          places={enMapa.map((punto) => ({
+            id: punto.pickup_point_id,
+            position: { lat: punto.location!.lat, lng: punto.location!.lng },
+            label: punto.name,
+            selected: punto.pickup_point_id === selectedId,
+            disabled: punto.stock?.state === 'unavailable',
+          }))}
+          onPlaceSelect={(id) => {
+            const punto = points.find((p) => p.pickup_point_id === id)
+            if (punto && punto.stock?.state !== 'unavailable') onSelect(punto)
+          }}
+        />
+      )}
 
       <Typography id="tiendas-recojo" component="h3" sx={{ fontSize: TS.label, fontWeight: 700, color: 'var(--muted)' }}>
         {t('store.pickup.title')}
@@ -122,6 +169,11 @@ export function PickupStorePicker({
                   <StorefrontRoundedIcon fontSize="small" sx={{ color: 'var(--muted)' }} aria-hidden />
                   <Typography sx={{ fontWeight: 700 }}>{point.name}</Typography>
                   {cerca && <StatusChip tone="info" label={t(cerca)} />}
+                  {typeof point.distance_km === 'number' && (
+                    <StatusChip
+                      label={t('store.pickup.distance').replace('{distance}', formatDistance(point.distance_km, locale))}
+                    />
+                  )}
                 </Stack>
                 {(calle || lugar) && (
                   <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>

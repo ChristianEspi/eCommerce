@@ -82,6 +82,13 @@ export const checkoutSchema = z.object({
    * —una para enseñárselo y otra, con la fila delante, para cobrárselo—.
    */
   deliveryMethodCode: z.string().trim().max(40).optional(),
+  /**
+   * El punto exacto de entrega (2026-11-15): el pin del mapa o el GPS. Viaja
+   * dentro de `shipping_address` y lo valida el borde. Opcional: sin mapa el
+   * pedido es el de siempre.
+   */
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
   pickupPointId: z.string().uuid().optional().or(z.literal('')),
   /**
    * CÓMO quiere pagarlo (P09-SaaS). Un código del comercio, nada más.
@@ -434,13 +441,20 @@ export interface StartCheckoutInput extends CheckoutValues {
  * petición, o el mismo carrito parecería dos compras distintas según si el
  * comprador tocó el campo y lo borró.
  */
-export function shippingAddressOf(values: CheckoutValues): Record<string, string> {
-  const address: Record<string, string> = { address: values.address }
+export function shippingAddressOf(
+  values: CheckoutValues,
+  withPoint = true,
+): Record<string, string | number> {
+  const address: Record<string, string | number> = { address: values.address }
   if (values.reference) address.reference = values.reference
   if (values.city) address.city = values.city
   if (values.region) address.region = values.region
   if (values.postalCode) address.postal_code = values.postalCode
   if (values.country) address.country = values.country
+  if (withPoint && values.latitude !== undefined && values.longitude !== undefined) {
+    address.latitude = Number(values.latitude.toFixed(6))
+    address.longitude = Number(values.longitude.toFixed(6))
+  }
   return address
 }
 
@@ -481,6 +495,9 @@ export async function startCheckout(input: StartCheckoutInput): Promise<OrderRes
     throw new CheckoutError('store.checkout.error.emptyCart', 'ITEMS_REQUERIDOS')
   }
 
+  // Sin punto si el borde todavía no lo admite (ver el reintento de abajo).
+  let conPunto = true
+
   async function invoke(cartToken: string | null) {
     return supabase.functions.invoke<{ data: unknown }>(CHECKOUT_FUNCTION, {
     body: {
@@ -490,7 +507,7 @@ export async function startCheckout(input: StartCheckoutInput): Promise<OrderRes
       customer_name: input.customerName,
       customer_email: input.customerEmail,
       customer_phone: input.customerPhone,
-      shipping_address: shippingAddressOf(input),
+      shipping_address: shippingAddressOf(input, conPunto),
       // Resumen v2. Solo con factura o centro de costo: ver `billingAddressOf`.
       ...(billingAddressOf(input) ? { billing_address: billingAddressOf(input) } : {}),
       // P12. La ELECCIÓN de entrega, sin un solo importe dentro. `null` cuando
@@ -547,6 +564,18 @@ export async function startCheckout(input: StartCheckoutInput): Promise<OrderRes
     if (failure.code === CART_GONE_CODE && input.cartToken) {
       input.onCartGone?.()
       ;({ data, error } = await invoke(null))
+      failure = error ? await failureFromInvokeError(error) : failure
+    }
+
+    /**
+     * Un borde anterior al mapa (2026-11-15) rechaza `latitude/longitude` con
+     * `CAMPO_NO_PERMITIDO` ANTES de hacer nada. El pin es un extra: perder la
+     * venta por él sería peor que perder el pin. Un reintento, sin punto, con
+     * la misma clave de idempotencia (el primero no llegó a registrar nada).
+     */
+    if (error && failure.code === 'CAMPO_NO_PERMITIDO' && input.latitude !== undefined) {
+      conPunto = false
+      ;({ data, error } = await invoke(input.cartToken ?? null))
       failure = error ? await failureFromInvokeError(error) : failure
     }
 

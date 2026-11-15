@@ -87,6 +87,14 @@ const GOOGLE_FONTS_CSS = 'https://fonts.googleapis.com'
 const GOOGLE_FONTS_FILES = 'https://fonts.gstatic.com'
 
 /**
+ * El mapa de la entrega (2026-11-15): OpenStreetMap, gratuito. Las teselas son
+ * imágenes y la búsqueda de direcciones (Nominatim) es una petición. Solo esos
+ * dos orígenes: nada de abrir `img-src` o `connect-src` a `https:` entero.
+ */
+const MAP_TILES = 'https://tile.openstreetmap.org'
+const MAP_GEOCODER = 'https://nominatim.openstreetmap.org'
+
+/**
  * La política, como lista ordenada de directivas.
  *
  * `default-src 'none'` y no `'self'`: con `'self'` cualquier tipo de recurso
@@ -119,8 +127,8 @@ export function contentSecurityPolicy(input: CspInput): string {
     // Las imágenes de producto viven en el Storage del proyecto (contrato:
     // bucket con ruta por tenant), así que el origen de Supabase basta. `blob:`
     // es la previsualización local al subir una imagen desde el backoffice.
-    ['img-src', ["'self'", 'data:', 'blob:', ...api]],
-    ['connect-src', ["'self'", ...api, ...sockets, ...gateway]],
+    ['img-src', ["'self'", 'data:', 'blob:', ...api, MAP_TILES]],
+    ['connect-src', ["'self'", ...api, ...sockets, ...gateway, MAP_GEOCODER]],
     // 2026-10-04 · Los videos de la portada viven en el mismo Storage que las
     // fotos. Sin esta línea `default-src 'none'` los bloquea en producción. `blob:`
     // es la vista previa local al subir uno desde el backoffice.

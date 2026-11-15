@@ -228,6 +228,9 @@ export const pickupPointSchema = z.object({
   contact_phone: z.string().nullable(),
   is_active: z.boolean(),
   position: z.number(),
+  /** Punto en el mapa (2026-11-15). Los dos o ninguno. */
+  latitude: z.coerce.number().nullable().default(null),
+  longitude: z.coerce.number().nullable().default(null),
 })
 export type PickupPoint = z.infer<typeof pickupPointSchema>
 
@@ -442,6 +445,9 @@ export interface PickupPointFormValues {
   region: string
   /** La dirección guardada, para no perder claves que el formulario no edita. */
   baseAddress?: Record<string, unknown>
+  /** Punto en el mapa: los dos o ninguno. */
+  latitude: number | null
+  longitude: number | null
   warehouseId: string
   contactPhone: string
   isActive: boolean

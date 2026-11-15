@@ -46,6 +46,10 @@ export const pickupPointSchema = z.object({
       missing: z.array(z.string()).default([]),
     })
     .optional(),
+  /** Punto de la tienda en el mapa (2026-11-15), si el comercio lo cargó. */
+  location: z.object({ lat: z.coerce.number(), lng: z.coerce.number() }).nullable().optional(),
+  /** Km hasta el comprador, si compartió su ubicación y la tienda tiene punto. */
+  distance_km: z.coerce.number().nullable().optional(),
 })
 export type StorePickupPoint = z.infer<typeof pickupPointSchema>
 
@@ -81,6 +85,9 @@ export interface DeliveryAddress {
   address: string
   /** Solo para ordenar las tiendas de recojo por cercanía. */
   district?: string
+  /** El punto del comprador (GPS): ordena las tiendas por km. */
+  latitude?: number
+  longitude?: number
   city?: string
   region?: string
   postal_code?: string

@@ -523,6 +523,21 @@ describe('direccion de entrega del checkout (P06)', () => {
     )
   })
 
+  it('el punto del mapa: las dos coordenadas, en rango, a 6 decimales', () => {
+    expect(
+      normalizeShippingAddress({ address: 'Av. Larco 1200', latitude: -12.12551234, longitude: '-77.0300019' }),
+    ).toEqual({ address: 'Av. Larco 1200', latitude: -12.125512, longitude: -77.030002 })
+    expectCode(() => normalizeShippingAddress({ address: 'Av. Larco 1200', latitude: -12.1 }), 'CAMPO_INVALIDO')
+    expectCode(
+      () => normalizeShippingAddress({ address: 'Av. Larco 1200', latitude: 95, longitude: -77 }),
+      'CAMPO_INVALIDO',
+    )
+    expectCode(
+      () => normalizeShippingAddress({ address: 'Av. Larco 1200', latitude: 'norte', longitude: -77 }),
+      'CAMPO_INVALIDO',
+    )
+  })
+
   it('corta los textos desmesurados en vez de guardarlos', () => {
     expectCode(() => normalizeShippingAddress({ address: 'x'.repeat(301) }), 'CAMPO_INVALIDO')
     expectCode(

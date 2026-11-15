@@ -39,6 +39,8 @@ import { CheckoutSteps } from './components/CheckoutSteps'
 import { CheckoutSummary } from './components/CheckoutSummary'
 import { DeliveryPicker } from './components/DeliveryPicker'
 import { PickupStorePicker } from './components/PickupStorePicker'
+import { DeliveryLocation } from './components/DeliveryLocation'
+import { currentPosition, geocodeAddress, reverseGeocode, type LatLng } from '@/shared/lib/geo'
 import { CheckoutStepRow } from './components/CheckoutStepRow'
 import { PaymentPicker } from './components/PaymentPicker'
 import { useDeliveryOptions, useStoreDeliveryMethods, type StorePickupPoint } from './delivery'
@@ -348,13 +350,31 @@ export function StoreCheckoutPage() {
     const espera = setTimeout(() => setDistritoConsultado(distrito.trim()), 400)
     return () => clearTimeout(espera)
   }, [distrito])
+  /**
+   * El mapa (2026-11-15, OpenStreetMap). Dos puntos distintos:
+   *
+   *  · `puntoEntrega`: dónde se entrega en ENVÍO. Sale de buscar la dirección
+   *    escrita (`auto`) o del comprador (`manual`: movió el pin o usó su
+   *    ubicación). Un punto manual no se pisa mientras la dirección escrita sea
+   *    la misma con la que se fijó.
+   *  · `puntoComprador`: dónde está el comprador en RECOJO, solo para ordenar
+   *    las tiendas por km. No viaja en el pedido: el pedido lleva el punto de la
+   *    tienda elegida.
+   */
+  const [puntoEntrega, setPuntoEntrega] = useState<(LatLng & { origen: 'auto' | 'manual' }) | null>(null)
+  const direccionDelPin = useRef('')
+  const [puntoComprador, setPuntoComprador] = useState<LatLng | null>(null)
+  const [ubicando, setUbicando] = useState(false)
+  const [avisoMapa, setAvisoMapa] = useState<MessageKey | null>(null)
+
   const direccionDeRecojo = useMemo(
     () => ({
       address: '',
       district: distritoConsultado || undefined,
       country: (store.default_country ?? '').toUpperCase() || undefined,
+      ...(puntoComprador ? { latitude: puntoComprador.lat, longitude: puntoComprador.lng } : {}),
     }),
-    [distritoConsultado, store.default_country],
+    [distritoConsultado, store.default_country, puntoComprador],
   )
 
   const delivery = useDeliveryOptions({
@@ -400,6 +420,7 @@ export function StoreCheckoutPage() {
     setValue('deliveryMethodCode', '')
     setValue('pickupPointId', '')
     setErrorKey(null)
+    setAvisoMapa(null)
     setModoEntrega(modo)
   }
 
@@ -425,6 +446,91 @@ export function StoreCheckoutPage() {
   }
   const tiendaElegida =
     opcionRecojo?.pickup_points.find((punto) => punto.pickup_point_id === (watched.pickupPointId ?? '')) ?? null
+
+  // Buscar en el mapa la dirección ESCRITA, al dejar de teclear (Nominatim
+  // pide no consultar letra a letra). Un pin puesto a mano se respeta mientras
+  // la calle no cambie.
+  const claveDireccion = [deliveryAddress.address, deliveryAddress.city, deliveryAddress.region, deliveryAddress.country]
+    .map((parte) => (parte ?? '').trim().toLowerCase())
+    .join('|')
+  useEffect(() => {
+    if (enRecojo) return
+    if (puntoEntrega?.origen === 'manual' && direccionDelPin.current === claveDireccion) return
+    if (deliveryAddress.address.length < 5) return
+    let vigente = true
+    const espera = setTimeout(() => {
+      void geocodeAddress({
+        address: deliveryAddress.address,
+        city: deliveryAddress.city,
+        region: deliveryAddress.region,
+        country: deliveryAddress.country,
+      }).then((punto) => {
+        if (!vigente) return
+        if (punto) {
+          setPuntoEntrega({ ...punto, origen: 'auto' })
+          setAvisoMapa(null)
+        } else {
+          setAvisoMapa('store.map.notFound')
+        }
+      })
+    }, 1200)
+    return () => {
+      vigente = false
+      clearTimeout(espera)
+    }
+    // `claveDireccion` resume la dirección escrita.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [claveDireccion, enRecojo])
+
+  // El punto que viaja con el pedido: el pin en envío, la tienda en recojo.
+  useEffect(() => {
+    const punto = enRecojo ? (tiendaElegida?.location ?? null) : puntoEntrega
+    setValue('latitude', punto ? punto.lat : undefined)
+    setValue('longitude', punto ? punto.lng : undefined)
+  }, [enRecojo, tiendaElegida, puntoEntrega, setValue])
+
+  /** El pin movido o el mapa tocado: ese es el punto, aunque la calle diga otra cosa. */
+  const moverPin = (punto: LatLng) => {
+    direccionDelPin.current = claveDireccion
+    setPuntoEntrega({ ...punto, origen: 'manual' })
+    setAvisoMapa(null)
+  }
+
+  /** «Usar mi ubicación actual»: GPS, y en envío además rellena la dirección. */
+  const usarMiUbicacion = async () => {
+    setUbicando(true)
+    setAvisoMapa(null)
+    try {
+      const punto = await currentPosition()
+      if (enRecojo) {
+        setPuntoComprador(punto)
+        const partes = await reverseGeocode(punto)
+        if (partes?.district) setDistrito(partes.district)
+        return
+      }
+      const partes = await reverseGeocode(punto)
+      const opciones = { shouldValidate: true, shouldDirty: true } as const
+      if (partes) {
+        if (partes.address) setValue('address', partes.address, opciones)
+        setValue('city', partes.district || partes.city, opciones)
+        if (partes.region) setValue('region', partes.region, opciones)
+        if (partes.postalCode) setValue('postalCode', partes.postalCode, opciones)
+        if (partes.country) setValue('country', partes.country, opciones)
+      }
+      const v = getValues()
+      direccionDelPin.current = [v.address, v.city, v.region, (v.country ?? '').toUpperCase()]
+        .map((parte) => (parte ?? '').trim().toLowerCase())
+        .join('|')
+      setPuntoEntrega({ ...punto, origen: 'manual' })
+      if (!partes) setAvisoMapa('store.map.reverseFailed')
+    } catch (error) {
+      setAvisoMapa(
+        error instanceof Error && error.message === 'GEO_DENEGADA' ? 'store.map.geoDenied' : 'store.map.geoUnavailable',
+      )
+    } finally {
+      setUbicando(false)
+    }
+  }
 
   /**
    * Los medios de pago de la tienda (P09-SaaS).
@@ -1006,6 +1112,10 @@ export function StoreCheckoutPage() {
                 selectedId={watched.pickupPointId ?? ''}
                 onSelect={elegirTienda}
                 error={null}
+                buyerPoint={puntoComprador}
+                onUseMyLocation={() => void usarMiUbicacion()}
+                locating={ubicando}
+                messageKey={avisoMapa}
               />
             )}
 
@@ -1099,6 +1209,14 @@ export function StoreCheckoutPage() {
                       : t('store.checkout.referenceHint')
                   }
                   {...register('reference')}
+                />
+                {/* 2026-11-15 · El punto exacto, en el mapa (OpenStreetMap). */}
+                <DeliveryLocation
+                  point={puntoEntrega}
+                  onMove={moverPin}
+                  onUseMyLocation={() => void usarMiUbicacion()}
+                  locating={ubicando}
+                  messageKey={avisoMapa}
                 />
                 {/* N06 · Guardar en la libreta lo que se escribió aquí, si no está ya. */}
                 {puedeGuardarDireccion && (

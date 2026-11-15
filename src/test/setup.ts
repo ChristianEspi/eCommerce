@@ -2,6 +2,9 @@ import '@testing-library/jest-dom/vitest'
 import { configure } from '@testing-library/dom'
 import { registerBackofficeMessages } from '@/shared/i18n/messages'
 import { esBackoffice } from '@/shared/i18n/messages.es.backoffice'
+import { createElement } from 'react'
+import { vi } from 'vitest'
+import type { MapViewProps } from '@/shared/ui/map/MapView'
 
 /**
  * El español del backoffice, ya cargado (cierre · certificación).
@@ -52,3 +55,53 @@ if (typeof Range !== 'undefined') {
     Range.prototype.getBoundingClientRect = () => emptyRect() as DOMRect
   }
 }
+
+/**
+ * El mapa y la geolocalización, sin red (2026-11-15).
+ *
+ * Leaflet necesita un motor de maquetación que jsdom no tiene, y Nominatim es
+ * un servicio público con límite de uso: ninguna prueba debe llamarlo. El mapa
+ * se sustituye por botones accesibles (una tienda = un botón; marcar el punto =
+ * un botón) para poder probar lo que la pantalla HACE con él. La búsqueda de
+ * direcciones no encuentra nada salvo que la prueba diga otra cosa
+ * (`vi.mocked(geocodeAddress).mockResolvedValue(...)`).
+ */
+vi.mock('@/shared/ui/map/MapView', () => ({
+  MapView: (props: MapViewProps) =>
+    createElement(
+      'div',
+      { role: 'region', 'aria-label': props.ariaLabel },
+      ...(props.places ?? []).map((place) =>
+        createElement(
+          'button',
+          {
+            key: place.id,
+            type: 'button',
+            disabled: place.disabled,
+            'aria-pressed': Boolean(place.selected),
+            onClick: () => props.onPlaceSelect?.(place.id),
+          },
+          `En el mapa: ${place.label}`,
+        ),
+      ),
+      props.pin?.draggable
+        ? createElement(
+            'button',
+            { type: 'button', onClick: () => props.pin?.onMove?.({ lat: -12.1255, lng: -77.03 }) },
+            'Marcar el punto en el mapa',
+          )
+        : null,
+      props.pin?.position
+        ? createElement('output', null, `${props.pin.position.lat},${props.pin.position.lng}`)
+        : null,
+    ),
+}))
+
+vi.mock('@/shared/lib/geo', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/shared/lib/geo')>()),
+  geocodeAddress: vi.fn(async () => null),
+  reverseGeocode: vi.fn(async () => null),
+  currentPosition: vi.fn(async () => {
+    throw new Error('GEO_NO_DISPONIBLE')
+  }),
+}))

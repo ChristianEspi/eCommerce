@@ -2,6 +2,7 @@ import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '@/test/render'
+import { geocodeAddress } from '@/shared/lib/geo'
 import type { PickupPoint } from './types'
 
 /**
@@ -25,6 +26,8 @@ const PUNTOS: PickupPoint[] = [
     contact_phone: null,
     is_active: true,
     position: 1,
+    latitude: -12.1255,
+    longitude: -77.03,
   },
   {
     id: 'p-sanisidro',
@@ -37,6 +40,8 @@ const PUNTOS: PickupPoint[] = [
     contact_phone: null,
     is_active: true,
     position: 2,
+    latitude: null,
+    longitude: null,
   },
 ]
 
@@ -91,6 +96,40 @@ describe('tiendas de recojo', () => {
         city: 'Lima',
         baseAddress: { line1: 'Av. Camino Real 456', city: 'Lima' },
       }),
+    )
+  })
+})
+
+describe('el punto de la tienda en el mapa', () => {
+  it('avisa de la tienda sin ubicación', () => {
+    renderWithProviders(<PickupPointsSection />)
+    const fila = screen.getByRole('row', { name: /Botica San Isidro/ })
+    expect(within(fila).getByText('Sin ubicación')).toBeInTheDocument()
+  })
+
+  it('«Ubicar la dirección en el mapa» busca la dirección escrita y guarda el punto', async () => {
+    vi.mocked(geocodeAddress).mockResolvedValueOnce({ lat: -12.0972, lng: -77.0365 })
+    const user = userEvent.setup()
+    renderWithProviders(<PickupPointsSection />)
+    await user.click(screen.getByRole('button', { name: 'Editar: Botica San Isidro' }))
+    await user.click(screen.getByRole('button', { name: 'Ubicar la dirección en el mapa' }))
+    expect(vi.mocked(geocodeAddress)).toHaveBeenCalledWith(
+      expect.objectContaining({ address: 'Av. Camino Real 456', city: 'Lima', country: 'PE' }),
+    )
+    await user.click(screen.getByRole('button', { name: 'Guardar' }))
+    expect(holder.save.mutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'p-sanisidro', latitude: -12.0972, longitude: -77.0365 }),
+    )
+  })
+
+  it('tocar el mapa también fija el punto', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<PickupPointsSection />)
+    await user.click(screen.getByRole('button', { name: 'Editar: Botica San Isidro' }))
+    await user.click(screen.getByRole('button', { name: 'Marcar el punto en el mapa' }))
+    await user.click(screen.getByRole('button', { name: 'Guardar' }))
+    expect(holder.save.mutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ latitude: -12.1255, longitude: -77.03 }),
     )
   })
 })

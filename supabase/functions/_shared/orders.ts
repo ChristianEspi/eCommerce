@@ -271,9 +271,16 @@ export type ShippingAddress = {
   postal_code?: string
   /** ISO 3166-1 alpha-2, en mayúsculas. */
   country?: string
+  /**
+   * El punto exacto de entrega (2026-11-15): el pin del mapa del checkout o
+   * el GPS del comprador. Grados decimales WGS84, 6 decimales (~10 cm). Van
+   * los dos o ninguno: media coordenada no ubica nada.
+   */
+  latitude?: number
+  longitude?: number
 }
 
-const SHIPPING_FIELDS = ['address', 'reference', 'city', 'region', 'postal_code', 'country']
+const SHIPPING_FIELDS = ['address', 'reference', 'city', 'region', 'postal_code', 'country', 'latitude', 'longitude']
 
 /** Los cuatro opcionales, con su tope. `country` se valida aparte por su forma. */
 const SHIPPING_OPTIONAL: ReadonlyArray<{ key: 'reference' | 'city' | 'region' | 'postal_code'; max: number }> = [
@@ -348,6 +355,25 @@ export function normalizeShippingAddress(raw: unknown): ShippingAddress {
       }
       normalized.country = country
     }
+  }
+
+  const coordenada = (key: 'latitude' | 'longitude', limite: number): number | undefined => {
+    const value = source[key]
+    if (value === undefined || value === null || value === '') return undefined
+    const numero = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : Number.NaN
+    if (!Number.isFinite(numero) || Math.abs(numero) > limite) {
+      throw badRequest('CAMPO_INVALIDO', `\`shipping_address.${key}\` debe ser un numero entre -${limite} y ${limite}`)
+    }
+    return Math.round(numero * 1e6) / 1e6
+  }
+  const latitude = coordenada('latitude', 90)
+  const longitude = coordenada('longitude', 180)
+  if ((latitude === undefined) !== (longitude === undefined)) {
+    throw badRequest('CAMPO_INVALIDO', '`shipping_address` lleva latitude y longitude juntas, o ninguna')
+  }
+  if (latitude !== undefined && longitude !== undefined) {
+    normalized.latitude = latitude
+    normalized.longitude = longitude
   }
 
   return normalized

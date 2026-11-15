@@ -30,6 +30,8 @@ import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { formatDate, formatDateTime, formatMoney, formatTime } from '@/shared/lib/format'
 import { isSafeExternalUrl } from '@/domain/href'
+import { mapsLink, pointOfAddress } from '@/shared/lib/geo'
+import { MapView } from '@/shared/ui/map/MapView'
 import { FormDrawer } from '@/shared/ui/FormDrawer'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
@@ -515,6 +517,27 @@ export function OrderDrawer({
           label={t('orders.delivery.reference')}
           value={current.shipping_address?.reference || '—'}
         />
+        {(() => {
+          // El punto exacto que marcó el comprador (o la tienda de recojo).
+          const punto = pointOfAddress(current.shipping_address as Record<string, unknown> | null)
+          if (!punto) return null
+          return (
+            <Stack spacing={1} sx={{ my: 1 }}>
+              <MapView ariaLabel={t('orders.delivery.map')} height={200} pin={{ position: punto }} />
+              <Button
+                size="small"
+                variant="outlined"
+                href={mapsLink(punto)}
+                target="_blank"
+                rel="noopener noreferrer"
+                startIcon={<OpenInNewRoundedIcon fontSize="small" />}
+                sx={{ alignSelf: 'flex-start' }}
+              >
+                {t('orders.delivery.openMaps')}
+              </Button>
+            </Stack>
+          )
+        })()}
         <Field
           label={t('orders.billing.address')}
           value={current.billing_address?.address || '—'}

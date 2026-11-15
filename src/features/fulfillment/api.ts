@@ -264,7 +264,7 @@ export async function deleteRate(id: string): Promise<void> {
 }
 
 const POINT_SELECT =
-  'id, store_id, code, name, address, zone_id, warehouse_id, contact_phone, is_active, position'
+  'id, store_id, code, name, address, zone_id, warehouse_id, contact_phone, is_active, position, latitude, longitude'
 
 export async function fetchPickupPoints(storeId: string | null): Promise<PickupPoint[]> {
   if (!storeId) return []
@@ -304,6 +304,8 @@ export async function savePickupPoint(
     code: values.code.trim().toLowerCase(),
     name: values.name.trim(),
     address: pickupAddress(values),
+    latitude: values.latitude !== null && values.longitude !== null ? Number(values.latitude.toFixed(6)) : null,
+    longitude: values.latitude !== null && values.longitude !== null ? Number(values.longitude.toFixed(6)) : null,
     warehouse_id: values.warehouseId === '' ? null : values.warehouseId,
     contact_phone: values.contactPhone.trim() === '' ? null : values.contactPhone.trim(),
     is_active: values.isActive,

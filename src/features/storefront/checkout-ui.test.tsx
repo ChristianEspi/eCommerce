@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router-dom'
 import { renderWithProviders } from '@/test/render'
+import { currentPosition, geocodeAddress, reverseGeocode } from '@/shared/lib/geo'
 import {
   createFakeSupabase,
   FunctionsHttpErrorLike,
@@ -1304,6 +1305,143 @@ describe('recojo en tienda: las más cercanas y con stock', () => {
     await user.click(await screen.findByRole('radio', { name: 'Botica Miraflores' }))
     await user.click(screen.getByRole('button', { name: 'Envío a domicilio' }))
     expect(await screen.findByLabelText(/Dirección de entrega/)).toHaveValue('Av. Primavera 120')
+  })
+})
+
+/**
+ * El mapa de la entrega (2026-11-15, OpenStreetMap). El mapa real y Nominatim
+ * están sustituidos en `src/test/setup.ts`: aquí se prueba lo que la pantalla
+ * hace con el punto, no Leaflet.
+ */
+describe('mapa de la entrega', () => {
+  beforeEach(() => {
+    vi.mocked(geocodeAddress).mockResolvedValue(null)
+    vi.mocked(reverseGeocode).mockResolvedValue(null)
+    vi.mocked(currentPosition).mockRejectedValue(new Error('GEO_NO_DISPONIBLE'))
+  })
+
+  it('la dirección escrita se ubica en el mapa y el punto viaja con el pedido', async () => {
+    vi.mocked(geocodeAddress).mockResolvedValue({ lat: -12.1188, lng: -77.0337 })
+    const user = userEvent.setup()
+    const fake = backendConEntrega()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(fake, '/s/casa-nordica/checkout')
+    await rellenarContacto(user)
+
+    expect(await screen.findByText('-12.1188,-77.0337', {}, { timeout: 5000 })).toBeInTheDocument()
+    await user.click(await screen.findByRole('radio', { name: /Envío estándar/ }))
+    await user.click(await irAPagar(user))
+
+    await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
+    const body = fake.state.invocations[0]?.body as Record<string, unknown>
+    expect(body.shipping_address).toMatchObject({ address: 'Av. Primavera 120', latitude: -12.1188, longitude: -77.0337 })
+  })
+
+  it('el comprador puede marcar el punto a mano, aunque la dirección no se encuentre', async () => {
+    const user = userEvent.setup()
+    const fake = backendConEntrega()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(fake, '/s/casa-nordica/checkout')
+    await rellenarContacto(user)
+
+    expect(
+      await screen.findByText(/No encontramos esa dirección en el mapa/, {}, { timeout: 5000 }),
+    ).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Marcar el punto en el mapa' }))
+    await user.click(await screen.findByRole('radio', { name: /Envío estándar/ }))
+    await user.click(await irAPagar(user))
+
+    await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
+    expect(fake.state.invocations[0]?.body.shipping_address).toMatchObject({ latitude: -12.1255, longitude: -77.03 })
+  })
+
+  it('«Usar mi ubicación actual» pone el punto y escribe la dirección', async () => {
+    vi.mocked(currentPosition).mockResolvedValue({ lat: -12.1255, lng: -77.03 })
+    vi.mocked(reverseGeocode).mockResolvedValue({
+      address: 'Avenida José Larco 1200',
+      district: 'Miraflores',
+      city: 'Lima',
+      region: 'Lima',
+      postalCode: '15074',
+      country: 'PE',
+    })
+    const user = userEvent.setup()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(backendConEntrega(), '/s/casa-nordica/checkout')
+    await rellenarContacto(user)
+
+    await user.click(screen.getByRole('button', { name: 'Usar mi ubicación actual' }))
+    await waitFor(() => expect(screen.getByLabelText(/Dirección de entrega/)).toHaveValue('Avenida José Larco 1200'))
+    expect(screen.getByLabelText(/Ciudad/)).toHaveValue('Miraflores')
+    expect(screen.getByLabelText(/Código postal/)).toHaveValue('15074')
+    expect(screen.getByText('-12.1255,-77.03')).toBeInTheDocument()
+  })
+
+  it('si no da permiso de ubicación se le dice, y puede seguir escribiendo', async () => {
+    vi.mocked(currentPosition).mockRejectedValue(new Error('GEO_DENEGADA'))
+    const user = userEvent.setup()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(backendConEntrega(), '/s/casa-nordica/checkout')
+    await rellenarContacto(user)
+
+    await user.click(screen.getByRole('button', { name: 'Usar mi ubicación actual' }))
+    expect(await screen.findByText(/No diste permiso para usar tu ubicación/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Dirección de entrega/)).toHaveValue('Av. Primavera 120')
+  })
+
+  it('un servidor anterior al mapa no tumba la venta: reintenta sin el punto', async () => {
+    vi.mocked(geocodeAddress).mockResolvedValue({ lat: -12.1188, lng: -77.0337 })
+    const user = userEvent.setup()
+    const fake = backend({
+      onCheckout: (body) => {
+        const direccion = body.shipping_address as Record<string, unknown>
+        if (direccion.latitude !== undefined) throw new FunctionsHttpErrorLike(400, 'CAMPO_NO_PERMITIDO')
+        return respuestaPedido(body)
+      },
+    })
+    fake.state.rpc.delivery_options_for_slug = () => OPCIONES_ENTREGA
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(fake, '/s/casa-nordica/checkout')
+    await rellenarContacto(user)
+    await screen.findByText('-12.1188,-77.0337', {}, { timeout: 5000 })
+    await user.click(await screen.findByRole('radio', { name: /Envío estándar/ }))
+    await user.click(await irAPagar(user))
+
+    await waitFor(() => expect(fake.state.invocations).toHaveLength(2))
+    expect(fake.state.invocations[1]?.body.shipping_address).not.toHaveProperty('latitude')
+    expect(fake.state.invocations[1]?.body.idempotency_key).toBe(fake.state.invocations[0]?.body.idempotency_key)
+    expect(await screen.findByRole('heading', { name: 'Pedido registrado' })).toBeInTheDocument()
+  })
+
+  it('en recojo, las tiendas salen en el mapa, se eligen tocándolas y el pedido lleva su punto', async () => {
+    const user = userEvent.setup()
+    const fake = backendConRecojo()
+    fake.state.rpc.delivery_options_for_slug = () => ({
+      ...OPCIONES_ENTREGA,
+      options: [
+        ...OPCIONES_ENTREGA.options,
+        {
+          ...OPCION_RECOJO,
+          pickup_points: OPCION_RECOJO.pickup_points.map((punto, i) => ({
+            ...punto,
+            location: i === 0 ? { lat: -12.1255, lng: -77.03 } : { lat: -12.0774, lng: -77.0826 },
+            distance_km: i === 0 ? 1.2 : 6.4,
+          })),
+        },
+      ],
+    })
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(fake, '/s/casa-nordica/checkout')
+    await contactoYRecojo(user)
+
+    expect(await screen.findByRole('button', { name: 'En el mapa: Botica San Miguel' })).toBeDisabled()
+    expect(screen.getByText('a 1,2 km')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'En el mapa: Botica Miraflores' }))
+    expect(screen.getByRole('radio', { name: 'Botica Miraflores' })).toBeChecked()
+
+    await user.click(await irAPagar(user))
+    await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
+    expect(fake.state.invocations[0]?.body.shipping_address).toMatchObject({ latitude: -12.1255, longitude: -77.03 })
   })
 })
 

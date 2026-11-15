@@ -211,3 +211,58 @@ describe('elegir la tienda: el servidor manda', () => {
     await expect(elegir(puntoSurco, 2)).resolves.toHaveLength(1)
   })
 })
+
+describe('el mapa: punto de cada tienda y distancia al comprador (20261115140000)', () => {
+  const MIRAFLORES = { lat: -12.1255, lng: -77.03 }
+  const SAN_MIGUEL = { lat: -12.0774, lng: -77.0826 }
+  const SURCO = { lat: -12.111, lng: -76.992 }
+
+  beforeAll(async () => {
+    for (const [id, p] of [
+      [puntoMiraflores, MIRAFLORES],
+      [puntoSanMiguel, SAN_MIGUEL],
+      [puntoSurco, SURCO],
+    ] as const) {
+      await svc(`update public.pickup_points set latitude = $2, longitude = $3 where id = $1`, [id, p.lat, p.lng])
+    }
+  })
+
+  interface PuntoConMapa extends Punto {
+    location: { lat: number; lng: number } | null
+    distance_km: number | null
+  }
+
+  it('con el punto del comprador, cada tienda dice a cuántos km y van de la más cercana a la más lejana', async () => {
+    // Comprador en Surco: Surco < Miraflores < San Miguel (San Miguel además sin stock de 1 unidad no aplica).
+    const opcion = (await recojo({ latitude: '-12.1100', longitude: '-76.9950' }, 1)) as unknown as {
+      pickup_points: PuntoConMapa[]
+    }
+    const codigos = opcion.pickup_points.map((p) => p.code)
+    expect(codigos).toEqual(['surco', 'miraflores', 'san-miguel'])
+    const km = opcion.pickup_points.map((p) => Number(p.distance_km))
+    expect(km[0]).toBeLessThan(1)
+    expect(km[1]).toBeGreaterThan(km[0]!)
+    expect(km[2]).toBeGreaterThan(km[1]!)
+    expect(opcion.pickup_points[0]?.location).toEqual({ lat: SURCO.lat, lng: SURCO.lng })
+  })
+
+  it('sin punto del comprador no hay distancia y manda el distrito', async () => {
+    const opcion = (await recojo({ district: 'San Miguel' }, 1)) as unknown as { pickup_points: PuntoConMapa[] }
+    expect(opcion.pickup_points.every((p) => p.distance_km === null)).toBe(true)
+    expect(opcion.pickup_points[0]?.code).toBe('san-miguel')
+  })
+
+  it('una coordenada basura del comprador se ignora, no rompe la cotización', async () => {
+    const opcion = (await recojo({ latitude: 'norte', longitude: '999' }, 1)) as unknown as {
+      pickup_points: PuntoConMapa[]
+    }
+    expect(opcion.pickup_points.every((p) => p.distance_km === null)).toBe(true)
+  })
+
+  it('una tienda no puede tener media coordenada', async () => {
+    const error = await expectFailure(() =>
+      svc(`update public.pickup_points set latitude = -12.1, longitude = null where id = $1`, [puntoSurco]),
+    )
+    expect(error).toMatch(/pickup_points_location_ck/)
+  })
+})

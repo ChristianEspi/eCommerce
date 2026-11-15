@@ -1,7 +1,9 @@
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded'
+import TravelExploreRoundedIcon from '@mui/icons-material/TravelExploreRounded'
 import EditRoundedIcon from '@mui/icons-material/EditRounded'
 import StorefrontRoundedIcon from '@mui/icons-material/StorefrontRounded'
 import {
+  Alert,
   Button,
   Card,
   FormControlLabel,
@@ -17,6 +19,8 @@ import {
   Typography,
 } from '@mui/material'
 import { useEffect, useState } from 'react'
+import { geocodeAddress } from '@/shared/lib/geo'
+import { MapView } from '@/shared/ui/map/MapView'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
@@ -43,6 +47,8 @@ const EMPTY: PickupPointFormValues = {
   contactPhone: '',
   isActive: false,
   position: 100,
+  latitude: null,
+  longitude: null,
 }
 
 const texto = (valor: unknown): string => (typeof valor === 'string' ? valor : '')
@@ -61,6 +67,8 @@ function toForm(point: PickupPoint): PickupPointFormValues {
     isActive: point.is_active,
     position: point.position,
     baseAddress: point.address,
+    latitude: point.latitude,
+    longitude: point.longitude,
   }
 }
 
@@ -91,10 +99,32 @@ export function PickupPointsSection() {
   const [drawer, setDrawer] = useState<{ open: boolean; point: PickupPoint | null }>({ open: false, point: null })
   const [values, setValues] = useState<PickupPointFormValues>(EMPTY)
   const [deleting, setDeleting] = useState<PickupPoint | null>(null)
+  const [ubicando, setUbicando] = useState(false)
+  const [sinResultado, setSinResultado] = useState(false)
+
+  /** Buscar en el mapa la dirección escrita en el formulario (OpenStreetMap). */
+  async function ubicar() {
+    setUbicando(true)
+    setSinResultado(false)
+    try {
+      const punto = await geocodeAddress({
+        address: values.address,
+        district: values.district,
+        city: values.city,
+        region: values.region,
+        country: 'PE',
+      })
+      if (punto) setValues((v) => ({ ...v, latitude: punto.lat, longitude: punto.lng }))
+      else setSinResultado(true)
+    } finally {
+      setUbicando(false)
+    }
+  }
 
   useEffect(() => {
     if (!drawer.open) return
     setValues(drawer.point ? toForm(drawer.point) : EMPTY)
+    setSinResultado(false)
   }, [drawer])
 
   function report(error: unknown) {
@@ -162,7 +192,15 @@ export function PickupPointsSection() {
                     <TableCell>
                       {distrito || <StatusChip tone="warning" label={t('fulfillment.pickup.noDistrict')} />}
                     </TableCell>
-                    <TableCell>{texto(point.address.address) || texto(point.address.line1)}</TableCell>
+                    <TableCell>
+                      {texto(point.address.address) || texto(point.address.line1)}
+                      {point.latitude === null && (
+                        <>
+                          {' '}
+                          <StatusChip tone="warning" label={t('fulfillment.pickup.noLocation')} />
+                        </>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {nombreAlmacen(point.warehouse_id) ?? (
                         <StatusChip label={t('fulfillment.pickup.noWarehouse')} />
@@ -275,6 +313,44 @@ export function PickupPointsSection() {
               label={t('fulfillment.pickup.region')}
               value={values.region}
               onChange={(e) => setValues((v) => ({ ...v, region: e.target.value }))}
+            />
+          </Stack>
+          <Stack spacing={1}>
+            <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+              <Typography sx={{ fontWeight: 700 }}>{t('fulfillment.pickup.location')}</Typography>
+              <Stack direction="row" sx={{ gap: 1 }}>
+                {values.latitude !== null && (
+                  <Button size="small" onClick={() => setValues((v) => ({ ...v, latitude: null, longitude: null }))}>
+                    {t('fulfillment.pickup.clearLocation')}
+                  </Button>
+                )}
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<TravelExploreRoundedIcon fontSize="small" />}
+                  disabled={ubicando || values.address.trim() === ''}
+                  onClick={() => void ubicar()}
+                >
+                  {t('fulfillment.pickup.locate')}
+                </Button>
+              </Stack>
+            </Stack>
+            <Typography variant="body2" sx={{ color: 'var(--muted)' }}>
+              {t('fulfillment.pickup.locationHelp')}
+            </Typography>
+            {sinResultado && <Alert severity="info">{t('fulfillment.pickup.locateFailed')}</Alert>}
+            <MapView
+              ariaLabel={t('fulfillment.pickup.location')}
+              height={220}
+              pin={{
+                position:
+                  values.latitude !== null && values.longitude !== null
+                    ? { lat: values.latitude, lng: values.longitude }
+                    : null,
+                draggable: true,
+                onMove: (punto) => setValues((v) => ({ ...v, latitude: punto.lat, longitude: punto.lng })),
+                label: values.name,
+              }}
             />
           </Stack>
           <SelectField
