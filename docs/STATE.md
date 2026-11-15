@@ -11,6 +11,18 @@ el recorrido SaaS P00–P17 queda cerrado)
 > (`claude-saas-opus/config/phases.json`), que se identifica siempre como «P0x-SaaS». No son la misma
 > serie: el P12 histórico es el framework de integraciones; el P12-SaaS es fulfillment y devoluciones.
 
+## Recojo en tienda: las más cercanas y con stock (2026-11-15)
+
+Checkout: si la tienda ofrece recojo, el paso de entrega empieza con «Envío a domicilio | Recojo en
+tienda». En recojo no se pide calle: el distrito ordena las tiendas y cada una dice «En tu distrito» y
+si tiene el pedido («Disponible para recoger» / «Sin stock: …», esta no se puede elegir). La dirección
+del pedido pasa a ser la de la tienda. Migración `20261115120000_recojo_cercano_con_stock.sql`:
+`ebim.delivery_options` deja de filtrar puntos por zona y los ordena (con stock → cercanía → posición),
+`ebim.quote_delivery_choice` rechaza una tienda sin stock (`PUNTO_SIN_STOCK`), y `address.line1` pasa
+a `address.address`. Backoffice: Logística → Red → «Tiendas de recojo» (distrito, almacén, teléfono).
+**Aplicada en QAS** (2026-11-15, a pedido del operador) y distritos cargados en los 8 puntos de QAS.
+Tests: 11 de base (`supabase/tests/pickup-nearby.test.ts`), 5 de checkout y 2 de backoffice.
+
 ## Culqi con las llaves de cada tienda (2026-11-13)
 
 Antes el cobro con tarjeta usaba UNA llave secreta del despliegue (`EBIM_PAYMENT_SECRET_CULQI`) y UNA
