@@ -11,6 +11,21 @@ el recorrido SaaS P00–P17 queda cerrado)
 > (`claude-saas-opus/config/phases.json`), que se identifica siempre como «P0x-SaaS». No son la misma
 > serie: el P12 histórico es el framework de integraciones; el P12-SaaS es fulfillment y devoluciones.
 
+## Mapa gratuito en la entrega (2026-11-15)
+
+Leaflet + OpenStreetMap + Nominatim (sin API key; 1 consulta/s, con cola y caché en
+`src/shared/lib/geo.ts`, único sitio a cambiar si se pasa a un proveedor de pago). Checkout: la
+dirección se ubica en el mapa, el pin se mueve o se marca tocando, «Usar mi ubicación actual» (GPS)
+rellena la dirección; en recojo las tiendas salen en el mapa y se ordenan por km si el comprador
+comparte su ubicación. El punto viaja en `shipping_address.latitude/longitude` (validado en
+`normalizeShippingAddress`; un borde antiguo hace que el front reintente sin el punto). Backoffice:
+punto de cada tienda de recojo y mapa + «Abrir en Google Maps» en el pedido. CSP: solo
+`tile.openstreetmap.org` (img) y `nominatim.openstreetmap.org` (connect). Leaflet va en chunk perezoso
+(46 kB gzip). Migración `20261115140000_mapa_tiendas_y_entrega.sql` **aplicada en QAS**, puntos
+aproximados cargados en los 8 puntos de recojo y función `checkout` **desplegada en QAS (v16,
+verify_jwt true)** el 2026-11-15 a pedido del operador. Ese despliegue incluye también las llaves de
+Culqi por tienda (20261113140000).
+
 ## Recojo en tienda: las más cercanas y con stock (2026-11-15)
 
 Checkout: si la tienda ofrece recojo, el paso de entrega empieza con «Envío a domicilio | Recojo en
@@ -43,9 +58,8 @@ la plataforma. Ahora las llaves son del **medio de pago de la tienda** y se conf
   `VITE_PAYMENTS_DISABLE_CULQI=true` los cierra.
 
 Migración `20261113140000_culqi_credenciales_por_tienda.sql` (también registra `culqi` en
-`integration_providers`). **Aplicada en QAS** (2026-11-13, a pedido del operador). La función
-`checkout` sigue **sin desplegar**: hasta desplegarla, QAS cobra con la versión anterior (llave del
-despliegue, hoy ninguna → simulacro), aunque la tienda ya tenga su llave secreta en Vault.
+`integration_providers`). **Aplicada en QAS** (2026-11-13, a pedido del operador). Función
+`checkout` **desplegada en QAS** el 2026-11-15 (v16): ya cobra con la llave secreta de la tienda.
 Tests: 11 de base (`supabase/tests/payment-method-secrets.test.ts`, aislamiento incluido) y 5 de
 pantalla.
 
