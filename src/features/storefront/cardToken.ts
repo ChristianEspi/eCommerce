@@ -88,29 +88,20 @@ function tokenSimulado(numero: string): string {
 }
 
 /**
- * Carga `Culqi.js` una sola vez.
+ * La API de tokens de Culqi (2026-11-15).
  *
- * Se hace bajo demanda y no en el arranque de la tienda: quien mira el catálogo
- * no debería pagar la descarga de una pasarela que quizá no use. Y va aquí y no
- * en el `index.html` para que sin clave no se cargue en absoluto.
+ * Antes se cargaba `Culqi.js v4` y se esperaba que `Culqi.createToken(datos)`
+ * devolviera una promesa; esa librería no funciona así (lee un formulario y
+ * responde a una función global), y el token nunca llegaba. La API documentada
+ * es un POST con la llave PÚBLICA: no hace falta ningún script de terceros en
+ * la página, y lo que se manda es exactamente lo mismo.
  */
-let cargando: Promise<void> | null = null
+const CULQI_TOKENS = 'https://secure.culqi.com/v2/tokens'
 
-function cargarCulqi(): Promise<void> {
-  if (typeof window === 'undefined') return Promise.reject(new TokenizacionError('SIN_NAVEGADOR'))
-  const global = window as unknown as { Culqi?: unknown }
-  if (global.Culqi) return Promise.resolve()
-  if (cargando) return cargando
-
-  cargando = new Promise<void>((resolver, rechazar) => {
-    const script = document.createElement('script')
-    script.src = 'https://checkout.culqi.com/js/v4'
-    script.async = true
-    script.onload = () => resolver()
-    script.onerror = () => rechazar(new TokenizacionError('CULQI_NO_CARGA'))
-    document.head.appendChild(script)
-  })
-  return cargando
+/** «28» → «2028»: Culqi pide el año con cuatro cifras. */
+function anioCompleto(anio: string): string {
+  const digitos = soloDigitos(anio)
+  return digitos.length === 2 ? `20${digitos}` : digitos
 }
 
 /**
@@ -118,6 +109,8 @@ function cargarCulqi(): Promise<void> {
  *
  * En modo real, los datos van directos a Culqi desde el navegador. Ni este
  * archivo ni ningún servidor de EBIM los guarda, los registra ni los reenvía.
+ * Si Culqi rechaza la tarjeta al tokenizar (número o fecha inválidos), se
+ * lanza `TokenizacionError('TARJETA_RECHAZADA')` y no se llega a crear pedido.
  */
 export async function tokenizarTarjeta(
   datos: DatosTarjeta,
@@ -126,22 +119,24 @@ export async function tokenizarTarjeta(
   const clave = clavePublicaCulqi(llavePublica)
   if (!clave) return tokenSimulado(datos.numero)
 
-  await cargarCulqi()
-  const culqi = (window as unknown as { Culqi?: Record<string, unknown> }).Culqi
-  if (!culqi) throw new TokenizacionError('CULQI_NO_CARGA')
-
-  culqi.publicKey = clave
-  const crear = culqi.createToken as ((datos: unknown) => Promise<unknown>) | undefined
-  if (typeof crear !== 'function') throw new TokenizacionError('CULQI_SIN_API')
-
-  const respuesta = (await crear.call(culqi, {
-    card_number: soloDigitos(datos.numero),
-    cvv: soloDigitos(datos.cvv),
-    expiration_month: soloDigitos(datos.mes),
-    expiration_year: soloDigitos(datos.anio),
-    email: datos.email,
-  })) as { id?: unknown }
-
-  if (typeof respuesta?.id !== 'string') throw new TokenizacionError('TOKEN_NO_EMITIDO')
-  return respuesta.id
+  let respuesta: Response
+  try {
+    respuesta = await fetch(CULQI_TOKENS, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${clave}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        card_number: soloDigitos(datos.numero),
+        cvv: soloDigitos(datos.cvv),
+        expiration_month: soloDigitos(datos.mes).padStart(2, '0'),
+        expiration_year: anioCompleto(datos.anio),
+        email: datos.email,
+      }),
+    })
+  } catch {
+    throw new TokenizacionError('CULQI_NO_RESPONDE')
+  }
+  const cuerpo = (await respuesta.json().catch(() => ({}))) as { id?: unknown; object?: unknown }
+  if (!respuesta.ok) throw new TokenizacionError('TARJETA_RECHAZADA')
+  if (typeof cuerpo.id !== 'string') throw new TokenizacionError('TOKEN_NO_EMITIDO')
+  return cuerpo.id
 }

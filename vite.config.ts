@@ -90,7 +90,7 @@ function securityHeadersPlugin(env: Record<string, string>): Plugin {
   const paymentGatewayOrigins =
     env.VITE_PAYMENTS_DISABLE_CULQI === 'true'
       ? []
-      : ['https://checkout.culqi.com', 'https://api.culqi.com', 'https://3ds.culqi.com']
+      : ['https://secure.culqi.com', 'https://checkout.culqi.com', 'https://api.culqi.com', 'https://3ds.culqi.com']
   const inlineScriptHashes: string[] = []
   let outDir = 'dist'
 

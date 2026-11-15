@@ -46,7 +46,7 @@ import { PaymentPicker } from './components/PaymentPicker'
 import { useDeliveryOptions, useStoreDeliveryMethods, type StorePickupPoint } from './delivery'
 import { defaultPaymentCode, usePaymentMethods } from './payment'
 import { CardFields } from './components/CardFields'
-import { pareceTarjeta, tokenizarTarjeta, type DatosTarjeta } from './cardToken'
+import { TokenizacionError, pareceTarjeta, tokenizarTarjeta, type DatosTarjeta } from './cardToken'
 import {
   CheckoutError,
   checkoutSchema,
@@ -805,7 +805,14 @@ export function StoreCheckoutPage() {
     },
     onError: (error) => {
       const checkoutError = error instanceof CheckoutError ? error : null
-      setErrorKey(checkoutError?.key ?? 'store.checkout.error.generic')
+      // La tarjeta no llegó a ser token: Culqi la rechazó o no respondió.
+      const errorTarjeta: MessageKey | null =
+        error instanceof TokenizacionError
+          ? error.message === 'TARJETA_RECHAZADA'
+            ? 'store.card.rejected'
+            : 'store.card.gatewayDown'
+          : null
+      setErrorKey(errorTarjeta ?? checkoutError?.key ?? 'store.checkout.error.generic')
       setErrorStage(checkoutError?.stage ?? null)
       setPriceChanged(checkoutError?.code === 'PRECIO_CAMBIADO')
 

@@ -4583,6 +4583,8 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.card.year': 'Year',
     'store.card.cvv': 'CVV',
     'store.card.incomplete': 'Fill in the expiry date and the CVV.',
+    'store.card.rejected': 'The card was not accepted. Check the number, expiry date and CVV, or try another card.',
+    'store.card.gatewayDown': 'We could not reach the payment gateway. Please try again shortly.',
     'store.card.privacy': 'Your details go encrypted to the gateway. The shop never stores your card number.',
     'store.card.simulatedTitle': 'Gateway in demo mode',
     'store.card.simulatedBody': 'No Culqi keys yet: nothing is charged. A card ending in 0 is declined; any other is approved.',

@@ -14,7 +14,7 @@ function respuesta(cuerpo: unknown) {
 
 describe('geo: OpenStreetMap sin costo', () => {
   it('lee la dirección de Nominatim y quita «Provincia de» / «Gobierno Regional de»', async () => {
-    const fetchMock = vi.fn(() =>
+    const fetchMock = vi.fn((_url: string) =>
       respuesta({
         address: {
           road: 'Avenida José Larco',
@@ -41,7 +41,7 @@ describe('geo: OpenStreetMap sin costo', () => {
   })
 
   it('busca la dirección limitada al país y devuelve el punto', async () => {
-    const fetchMock = vi.fn(() => respuesta([{ lat: '-12.0972', lon: '-77.0365' }]))
+    const fetchMock = vi.fn((_url: string) => respuesta([{ lat: '-12.0972', lon: '-77.0365' }]))
     vi.stubGlobal('fetch', fetchMock)
     const punto = await geo.geocodeAddress({ address: 'Av. Camino Real 456', city: 'San Isidro', country: 'PE' })
     expect(punto).toEqual({ lat: -12.0972, lng: -77.0365 })
@@ -51,7 +51,7 @@ describe('geo: OpenStreetMap sin costo', () => {
   })
 
   it('una dirección demasiado corta no consulta, y lo repetido sale de la caché', async () => {
-    const fetchMock = vi.fn(() => respuesta([{ lat: '-12.05', lon: '-77.05' }]))
+    const fetchMock = vi.fn((_url: string) => respuesta([{ lat: '-12.05', lon: '-77.05' }]))
     vi.stubGlobal('fetch', fetchMock)
     expect(await geo.geocodeAddress({ address: 'ab' })).toBeNull()
     expect(fetchMock).not.toHaveBeenCalled()

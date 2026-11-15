@@ -3526,6 +3526,8 @@ export const es = {
     'store.card.year': 'Año',
     'store.card.cvv': 'CVV',
     'store.card.incomplete': 'Completa la fecha de vencimiento y el CVV.',
+    'store.card.rejected': 'La tarjeta no fue aceptada. Revisa el número, la fecha y el CVV, o prueba con otra.',
+    'store.card.gatewayDown': 'No pudimos conectar con la pasarela de pago. Inténtalo de nuevo en un momento.',
     'store.card.privacy': 'Tus datos van cifrados a la pasarela. La tienda no guarda tu número de tarjeta.',
     'store.card.simulatedTitle': 'Pasarela en modo demostración',
     'store.card.simulatedBody': 'Todavía no hay claves de Culqi: no se cobra nada. Una tarjeta terminada en 0 se rechaza; cualquier otra se aprueba.',
