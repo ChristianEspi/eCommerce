@@ -1459,15 +1459,59 @@ describe('checkout con sesión: datos y direcciones propuestos (H04)', () => {
 
     const grupo = screen.getByRole('group', { name: 'Tus direcciones' })
     const opciones = within(grupo).getAllByRole('button').map((b) => b.textContent)
-    expect(opciones).toEqual(['Casa · Av. Primavera 120, Lima, PE', 'Jr. Lampa 55, Lima, PE'])
+    // Y al final, «Nueva dirección» para la que todavía no está.
+    expect(opciones).toEqual(['Casa · Av. Primavera 120, Lima, PE', 'Jr. Lampa 55, Lima, PE', 'Nueva dirección'])
 
     await user.click(within(grupo).getByRole('button', { name: 'Casa · Av. Primavera 120, Lima, PE' }))
     expect(screen.getByLabelText(/Dirección de entrega/)).toHaveValue('Av. Primavera 120')
     expect(fake.state.rpcCalls.find((c) => c.name === 'my_consumer_addresses')?.args).toEqual({ p_store_slug: 'casa-nordica' })
+    // Una que ya está en la libreta no ofrece guardarse otra vez.
+    expect(screen.queryByLabelText('Guardar esta dirección en mis direcciones')).not.toBeInTheDocument()
     // Comprar no escribe la libreta.
     await user.click(await irAPagar(user))
     await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
     expect(fake.state.rpcCalls.map((c) => c.name)).not.toContain('save_my_consumer_address')
+  })
+
+  it('«Nueva dirección» vacía los campos y, con la casilla, la guarda en la libreta DESPUÉS del pedido', async () => {
+    const user = userEvent.setup()
+    const session = makeSession({ email: 'ana@consumidora.test', withTenantClaims: false })
+    const fake = conCarritoDeServidor(backend({ session }))
+    fake.state.rpc.my_consumer_addresses = () => [
+      { id: '0c000000-0000-4000-8000-00000000ad01', label: 'Casa', address: 'Av. Primavera 120', city: 'Lima', country: 'PE', is_default: true },
+    ]
+    fake.state.rpc.my_checkout_profile = () => ({ contact: null, addresses: [] })
+    fake.state.rpc.save_my_consumer_address = () => ({
+      id: '0c000000-0000-4000-8000-00000000ad02', label: 'Oficina', address: 'Calle Las Begonias 441', city: 'San Isidro', is_default: false,
+    })
+    renderStorefront(fake, '/s/casa-nordica/checkout', session)
+
+    await user.type(await screen.findByLabelText(/Nombre y apellido/), 'Ana')
+    await user.type(screen.getByLabelText(/Teléfono/), '+51 999 111 222')
+    await user.click(screen.getByRole('button', { name: 'Siguiente' }))
+
+    const grupo = await screen.findByRole('group', { name: 'Tus direcciones' })
+    await user.click(within(grupo).getByRole('button', { name: 'Casa · Av. Primavera 120, Lima, PE' }))
+    await user.click(within(grupo).getByRole('button', { name: 'Nueva dirección' }))
+    expect(screen.getByLabelText(/Dirección de entrega/)).toHaveValue('')
+    expect(screen.getByLabelText(/Ciudad/)).toHaveValue('')
+
+    await user.type(screen.getByLabelText(/Dirección de entrega/), 'Calle Las Begonias 441')
+    await user.type(screen.getByLabelText(/Ciudad/), 'San Isidro')
+    expect(screen.getByLabelText('Guardar esta dirección en mis direcciones')).toBeChecked()
+    await user.type(screen.getByLabelText('Nombre de la dirección'), 'Oficina')
+
+    // Mientras no hay pedido, nada se guarda.
+    expect(fake.state.rpcCalls.map((c) => c.name)).not.toContain('save_my_consumer_address')
+    await user.click(await irAPagar(user))
+    await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
+    await waitFor(() =>
+      expect(fake.state.rpcCalls.find((c) => c.name === 'save_my_consumer_address')?.args).toMatchObject({
+        p_store_slug: 'casa-nordica',
+        p_address_id: null,
+        p_address: { label: 'Oficina', address: 'Calle Las Begonias 441', city: 'San Isidro', recipient: 'Ana' },
+      }),
+    )
   })
 
   it('si la base no tiene el perfil, se sigue con lo que dice la sesión', async () => {

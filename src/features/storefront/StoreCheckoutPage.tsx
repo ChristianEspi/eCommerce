@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded'
+import AddRoundedIcon from '@mui/icons-material/AddRounded'
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded'
 import LockRoundedIcon from '@mui/icons-material/LockRounded'
 import ShoppingCartRoundedIcon from '@mui/icons-material/ShoppingCartRounded'
@@ -9,9 +10,11 @@ import {
   Box,
   Button,
   Card,
+  Checkbox,
   Chip,
   CircularProgress,
   Divider,
+  FormControlLabel,
   Stack,
   TextField,
   ToggleButton,
@@ -56,7 +59,16 @@ import {
 import { BuyerTermsNotice } from './commerce/BuyerTermsNotice'
 import { useBuyerCredit } from './commerce/buyerTerms'
 import { useCommerceContext } from './commerce/context'
-import { addressBookKey, checkoutProfileKey, consumerOrdersKey, formatSavedAddress, type SavedAddress } from './consumer'
+import {
+  addressBookKey,
+  checkoutProfileKey,
+  consumerOrdersKey,
+  formatSavedAddress,
+  sameAddress,
+  saveAddress,
+  type AddressInput,
+  type SavedAddress,
+} from './consumer'
 import { useStorefront } from './hooks'
 import { privateMeta } from './seo'
 import { useCheckoutPrefill } from './useCheckoutPrefill'
@@ -198,6 +210,7 @@ export function StoreCheckoutPage() {
     setValue,
     getValues,
     trigger,
+    setFocus,
     handleSubmit,
     formState: { errors },
   } = useForm<CheckoutValues>({
@@ -258,8 +271,31 @@ export function StoreCheckoutPage() {
     if (!actuales.customerPhone && prefill.phone) setValue('customerPhone', prefill.phone)
   }, [prefill.ready, prefill.name, prefill.email, prefill.phone, getValues, setValue])
 
+  /**
+   * Guardar la dirección del pedido en la libreta (N06).
+   *
+   * Es un gesto de la persona, nunca automático: la casilla nace apagada y
+   * solo se enciende sola al pulsar «Nueva dirección», que es decir «esta no
+   * la tengo». Se guarda DESPUÉS de que el servidor confirme el pedido: una
+   * dirección de un pedido que falló no tiene por qué quedar en la libreta.
+   */
+  const [guardarDireccion, setGuardarDireccion] = useState(false)
+  const [nombreDireccion, setNombreDireccion] = useState('')
+
+  /** «Nueva dirección»: campos de entrega vacíos (el país se queda) y el foco en la calle. */
+  const nuevaDireccion = () => {
+    const opciones = { shouldDirty: true } as const
+    for (const campo of ['address', 'reference', 'city', 'region', 'postalCode'] as const) {
+      setValue(campo, '', opciones)
+    }
+    setGuardarDireccion(true)
+    setFocus('address')
+  }
+
   /** Elegir una dirección guardada escribe los campos de entrega, y nada más. */
   const usarDireccion = (direccion: SavedAddress) => {
+    // Una dirección que ya está en la libreta no se ofrece volver a guardar.
+    if (direccion.id) setGuardarDireccion(false)
     const opciones = { shouldValidate: true, shouldDirty: true } as const
     setValue('address', direccion.address, opciones)
     setValue('reference', direccion.reference ?? '', opciones)
@@ -461,6 +497,13 @@ export function StoreCheckoutPage() {
     return t('store.checkout.paymentPending')
   }
 
+  // ¿Se puede guardar lo escrito? Con sesión, con una calle de verdad y si no
+  // está ya en la libreta (misma regla con la que la base deduplica).
+  const direccionEscrita = { address: watched.address ?? '', city: watched.city ?? '' }
+  const yaEnLibreta = prefill.addresses.some((guardada) => guardada.id && sameAddress(guardada, direccionEscrita))
+  const puedeGuardarDireccion = authenticated && direccionEscrita.address.trim().length >= 3 && !yaEnLibreta
+  const libretaVacia = !prefill.addresses.some((guardada) => guardada.id)
+
   const pistasDePago = useMemo(() => {
     const pistas: Record<string, string> = {}
     if (!credito) return pistas
@@ -510,6 +553,28 @@ export function StoreCheckoutPage() {
       // comprador sin carrito y sin pedido.
       clearPendingAttempt(storeSlug)
       clear()
+      if (guardarDireccion && puedeGuardarDireccion) {
+        const v = variables.values
+        const opcional = (valor: string | undefined) => (valor ?? '').trim() || undefined
+        const entrada: AddressInput = {
+          label: nombreDireccion.trim() || t('store.checkout.addressLabelDefault'),
+          recipient: opcional(v.customerName),
+          phone: opcional(v.customerPhone),
+          address: v.address.trim(),
+          reference: opcional(v.reference),
+          city: opcional(v.city),
+          region: opcional(v.region),
+          postal_code: opcional(v.postalCode),
+          country: opcional(v.country)?.toUpperCase(),
+          // La primera de la libreta queda como predeterminada.
+          is_default: libretaVacia || undefined,
+        }
+        // Sin bloquear la confirmación: el pedido ya existe, y una libreta llena
+        // o un fallo de red no pueden convertirlo en un error.
+        void saveAddress(storeSlug, entrada, null)
+          .catch(() => undefined)
+          .finally(() => void queryClient.invalidateQueries({ queryKey: addressBookKey(storeSlug) }))
+      }
       // Lo que «Mi cuenta» y el siguiente checkout leen de ESTA compra —sus
       // pedidos y las direcciones usadas— dejó de ser verdad. Sin esto la
       // primera compra de una cuenta nueva seguía diciendo «todavía no hay
@@ -845,6 +910,14 @@ export function StoreCheckoutPage() {
                           sx={{ maxWidth: '100%', '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' } }}
                         />
                       ))}
+                      <Chip
+                        clickable
+                        variant="outlined"
+                        icon={<AddRoundedIcon fontSize="small" />}
+                        label={t('store.checkout.newAddress')}
+                        onClick={nuevaDireccion}
+                        data-checkout-new-address
+                      />
                     </Stack>
                   </Box>
                 )}
@@ -898,6 +971,32 @@ export function StoreCheckoutPage() {
                   }
                   {...register('reference')}
                 />
+                {/* N06 · Guardar en la libreta lo que se escribió aquí, si no está ya. */}
+                {puedeGuardarDireccion && (
+                  <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ gap: 1.5, alignItems: { sm: 'center' } }}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={guardarDireccion}
+                          onChange={(evento) => setGuardarDireccion(evento.target.checked)}
+                        />
+                      }
+                      label={t('store.checkout.saveAddress')}
+                      sx={{ flexShrink: 0, mr: 0 }}
+                    />
+                    {guardarDireccion && (
+                      <TextField
+                        size="small"
+                        fullWidth
+                        label={t('store.checkout.addressLabel')}
+                        placeholder={t('store.checkout.addressLabelHint')}
+                        value={nombreDireccion}
+                        onChange={(evento) => setNombreDireccion(evento.target.value)}
+                        slotProps={{ htmlInput: { maxLength: 60 } }}
+                      />
+                    )}
+                  </Stack>
+                )}
                 <Divider />
 
                 {/* P12 · cómo lo quiere recibir. Envío, recojo, reparto propio y
