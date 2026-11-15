@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { z } from 'zod'
-import { DELIVERY_OPTIONS_PUBLIC_RPC } from '@/shared/lib/db-schema'
+import { DELIVERY_OPTIONS_PUBLIC_RPC, PUBLIC_DELIVERY_METHODS_VIEW } from '@/shared/lib/db-schema'
 import { moneyText } from '@/shared/lib/money'
 import { tryGetStorefrontRpcClient } from '@/shared/lib/supabase'
+import { storefrontClient } from './api'
 import type { Cart } from './cart/cart'
 import { toOrderItems } from './cart/cart'
 
@@ -31,6 +32,20 @@ export const pickupPointSchema = z.object({
   name: z.string(),
   address: z.record(z.unknown()).default({}),
   contact_phone: z.string().nullable().optional(),
+  /** Distrito de la tienda (2026-11-15), para decir «en tu distrito». */
+  district: z.string().nullable().optional(),
+  /** Cercanía al comprador según lo que escribió. Ordena la lista el servidor. */
+  proximity: z.enum(['district', 'city', 'region', 'other']).optional(),
+  /**
+   * Si ESTA tienda tiene el carrito: `unknown` = sin almacén propio. Elegir una
+   * `unavailable` lo rechaza el servidor (`PUNTO_SIN_STOCK`).
+   */
+  stock: z
+    .object({
+      state: z.enum(['available', 'unavailable', 'unknown']),
+      missing: z.array(z.string()).default([]),
+    })
+    .optional(),
 })
 export type StorePickupPoint = z.infer<typeof pickupPointSchema>
 
@@ -64,6 +79,8 @@ export type DeliveryQuote = z.infer<typeof deliveryQuoteSchema>
 
 export interface DeliveryAddress {
   address: string
+  /** Solo para ordenar las tiendas de recojo por cercanía. */
+  district?: string
   city?: string
   region?: string
   postal_code?: string
@@ -115,6 +132,11 @@ export function useDeliveryOptions(input: {
   address: DeliveryAddress
   cart: Cart
   enabled: boolean
+  /**
+   * Recojo en tienda: se cotiza SIN calle (la dirección que importa es la de
+   * la tienda); el distrito, si lo hay, solo ordena la lista.
+   */
+  withoutAddress?: boolean
 }) {
   const fingerprint = input.cart.lines
     .map((line) => `${line.product_id}:${line.variant_id ?? ''}:${line.quantity}`)
@@ -129,7 +151,43 @@ export function useDeliveryOptions(input: {
         address: input.address,
         cart: input.cart,
       }),
-    enabled: input.enabled && input.address.address.trim().length >= 3 && fingerprint !== '',
+    enabled:
+      input.enabled &&
+      (input.withoutAddress === true || input.address.address.trim().length >= 3) &&
+      fingerprint !== '',
     retry: false,
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Los métodos de entrega de la tienda, sin cotizar (sin dirección ni carrito).
+// Para saber de entrada si la tienda ofrece recojo y pintar «Envío a domicilio
+// | Recojo en tienda» antes de que el comprador escriba nada.
+// ---------------------------------------------------------------------------
+export const storeDeliveryMethodSchema = z.object({
+  delivery_method_id: z.string().uuid(),
+  display_name: z.string().min(1),
+  description: z.string().nullable().default(null),
+  strategy: z.string(),
+  lead_time_min_days: z.number().int().nullable().default(null),
+  lead_time_max_days: z.number().int().nullable().default(null),
+})
+export type StoreDeliveryMethod = z.infer<typeof storeDeliveryMethodSchema>
+
+export function useStoreDeliveryMethods(storeId: string) {
+  return useQuery({
+    queryKey: ['storefront', 'delivery-methods', storeId] as const,
+    staleTime: 10 * 60 * 1000,
+    retry: false,
+    enabled: storeId !== '',
+    queryFn: async (): Promise<StoreDeliveryMethod[]> => {
+      const { data, error } = await storefrontClient()
+        .from(PUBLIC_DELIVERY_METHODS_VIEW)
+        .select('delivery_method_id, display_name, description, strategy, lead_time_min_days, lead_time_max_days')
+        .eq('store_id', storeId)
+        .order('position', { ascending: true })
+      if (error) throw new Error('DELIVERY_METHODS_FAILED')
+      return z.array(storeDeliveryMethodSchema).parse(data ?? [])
+    },
   })
 }

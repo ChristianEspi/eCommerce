@@ -277,6 +277,25 @@ export async function fetchPickupPoints(storeId: string | null): Promise<PickupP
   return (data ?? []).map((row) => pickupPointSchema.parse(row))
 }
 
+/** La dirección del punto: lo que había, con lo editado encima; sin claves vacías. */
+function pickupAddress(values: PickupPointFormValues): Record<string, unknown> {
+  // `line1` era la calle de los puntos sembrados por script: la reemplaza `address`.
+  const base = { ...(values.baseAddress ?? {}) }
+  delete base.line1
+  const editado: Record<string, string> = {
+    address: values.address.trim(),
+    district: values.district.trim(),
+    city: values.city.trim(),
+    region: values.region.trim(),
+  }
+  const resultado: Record<string, unknown> = { ...base }
+  for (const [clave, valor] of Object.entries(editado)) {
+    if (valor === '') delete resultado[clave]
+    else resultado[clave] = valor
+  }
+  return resultado
+}
+
 export async function savePickupPoint(
   scope: StoreScope,
   values: PickupPointFormValues,
@@ -284,7 +303,7 @@ export async function savePickupPoint(
   const payload = {
     code: values.code.trim().toLowerCase(),
     name: values.name.trim(),
-    address: { address: values.address.trim() },
+    address: pickupAddress(values),
     warehouse_id: values.warehouseId === '' ? null : values.warehouseId,
     contact_phone: values.contactPhone.trim() === '' ? null : values.contactPhone.trim(),
     is_active: values.isActive,

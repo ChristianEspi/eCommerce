@@ -1138,6 +1138,175 @@ async function llegarAlPago(user: ReturnType<typeof userEvent.setup>) {
   await irAPagar(user)
 }
 
+/**
+ * Recojo en tienda (2026-11-15): se elige PRIMERO envío o recojo; en recojo no
+ * se pide calle, el distrito ordena las tiendas (lo hace el servidor) y una
+ * tienda sin stock se ve pero no se puede elegir.
+ */
+const PUNTO_MIRAFLORES = 'eeee1111-1111-4111-8111-111111111111'
+const PUNTO_SAN_MIGUEL = 'eeee2222-1111-4111-8111-111111111111'
+const METODOS_CON_RECOJO = [
+  {
+    delivery_method_id: 'ffff1111-1111-4111-8111-111111111111',
+    store_id: STORE,
+    code: 'estandar',
+    strategy: 'ship',
+    display_name: 'Envío estándar',
+    description: null,
+    position: 1,
+    lead_time_min_days: 1,
+    lead_time_max_days: 3,
+  },
+  {
+    delivery_method_id: 'ffff3333-1111-4111-8111-111111111111',
+    store_id: STORE,
+    code: 'recojo',
+    strategy: 'pickup',
+    display_name: 'Recojo en tienda',
+    description: null,
+    position: 2,
+    lead_time_min_days: 0,
+    lead_time_max_days: 1,
+  },
+]
+const OPCION_RECOJO = {
+  delivery_method_id: 'ffff3333-1111-4111-8111-111111111111',
+  code: 'recojo',
+  name: 'Recojo en tienda',
+  description: null,
+  instructions: null,
+  strategy: 'pickup',
+  available: true,
+  reason: null,
+  currency: 'PEN',
+  amount: '0.00',
+  free: true,
+  promised_from: '2026-11-15',
+  promised_to: '2026-11-16',
+  requires_window: false,
+  pickup_points: [
+    {
+      pickup_point_id: PUNTO_MIRAFLORES,
+      code: 'miraflores',
+      name: 'Botica Miraflores',
+      address: { address: 'Av. Larco 1200', city: 'Lima', region: 'Lima' },
+      district: 'Miraflores',
+      contact_phone: null,
+      proximity: 'district',
+      stock: { state: 'available', missing: [] },
+    },
+    {
+      pickup_point_id: PUNTO_SAN_MIGUEL,
+      code: 'san-miguel',
+      name: 'Botica San Miguel',
+      address: { address: 'Av. La Marina 2000', city: 'Lima' },
+      district: 'San Miguel',
+      contact_phone: null,
+      proximity: 'city',
+      stock: { state: 'unavailable', missing: ['Silla de roble'] },
+    },
+  ],
+}
+
+function backendConRecojo() {
+  const fake = backend()
+  fake.state.tables.public_delivery_methods = METODOS_CON_RECOJO
+  fake.state.rpc.delivery_options_for_slug = () => ({
+    ...OPCIONES_ENTREGA,
+    options: [...OPCIONES_ENTREGA.options, OPCION_RECOJO],
+  })
+  return fake
+}
+
+async function contactoYRecojo(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(await screen.findByLabelText(/Nombre y apellido/), 'Ana Pérez')
+  await user.type(screen.getByLabelText(/Correo/), 'ana@compradora.com')
+  await user.type(screen.getByLabelText(/Teléfono/), '+51 999 888 777')
+  await user.click(screen.getByRole('button', { name: 'Siguiente' }))
+  await user.click(await screen.findByRole('button', { name: 'Recojo en tienda' }))
+}
+
+describe('recojo en tienda: las más cercanas y con stock', () => {
+  it('si la tienda ofrece recojo, primero se elige envío o recojo; en envío el recojo no se repite', async () => {
+    const user = userEvent.setup()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(backendConRecojo(), '/s/casa-nordica/checkout')
+    await rellenarContacto(user)
+
+    expect(await screen.findByRole('button', { name: 'Envío a domicilio' })).toBeInTheDocument()
+    expect(await screen.findByRole('radio', { name: /Envío estándar/ })).toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: /Recojo en tienda/ })).not.toBeInTheDocument()
+  })
+
+  it('en recojo no se pide calle: el distrito ordena las tiendas y se ve el stock de cada una', async () => {
+    const user = userEvent.setup()
+    const fake = backendConRecojo()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(fake, '/s/casa-nordica/checkout')
+    await contactoYRecojo(user)
+
+    expect(screen.queryByLabelText(/Dirección de entrega/)).not.toBeInTheDocument()
+    await user.type(screen.getByLabelText('Tu distrito'), 'Miraflores')
+    await waitFor(() =>
+      expect(
+        fake.state.rpcCalls.some(
+          (c) =>
+            c.name === 'delivery_options_for_slug' &&
+            (c.args.p_address as Record<string, unknown>).district === 'Miraflores',
+        ),
+      ).toBe(true),
+    )
+
+    expect(await screen.findByText('En tu distrito')).toBeInTheDocument()
+    expect(screen.getByText('Disponible para recoger')).toBeInTheDocument()
+    expect(screen.getByText('Sin stock: Silla de roble')).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Botica San Miguel' })).toBeDisabled()
+  })
+
+  it('sin tienda elegida no se avanza, y el aviso dice qué falta', async () => {
+    const user = userEvent.setup()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(backendConRecojo(), '/s/casa-nordica/checkout')
+    await contactoYRecojo(user)
+    await screen.findByRole('radio', { name: 'Botica Miraflores' })
+
+    await user.click(screen.getByRole('button', { name: 'Siguiente' }))
+    expect(await screen.findByText('Elige dónde vas a recoger tu pedido.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Confirmar pedido' })).not.toBeInTheDocument()
+  })
+
+  it('el pedido viaja con el método de recojo, la tienda y su dirección', async () => {
+    const user = userEvent.setup()
+    const fake = backendConRecojo()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(fake, '/s/casa-nordica/checkout')
+    await contactoYRecojo(user)
+
+    await user.click(await screen.findByRole('radio', { name: 'Botica Miraflores' }))
+    await user.click(await irAPagar(user))
+
+    await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
+    const body = fake.state.invocations[0]?.body as Record<string, unknown>
+    expect(body.delivery).toMatchObject({ method_code: 'recojo', pickup_point_id: PUNTO_MIRAFLORES })
+    expect(body.shipping_address).toMatchObject({
+      address: 'Recojo en tienda: Botica Miraflores · Av. Larco 1200',
+      city: 'Miraflores',
+    })
+  })
+
+  it('volver a «Envío a domicilio» devuelve la dirección que había escrito', async () => {
+    const user = userEvent.setup()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(backendConRecojo(), '/s/casa-nordica/checkout')
+    await rellenarContacto(user)
+
+    await user.click(await screen.findByRole('button', { name: 'Recojo en tienda' }))
+    await user.click(await screen.findByRole('radio', { name: 'Botica Miraflores' }))
+    await user.click(screen.getByRole('button', { name: 'Envío a domicilio' }))
+    expect(await screen.findByLabelText(/Dirección de entrega/)).toHaveValue('Av. Primavera 120')
+  })
+})
+
 describe('medio de pago en el checkout (P09)', () => {
   it('lo que viaja es el CODIGO del medio, sin proveedor ni configuracion', async () => {
     const user = userEvent.setup()

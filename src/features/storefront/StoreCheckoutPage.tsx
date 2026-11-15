@@ -38,9 +38,10 @@ import { useCart } from './cart/cart-context'
 import { CheckoutSteps } from './components/CheckoutSteps'
 import { CheckoutSummary } from './components/CheckoutSummary'
 import { DeliveryPicker } from './components/DeliveryPicker'
+import { PickupStorePicker } from './components/PickupStorePicker'
 import { CheckoutStepRow } from './components/CheckoutStepRow'
 import { PaymentPicker } from './components/PaymentPicker'
-import { useDeliveryOptions } from './delivery'
+import { useDeliveryOptions, useStoreDeliveryMethods, type StorePickupPoint } from './delivery'
 import { defaultPaymentCode, usePaymentMethods } from './payment'
 import { CardFields } from './components/CardFields'
 import { pareceTarjeta, tokenizarTarjeta, type DatosTarjeta } from './cardToken'
@@ -328,13 +329,102 @@ export function StoreCheckoutPage() {
     }),
     [watched.address, watched.city, watched.region, watched.postalCode, watched.country],
   )
+  /**
+   * Envío a domicilio o recojo en tienda (2026-11-15).
+   *
+   * Si la tienda ofrece recojo, es lo PRIMERO que se pregunta en el paso de
+   * entrega. En recojo no se pide calle: se pide el distrito, que solo ordena
+   * las tiendas (la más cercana y con stock primero, lo decide el servidor), y
+   * la dirección del pedido pasa a ser la de la tienda elegida.
+   */
+  const metodosDeLaTienda = useStoreDeliveryMethods(store.store_id)
+  const ofreceRecojo = (metodosDeLaTienda.data ?? []).some((metodo) => metodo.strategy === 'pickup')
+  const [modoEntrega, setModoEntrega] = useState<'envio' | 'recojo'>('envio')
+  const enRecojo = ofreceRecojo && modoEntrega === 'recojo'
+  const [distrito, setDistrito] = useState('')
+  // El distrito se consulta al dejar de teclear: cada letra no es una cotización.
+  const [distritoConsultado, setDistritoConsultado] = useState('')
+  useEffect(() => {
+    const espera = setTimeout(() => setDistritoConsultado(distrito.trim()), 400)
+    return () => clearTimeout(espera)
+  }, [distrito])
+  const direccionDeRecojo = useMemo(
+    () => ({
+      address: '',
+      district: distritoConsultado || undefined,
+      country: (store.default_country ?? '').toUpperCase() || undefined,
+    }),
+    [distritoConsultado, store.default_country],
+  )
+
   const delivery = useDeliveryOptions({
     storeSlug,
     address: deliveryAddress,
     cart,
-    enabled: cart.lines.length > 0,
+    enabled: cart.lines.length > 0 && !enRecojo,
   })
-  const deliveryOptions = delivery.data?.options ?? []
+  const pickupQuote = useDeliveryOptions({
+    storeSlug,
+    address: direccionDeRecojo,
+    cart,
+    enabled: cart.lines.length > 0 && enRecojo,
+    withoutAddress: true,
+  })
+  const opcionRecojo = (pickupQuote.data?.options ?? []).find((option) => option.strategy === 'pickup') ?? null
+  // En envío, el recojo no se ofrece como una opción más: ya tiene su pestaña.
+  const deliveryOptions = enRecojo
+    ? opcionRecojo
+      ? [opcionRecojo]
+      : []
+    : (delivery.data?.options ?? []).filter((option) => !ofreceRecojo || option.strategy !== 'pickup')
+
+  /**
+   * Lo que el comprador escribió para el envío, guardado al pasar a recojo: la
+   * dirección del pedido pasa a ser la de la tienda, y al volver a «Envío a
+   * domicilio» se le devuelve lo suyo.
+   */
+  const direccionDeEnvio = useRef<Partial<CheckoutValues> | null>(null)
+  const CAMPOS_DIRECCION = ['address', 'reference', 'city', 'region', 'postalCode', 'country'] as const
+  const cambiarModo = (modo: 'envio' | 'recojo') => {
+    if (modo === modoEntrega) return
+    const opciones = { shouldDirty: true } as const
+    if (modo === 'recojo') {
+      const actuales = getValues()
+      direccionDeEnvio.current = Object.fromEntries(CAMPOS_DIRECCION.map((campo) => [campo, actuales[campo]]))
+      for (const campo of CAMPOS_DIRECCION) setValue(campo, '', opciones)
+    } else {
+      for (const campo of CAMPOS_DIRECCION) {
+        setValue(campo, (direccionDeEnvio.current?.[campo] as string | undefined) ?? '', opciones)
+      }
+    }
+    setValue('deliveryMethodCode', '')
+    setValue('pickupPointId', '')
+    setErrorKey(null)
+    setModoEntrega(modo)
+  }
+
+  /** Elegir tienda: método de recojo + punto, y la dirección del pedido es la de la tienda. */
+  const elegirTienda = (punto: StorePickupPoint) => {
+    if (!opcionRecojo) return
+    const texto = (valor: unknown) => (typeof valor === 'string' ? valor.trim() : '')
+    const calle = texto(punto.address.address) || texto(punto.address.line1)
+    const opciones = { shouldValidate: true, shouldDirty: true } as const
+    setValue('deliveryMethodCode', opcionRecojo.code)
+    setValue('pickupPointId', punto.pickup_point_id)
+    setValue(
+      'address',
+      [`${t('store.pickup.addressPrefix')}: ${punto.name}`, calle].filter(Boolean).join(' · ').slice(0, 300),
+      opciones,
+    )
+    setValue('reference', '', opciones)
+    setValue('city', texto(punto.district) || texto(punto.address.city), opciones)
+    setValue('region', texto(punto.address.region), opciones)
+    setValue('postalCode', texto(punto.address.postal_code), opciones)
+    setValue('country', (texto(punto.address.country) || (store.default_country ?? '')).toUpperCase(), opciones)
+    setErrorKey(null)
+  }
+  const tiendaElegida =
+    opcionRecojo?.pickup_points.find((punto) => punto.pickup_point_id === (watched.pickupPointId ?? '')) ?? null
 
   /**
    * Los medios de pago de la tienda (P09-SaaS).
@@ -457,6 +547,13 @@ export function StoreCheckoutPage() {
       return
     }
     for (let i = paso; i < destino; i += 1) {
+      // En recojo la «dirección» la pone la tienda elegida: sin tienda, el
+      // aviso es «elige dónde recoges», no un error en un campo que no se ve.
+      if (i === 1 && enRecojo && !getValues('pickupPointId')) {
+        setErrorKey('store.checkout.error.delivery.pickup')
+        setPaso(1)
+        return
+      }
       if (!(await trigger(CAMPOS[i] as Array<keyof CheckoutValues>))) {
         setPaso(i)
         return
@@ -491,6 +588,9 @@ export function StoreCheckoutPage() {
         .join(' · ')
     }
     if (indice === 1) {
+      if (enRecojo) {
+        return tiendaElegida ? t('store.pickup.summary').replace('{store}', tiendaElegida.name) : t('store.pickup.modePickup')
+      }
       const donde = [watched.address, watched.city].map((valor) => (valor ?? '').trim()).filter(Boolean).join(', ')
       return [donde, selectedDelivery?.name].filter(Boolean).join(' · ')
     }
@@ -501,7 +601,8 @@ export function StoreCheckoutPage() {
   // está ya en la libreta (misma regla con la que la base deduplica).
   const direccionEscrita = { address: watched.address ?? '', city: watched.city ?? '' }
   const yaEnLibreta = prefill.addresses.some((guardada) => guardada.id && sameAddress(guardada, direccionEscrita))
-  const puedeGuardarDireccion = authenticated && direccionEscrita.address.trim().length >= 3 && !yaEnLibreta
+  const puedeGuardarDireccion =
+    authenticated && !enRecojo && direccionEscrita.address.trim().length >= 3 && !yaEnLibreta
   const libretaVacia = !prefill.addresses.some((guardada) => guardada.id)
 
   const pistasDePago = useMemo(() => {
@@ -880,7 +981,35 @@ export function StoreCheckoutPage() {
               </>
             )}
 
-            {paso === 1 && (
+            {paso === 1 && ofreceRecojo && (
+              <ToggleButtonGroup
+                exclusive
+                fullWidth
+                value={modoEntrega}
+                aria-label={t('store.pickup.modeLabel')}
+                onChange={(_, siguiente: 'envio' | 'recojo' | null) => siguiente && cambiarModo(siguiente)}
+                sx={{ '& .MuiToggleButton-root': { textTransform: 'none', fontWeight: 700 } }}
+              >
+                <ToggleButton value="envio">{t('store.pickup.modeShip')}</ToggleButton>
+                <ToggleButton value="recojo">{t('store.pickup.modePickup')}</ToggleButton>
+              </ToggleButtonGroup>
+            )}
+
+            {paso === 1 && enRecojo && (
+              <PickupStorePicker
+                district={distrito}
+                onDistrictChange={setDistrito}
+                points={opcionRecojo?.pickup_points ?? []}
+                loading={pickupQuote.isFetching}
+                failed={pickupQuote.isError}
+                unavailableReason={opcionRecojo && !opcionRecojo.available ? opcionRecojo.reason : null}
+                selectedId={watched.pickupPointId ?? ''}
+                onSelect={elegirTienda}
+                error={null}
+              />
+            )}
+
+            {paso === 1 && !enRecojo && (
               <>
                 {/* H04 · las direcciones de sus pedidos anteriores, para ELEGIR.
                     No se escribe ninguna sola: una entrega en la casa de antes

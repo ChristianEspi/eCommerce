@@ -436,6 +436,12 @@ export interface PickupPointFormValues {
   code: string
   name: string
   address: string
+  /** Distrito: con él la vitrina dice «en tu distrito» y ordena por cercanía. */
+  district: string
+  city: string
+  region: string
+  /** La dirección guardada, para no perder claves que el formulario no edita. */
+  baseAddress?: Record<string, unknown>
   warehouseId: string
   contactPhone: string
   isActive: boolean

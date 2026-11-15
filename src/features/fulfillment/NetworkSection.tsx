@@ -53,6 +53,7 @@ import {
   type ZoneFormValues,
 } from './types'
 import { SelectField } from '@/shared/ui/SelectField'
+import { PickupPointsSection } from './PickupPointsSection'
 
 const EMPTY_ZONE: ZoneFormValues = {
   code: '',
@@ -236,6 +237,9 @@ export function NetworkSection() {
 
   return (
     <Stack spacing={4}>
+      {/* ---------------- Tiendas de recojo (2026-11-15) ------------------- */}
+      <PickupPointsSection />
+
       {/* ---------------- Métodos ------------------------------------------ */}
       <Stack spacing={2}>
         <Stack direction="row" justifyContent="space-between" alignItems="center">

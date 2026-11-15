@@ -5,13 +5,10 @@ import PaymentsRoundedIcon from '@mui/icons-material/PaymentsRounded'
 import PhoneIphoneRoundedIcon from '@mui/icons-material/PhoneIphoneRounded'
 import StorefrontRoundedIcon from '@mui/icons-material/StorefrontRounded'
 import { Box, Stack, Typography } from '@mui/material'
-import { useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
-import { z } from 'zod'
 import { useI18n } from '@/shared/i18n/i18n-context'
-import { PUBLIC_DELIVERY_METHODS_VIEW } from '@/shared/lib/db-schema'
 import { TS } from '@/theme/tokens'
-import { storefrontClient } from '../api'
+import { useStoreDeliveryMethods, type StoreDeliveryMethod } from '../delivery'
 import { usePaymentMethods } from '../payment'
 import { useCommerceContext } from '../commerce/context'
 import { useSessionContext } from '@/features/auth/session-context'
@@ -31,33 +28,6 @@ import { useSessionContext } from '@/features/auth/session-context'
  *
  * Si la tienda no tiene configurado uno de los dos, ese bloque no sale.
  */
-const deliveryMethodSchema = z.object({
-  delivery_method_id: z.string().uuid(),
-  display_name: z.string().min(1),
-  description: z.string().nullable().default(null),
-  strategy: z.string(),
-  lead_time_min_days: z.number().int().nullable().default(null),
-  lead_time_max_days: z.number().int().nullable().default(null),
-})
-type DeliveryMethod = z.infer<typeof deliveryMethodSchema>
-
-function useStoreDeliveryMethods(storeId: string) {
-  return useQuery({
-    queryKey: ['storefront', 'delivery-methods', storeId] as const,
-    staleTime: 10 * 60 * 1000,
-    retry: false,
-    queryFn: async (): Promise<DeliveryMethod[]> => {
-      const { data, error } = await storefrontClient()
-        .from(PUBLIC_DELIVERY_METHODS_VIEW)
-        .select('delivery_method_id, display_name, description, strategy, lead_time_min_days, lead_time_max_days')
-        .eq('store_id', storeId)
-        .order('position', { ascending: true })
-      if (error) throw new Error('DELIVERY_METHODS_FAILED')
-      return z.array(deliveryMethodSchema).parse(data ?? [])
-    },
-  })
-}
-
 const ICONO_PAGO: Record<string, ReactNode> = {
   bank_transfer: <AccountBalanceRoundedIcon fontSize="inherit" />,
   wallet: <PhoneIphoneRoundedIcon fontSize="inherit" />,
@@ -77,7 +47,7 @@ export function CartPurchaseInfo({ storeId, storeSlug }: { storeId: string; stor
   const formas = envios.data ?? []
   if (medios.length === 0 && formas.length === 0) return null
 
-  const plazo = (m: DeliveryMethod) => {
+  const plazo = (m: StoreDeliveryMethod) => {
     const { lead_time_min_days: min, lead_time_max_days: max } = m
     if (min === null && max === null) return null
     if (max === null || min === max) {
