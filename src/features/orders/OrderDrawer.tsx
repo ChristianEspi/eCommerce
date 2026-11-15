@@ -538,8 +538,37 @@ export function OrderDrawer({
             </Stack>
           )
         })()}
+        {/* 2026-11-15 · Lo que hace falta para emitir el comprobante. */}
         <Field
-          label={t('orders.billing.address')}
+          label={t('orders.billing.document')}
+          value={
+            current.billing_address?.document_type === 'invoice'
+              ? t('orders.billing.invoice')
+              : t('orders.billing.receipt')
+          }
+        />
+        {current.billing_address?.tax_id && (
+          <Field
+            label={t(`orders.billing.idType.${current.billing_address.id_type ?? (current.billing_address.document_type === 'invoice' ? 'ruc' : 'dni')}` as MessageKey)}
+            value={current.billing_address.tax_id}
+          />
+        )}
+        {current.billing_address?.legal_name && (
+          <Field
+            label={
+              current.billing_address.document_type === 'invoice'
+                ? t('orders.billing.legalName')
+                : t('orders.billing.name')
+            }
+            value={current.billing_address.legal_name}
+          />
+        )}
+        <Field
+          label={
+            current.billing_address?.document_type === 'invoice'
+              ? t('orders.billing.fiscalAddress')
+              : t('orders.billing.address')
+          }
           value={current.billing_address?.address || '—'}
         />
       </Section>

@@ -143,6 +143,24 @@ export const shippingAddressSchema = z
 export type ShippingAddress = z.infer<typeof shippingAddressSchema>
 
 /**
+ * Los datos del comprobante que pidió el comprador (2026-11-15): boleta con
+ * documento y nombre, o factura con RUC, razón social y dirección fiscal.
+ */
+export const billingAddressSchema = z
+  .object({
+    address: z.string().nullable().default(null),
+    reference: z.string().nullable().default(null),
+    document_type: z.enum(['invoice', 'receipt']).nullable().default(null),
+    id_type: z.enum(['ruc', 'dni', 'ce', 'passport']).nullable().default(null),
+    tax_id: z.string().nullable().default(null),
+    legal_name: z.string().nullable().default(null),
+    cost_center: z.string().nullable().default(null),
+  })
+  .partial()
+  .catch({})
+export type BillingAddress = z.infer<typeof billingAddressSchema>
+
+/**
  * Snapshot del cliente (P08-SaaS). Todas las claves opcionales: un pedido B2C
  * solo trae correo y nombre, y uno B2B trae además la ficha que resolvió el
  * servidor. `.catch({})` porque es `jsonb`: un pedido antiguo no lo tiene.
@@ -191,7 +209,7 @@ export const orderSchema = z.object({
   grand_total: moneyText,
   tax_inclusive: z.boolean().nullable().default(false),
   shipping_address: shippingAddressSchema.nullable().default(null),
-  billing_address: shippingAddressSchema.nullable().default(null),
+  billing_address: billingAddressSchema.nullable().default(null),
   customer_snapshot: customerSnapshotSchema.nullable().default(null),
   purchase_order_number: z.string().nullable().default(null),
   approval_reason: z.string().nullable().default(null),

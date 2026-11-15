@@ -554,7 +554,7 @@ describe('normalizeBillingAddress · datos del comprobante', () => {
         address: 'Av. Javier Prado 1234',
         country: 'pe',
         document_type: 'invoice',
-        tax_id: ' 20601234567 ',
+        tax_id: ' 20131312955 ',
         legal_name: ' Policlínico Andino S.A.C. ',
         cost_center: 'CC-0412',
       }),
@@ -562,9 +562,10 @@ describe('normalizeBillingAddress · datos del comprobante', () => {
       address: 'Av. Javier Prado 1234',
       country: 'PE',
       document_type: 'invoice',
-      tax_id: '20601234567',
+      tax_id: '20131312955',
       legal_name: 'Policlínico Andino S.A.C.',
       cost_center: 'CC-0412',
+      id_type: 'ruc',
     })
   })
 
@@ -574,7 +575,58 @@ describe('normalizeBillingAddress · datos del comprobante', () => {
       'CAMPO_INVALIDO',
     )
     expectCode(
-      () => normalizeBillingAddress({ address: 'Jr. Lima 45', document_type: 'invoice', tax_id: '20601234567' }),
+      () => normalizeBillingAddress({ address: 'Jr. Lima 45', document_type: 'invoice', tax_id: '20131312955' }),
+      'CAMPO_INVALIDO',
+    )
+  })
+
+  it('factura: el RUC tiene que pasar su dígito verificador y ser RUC (2026-11-15)', () => {
+    expectCode(
+      () =>
+        normalizeBillingAddress({
+          address: 'Jr. Lima 45',
+          document_type: 'invoice',
+          tax_id: '20601234567',
+          legal_name: 'ACME SAC',
+        }),
+      'CAMPO_INVALIDO',
+    )
+    expectCode(
+      () =>
+        normalizeBillingAddress({
+          address: 'Jr. Lima 45',
+          document_type: 'invoice',
+          id_type: 'dni',
+          tax_id: '45781236',
+          legal_name: 'Ana Pérez',
+        }),
+      'CAMPO_INVALIDO',
+    )
+  })
+
+  it('boleta: tipo y número de documento, con su forma', () => {
+    expect(
+      normalizeBillingAddress({
+        address: 'Jr. Lima 45',
+        document_type: 'receipt',
+        id_type: 'dni',
+        tax_id: '45781236',
+        legal_name: 'Ana Pérez',
+      }),
+    ).toEqual({
+      address: 'Jr. Lima 45',
+      document_type: 'receipt',
+      id_type: 'dni',
+      tax_id: '45781236',
+      legal_name: 'Ana Pérez',
+    })
+    expectCode(
+      () =>
+        normalizeBillingAddress({ address: 'Jr. Lima 45', document_type: 'receipt', id_type: 'dni', tax_id: '4578123' }),
+      'CAMPO_INVALIDO',
+    )
+    expectCode(
+      () => normalizeBillingAddress({ address: 'Jr. Lima 45', document_type: 'receipt', id_type: 'cedula', tax_id: '1' }),
       'CAMPO_INVALIDO',
     )
   })

@@ -140,3 +140,128 @@ export async function tokenizarTarjeta(
   if (typeof cuerpo.id !== 'string') throw new TokenizacionError('TOKEN_NO_EMITIDO')
   return cuerpo.id
 }
+
+// ---------------------------------------------------------------------------
+// Culqi Checkout: el formulario OFICIAL de Culqi (2026-11-15)
+// ---------------------------------------------------------------------------
+
+/**
+ * Decisión del operador: la tarjeta se escribe en la ventana de Culqi, no en
+ * campos de la tienda. Así el número nunca pasa por el código de esta página
+ * (PCI) y Culqi resuelve la verificación del banco (3DS).
+ *
+ * La librería es `checkout.culqi.com/js/v4`: se fija la llave pública, el
+ * monto (solo para mostrarlo: el cobro lo calcula el servidor) y se abre.
+ * Culqi avisa llamando a la función global `window.culqi`; aquí se envuelve
+ * en una promesa que devuelve el token, o falla con:
+ *
+ *   CANCELADO          el comprador cerró la ventana sin pagar;
+ *   TARJETA_RECHAZADA  Culqi no aceptó la tarjeta;
+ *   CULQI_NO_CARGA / CULQI_SIN_API  la librería no está disponible.
+ *
+ * Se piden SOLO tarjetas: Yape, banca móvil o agentes dentro de Culqi crean
+ * una «orden» que se paga después y necesita otro circuito en el servidor.
+ */
+export interface CulqiCheckoutInput {
+  readonly llavePublica: string
+  /** Monto en céntimos, para que la ventana lo muestre. */
+  readonly montoCentimos: number
+  readonly moneda: string
+  readonly titulo: string
+}
+
+let cargandoCheckout: Promise<void> | null = null
+
+function cargarCulqiCheckout(): Promise<void> {
+  if (typeof window === 'undefined') return Promise.reject(new TokenizacionError('CULQI_NO_CARGA'))
+  if ((window as unknown as { Culqi?: unknown }).Culqi) return Promise.resolve()
+  if (cargandoCheckout) return cargandoCheckout
+  cargandoCheckout = new Promise<void>((resolver, rechazar) => {
+    const script = document.createElement('script')
+    script.src = 'https://checkout.culqi.com/js/v4'
+    script.async = true
+    script.onload = () => resolver()
+    script.onerror = () => {
+      cargandoCheckout = null
+      rechazar(new TokenizacionError('CULQI_NO_CARGA'))
+    }
+    document.head.appendChild(script)
+  })
+  return cargandoCheckout
+}
+
+interface CulqiGlobal {
+  publicKey?: string
+  settings?: (opciones: Record<string, unknown>) => void
+  options?: (opciones: Record<string, unknown>) => void
+  open?: () => void
+  close?: () => void
+  isOpen?: boolean
+  token?: { id?: string } | null
+  error?: { user_message?: string } | null
+}
+
+export async function pagarConCulqiCheckout(input: CulqiCheckoutInput): Promise<string> {
+  await cargarCulqiCheckout()
+  const ventana = window as unknown as { Culqi?: CulqiGlobal; culqi?: () => void }
+  const culqi = ventana.Culqi
+  if (!culqi || typeof culqi.open !== 'function' || typeof culqi.settings !== 'function') {
+    throw new TokenizacionError('CULQI_SIN_API')
+  }
+
+  culqi.publicKey = input.llavePublica
+  culqi.token = null
+  culqi.error = null
+  culqi.settings({
+    title: input.titulo,
+    currency: input.moneda,
+    amount: Math.max(1, Math.round(input.montoCentimos)),
+  })
+  culqi.options?.({
+    lang: 'auto',
+    installments: false,
+    paymentMethods: { tarjeta: true, yape: false, bancaMovil: false, agente: false, billetera: false, cuotealo: false },
+  })
+
+  return new Promise<string>((resolve, reject) => {
+    const anterior = ventana.culqi
+    let terminado = false
+    let visto = false
+    const terminar = (accion: () => void) => {
+      if (terminado) return
+      terminado = true
+      clearInterval(vigia)
+      ventana.culqi = anterior
+      accion()
+    }
+
+    ventana.culqi = () => {
+      const id = culqi.token?.id
+      if (typeof id === 'string' && id) {
+        culqi.close?.()
+        terminar(() => resolve(id))
+      } else if (culqi.error) {
+        culqi.close?.()
+        terminar(() => reject(new TokenizacionError('TARJETA_RECHAZADA')))
+      }
+    }
+
+    // Cerrar la ventana sin pagar no llama a `culqi()`: se vigila si sigue
+    // abierta (`Culqi.isOpen` o, si la versión no lo expone, su iframe).
+    const vigia = setInterval(() => {
+      const abierta =
+        typeof culqi.isOpen === 'boolean'
+          ? culqi.isOpen
+          : Boolean(document.querySelector('iframe[src*="culqi"], iframe[name*="culqi" i]'))
+      if (abierta) visto = true
+      else if (visto) terminar(() => reject(new TokenizacionError('CANCELADO')))
+    }, 400)
+
+    culqi.open?.()
+    // Se mira YA si quedó abierta: si el comprador la cierra antes del primer
+    // ciclo de la vigía, sin esto la promesa no terminaría nunca.
+    if (culqi.isOpen === true || document.querySelector('iframe[src*="culqi"], iframe[name*="culqi" i]')) {
+      visto = true
+    }
+  })
+}

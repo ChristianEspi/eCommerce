@@ -1,3 +1,4 @@
+import { isValidReceiptId, isValidRuc } from '@/shared/lib/peruDocs'
 import { z } from 'zod'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { UiError } from '@/shared/lib/appError'
@@ -142,13 +143,28 @@ export const checkoutSchema = z.object({
     .optional(),
   legalName: z.string().trim().max(200, 'store.checkout.error.legalName').optional(),
   costCenter: z.string().trim().max(60, 'store.checkout.error.costCenter').optional(),
+  /**
+   * 2026-11-15 · Boleta: tipo del documento del comprador (DNI, carné de
+   * extranjería, pasaporte); el número va en `taxId` y el nombre en
+   * `legalName`. Factura: el documento es siempre RUC.
+   */
+  idType: z.enum(['dni', 'ce', 'passport']).optional(),
+  /** Factura: la dirección fiscal del RUC (puede no ser la de entrega). */
+  fiscalAddress: z.string().trim().max(300, 'store.checkout.error.fiscalAddress').optional(),
 }).superRefine((values, ctx) => {
-  if (values.invoiceType !== 'invoice') return
-  if (!values.taxId || values.taxId.length < 3) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['taxId'], message: 'store.checkout.error.taxId' })
+  const issue = (path: 'taxId' | 'legalName' | 'fiscalAddress' | 'idType', message: MessageKey) =>
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message })
+  if (values.invoiceType === 'invoice') {
+    if (!values.taxId || !isValidRuc(values.taxId)) issue('taxId', 'store.checkout.error.ruc')
+    if (!values.legalName || values.legalName.length < 2) issue('legalName', 'store.checkout.error.legalName')
+    if (!values.fiscalAddress || values.fiscalAddress.length < 5) issue('fiscalAddress', 'store.checkout.error.fiscalAddress')
+    return
   }
-  if (!values.legalName || values.legalName.length < 2) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['legalName'], message: 'store.checkout.error.legalName' })
+  // Boleta: SIEMPRE con documento y nombre (decisión del operador, 2026-11-15).
+  if (values.invoiceType === 'receipt') {
+    if (!values.idType) issue('idType', 'store.checkout.error.docNumber')
+    else if (!values.taxId || !isValidReceiptId(values.idType, values.taxId)) issue('taxId', 'store.checkout.error.docNumber')
+    if (!values.legalName || values.legalName.length < 3) issue('legalName', 'store.checkout.error.receiptName')
   }
 })
 export type CheckoutValues = z.infer<typeof checkoutSchema>
@@ -466,16 +482,24 @@ export function shippingAddressOf(
  * entrega cambiaría el `request_hash` de todas las compras de siempre sin
  * aportar nada.
  */
-export function billingAddressOf(values: CheckoutValues): Record<string, string> | null {
+export function billingAddressOf(
+  values: CheckoutValues,
+  withIdType = true,
+): Record<string, string | number> | null {
   const factura = values.invoiceType === 'invoice'
+  const boleta = values.invoiceType === 'receipt' && Boolean(values.taxId?.trim())
   const centro = values.costCenter?.trim()
-  if (!factura && !centro) return null
-  const billing: Record<string, string> = {
-    ...shippingAddressOf(values),
-    document_type: factura ? 'invoice' : 'receipt',
-  }
-  if (factura && values.taxId) billing.tax_id = values.taxId.trim()
-  if (factura && values.legalName) billing.legal_name = values.legalName.trim()
+  if (!factura && !boleta && !centro) return null
+  // Factura: la dirección FISCAL del RUC. Boleta: la de entrega, sin el punto
+  // del mapa (eso es de la entrega, no del comprobante).
+  const billing: Record<string, string | number> = factura
+    ? { address: (values.fiscalAddress ?? '').trim(), ...(values.country ? { country: values.country } : {}) }
+    : { ...shippingAddressOf(values, false) }
+  billing.document_type = factura ? 'invoice' : 'receipt'
+  if ((factura || boleta) && values.taxId) billing.tax_id = values.taxId.trim().toUpperCase()
+  if ((factura || boleta) && values.legalName) billing.legal_name = values.legalName.trim()
+  if (withIdType && factura) billing.id_type = 'ruc'
+  if (withIdType && boleta && values.idType) billing.id_type = values.idType
   if (centro) billing.cost_center = centro
   return billing
 }
@@ -495,7 +519,8 @@ export async function startCheckout(input: StartCheckoutInput): Promise<OrderRes
     throw new CheckoutError('store.checkout.error.emptyCart', 'ITEMS_REQUERIDOS')
   }
 
-  // Sin punto si el borde todavía no lo admite (ver el reintento de abajo).
+  // Sin punto ni tipo de documento si el borde todavía no los admite (ver el
+  // reintento de abajo).
   let conPunto = true
 
   async function invoke(cartToken: string | null) {
@@ -509,7 +534,7 @@ export async function startCheckout(input: StartCheckoutInput): Promise<OrderRes
       customer_phone: input.customerPhone,
       shipping_address: shippingAddressOf(input, conPunto),
       // Resumen v2. Solo con factura o centro de costo: ver `billingAddressOf`.
-      ...(billingAddressOf(input) ? { billing_address: billingAddressOf(input) } : {}),
+      ...(billingAddressOf(input, conPunto) ? { billing_address: billingAddressOf(input, conPunto) } : {}),
       // P12. La ELECCIÓN de entrega, sin un solo importe dentro. `null` cuando
       // la tienda no tiene métodos: el pedido nace con transporte cero, que es
       // exactamente lo que hacía antes de esta fase.
@@ -573,7 +598,11 @@ export async function startCheckout(input: StartCheckoutInput): Promise<OrderRes
      * venta por él sería peor que perder el pin. Un reintento, sin punto, con
      * la misma clave de idempotencia (el primero no llegó a registrar nada).
      */
-    if (error && failure.code === 'CAMPO_NO_PERMITIDO' && input.latitude !== undefined) {
+    if (
+      error &&
+      failure.code === 'CAMPO_NO_PERMITIDO' &&
+      (input.latitude !== undefined || billingAddressOf(input)?.id_type !== undefined)
+    ) {
       conPunto = false
       ;({ data, error } = await invoke(input.cartToken ?? null))
       failure = error ? await failureFromInvokeError(error) : failure

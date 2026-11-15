@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router-dom'
 import { renderWithProviders } from '@/test/render'
 import { currentPosition, geocodeAddress, reverseGeocode } from '@/shared/lib/geo'
@@ -1002,8 +1002,18 @@ async function rellenarContacto(user: ReturnType<typeof userEvent.setup>) {
 async function irAPagar(user: ReturnType<typeof userEvent.setup>) {
   const siguiente = screen.queryByRole('button', { name: 'Siguiente' })
   if (siguiente) await user.click(siguiente)
-  return screen.findByRole('button', { name: 'Confirmar pedido' })
+  const confirmar = await screen.findByRole('button', { name: 'Confirmar pedido' })
+  // 2026-11-15 · La boleta lleva SIEMPRE documento y nombre: se completa el DNI
+  // (el nombre se propone con el del contacto) salvo que la prueba ya lo hiciera.
+  const documento = screen.queryByLabelText(/Número de documento/)
+  if (documento && (documento as HTMLInputElement).value === '') await user.type(documento, DNI_PRUEBA)
+  const nombre = screen.queryByLabelText(/Nombre completo/)
+  if (nombre && (nombre as HTMLInputElement).value === '') await user.type(nombre, 'Ana Pérez')
+  return confirmar
 }
+
+/** Un DNI con forma válida (8 dígitos) para la boleta. */
+const DNI_PRUEBA = '45781236'
 
 describe('entrega en el checkout (P12)', () => {
   it('enseña el envío ya calculado por el servidor, separado del total', async () => {
@@ -1442,6 +1452,99 @@ describe('mapa de la entrega', () => {
     await user.click(await irAPagar(user))
     await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
     expect(fake.state.invocations[0]?.body.shipping_address).toMatchObject({ latitude: -12.1255, longitude: -77.03 })
+  })
+})
+
+/**
+ * Culqi Checkout (2026-11-15): con llave pública de la tienda, la tarjeta se
+ * escribe en la ventana OFICIAL de Culqi. Aquí `window.Culqi` es un doble que
+ * imita su contrato: `settings`, `options`, `open` y la llamada a `window.culqi`.
+ */
+const TARJETA_CULQI = {
+  payment_method_id: 'dddd3333-3333-4333-8333-333333333333',
+  store_id: STORE,
+  code: 'tarjeta',
+  kind: 'card',
+  display_name: 'Tarjeta de crédito o débito',
+  position: 5,
+  instructions: null,
+  checkout_public_key: 'pk_test_ifgncgnlZF7oxgGv',
+}
+
+type CulqiDoble = Record<string, unknown> & { token?: { id: string } | null; isOpen?: boolean }
+
+function instalarCulqi(alAbrir: (culqi: CulqiDoble) => void) {
+  const ajustes: Array<Record<string, unknown>> = []
+  const culqi: CulqiDoble = {
+    settings: (opciones: Record<string, unknown>) => ajustes.push(opciones),
+    options: () => undefined,
+    close: () => {
+      culqi.isOpen = false
+    },
+    open: () => {
+      culqi.isOpen = true
+      alAbrir(culqi)
+    },
+  }
+  ;(window as unknown as { Culqi?: CulqiDoble }).Culqi = culqi
+  return ajustes
+}
+
+describe('pago con el formulario oficial de Culqi', () => {
+  afterEach(() => {
+    delete (window as unknown as { Culqi?: unknown }).Culqi
+  })
+
+  function backendConCulqi() {
+    const fake = backendConEntrega()
+    fake.state.tables.public_payment_methods = [TARJETA_CULQI, ...MEDIOS_PAGO]
+    return fake
+  }
+
+  it('no pide la tarjeta en la tienda: abre Culqi con el monto, y su token viaja con el pedido', async () => {
+    const ajustes = instalarCulqi((culqi) => {
+      culqi.token = { id: 'tkn_test_desde_culqi' }
+      ;(window as unknown as { culqi: () => void }).culqi()
+    })
+    const user = userEvent.setup()
+    const fake = backendConCulqi()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(fake, '/s/casa-nordica/checkout')
+    await rellenarContacto(user)
+    await user.click(await screen.findByRole('radio', { name: /Envío estándar/ }))
+    const confirmar = await irAPagar(user)
+    await user.click(screen.getByRole('radio', { name: /Tarjeta de crédito o débito/ }))
+
+    expect(screen.queryByLabelText(/Número de tarjeta/)).not.toBeInTheDocument()
+    expect(screen.getByText('Pago seguro con Culqi')).toBeInTheDocument()
+
+    await user.click(confirmar)
+    await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
+    expect(fake.state.invocations[0]?.body.payment_token).toBe('tkn_test_desde_culqi')
+    expect(fake.state.invocations[0]?.body.payment_method_code).toBe('tarjeta')
+    // La ventana muestra el monto en céntimos y la moneda de la tienda.
+    expect(ajustes[0]).toMatchObject({ currency: 'PEN' })
+    expect(Number(ajustes[0]?.amount)).toBeGreaterThan(0)
+  })
+
+  it('si el comprador cierra la ventana sin pagar, no hay pedido y se le dice', async () => {
+    instalarCulqi((culqi) => {
+      setTimeout(() => {
+        culqi.isOpen = false
+      }, 50)
+    })
+    const user = userEvent.setup()
+    const fake = backendConCulqi()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(fake, '/s/casa-nordica/checkout')
+    await rellenarContacto(user)
+    await user.click(await screen.findByRole('radio', { name: /Envío estándar/ }))
+    const confirmar = await irAPagar(user)
+    await user.click(screen.getByRole('radio', { name: /Tarjeta de crédito o débito/ }))
+    await user.click(confirmar)
+
+    expect(await screen.findByText(/Cerraste el formulario de Culqi sin pagar/)).toBeInTheDocument()
+    expect(fake.state.invocations).toHaveLength(0)
   })
 })
 
@@ -2016,31 +2119,60 @@ describe('orden de compra (N05)', () => {
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
     expect(fake.state.invocations).toHaveLength(0)
 
+    // 2026-11-15 · Un RUC sin su dígito verificador correcto tampoco.
     await user.type(screen.getByLabelText(/RUC/), '20601234567')
+    await user.type(screen.getByLabelText(/Dirección fiscal/), 'Av. Javier Prado Este 4200, Surco')
+    await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
+    expect(await screen.findByText('El RUC no es válido: revisa los 11 dígitos.')).toBeInTheDocument()
+    expect(fake.state.invocations).toHaveLength(0)
+
+    await user.clear(screen.getByLabelText(/RUC/))
+    await user.type(screen.getByLabelText(/RUC/), '20131312955')
     await user.type(screen.getByLabelText(/Centro de costo/), 'CC-0412')
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
     await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
     const { body } = fake.state.invocations[0]!
+    // La factura va a la dirección FISCAL del RUC, no a la de entrega.
     expect(body.billing_address).toMatchObject({
-      address: 'Av. Primavera 120',
+      address: 'Av. Javier Prado Este 4200, Surco',
       document_type: 'invoice',
-      tax_id: '20601234567',
+      id_type: 'ruc',
+      tax_id: '20131312955',
       legal_name: 'Corporación Andina SAC',
       cost_center: 'CC-0412',
     })
     for (const prohibida of CLAVES_PROHIBIDAS) expect(todasLasClaves(body)).not.toContain(prohibida)
   })
 
-  it('con boleta y sin centro de costo no se manda dirección fiscal: se factura donde se entrega', async () => {
+  it('la boleta lleva SIEMPRE documento y nombre, en la dirección de entrega (2026-11-15)', async () => {
     const user = userEvent.setup()
     const fake = conSesion({ ...CONTEXTO_EMPRESA, purchase_order_required: false })
     await rellenarConSesion(user)
-    await irAPagar(user)
+    const confirmar = await irAPagar(user)
 
     expect(await screen.findByRole('button', { name: 'Boleta' })).toHaveAttribute('aria-pressed', 'true')
-    await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
+    // Sin documento no se confirma, y el aviso dice qué falta.
+    await user.clear(screen.getByLabelText(/Número de documento/))
+    await user.type(screen.getByLabelText(/Número de documento/), '1234')
+    await user.click(confirmar)
+    expect(await screen.findByText('Revisa el número de documento: un DNI tiene 8 dígitos.')).toBeInTheDocument()
+    expect(fake.state.invocations).toHaveLength(0)
+
+    await user.clear(screen.getByLabelText(/Número de documento/))
+    await user.type(screen.getByLabelText(/Número de documento/), '45781236')
+    await user.click(confirmar)
     await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
-    expect(Object.keys(fake.state.invocations[0]!.body)).not.toContain('billing_address')
+    const billing = fake.state.invocations[0]!.body.billing_address as Record<string, unknown>
+    expect(billing).toMatchObject({
+      address: 'Av. Primavera 120',
+      document_type: 'receipt',
+      id_type: 'dni',
+      tax_id: '45781236',
+    })
+    // El nombre se propuso con el de contacto, completo (no solo su primera letra).
+    expect(String(billing.legal_name).length).toBeGreaterThan(2)
+    // El punto del mapa es de la entrega, no del comprobante.
+    expect(billing).not.toHaveProperty('latitude')
   })
 
   it('si el servidor la exige igualmente, el aviso dice qué falta', async () => {

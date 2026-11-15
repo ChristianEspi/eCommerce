@@ -41,6 +41,17 @@ export function CardFields({
 }) {
   const { t } = useI18n()
   const simulado = esSimulacroDePago(llavePublica)
+
+  // Con llave de la tienda la tarjeta se escribe en la ventana OFICIAL de
+  // Culqi (2026-11-15): aquí solo se avisa de que se abrirá.
+  if (!simulado) {
+    return (
+      <Alert icon={<LockRoundedIcon fontSize="small" />} severity="info" sx={{ mt: 1, borderRadius: 'var(--sf-radius-sm)' }}>
+        <Typography sx={{ fontSize: TS.label, fontWeight: 800, mb: 0.25 }}>{t('store.card.culqiTitle')}</Typography>
+        <Box sx={{ fontSize: TS.label }}>{t('store.card.culqiBody')}</Box>
+      </Alert>
+    )
+  }
   const numeroDigitos = soloDigitos(datos.numero)
   const numeroMal = numeroDigitos.length >= 13 && !pareceTarjeta(datos.numero)
 

@@ -14,6 +14,7 @@ import {
   Chip,
   CircularProgress,
   Divider,
+  MenuItem,
   FormControlLabel,
   Stack,
   TextField,
@@ -46,7 +47,14 @@ import { PaymentPicker } from './components/PaymentPicker'
 import { useDeliveryOptions, useStoreDeliveryMethods, type StorePickupPoint } from './delivery'
 import { defaultPaymentCode, usePaymentMethods } from './payment'
 import { CardFields } from './components/CardFields'
-import { TokenizacionError, pareceTarjeta, tokenizarTarjeta, type DatosTarjeta } from './cardToken'
+import {
+  TokenizacionError,
+  clavePublicaCulqi,
+  pagarConCulqiCheckout,
+  pareceTarjeta,
+  tokenizarTarjeta,
+  type DatosTarjeta,
+} from './cardToken'
 import {
   CheckoutError,
   checkoutSchema,
@@ -154,7 +162,7 @@ const CAMPOS: ReadonlyArray<ReadonlyArray<keyof CheckoutValues>> = [
   ['customerName', 'customerEmail', 'customerPhone'],
   ['address', 'city', 'region', 'postalCode', 'country', 'reference'],
   // Resumen v2 · El cupón vive en el paso de PAGO, junto al total que cambia.
-  ['paymentMethodCode', 'purchaseOrderNumber', 'invoiceType', 'taxId', 'legalName', 'costCenter', 'couponCode', 'giftCardCode'],
+  ['paymentMethodCode', 'purchaseOrderNumber', 'invoiceType', 'idType', 'taxId', 'legalName', 'fiscalAddress', 'costCenter', 'couponCode', 'giftCardCode'],
 ]
 
 export function StoreCheckoutPage() {
@@ -237,8 +245,10 @@ export function StoreCheckoutPage() {
       paymentMethodCode: '',
       purchaseOrderNumber: '',
       invoiceType: 'receipt',
+      idType: 'dni',
       taxId: '',
       legalName: '',
+      fiscalAddress: '',
       costCenter: '',
     },
   })
@@ -255,6 +265,32 @@ export function StoreCheckoutPage() {
     if (tipoComprobante !== 'invoice' || !contextoComercial) return
     if ((getValues('legalName') ?? '') === '') setValue('legalName', contextoComercial.account_name)
   }, [tipoComprobante, contextoComercial, getValues, setValue])
+
+  // Boleta: el nombre del comprobante se propone con el del contacto, sin
+  // pisar lo que el comprador ya escribió (2026-11-15).
+  // Sigue al nombre de contacto mientras sea el propuesto (o esté vacío): si se
+  // copiara una sola vez, se quedaría con la primera letra tecleada.
+  const nombreContacto = useWatch({ control, name: 'customerName' })
+  const nombrePropuesto = useRef('')
+  useEffect(() => {
+    if (tipoComprobante === 'invoice') return
+    const actual = getValues('legalName') ?? ''
+    const contacto = (nombreContacto ?? '').trim()
+    if (actual === '' || actual === nombrePropuesto.current) {
+      nombrePropuesto.current = contacto
+      setValue('legalName', contacto)
+    }
+  }, [tipoComprobante, nombreContacto, getValues, setValue])
+
+  /** Cambiar boleta ↔ factura: el número y el nombre de uno no sirven para el otro. */
+  const cambiarComprobante = (tipo: 'receipt' | 'invoice') => {
+    setValue('invoiceType', tipo)
+    setValue('taxId', '')
+    setValue('idType', 'dni')
+    const contacto = (getValues('customerName') ?? '').trim()
+    if (tipo === 'receipt') nombrePropuesto.current = contacto
+    setValue('legalName', tipo === 'invoice' ? (contextoComercial?.account_name ?? '') : contacto)
+  }
 
   /**
    * H04 · Lo que ya sabemos de quien compra con sesión.
@@ -571,6 +607,10 @@ export function StoreCheckoutPage() {
     (metodo) => metodo.code === (watched.paymentMethodCode ?? ''),
   )
   const pideTarjeta = medioElegido?.kind === 'card'
+  // Con llave de la tienda, la tarjeta se escribe en la ventana de Culqi y
+  // nuestros campos no se piden; sin llave, simulacro con nuestros campos.
+  const llaveCulqi = pideTarjeta ? clavePublicaCulqi(medioElegido?.checkout_public_key) : null
+  const camposPropios = pideTarjeta && !llaveCulqi
 
   // Se marca solo cuando la eleccion es inequivoca: con un unico medio,
   // obligar a pulsarlo es un clic que no decide nada. Con dos o mas se deja en
@@ -582,6 +622,12 @@ export function StoreCheckoutPage() {
   }, [paymentMethods, setValue])
   const selectedDelivery =
     deliveryOptions.find((option) => option.code === (watched.deliveryMethodCode ?? '')) ?? null
+  // El total que se enseña (y que muestra la ventana de Culqi): cotización
+  // del servidor más el envío elegido. El cobro lo vuelve a calcular el servidor.
+  const totalAPagar = quoted
+    ? Number(quoted.grossTotal) +
+      (selectedDelivery?.available && selectedDelivery.amount !== null ? Number(selectedDelivery.amount) : 0)
+    : null
   const shippingAmount =
     selectedDelivery?.available && selectedDelivery.amount !== null
       ? Number(selectedDelivery.amount)
@@ -629,9 +675,9 @@ export function StoreCheckoutPage() {
       }
       // Luhn en el navegador no valida una tarjeta —eso lo dice el emisor—:
       // evita gastar una llamada a la pasarela por un digito mal tecleado.
-      if (pideTarjeta && !pareceTarjeta(tarjeta.numero)) return 'store.card.numberInvalid'
+      if (camposPropios && !pareceTarjeta(tarjeta.numero)) return 'store.card.numberInvalid'
       if (
-        pideTarjeta &&
+        camposPropios &&
         (tarjeta.mes.length < 1 || tarjeta.anio.length < 2 || tarjeta.cvv.length < 3)
       ) {
         return 'store.card.incomplete'
@@ -732,12 +778,16 @@ export function StoreCheckoutPage() {
        * pasarela desde el propio navegador: es lo que mantiene el numero
        * fuera de todo el backend y, con el, el alcance de PCI.
        */
-      const paymentToken = pideTarjeta
-        ? await tokenizarTarjeta(
-            { ...tarjeta, email: input.values.customerEmail },
-            medioElegido?.checkout_public_key ?? null,
-          )
-        : null
+      const paymentToken = !pideTarjeta
+        ? null
+        : llaveCulqi
+          ? await pagarConCulqiCheckout({
+              llavePublica: llaveCulqi,
+              montoCentimos: Math.round((totalAPagar ?? Number(subtotal)) * 100),
+              moneda: currency,
+              titulo: store.name,
+            })
+          : await tokenizarTarjeta({ ...tarjeta, email: input.values.customerEmail }, null)
 
       writePendingAttempt(storeSlug, { key: idempotencyKey, startedAt: Date.now() })
       return startCheckout({
@@ -810,7 +860,9 @@ export function StoreCheckoutPage() {
         error instanceof TokenizacionError
           ? error.message === 'TARJETA_RECHAZADA'
             ? 'store.card.rejected'
-            : 'store.card.gatewayDown'
+            : error.message === 'CANCELADO'
+              ? 'store.card.cancelled'
+              : 'store.card.gatewayDown'
           : null
       setErrorKey(errorTarjeta ?? checkoutError?.key ?? 'store.checkout.error.generic')
       setErrorStage(checkoutError?.stage ?? null)
@@ -1304,16 +1356,12 @@ export function StoreCheckoutPage() {
                   />
                 )}
 
-                {/* Resumen v2 · El comprobante, en UNA fila: tipo, RUC y razón
-                    social. Boleta no pide nada más; factura pide RUC y razón
-                    social, que el servidor vuelve a validar. */}
+                {/* El comprobante (2026-11-15). Boleta: tipo y número de documento y
+                    nombre, SIEMPRE. Factura: RUC (con dígito verificador), razón social y
+                    dirección fiscal. El servidor vuelve a validar todo. */}
                 <Divider />
-                <Stack
-                  direction={{ xs: 'column', md: 'row' }}
-                  sx={{ gap: 1.5, alignItems: { md: 'flex-start' } }}
-                  data-checkout-invoice={watched.invoiceType ?? 'receipt'}
-                >
-                  <Stack sx={{ gap: 0.5, flexShrink: 0 }}>
+                <Stack sx={{ gap: 1.5 }} data-checkout-invoice={watched.invoiceType ?? 'receipt'}>
+                  <Stack direction="row" sx={{ alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
                     <Typography component="h3" sx={{ fontSize: TS.label, fontWeight: 700, color: 'var(--muted)' }}>
                       {t('store.checkout.invoiceTitle')}
                     </Typography>
@@ -1322,34 +1370,87 @@ export function StoreCheckoutPage() {
                       size="small"
                       value={watched.invoiceType ?? 'receipt'}
                       aria-label={t('store.checkout.invoiceTitle')}
-                      onChange={(_, next: 'receipt' | 'invoice' | null) => next && setValue('invoiceType', next)}
-                      sx={{ alignSelf: 'flex-start', '& .MuiToggleButton-root': { textTransform: 'none', fontWeight: 700, px: 2 } }}
+                      onChange={(_, next: 'receipt' | 'invoice' | null) => next && cambiarComprobante(next)}
+                      sx={{ '& .MuiToggleButton-root': { textTransform: 'none', fontWeight: 700, px: 2 } }}
                     >
                       <ToggleButton value="receipt">{t('store.checkout.invoiceReceipt')}</ToggleButton>
                       <ToggleButton value="invoice">{t('store.checkout.invoiceInvoice')}</ToggleButton>
                     </ToggleButtonGroup>
                   </Stack>
-                  {watched.invoiceType === 'invoice' && (
-                    <>
+                  {(watched.invoiceType ?? 'receipt') === 'receipt' ? (
+                    <Stack direction={{ xs: 'column', md: 'row' }} sx={{ gap: 1.5 }}>
                       <TextField
-                        label={t('store.checkout.taxId')}
+                        select
+                        label={t('store.checkout.idType')}
+                        value={watched.idType ?? 'dni'}
+                        onChange={(evento) => setValue('idType', evento.target.value as 'dni' | 'ce' | 'passport', { shouldValidate: true })}
+                        sx={{ width: { md: 210 }, flexShrink: 0 }}
+                        slotProps={{ htmlInput: { 'aria-label': t('store.checkout.idType') } }}
+                      >
+                        <MenuItem value="dni">{t('store.checkout.idType.dni')}</MenuItem>
+                        <MenuItem value="ce">{t('store.checkout.idType.ce')}</MenuItem>
+                        <MenuItem value="passport">{t('store.checkout.idType.passport')}</MenuItem>
+                      </TextField>
+                      <TextField
+                        label={t('store.checkout.docNumber')}
                         required
                         autoComplete="off"
-                        sx={{ width: { md: 180 }, flexShrink: 0 }}
+                        sx={{ width: { md: 190 }, flexShrink: 0 }}
                         error={Boolean(errors.taxId)}
                         helperText={errors.taxId ? t(errors.taxId.message as MessageKey) : undefined}
-                        slotProps={{ htmlInput: { maxLength: 20, inputMode: 'numeric', style: { fontFamily: 'monospace' } } }}
+                        slotProps={{
+                          htmlInput: {
+                            maxLength: 15,
+                            inputMode: (watched.idType ?? 'dni') === 'dni' ? 'numeric' : 'text',
+                            style: { fontFamily: 'monospace' },
+                          },
+                        }}
                         {...register('taxId')}
                       />
                       <TextField
-                        label={t('store.checkout.legalName')}
+                        label={t('store.checkout.receiptName')}
                         required
                         fullWidth
-                        autoComplete="organization"
+                        autoComplete="name"
                         error={Boolean(errors.legalName)}
                         helperText={errors.legalName ? t(errors.legalName.message as MessageKey) : undefined}
                         slotProps={{ htmlInput: { maxLength: 200 } }}
                         {...register('legalName')}
+                      />
+                    </Stack>
+                  ) : (
+                    <>
+                      <Stack direction={{ xs: 'column', md: 'row' }} sx={{ gap: 1.5 }}>
+                        <TextField
+                          label={t('store.checkout.taxId')}
+                          required
+                          autoComplete="off"
+                          sx={{ width: { md: 190 }, flexShrink: 0 }}
+                          error={Boolean(errors.taxId)}
+                          helperText={errors.taxId ? t(errors.taxId.message as MessageKey) : undefined}
+                          slotProps={{ htmlInput: { maxLength: 11, inputMode: 'numeric', style: { fontFamily: 'monospace' } } }}
+                          {...register('taxId')}
+                        />
+                        <TextField
+                          label={t('store.checkout.legalName')}
+                          required
+                          fullWidth
+                          autoComplete="organization"
+                          error={Boolean(errors.legalName)}
+                          helperText={errors.legalName ? t(errors.legalName.message as MessageKey) : undefined}
+                          slotProps={{ htmlInput: { maxLength: 200 } }}
+                          {...register('legalName')}
+                        />
+                      </Stack>
+                      <TextField
+                        label={t('store.checkout.fiscalAddress')}
+                        required
+                        fullWidth
+                        autoComplete="off"
+                        error={Boolean(errors.fiscalAddress)}
+                        helperText={errors.fiscalAddress ? t(errors.fiscalAddress.message as MessageKey) : t('store.checkout.fiscalAddressHint')}
+                        slotProps={{ htmlInput: { maxLength: 300 } }}
+                        {...register('fiscalAddress')}
                       />
                     </>
                   )}

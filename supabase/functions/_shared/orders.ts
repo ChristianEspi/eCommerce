@@ -399,9 +399,37 @@ export type BillingAddress = ShippingAddress & {
   tax_id?: string
   legal_name?: string
   cost_center?: string
+  /** Tipo del documento del adquirente: `ruc` (factura) o `dni`/`ce`/`passport` (boleta). */
+  id_type?: 'ruc' | 'dni' | 'ce' | 'passport'
 }
 
-const BILLING_EXTRA = ['document_type', 'tax_id', 'legal_name', 'cost_center'] as const
+const BILLING_EXTRA = ['document_type', 'tax_id', 'legal_name', 'cost_center', 'id_type'] as const
+
+/**
+ * Tipo de documento del adquirente (2026-11-15): `ruc` en factura; `dni`,
+ * `ce` (carné de extranjería) o `passport` en boleta. Mismas reglas que
+ * `src/shared/lib/peruDocs.ts`, que solo adelanta el aviso en la pantalla.
+ */
+const ID_TYPES = ['ruc', 'dni', 'ce', 'passport'] as const
+type IdType = (typeof ID_TYPES)[number]
+
+const PESOS_RUC = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2]
+
+/** RUC: 11 dígitos, prefijo de contribuyente y dígito verificador (módulo 11). */
+export function isValidRuc(value: string): boolean {
+  if (!/^(10|15|16|17|20)\d{9}$/.test(value)) return false
+  const suma = PESOS_RUC.reduce((total, peso, i) => total + peso * Number(value[i]), 0)
+  const resto = 11 - (suma % 11)
+  const verificador = resto === 10 ? 0 : resto === 11 ? 1 : resto
+  return verificador === Number(value[10])
+}
+
+function documentoValido(type: IdType, value: string): boolean {
+  if (type === 'ruc') return isValidRuc(value)
+  if (type === 'dni') return /^\d{8}$/.test(value)
+  if (type === 'ce') return /^[A-Z0-9]{8,12}$/.test(value)
+  return /^[A-Z0-9]{6,15}$/.test(value)
+}
 
 export function normalizeBillingAddress(raw: unknown): BillingAddress {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
@@ -446,10 +474,28 @@ export function normalizeBillingAddress(raw: unknown): BillingAddress {
   const costCenter = texto('cost_center', 1, 60)
   if (costCenter !== undefined) normalized.cost_center = costCenter
 
+  const rawIdType = source.id_type
+  if (rawIdType !== undefined && rawIdType !== null) {
+    if (typeof rawIdType !== 'string' || !(ID_TYPES as readonly string[]).includes(rawIdType)) {
+      throw badRequest('CAMPO_INVALIDO', '`billing_address.id_type` debe ser `ruc`, `dni`, `ce` o `passport`')
+    }
+    normalized.id_type = rawIdType as IdType
+  }
+
   // Una factura sin RUC o sin razón social no se puede emitir: se rechaza aquí
   // y no cuando alguien intente facturar el pedido.
   if (normalized.document_type === 'invoice' && (!normalized.tax_id || !normalized.legal_name)) {
     throw badRequest('CAMPO_INVALIDO', 'La factura necesita `tax_id` y `legal_name`')
+  }
+  // Factura = RUC, y un RUC con su dígito verificador (2026-11-15).
+  if (normalized.document_type === 'invoice') {
+    if (normalized.id_type !== undefined && normalized.id_type !== 'ruc') {
+      throw badRequest('CAMPO_INVALIDO', 'La factura se emite a un RUC')
+    }
+    normalized.id_type = 'ruc'
+  }
+  if (normalized.tax_id && normalized.id_type && !documentoValido(normalized.id_type, normalized.tax_id)) {
+    throw badRequest('CAMPO_INVALIDO', `\`billing_address.tax_id\` no es un ${normalized.id_type.toUpperCase()} valido`)
   }
 
   return normalized

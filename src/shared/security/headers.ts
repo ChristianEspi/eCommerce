@@ -122,12 +122,13 @@ export function contentSecurityPolicy(input: CspInput): string {
       'script-src',
       ["'self'", ...input.inlineScriptHashes.map((hash) => `'${hash}'`), ...gateway],
     ],
-    ['style-src', ["'self'", "'unsafe-inline'", GOOGLE_FONTS_CSS]],
-    ['font-src', ["'self'", GOOGLE_FONTS_FILES, 'data:']],
+    // La ventana de Culqi trae su hoja de estilos, sus logos y su tipografía.
+    ['style-src', ["'self'", "'unsafe-inline'", GOOGLE_FONTS_CSS, ...gateway]],
+    ['font-src', ["'self'", GOOGLE_FONTS_FILES, 'data:', ...gateway]],
     // Las imágenes de producto viven en el Storage del proyecto (contrato:
     // bucket con ruta por tenant), así que el origen de Supabase basta. `blob:`
     // es la previsualización local al subir una imagen desde el backoffice.
-    ['img-src', ["'self'", 'data:', 'blob:', ...api, MAP_TILES]],
+    ['img-src', ["'self'", 'data:', 'blob:', ...api, MAP_TILES, ...gateway]],
     ['connect-src', ["'self'", ...api, ...sockets, ...gateway, MAP_GEOCODER]],
     // 2026-10-04 · Los videos de la portada viven en el mismo Storage que las
     // fotos. Sin esta línea `default-src 'none'` los bloquea en producción. `blob:`
