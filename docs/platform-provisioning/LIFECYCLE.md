@@ -54,7 +54,7 @@ eCommerce cuyo `base_url` ya es `https://<ref>.supabase.co/functions/v1/platform
 `lifecycle_path = /tenants/{controlPlaneTenantId}/lifecycle` (igual que `entitlements_path`),
 `lifecycle_write_scope = ecommerce:lifecycle:write`, `lifecycle_read_scope = ecommerce:lifecycle:read`.
 
-## 4. Base de datos (migración `20261013100000_tenant_lifecycle.sql`)
+## 4. Base de datos (migración `20261116100000_tenant_lifecycle.sql`)
 
 | Objeto | Qué es |
 |---|---|
@@ -62,7 +62,7 @@ eCommerce cuyo `base_url` ya es `https://<ref>.supabase.co/functions/v1/platform
 | `platform_lifecycle.events` | bitácora append-only de cada PUT verificado (aplicado, repetido, stale, conflicto, 404, inválido) |
 | `platform_lifecycle.exempt_tables` | tablas de `public` con `organization_id` SIN guardián, con su porqué (≥ 40 caracteres) |
 | `public.platform_apply_lifecycle` / `public.platform_get_lifecycle` | RPC M2M, solo `service_role` |
-| `ebim.enforce_tenant_lifecycle()` + trigger `a_tenant_lifecycle_guard` | el guardián: `BEFORE INSERT OR UPDATE OR DELETE` por fila en **162** tablas |
+| `ebim.enforce_tenant_lifecycle()` + trigger `a_tenant_lifecycle_guard` | el guardián: `BEFORE INSERT OR UPDATE OR DELETE` por fila en **166** tablas |
 | `platform_lifecycle.ensure_guards()` | instala el guardián donde falte (idempotente) |
 | `public.my_tenant_lifecycle()` | `state`, `reason`, `applied_at` del tenant del JWT (miembro), para el aviso del backoffice |
 | `public.store_operational_for_slug(slug)` | `{operational}` para la vitrina (anon), sin la causa |
@@ -83,12 +83,21 @@ cliente (PostgREST no expone `set_config`):
 |---|---|---|
 | `platform` | `platform_provision_tenant`, `platform_apply_entitlements`, `platform_set_entitlement_enforcement_mode`, `platform_reconcile_entitlements`, `sync_platform_context` | los canales de plataforma siguen abiertos: MasterAdmin gobierna (y reactiva) una cuenta suspendida; entitlements escribe `tenant_platform_context`, `tenant_entitlements`, `ai_quotas`, `store_settings.white_label` |
 | `access` | `claim_provisioned_tenant` | **login permitido**: es la única escritura del camino de entrada (el primer ingreso del administrador PREPROVISIONED crea su membresía `owner`). El resto del login solo lee (`tenants`, `tenant_members`, `stores`, `my_tenant_lifecycle`); Supabase Auth escribe en `auth.*`, que no tiene guardián; el hook de token solo lee. |
-| `skip` | purgas (`purge_*`), caducidades (`expire_carts`, `expire_inventory_reservations`, `expire_gift_cards`), rescates (`integration_reclaim_stale`, `reclaim_stale_domain_events`, `ebim.cart_recovery_guard_queue`) y los reclamadores de colas | recorren filas de TODOS los tenants en una sentencia: la fila del suspendido se salta en silencio (queda intacta) y el resto se procesa. Sin esto una sola fila suspendida tumbaría el trabajo de todos. |
+| `skip` | purgas (`purge_*`), caducidades (`expire_carts`, `expire_inventory_reservations`, `expire_gift_cards`), rescates (`integration_reclaim_stale`, `reclaim_stale_domain_events`, `ebim.cart_recovery_guard_queue`) y los reclamadores de colas (incluido `connector_claim`) | recorren filas de TODOS los tenants en una sentencia: la fila del suspendido se salta en silencio (queda intacta) y el resto se procesa. Sin esto una sola fila suspendida tumbaría el trabajo de todos. |
 
 Los reclamadores con límite (`integration_claim`, `claim_domain_events`, `notification_email_claim`,
-`ebim.enqueue_cart_recovery`, `ebim.run_order_schedules`) además **filtran** lo suspendido al elegir:
+`ebim.enqueue_cart_recovery`, `ebim.run_order_schedules`, `connector_claim`) además **filtran** lo suspendido al elegir:
 si solo lo saltaran, esas filas ocuparían el lote para siempre. Lo del suspendido queda `pending`
-(correos, integraciones, eventos, pedidos programados) y sale al reactivar.
+(correos, integraciones, eventos, pedidos programados, flujos del conector de lectura) y sale al reactivar.
+
+> **Rebase 2026-11-16.** La migración nació como `20261013100000` y chocaba en versión con
+> `20261013100000_product_detail_extras` de `origin/dev`; pasó a `20261116100000`, después de la
+> última migración de `dev` (`20261115140000`). Al aplicarse la última, `ensure_guards()` cubre también
+> las tablas nuevas de esos 46 commits (`connector_sources`, `connector_feeds`, `connector_runs`,
+> `connector_rejects`…: 166 en total) y `connector_claim` (cron `ecommerce-connector-pull`) se
+> redefine con el filtro y el modo `skip`. Los secretos en `ebim.connector_secrets` y
+> `ebim.payment_method_secrets` no llevan guardián (esquema `ebim`), pero solo se escriben junto con
+> `connector_sources`/`payment_methods`, que sí lo llevan.
 
 ### 4.2 Exenciones (y por qué)
 

@@ -607,7 +607,7 @@ alter function ebim.cart_recovery_guard_queue() set ebim.lifecycle_guard = 'skip
 -- 9 · Reclamadores con límite: además FILTRAN lo suspendido
 --
 -- Las definiciones vigentes (integration_targets, domain_events, cart_recovery,
--- scheduled_orders), sin otro cambio que el filtro y el modo `skip` para sus
+-- scheduled_orders, connector_feeds), sin otro cambio que el filtro y el modo `skip` para sus
 -- actualizaciones auxiliares (disyuntor, caducidad, rescate). Lo suspendido se
 -- queda `pending` y sale solo cuando el tenant vuelve a ACTIVE.
 -- ---------------------------------------------------------------------------
@@ -1024,6 +1024,71 @@ begin
   return jsonb_build_object('ready', v_ready, 'skipped', v_skipped, 'failed', v_failed, 'dead', v_dead);
 end;
 $fn$;
+
+-- Conector de lectura (20261112120000_connector_sources): misma definición,
+-- con el filtro y el modo `skip` para el cierre de concesiones vencidas, que
+-- recorre las ejecuciones de todos los tenants.
+create or replace function public.connector_claim(p_limit integer default 5)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+set ebim.lifecycle_guard = 'skip'
+as $fn$
+declare
+  v_out  jsonb := '[]'::jsonb;
+  v_feed record;
+  v_run  uuid;
+begin
+  -- Concesiones vencidas: la ejecución que quedó colgada se cierra.
+  update public.connector_runs r
+     set status = 'failed', finished_at = now(), error_code = 'CONCESION_VENCIDA',
+         error_message = 'El trabajador no cerro la ejecucion a tiempo'
+   where r.status = 'running'
+     and exists (select 1 from public.connector_feeds f
+                  where f.id = r.feed_id and f.lease_until is not null and f.lease_until < now());
+
+  for v_feed in
+    select f.*, s.base_url, s.auth_type, s.auth_header, s.auth_username, s.oauth_token_url,
+           s.oauth_scope, s.timeout_seconds, s.has_secret
+      from public.connector_feeds f
+      join public.connector_sources s on s.id = f.source_id
+     where f.is_active and s.is_active
+       and f.next_run_at <= now()
+       and (f.lease_until is null or f.lease_until < now())
+       and ebim.company_is_entitled(f.organization_id, f.company_id, 'integrations.enterprise')
+       -- lifecycle.v1: el flujo de un tenant suspendido espera, no ocupa el lote.
+       and not ebim.tenant_is_suspended(f.organization_id)
+     order by f.next_run_at
+     limit greatest(1, least(coalesce(p_limit, 5), 20))
+     for update of f skip locked
+  loop
+    insert into public.connector_runs (organization_id, company_id, feed_id, trigger)
+    values (v_feed.organization_id, v_feed.company_id, v_feed.id,
+            case when v_feed.run_requested then 'manual' else 'schedule' end)
+    returning id into v_run;
+
+    update public.connector_feeds
+       set lease_until = now() + interval '15 minutes', run_requested = false
+     where id = v_feed.id;
+
+    v_out := v_out || jsonb_build_object(
+      'run_id',    v_run,
+      'feed', jsonb_build_object(
+        'id', v_feed.id, 'resource', v_feed.resource, 'path', v_feed.path,
+        'page_size', v_feed.page_size, 'watermark', v_feed.watermark),
+      'source', jsonb_build_object(
+        'id', v_feed.source_id, 'base_url', v_feed.base_url, 'auth_type', v_feed.auth_type,
+        'auth_header', v_feed.auth_header, 'auth_username', v_feed.auth_username,
+        'oauth_token_url', v_feed.oauth_token_url, 'oauth_scope', v_feed.oauth_scope,
+        'timeout_seconds', v_feed.timeout_seconds, 'has_secret', v_feed.has_secret));
+  end loop;
+
+  return v_out;
+end;
+$fn$;
+revoke execute on function public.connector_claim(integer) from public, anon, authenticated;
+grant  execute on function public.connector_claim(integer) to service_role;
 
 -- ---------------------------------------------------------------------------
 -- 10 · Storage: los objetos van bajo `{organization_id}/…`. Una policy

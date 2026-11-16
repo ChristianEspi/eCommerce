@@ -1,6 +1,6 @@
 /**
  * Acceso a base de datos del receptor `lifecycle.v1`: SOLO las RPC de la
- * migración `20261013100000_tenant_lifecycle` (service_role) y el registro de
+ * migración `20261116100000_tenant_lifecycle` (service_role) y el registro de
  * `jti` de un solo uso que ya usa entitlements (`platform_entitlements_use_jti`:
  * un `jti` es de un solo uso en TODO el canal M2M, sea cual sea la ruta).
  *

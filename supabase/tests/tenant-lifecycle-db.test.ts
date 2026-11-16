@@ -173,23 +173,24 @@ describe('estructura: el guardián está en TODA tabla de negocio', () => {
       'purge_checkout_attempts(interval)', 'purge_empty_guest_carts(interval)', 'purge_public_rate_events(interval)',
       'integration_reclaim_stale(interval)', 'reclaim_stale_domain_events(interval)', 'ebim.cart_recovery_guard_queue()',
       'integration_claim(text,text,integer)', 'claim_domain_events(text,integer,text[])', 'notification_email_claim(integer)',
-      'ebim.enqueue_cart_recovery(integer)', 'ebim.run_order_schedules(integer)',
+      'ebim.enqueue_cart_recovery(integer)', 'ebim.run_order_schedules(integer)', 'connector_claim(integer)',
     ]) {
       expect(byFn[fn], fn).toBe('skip')
     }
     // Login permitido: el único paso de entrada que escribe (crea la membresía).
     expect(byFn['claim_provisioned_tenant()']).toBe('access')
     // Nada más tiene un modo: el modo no se reparte por accidente.
-    expect(Object.keys(byFn)).toHaveLength(23)
+    expect(Object.keys(byFn)).toHaveLength(24)
     const filtered = await sql(`
       select p.proname from pg_proc p
        where p.oid in ('public.integration_claim(text,text,integer)'::regprocedure,
                        'public.claim_domain_events(text,integer,text[])'::regprocedure,
                        'public.notification_email_claim(integer)'::regprocedure,
                        'ebim.enqueue_cart_recovery(integer)'::regprocedure,
-                       'ebim.run_order_schedules(integer)'::regprocedure)
+                       'ebim.run_order_schedules(integer)'::regprocedure,
+                       'public.connector_claim(integer)'::regprocedure)
          and p.prosrc like '%not ebim.tenant_is_suspended(%'`)
-    expect(filtered).toHaveLength(5)
+    expect(filtered).toHaveLength(6)
   })
 
   it('las tablas privadas: RLS forzada y sin GRANT; las RPC M2M solo para service_role', async () => {

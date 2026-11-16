@@ -344,7 +344,7 @@ entitlements comerciales del SaaS; no bloquea por sí sola la aplicación operat
   eCommerce es la de D-14. Los tests de contrato solo comparan respuestas HTTP PUT/GET, que no
   cambian. El dueño del contrato debe alinear ese texto en la próxima versión del fixture.
 - **El apagado operativo** que D-14 dejó como política aparte ya existe: `lifecycle.v1`
-  (`docs/platform-provisioning/LIFECYCLE.md`, migración `20261013100000_tenant_lifecycle.sql`).
+  (`docs/platform-provisioning/LIFECYCLE.md`, migración `20261116100000_tenant_lifecycle.sql`).
   `SUSPENDED` bloquea en la base toda escritura del tenant (`TENANT_SUSPENDED`, SQLSTATE `PT423`) y
   deja la lectura y el login; `appActive` sigue sin bloquear nada operativo.
 
