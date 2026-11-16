@@ -151,13 +151,21 @@ describe('estructura: el guardián está en TODA tabla de negocio', () => {
   })
 
   it('canales de plataforma en modo platform, mantenimiento en skip, reclamadores con filtro', async () => {
+    // El modo vive en platform_lifecycle.guard_modes (Supabase Cloud no deja fijar
+    // parámetros propios con ALTER FUNCTION … SET). Cada fila nombra una función
+    // que EXISTE, con su firma resuelta para comparar como antes.
     const modes = await sql(`
-      select p.oid::regprocedure::text as fn,
-             (select split_part(c, '=', 2) from unnest(p.proconfig) c where c like 'ebim.lifecycle_guard=%') as mode
-        from pg_proc p
-       where exists (select 1 from unnest(p.proconfig) c where c like 'ebim.lifecycle_guard=%')
+      select p.oid::regprocedure::text as fn, g.mode
+        from platform_lifecycle.guard_modes g
+        join pg_namespace n on n.nspname = split_part(g.function_name, '.', 1)
+        join pg_proc p on p.pronamespace = n.oid and p.proname = split_part(g.function_name, '.', 2)
        order by 1`)
     const byFn = Object.fromEntries(modes.map((r) => [r.fn, r.mode]))
+    // Ninguna función fija el modo con un parámetro propio (falla en la nube).
+    const withConfig = await sql(`
+      select p.oid::regprocedure::text as fn from pg_proc p
+       where exists (select 1 from unnest(p.proconfig) c where c like 'ebim.%')`)
+    expect(withConfig).toEqual([])
     for (const fn of [
       'platform_provision_tenant(jsonb,jsonb)',
       'platform_apply_entitlements(uuid,jsonb,jsonb)',
@@ -198,7 +206,7 @@ describe('estructura: el guardián está en TODA tabla de negocio', () => {
       select c.relname, c.relrowsecurity, c.relforcerowsecurity
         from pg_class c join pg_namespace n on n.oid = c.relnamespace
        where n.nspname = 'platform_lifecycle' and c.relkind = 'r' order by 1`)
-    expect(tables.map((r) => r.relname)).toEqual(['events', 'exempt_tables', 'tenant_state'])
+    expect(tables.map((r) => r.relname)).toEqual(['events', 'exempt_tables', 'guard_modes', 'tenant_state'])
     for (const t of tables) {
       expect(t.relrowsecurity).toBe(true)
       expect(t.relforcerowsecurity).toBe(true)
