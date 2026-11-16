@@ -39,7 +39,7 @@
 -- `select platform_lifecycle.ensure_guards();`, y la prueba estructural
 -- (`tenant-lifecycle-db.test.ts`) falla si alguna queda sin guardián.
 --
--- ## Tres modos (`ebim.lifecycle_guard`, fijado POR FUNCIÓN con `SET`)
+-- ## Tres modos, por FUNCIÓN registrada en `platform_lifecycle.guard_modes`
 --
 --   (vacío)    lo normal: suspendido → TENANT_SUSPENDED.
 --   platform   los canales de plataforma (alta, entitlements, contexto del hub)
@@ -54,8 +54,14 @@
 --              silencio (el trigger devuelve NULL). Sin esto, una sola fila
 --              suspendida tumbaría el lote de todos los demás tenants.
 --
--- El modo solo se fija con `ALTER FUNCTION … SET` o en la propia definición:
--- PostgREST no expone `set_config`, así que un cliente no puede pedirlo. Los
+-- El modo lo decide el guardián mirando la PILA de llamadas (`PG_CONTEXT`): si
+-- la escritura viene de una función registrada en `guard_modes`, vale su modo.
+-- No se usa `ALTER FUNCTION … SET ebim.lifecycle_guard`: en Supabase Cloud el rol
+-- `postgres` no es superusuario y no puede fijar parámetros propios en una
+-- función (42501). La pila solo la escriben funciones que existen en la base, así
+-- que un cliente no puede fingir un modo; y solo se mira cuando la organización
+-- está suspendida (el camino normal no paga nada). `ebim.lifecycle_guard` de
+-- sesión se sigue respetando (pruebas, scripts de operador). Los
 -- reclamadores de colas con LÍMITE (integración, eventos, correo, recuperación
 -- de carritos, pedidos programados) además FILTRAN lo suspendido al elegir: si
 -- solo lo saltaran, las filas suspendidas ocuparían el lote para siempre.
@@ -242,6 +248,46 @@ as $fn$
         where s.organization_id = p_organization_id and s.state = 'SUSPENDED');
 $fn$;
 
+-- Modo de cada función que escribe por encima del bloqueo (ver «Tres modos»).
+create table if not exists platform_lifecycle.guard_modes (
+  function_name text primary key,
+  mode          text not null,
+  constraint pl_guard_modes_mode_ck check (mode in ('platform', 'access', 'skip')),
+  constraint pl_guard_modes_name_ck check (function_name ~ '^[a-z_]+\.[a-z0-9_]+$')
+);
+alter table platform_lifecycle.guard_modes enable row level security;
+alter table platform_lifecycle.guard_modes force row level security;
+revoke all on table platform_lifecycle.guard_modes from public, anon, authenticated, service_role;
+
+comment on table platform_lifecycle.guard_modes is
+  'Funciones que escriben pese a la suspensión: platform (canales de MasterAdmin), access (login), skip (mantenimiento entre tenants: salta la fila). El guardián las reconoce en PG_CONTEXT.';
+
+-- Modo que corresponde a la pila de llamadas actual: el de la función registrada
+-- más «abierta» que esté en la pila (platform > access > skip), o '' si ninguna.
+create or replace function platform_lifecycle.guard_mode_from_stack()
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $fn$
+declare
+  v_ctx  text;
+  v_mode text;
+begin
+  get diagnostics v_ctx = pg_context;
+  select g.mode into v_mode
+    from platform_lifecycle.guard_modes g
+   where v_ctx ~ ('function (' || split_part(g.function_name, '.', 1) || '\.)?'
+                  || split_part(g.function_name, '.', 2) || '\(')
+   order by case g.mode when 'platform' then 1 when 'access' then 2 else 3 end
+   limit 1;
+  return coalesce(v_mode, '');
+end;
+$fn$;
+
+revoke all on function platform_lifecycle.guard_mode_from_stack() from public, anon, authenticated, service_role;
+
 -- ---------------------------------------------------------------------------
 -- 3 · El guardián
 -- ---------------------------------------------------------------------------
@@ -257,7 +303,7 @@ declare
   v_new  uuid;
 begin
   -- Canal de plataforma (alta, entitlements, contexto del hub) y acceso del
-  -- usuario (login): siempre abiertos.
+  -- usuario (login) fijados por sesión: siempre abiertos.
   if v_mode in ('platform', 'access') then
     return case when tg_op = 'DELETE' then old else new end;
   end if;
@@ -272,6 +318,13 @@ begin
 
   if ebim.tenant_is_suspended(v_old)
      or (v_new is distinct from v_old and ebim.tenant_is_suspended(v_new)) then
+    -- Solo con la organización suspendida se mira quién escribe (pila de llamadas).
+    if v_mode = '' then
+      v_mode := platform_lifecycle.guard_mode_from_stack();
+    end if;
+    if v_mode in ('platform', 'access') then
+      return case when tg_op = 'DELETE' then old else new end;
+    end if;
     -- Mantenimiento entre tenants: la fila del suspendido se queda como está.
     if v_mode = 'skip' then
       return null;
@@ -569,18 +622,23 @@ grant execute on function public.store_operational_for_slug(text) to anon, authe
 -- `ai_quotas` y `store_settings.white_label`. Un tenant suspendido tiene que
 -- seguir recibiendo sus entitlements: si no, MasterAdmin no podría gobernarlo.
 -- ---------------------------------------------------------------------------
-alter function public.platform_provision_tenant(jsonb, jsonb) set ebim.lifecycle_guard = 'platform';
-alter function public.platform_apply_entitlements(uuid, jsonb, jsonb) set ebim.lifecycle_guard = 'platform';
-alter function public.platform_set_entitlement_enforcement_mode(text, text, text) set ebim.lifecycle_guard = 'platform';
-alter function public.platform_reconcile_entitlements(uuid) set ebim.lifecycle_guard = 'platform';
-alter function public.sync_platform_context(uuid, uuid, boolean, text[], public.entitlement_source, text)
-  set ebim.lifecycle_guard = 'platform';
+insert into platform_lifecycle.guard_modes (function_name, mode) values ('public.platform_provision_tenant', 'platform')
+  on conflict (function_name) do update set mode = excluded.mode;
+insert into platform_lifecycle.guard_modes (function_name, mode) values ('public.platform_apply_entitlements', 'platform')
+  on conflict (function_name) do update set mode = excluded.mode;
+insert into platform_lifecycle.guard_modes (function_name, mode) values ('public.platform_set_entitlement_enforcement_mode', 'platform')
+  on conflict (function_name) do update set mode = excluded.mode;
+insert into platform_lifecycle.guard_modes (function_name, mode) values ('public.platform_reconcile_entitlements', 'platform')
+  on conflict (function_name) do update set mode = excluded.mode;
+insert into platform_lifecycle.guard_modes (function_name, mode) values ('public.sync_platform_context', 'platform')
+  on conflict (function_name) do update set mode = excluded.mode;
 
 -- Login permitido (contrato §5): el ingreso del backoffice solo LEE
 -- (`tenants`, `tenant_members`, `stores`, `my_tenant_lifecycle`); la única
 -- escritura del camino de entrada es el reclamo del administrador
 -- PREPROVISIONED, que crea su membresía `owner`. Esa escritura de ACCESO pasa.
-alter function public.claim_provisioned_tenant() set ebim.lifecycle_guard = 'access';
+insert into platform_lifecycle.guard_modes (function_name, mode) values ('public.claim_provisioned_tenant', 'access')
+  on conflict (function_name) do update set mode = excluded.mode;
 
 -- ---------------------------------------------------------------------------
 -- 8 · Mantenimiento entre tenants: salta lo suspendido (modo `skip`)
@@ -590,18 +648,30 @@ alter function public.claim_provisioned_tenant() set ebim.lifecycle_guard = 'acc
 -- abortaría la sentencia entera. En `skip` esa fila se queda intacta (no se
 -- borra ni caduca mientras dure la suspensión) y el resto se procesa.
 -- ---------------------------------------------------------------------------
-alter function public.expire_carts() set ebim.lifecycle_guard = 'skip';
-alter function public.expire_inventory_reservations() set ebim.lifecycle_guard = 'skip';
-alter function public.expire_gift_cards(uuid) set ebim.lifecycle_guard = 'skip';
-alter function public.purge_api_idempotency(interval) set ebim.lifecycle_guard = 'skip';
-alter function public.purge_api_requests(interval) set ebim.lifecycle_guard = 'skip';
-alter function public.purge_api_tokens(interval) set ebim.lifecycle_guard = 'skip';
-alter function public.purge_checkout_attempts(interval) set ebim.lifecycle_guard = 'skip';
-alter function public.purge_empty_guest_carts(interval) set ebim.lifecycle_guard = 'skip';
-alter function public.purge_public_rate_events(interval) set ebim.lifecycle_guard = 'skip';
-alter function public.integration_reclaim_stale(interval) set ebim.lifecycle_guard = 'skip';
-alter function public.reclaim_stale_domain_events(interval) set ebim.lifecycle_guard = 'skip';
-alter function ebim.cart_recovery_guard_queue() set ebim.lifecycle_guard = 'skip';
+insert into platform_lifecycle.guard_modes (function_name, mode) values ('public.expire_carts', 'skip')
+  on conflict (function_name) do update set mode = excluded.mode;
+insert into platform_lifecycle.guard_modes (function_name, mode) values ('public.expire_inventory_reservations', 'skip')
+  on conflict (function_name) do update set mode = excluded.mode;
+insert into platform_lifecycle.guard_modes (function_name, mode) values ('public.expire_gift_cards', 'skip')
+  on conflict (function_name) do update set mode = excluded.mode;
+insert into platform_lifecycle.guard_modes (function_name, mode) values ('public.purge_api_idempotency', 'skip')
+  on conflict (function_name) do update set mode = excluded.mode;
+insert into platform_lifecycle.guard_modes (function_name, mode) values ('public.purge_api_requests', 'skip')
+  on conflict (function_name) do update set mode = excluded.mode;
+insert into platform_lifecycle.guard_modes (function_name, mode) values ('public.purge_api_tokens', 'skip')
+  on conflict (function_name) do update set mode = excluded.mode;
+insert into platform_lifecycle.guard_modes (function_name, mode) values ('public.purge_checkout_attempts', 'skip')
+  on conflict (function_name) do update set mode = excluded.mode;
+insert into platform_lifecycle.guard_modes (function_name, mode) values ('public.purge_empty_guest_carts', 'skip')
+  on conflict (function_name) do update set mode = excluded.mode;
+insert into platform_lifecycle.guard_modes (function_name, mode) values ('public.purge_public_rate_events', 'skip')
+  on conflict (function_name) do update set mode = excluded.mode;
+insert into platform_lifecycle.guard_modes (function_name, mode) values ('public.integration_reclaim_stale', 'skip')
+  on conflict (function_name) do update set mode = excluded.mode;
+insert into platform_lifecycle.guard_modes (function_name, mode) values ('public.reclaim_stale_domain_events', 'skip')
+  on conflict (function_name) do update set mode = excluded.mode;
+insert into platform_lifecycle.guard_modes (function_name, mode) values ('ebim.cart_recovery_guard_queue', 'skip')
+  on conflict (function_name) do update set mode = excluded.mode;
 
 -- ---------------------------------------------------------------------------
 -- 9 · Reclamadores con límite: además FILTRAN lo suspendido
@@ -621,7 +691,6 @@ returns setof public.integration_outbox
 language plpgsql
 security definer
 set search_path = ''
-set ebim.lifecycle_guard = 'skip'
 as $fn$
 begin
   update public.integration_circuit c
@@ -672,7 +741,6 @@ returns setof public.domain_events
 language plpgsql
 security definer
 set search_path = ''
-set ebim.lifecycle_guard = 'skip'
 as $fn$
 begin
   return query
@@ -711,7 +779,6 @@ returns table (
 language plpgsql
 security definer
 set search_path = ''
-set ebim.lifecycle_guard = 'skip'
 as $fn$
 declare
   v_guard_ok boolean;
@@ -764,7 +831,6 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = ''
-set ebim.lifecycle_guard = 'skip'
 as $fn$
 declare
   v_limit      integer := greatest(1, least(coalesce(p_limit, 100), 500));
@@ -876,7 +942,6 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = ''
-set ebim.lifecycle_guard = 'skip'
 as $fn$
 declare
   c_max_attempts constant integer := 5;
@@ -1033,7 +1098,6 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = ''
-set ebim.lifecycle_guard = 'skip'
 as $fn$
 declare
   v_out  jsonb := '[]'::jsonb;
@@ -1127,3 +1191,17 @@ comment on function public.store_operational_for_slug(text) is
   'Booleano para el aviso de la vitrina: ¿la tienda puede vender ahora? Sin la causa. Solo UX.';
 comment on function platform_lifecycle.ensure_guards() is
   'Instala a_tenant_lifecycle_guard en toda tabla public con organization_id no exenta. Toda migración que cree una tabla de negocio la llama.';
+
+-- Reclamadores con límite redefinidos arriba: además del filtro, modo `skip`.
+insert into platform_lifecycle.guard_modes (function_name, mode) values ('public.integration_claim', 'skip')
+  on conflict (function_name) do update set mode = excluded.mode;
+insert into platform_lifecycle.guard_modes (function_name, mode) values ('public.claim_domain_events', 'skip')
+  on conflict (function_name) do update set mode = excluded.mode;
+insert into platform_lifecycle.guard_modes (function_name, mode) values ('public.notification_email_claim', 'skip')
+  on conflict (function_name) do update set mode = excluded.mode;
+insert into platform_lifecycle.guard_modes (function_name, mode) values ('ebim.enqueue_cart_recovery', 'skip')
+  on conflict (function_name) do update set mode = excluded.mode;
+insert into platform_lifecycle.guard_modes (function_name, mode) values ('ebim.run_order_schedules', 'skip')
+  on conflict (function_name) do update set mode = excluded.mode;
+insert into platform_lifecycle.guard_modes (function_name, mode) values ('public.connector_claim', 'skip')
+  on conflict (function_name) do update set mode = excluded.mode;
