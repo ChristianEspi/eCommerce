@@ -47,6 +47,12 @@ export interface CartApi {
     quantity?: number,
     variant?: PublicVariant | null,
   ) => Promise<boolean>
+  /**
+   * Por qué el último `add` devolvió `false` (2026-11-16): sin stock, o el
+   * producto no está en el surtido de la empresa. Opcional: los dobles de
+   * prueba que no lo traen siguen valiendo.
+   */
+  lastRejection?: () => 'stock' | 'assortment' | null
   setQuantity: (productId: string, quantity: number, variantId?: string | null) => void
   remove: (productId: string, variantId?: string | null) => void
   clear: () => void

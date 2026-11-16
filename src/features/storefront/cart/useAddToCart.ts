@@ -25,7 +25,7 @@ import { useCart } from './cart-context'
  */
 export function useAddToCart() {
   const { t } = useI18n()
-  const { add } = useCart()
+  const { add, lastRejection } = useCart()
   const { notify } = useFeedback()
   const [pending, setPending] = useState(false)
 
@@ -36,13 +36,17 @@ export function useAddToCart() {
         const ok = await add(product, quantity, variant)
         // El «no» del servidor no es un error: es una respuesta. Va en tono de
         // aviso y dice qué hacer, no qué pasó.
-        notify(t(ok ? 'store.cart.added' : 'store.cart.notEnough'), ok ? 'success' : 'warning')
+        const motivo = ok ? null : (lastRejection?.() ?? 'stock')
+        notify(
+          t(ok ? 'store.cart.added' : motivo === 'assortment' ? 'store.assortment.notAllowed' : 'store.cart.notEnough'),
+          ok ? 'success' : 'warning',
+        )
         return ok
       } finally {
         setPending(false)
       }
     },
-    [add, notify, t],
+    [add, lastRejection, notify, t],
   )
 
   return { agregar, pending }

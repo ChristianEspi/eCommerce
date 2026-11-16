@@ -544,6 +544,8 @@ export const MY_PURCHASED_PRODUCTS_RPC = 'my_purchased_products_for_slug' satisf
 // estado y sociedad antes de guardar. `my_effective_business_account_for_slug`
 // la usa el checkout (Edge Function), no la vitrina.
 export const MY_STORE_BUSINESS_ACCOUNTS_RPC = 'my_store_business_accounts' satisfies FunctionName
+/** 2026-11-16 · Qué productos NO puede comprar la cuenta B2B de la sesión por su surtido. */
+export const MY_ASSORTMENT_BLOCKED_RPC = 'my_assortment_blocked'
 export const SELECT_STORE_BUSINESS_ACCOUNT_RPC = 'select_store_business_account' satisfies FunctionName
 
 // --- Cierre A3 · cotizaciones del comprador (migración 20260914101000) -------

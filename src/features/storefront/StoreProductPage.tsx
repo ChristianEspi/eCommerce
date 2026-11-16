@@ -7,6 +7,7 @@ import ShoppingCartRoundedIcon from '@mui/icons-material/ShoppingCartRounded'
 import FavoriteBorderRoundedIcon from '@mui/icons-material/FavoriteBorderRounded'
 import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded'
 import {
+  Alert,
   Box,
   Button,
   Card,
@@ -32,6 +33,7 @@ import { ProductPageSkeleton } from './components/ProductPageSkeleton'
 import { notFoundMeta, productMeta } from './seo'
 import { track } from './analytics'
 import { useAddToCart } from './cart/useAddToCart'
+import { useAssortmentBlocked } from './commerce/assortment'
 import { PriceTiers } from './components/PriceTiers'
 import {
   DeliveryAside,
@@ -950,7 +952,10 @@ function AddToCart({
 
   const hasVariants = product.kind === 'variant'
   const { selected, select } = choice
-  const canBuy = available && (!hasVariants || (selected !== null && selected.in_stock !== false))
+  // 2026-11-16 · Fuera del surtido de la empresa: se ve, pero no se compra.
+  const fueraDeSurtido = useAssortmentBlocked(storeSlug, [product.product_id]).has(product.product_id)
+  const canBuy =
+    !fueraDeSurtido && available && (!hasVariants || (selected !== null && selected.in_stock !== false))
 
   /**
    * El grupo de compra, para poder volver a él desde la barra del teléfono.
@@ -1038,6 +1043,12 @@ function AddToCart({
 
       <PriceTiers tiers={tiers} currency={product.currency} quantity={quantity} onChoose={setQuantity} />
 
+      {fueraDeSurtido && (
+        <Alert severity="info" data-pdp-out-of-assortment>
+          {t('store.assortment.productBlocked')}
+        </Alert>
+      )}
+
       <Stack direction="row" sx={{ gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
         <QuantityStepper value={quantity} onChange={setQuantity} />
 
@@ -1098,7 +1109,7 @@ function AddToCart({
       * falta elegir variante, porque ahí tiene algo que hacer: llevar a
       * elegirla.
       */}
-    {available ? (
+    {available && !fueraDeSurtido ? (
       <StoreProductPurchaseBar
         priceLabel={
           selected ? formatMoney(Number(selected.price), selected.currency, locale) : priceLabel

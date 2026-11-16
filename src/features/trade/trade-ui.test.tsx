@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '@/test/render'
@@ -136,6 +136,22 @@ function backend(options: { entitlements?: string[] } = {}): FakeSupabase {
         },
       ],
       assortment_items: [],
+      // El blanco se aplica a toda la tienda; el negro, a nadie todavía.
+      assortment_assignments: [
+        {
+          id: 'abab1111-1111-4111-8111-111111111111',
+          organization_id: ORG,
+          company_id: COMPANY_A,
+          store_id: STORE_A,
+          assortment_id: SURTIDO_BLANCO,
+          scope: 'store',
+          channel_id: null,
+          territory_id: null,
+          segment_id: null,
+          customer_id: null,
+          is_active: true,
+        },
+      ],
       customers: [],
       products: [],
     },
@@ -262,6 +278,30 @@ describe('los surtidos', () => {
     expect(
       await screen.findByText('Se ofrece todo el catálogo MENOS lo que está en la lista.'),
     ).toBeInTheDocument()
+  })
+})
+
+describe('a quién se aplica un surtido', () => {
+  it('la tabla dice a quién se aplica y avisa del que no se aplica a nadie', async () => {
+    pintar(backend(), 'trade.assortments')
+    await screen.findByText('Canal moderno')
+
+    const filas = screen.getAllByRole('row')
+    const blanco = filas.find((row) => row.textContent?.includes('Canal moderno'))!
+    const negro = filas.find((row) => row.textContent?.includes('Canal tradicional'))!
+    expect(await within(blanco).findByText('1 asignación')).toBeInTheDocument()
+    expect(within(negro).getByText('Sin asignar')).toBeInTheDocument()
+  })
+
+  it('el cajón de un surtido sin asignar lo dice y deja asignarlo', async () => {
+    const user = userEvent.setup()
+    pintar(backend(), 'trade.assortments')
+    await screen.findByText('Canal tradicional')
+
+    const fila = screen.getAllByRole('row').find((row) => row.textContent?.includes('Canal tradicional'))!
+    await user.click(within_(fila, 'Abrir'))
+
+    expect(await screen.findByText('No se aplica a nadie todavía')).toBeInTheDocument()
   })
 })
 

@@ -24,6 +24,7 @@ import { FieldRow, FormDrawer } from '@/shared/ui/FormDrawer'
 import { RowActions } from '@/shared/ui/RowActions'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import type { TradeScope } from './api'
+import { AssortmentAssignmentsPanel } from './AssortmentAssignmentsPanel'
 import { TradeError } from './errors'
 import {
   useAddAssortmentItem,
@@ -298,6 +299,9 @@ export function AssortmentDrawer({
               )}
             </Box>
           )}
+
+          {/* 2026-11-16 · A quién se aplica. Sin asignación el surtido no actúa. */}
+          {assortment && <AssortmentAssignmentsPanel assortment={assortment} scope={scope} canWrite={canWrite} />}
         </Stack>
       </Box>
     </FormDrawer>

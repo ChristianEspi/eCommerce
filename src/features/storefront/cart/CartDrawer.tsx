@@ -2,7 +2,7 @@ import ApartmentRoundedIcon from '@mui/icons-material/ApartmentRounded'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import ShoppingCartRoundedIcon from '@mui/icons-material/ShoppingCartRounded'
 import VerifiedRoundedIcon from '@mui/icons-material/VerifiedRounded'
-import { Box, Button, Card, Chip, Drawer, IconButton, Stack, Typography } from '@mui/material'
+import { Alert, Box, Button, Card, Chip, Drawer, IconButton, Stack, Typography } from '@mui/material'
 import { Link } from 'react-router-dom'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { formatMoney } from '@/shared/lib/format'
@@ -10,6 +10,7 @@ import { EmptyState } from '@/shared/ui/states'
 import { TS } from '@/theme/tokens'
 import { useSessionContext } from '@/features/auth/session-context'
 import { BuyerTermsNotice } from '../commerce/BuyerTermsNotice'
+import { useAssortmentBlocked } from '../commerce/assortment'
 import { useCommerceContext } from '../commerce/context'
 import { CartLineList } from './CartLineList'
 import { RequestQuoteButton } from './RequestQuoteButton'
@@ -34,6 +35,8 @@ export function CartDrawer({ storeSlug }: { storeSlug: string }) {
   const { cart, count, subtotal, currency, isOpen, closeCart } = useCart()
   const { quoted, discounted } = useQuotedCart(storeSlug)
   const empty = cart.lines.length === 0
+  // 2026-11-16 · Con líneas fuera del surtido de la empresa no se pasa a pagar.
+  const fueraDeSurtido = useAssortmentBlocked(storeSlug, cart.lines.map((l) => l.product_id)).size > 0
   // La cuenta con la que se compra, arriba: en B2B el total depende de ella.
   const { status } = useSessionContext()
   const { context } = useCommerceContext(storeSlug, status === 'authenticated')
@@ -259,6 +262,11 @@ export function CartDrawer({ storeSlug }: { storeSlug: string }) {
             <Box sx={{ mb: compacto ? 1 : 1.25 }} className="sf-drawer-terms">
               <BuyerTermsNotice storeSlug={storeSlug} total={total} currency={moneda} compact />
             </Box>
+            {fueraDeSurtido && (
+              <Alert severity="warning" sx={{ mb: 1 }} data-cart-assortment-blocked>
+                {t('store.assortment.cartBlocked')}
+              </Alert>
+            )}
             <Stack sx={{ gap: 0.5 }} className="sf-drawer-actions">
               <Button
                 component={Link}
@@ -267,6 +275,7 @@ export function CartDrawer({ storeSlug }: { storeSlug: string }) {
                 size="large"
                 onClick={closeCart}
                 fullWidth
+                disabled={fueraDeSurtido}
                 className="sf-cart-checkout"
                 sx={{ textTransform: 'none', fontWeight: 800 }}
               >

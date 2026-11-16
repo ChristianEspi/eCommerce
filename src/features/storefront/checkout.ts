@@ -337,6 +337,8 @@ export function mapCheckoutCode(code: string): MessageKey {
     case 'PUNTO_DE_RECOJO_NO_VALIDO':
     case 'PUNTO_DE_RECOJO_NO_APLICA':
       return 'store.checkout.error.delivery.pickup'
+    case 'PRODUCTO_FUERA_DE_SURTIDO':
+      return 'store.checkout.error.assortment'
     case 'PUNTO_SIN_STOCK':
       return 'store.checkout.error.delivery.pickupStock'
     case 'LIMITE_DE_PEDIDOS':
