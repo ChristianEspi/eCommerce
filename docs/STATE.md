@@ -11,6 +11,17 @@ el recorrido SaaS P00–P17 queda cerrado)
 > (`claude-saas-opus/config/phases.json`), que se identifica siempre como «P0x-SaaS». No son la misma
 > serie: el P12 histórico es el framework de integraciones; el P12-SaaS es fulfillment y devoluciones.
 
+## Inventario y vínculo con EBIM MasterAdmin — `tenant-inventory.v1` (2026-11-16)
+
+- `GET /platform-provisioning/tenants` (scope `ecommerce:tenants:list`) lista todos los tenants
+  (identidad y estado, keyset por `organization_id`); `PUT /platform-provisioning/tenants/{id}/link`
+  (scope `ecommerce:tenants:link`) adopta un tenant existente: crea solo su registro de alta
+  (`origin = LINKED`) y desde ahí estado, entitlements y lifecycle lo resuelven. Migración
+  `20261116110000_tenant_inventory_and_link.sql`; detalle en `docs/platform-provisioning/TENANT_INVENTORY.md`.
+- Un alta cuyo tenant se borró responde 404 en estado y lifecycle (antes 200 `TENANT_MISSING`).
+- **No desplegado**: migración, secretos y función pendientes de la promoción a QAS.
+- Pruebas: `supabase/tests/platform-inventory-contract.test.ts`.
+
 ## Suspensión y reactivación desde EBIM MasterAdmin — `lifecycle.v1` (2026-10-13, rebasado el 2026-11-16)
 
 - Rutas `PUT|GET /platform-provisioning/tenants/{id}/lifecycle` (scopes `ecommerce:lifecycle:write|read`),

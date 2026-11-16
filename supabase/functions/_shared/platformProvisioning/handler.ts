@@ -6,6 +6,9 @@
  *   GET  /platform-provisioning/tenants/{controlPlaneTenantId}   scope ecommerce:tenant:read
  *   GET  /platform-provisioning/health                           sin autenticación
  *
+ * `GET /tenants` (inventario) y `PUT /tenants/{id}/link` los atiende
+ * `_shared/platformInventory/handler.ts` antes de llegar aquí.
+ *
  * Orden de cada petición (importa):
  *   1. Ruta y método — estático, no revela nada.
  *   2. Configuración M2M — sin ella, 503 fail-closed.
@@ -73,7 +76,8 @@ export function resolveRoute(method: string, url: string): Route {
     return method === 'GET' ? { kind: 'health' } : { kind: 'method_not_allowed', allow: 'GET' }
   }
   if (path === '/tenants') {
-    return method === 'POST' ? { kind: 'create' } : { kind: 'method_not_allowed', allow: 'POST' }
+    // `GET /tenants` es el inventario (tenant-inventory.v1) y no llega aquí.
+    return method === 'POST' ? { kind: 'create' } : { kind: 'method_not_allowed', allow: 'GET, POST' }
   }
   const m = path.match(/^\/tenants\/([^/]+)$/)
   if (m && m[1]) {

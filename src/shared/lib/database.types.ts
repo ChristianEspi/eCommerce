@@ -13995,6 +13995,19 @@ export type Database = {
         Args: { p_control_plane_tenant_id: string }
         Returns: Json
       }
+      platform_link_tenant: {
+        Args: {
+          p_control_plane_tenant_id: string
+          p_external_tenant_id: string
+          p_fallback_company: string
+          p_meta: Json
+        }
+        Returns: Json
+      }
+      platform_list_tenants: {
+        Args: { p_after: string; p_limit: number }
+        Returns: Json
+      }
       platform_provision_tenant: {
         Args: { p_meta: Json; p_payload: Json }
         Returns: Json
