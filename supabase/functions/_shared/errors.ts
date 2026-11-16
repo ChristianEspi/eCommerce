@@ -16,9 +16,13 @@
  * no es ni un error del cliente (400) ni una falta de permiso (403) ni un fallo
  * de esta app (500). Es el unico codigo que dice lo que de verdad paso, y de el
  * depende que la pantalla ofrezca otro medio de pago en vez de reintentar.
+ *
+ * `423` entra con `lifecycle.v1`: la cuenta está suspendida por EBIM
+ * MasterAdmin (`TENANT_SUSPENDED`, SQLSTATE `PT423`). Ni es culpa de la
+ * petición ni se arregla reintentando: se arregla reactivando la cuenta.
  */
 export type ErrorStatus =
-  | 400 | 401 | 402 | 403 | 404 | 405 | 409 | 422 | 429 | 500 | 502 | 503
+  | 400 | 401 | 402 | 403 | 404 | 405 | 409 | 422 | 423 | 429 | 500 | 502 | 503
 
 export class AppError extends Error {
   readonly code: string
@@ -68,7 +72,13 @@ const DB_CODE_STATUS: Record<string, ErrorStatus> = {
   ORDER_TRANSICION_INVALIDA: 409,
   ORDER_IMPORTES_INMUTABLES: 403,
   EBIM_TENANT_REQUERIDO: 400,
+  // lifecycle.v1: el guardián de la base (trigger) rechaza toda escritura de un
+  // tenant suspendido. La lectura sigue; por eso no es 403 ni 404.
+  TENANT_SUSPENDED: 423,
 }
+
+/** Lo que levanta `ebim.enforce_tenant_lifecycle` (lifecycle.v1). */
+export const TENANT_SUSPENDED_SQLSTATE = 'PT423'
 
 type PostgrestLike = { message?: string; code?: string; details?: string | null }
 
@@ -86,6 +96,11 @@ export function fromDatabaseError(error: PostgrestLike | null | undefined): AppE
   if (code && message) {
     const status = DB_CODE_STATUS[code]
     if (status) return new AppError(code, message.trim(), status)
+  }
+
+  // El guardián lifecycle.v1, aunque el mensaje llegue recortado.
+  if (error?.code === TENANT_SUSPENDED_SQLSTATE) {
+    return new AppError('TENANT_SUSPENDED', 'La cuenta esta suspendida: se puede consultar, no modificar', 423)
   }
 
   // Violación de RLS o de permiso: el tenant no puede tocar esa fila.

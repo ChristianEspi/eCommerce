@@ -203,6 +203,9 @@ const ANON_SURFACE: Record<
   // tienda; el tenant sale del slug y no devuelve nada del comercio.
   submit_complaint: { clase: 'techo', porque: 'ESCRIBE un reclamo: techo por tienda; tenant del slug' },
   store_page_for_slug: { clase: 'publicado', porque: 'la página del CMS, ya publicada' },
+  // lifecycle.v1 · solo un booleano «¿puede vender ahora?» para el aviso de
+  // tienda no disponible; sin la causa de la suspensión ni dato del comercio.
+  store_operational_for_slug: { clase: 'publicado', porque: 'booleano de tienda operativa, sin causa ni datos' },
   store_promotions_for_slug: {
     clase: 'publicado',
     porque: 'campañas vigentes SIN cupón: la forma del descuento, nunca el código ni el cupo',
@@ -228,10 +231,10 @@ describe('la superficie anónima es una lista cerrada', () => {
    * publica esta tabla; sin este test, el documento y el código se separan en la
    * primera función nueva y nadie se entera hasta la siguiente auditoría.
    */
-  it('el reparto por clase es 16 publicado · 9 secreto · 3 techo · 1 recogido', () => {
+  it('el reparto por clase es 17 publicado · 9 secreto · 3 techo · 1 recogido', () => {
     const cuenta = { publicado: 0, secreto: 0, techo: 0, recogido: 0 }
     for (const entry of Object.values(ANON_SURFACE)) cuenta[entry.clase] += 1
-    expect(cuenta).toEqual({ publicado: 16, secreto: 9, techo: 3, recogido: 1 })
+    expect(cuenta).toEqual({ publicado: 17, secreto: 9, techo: 3, recogido: 1 })
   })
 
   /**

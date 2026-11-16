@@ -33,7 +33,14 @@ no uno de Supabase), sin CORS.
 | --- | --- | --- |
 | `GET /platform-provisioning/health` | ninguno | `200 {"status":"ok"}` · `503 {"status":"unavailable"}` si está apagada o la clave no importa |
 | `POST /platform-provisioning/tenants` | `ecommerce:tenant:create` | `201` creado · `200 replayed:true` · `400` · `401` · `403` · `409` · `413` · `415` · `500` · `503` |
-| `GET /platform-provisioning/tenants/{controlPlaneTenantId}` | `ecommerce:tenant:read` | `200` · `400` · `401` · `403` · `404 PROVISIONING_NOT_FOUND` · `503` |
+| `GET /platform-provisioning/tenants/{controlPlaneTenantId}` | `ecommerce:tenant:read` | `200` · `400` · `401` · `403` · `404 PROVISIONING_NOT_FOUND` (también si el tenant del alta ya no existe, desde `20261116110000`) · `503` |
+
+Rutas aditivas de la misma función (contratos aparte): entitlements (`/tenants/{id}/entitlements`,
+`/entitlements/manifest`) y **suspensión/reactivación** `lifecycle.v1`
+(`PUT|GET /tenants/{id}/lifecycle`, scopes `ecommerce:lifecycle:write|read`): ver
+[`LIFECYCLE.md`](LIFECYCLE.md); **inventario y vínculo** `tenant-inventory.v1` (`GET /tenants`,
+`PUT /tenants/{id}/link`, scopes `ecommerce:tenants:list|link`): ver
+[`TENANT_INVENTORY.md`](TENANT_INVENTORY.md). Este contrato GENERIC sigue siendo solo alta y consulta.
 
 Cabeceras del POST: `Authorization: Bearer <JWT>`, `Content-Type: application/json`,
 `Idempotency-Key` (obligatoria, `^[A-Za-z0-9._:-]{8,200}$`), `X-MasterAdmin-Contract: v1` (si viene,

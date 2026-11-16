@@ -6577,4 +6577,17 @@ export const en: Readonly<Record<MessageKey, string>> = {
   'watch.finding.integrations.circuit_open.body': "{count} connections have their breaker open: nothing reaches the other system until it is closed.",
   'watch.finding.ops.critical_events.title': "Critical incidents",
   'watch.finding.ops.critical_events.body': "{count} critical incidents in the last {window_hours} hours.",
+  // lifecycle.v1 · account suspended by EBIM MasterAdmin (storefront and back office).
+  'tenantLifecycle.suspended.title': 'Account suspended',
+  'tenantLifecycle.suspended.nonPayment':
+    'Please settle the payment with your provider to resume operations. You can still view and export your data; changes are blocked.',
+  'tenantLifecycle.suspended.manual':
+    'Your provider has paused this account. You can still view and export your data; changes are blocked.',
+  'tenantLifecycle.suspended.terminated':
+    'The service for this account has ended. You can still view and export your data; changes are blocked.',
+  'tenantLifecycle.store.title': 'Store temporarily unavailable',
+  'tenantLifecycle.store.body': 'You can browse the catalogue, but purchases are not possible right now.',
+  'tenantLifecycle.error':
+    'The account is suspended: you can view information, but changes are blocked until it is reactivated.',
+  'tenantLifecycle.error.store': 'Store temporarily unavailable: purchases are not possible right now.',
 }

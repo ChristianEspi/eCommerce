@@ -40,6 +40,7 @@ export const API_ERROR_CODES = [
   'VERSION_NO_SOPORTADA',
   'METODO_NO_PERMITIDO',
   'LOTE_DEMASIADO_GRANDE',
+  'TENANT_SUSPENDED',
   'ERROR_INTERNO',
 ] as const
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number]
@@ -73,6 +74,9 @@ export const API_ERROR_STATUS: Record<ApiErrorCode, number> = {
   VERSION_NO_SOPORTADA: 400,
   METODO_NO_PERMITIDO: 405,
   LOTE_DEMASIADO_GRANDE: 413,
+  // lifecycle.v1: la cuenta está suspendida. Leer sigue funcionando; escribir
+  // no, y reintentar no lo arregla hasta que la cuenta se reactive.
+  TENANT_SUSPENDED: 423,
   ERROR_INTERNO: 500,
 }
 
@@ -108,6 +112,7 @@ export const DB_CODE_TO_API: Record<string, ApiErrorCode> = {
   SIN_PERMISO: 'SCOPE_INSUFICIENTE',
   LOTE_INVALIDO: 'PETICION_INVALIDA',
   LOTE_EXCESIVO: 'LOTE_DEMASIADO_GRANDE',
+  TENANT_SUSPENDED: 'TENANT_SUSPENDED',
 }
 
 export interface ApiErrorBody {

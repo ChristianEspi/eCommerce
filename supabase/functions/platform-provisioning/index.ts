@@ -25,6 +25,16 @@
  * `PUT|GET /tenants/{id}/entitlements` y `GET /entitlements/manifest`): ver
  * `_shared/platformEntitlements/config.ts`. Sin sus secretos, solo esas rutas
  * responden 503; las de provisioning no cambian.
+ *
+ * Lifecycle (contrato `lifecycle.v1`, rutas ADITIVAS
+ * `PUT|GET /tenants/{id}/lifecycle`): ver `_shared/platformLifecycle/config.ts`
+ * y `docs/platform-provisioning/LIFECYCLE.md`. Sin sus scopes, solo esas rutas
+ * responden 503.
+ *
+ * Inventario y vínculo (contrato `tenant-inventory.v1`, rutas ADITIVAS
+ * `GET /tenants` y `PUT /tenants/{id}/link`): ver `_shared/platformInventory/config.ts`
+ * y `docs/platform-provisioning/TENANT_INVENTORY.md`. Sin sus scopes, solo esas
+ * rutas responden 503. `POST /tenants` y `GET /tenants/{id}` siguen siendo provisioning.
  */
 import { createClient } from 'npm:@supabase/supabase-js@2.48.0'
 import { handleProvisioningRequest } from '../_shared/platformProvisioning/handler.ts'
@@ -36,6 +46,12 @@ import { createRpcRepository } from '../_shared/platformProvisioning/repository.
 import { loadEntitlementsConfig } from '../_shared/platformEntitlements/config.ts'
 import { handleEntitlementsRequest, isEntitlementsRoute } from '../_shared/platformEntitlements/handler.ts'
 import { createEntitlementsRpcRepository } from '../_shared/platformEntitlements/repository.ts'
+import { loadLifecycleConfig } from '../_shared/platformLifecycle/config.ts'
+import { handleLifecycleRequest, isLifecycleRoute } from '../_shared/platformLifecycle/handler.ts'
+import { createLifecycleRpcRepository } from '../_shared/platformLifecycle/repository.ts'
+import { loadInventoryConfig, loadTenantLinkConfig } from '../_shared/platformInventory/config.ts'
+import { handleInventoryRequest, isInventoryRoute } from '../_shared/platformInventory/handler.ts'
+import { createInventoryRpcRepository } from '../_shared/platformInventory/repository.ts'
 import { edgeSecurityHeaders } from '../_shared/securityHeaders.ts'
 
 /**
@@ -80,7 +96,65 @@ function serveEntitlements(req: Request): Promise<Response> {
   })
 }
 
-Deno.serve(async (req) => isEntitlementsRoute(req.url) ? secured(await serveEntitlements(req)) :
+// ── Lifecycle (lifecycle.v1): también se despacha ANTES y no toca lo demás ──
+const lifecycleConfig = loadLifecycleConfig(Deno.env)
+let lifecycleKeyPromise: Promise<CryptoKey> | null = null
+
+function serveLifecycle(req: Request): Promise<Response> {
+  return handleLifecycleRequest(req, {
+    config: lifecycleConfig,
+    publicKey: () => {
+      if (!lifecycleConfig) return Promise.reject(new Error('Lifecycle no configurado'))
+      lifecycleKeyPromise ??= importMasterAdminPublicKey(lifecycleConfig.m2m.publicKeyB64).catch((e) => {
+        lifecycleKeyPromise = null
+        throw e
+      })
+      return lifecycleKeyPromise
+    },
+    repository: () => {
+      const url = Deno.env.get('SUPABASE_URL')
+      const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+      if (!url || !key) throw new Error('Faltan credenciales de servidor')
+      return createLifecycleRpcRepository(
+        createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } }),
+      )
+    },
+    log: (event) => console.log(JSON.stringify(event)),
+  })
+}
+
+// ── Inventario y vínculo (tenant-inventory.v1): antes que provisioning ──────
+const inventoryConfig = loadInventoryConfig(Deno.env)
+const tenantLinkConfig = loadTenantLinkConfig(Deno.env)
+let inventoryKeyPromise: Promise<CryptoKey> | null = null
+
+function serveInventory(req: Request): Promise<Response> {
+  return handleInventoryRequest(req, {
+    listConfig: inventoryConfig,
+    linkConfig: tenantLinkConfig,
+    publicKey: (routeConfig) => {
+      // Las dos rutas comparten la clave pública de MasterAdmin.
+      inventoryKeyPromise ??= importMasterAdminPublicKey(routeConfig.m2m.publicKeyB64).catch((e) => {
+        inventoryKeyPromise = null
+        throw e
+      })
+      return inventoryKeyPromise
+    },
+    repository: () => {
+      const url = Deno.env.get('SUPABASE_URL')
+      const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+      if (!url || !key) throw new Error('Faltan credenciales de servidor')
+      return createInventoryRpcRepository(
+        createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } }),
+      )
+    },
+    log: (event) => console.log(JSON.stringify(event)),
+  })
+}
+
+Deno.serve(async (req) => isLifecycleRoute(req.url) ? secured(await serveLifecycle(req)) :
+  isInventoryRoute(req.method, req.url) ? secured(await serveInventory(req)) :
+  isEntitlementsRoute(req.url) ? secured(await serveEntitlements(req)) :
   secured(await handleProvisioningRequest(req, {
     config,
     publicKey: () => {

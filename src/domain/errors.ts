@@ -55,6 +55,10 @@ const CODE_KINDS: Readonly<Record<string, AppErrorKind>> = {
   SIN_PERMISO: 'forbidden',
   PROHIBIDO: 'forbidden',
   '42501': 'forbidden',
+  // lifecycle.v1: la cuenta está suspendida por EBIM MasterAdmin. Se puede
+  // leer; escribir no, y reintentar no lo cambia hasta que se reactive.
+  TENANT_SUSPENDED: 'forbidden',
+  PT423: 'forbidden',
 
   // --- ausencia ------------------------------------------------------------
   NO_ENCONTRADO: 'not_found',

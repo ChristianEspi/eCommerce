@@ -347,6 +347,8 @@ export function mapCheckoutCode(code: string): MessageKey {
       return 'store.checkout.error.idempotency'
     case 'TIENDA_NO_DISPONIBLE':
       return 'store.checkout.error.store'
+    case 'TENANT_SUSPENDED':
+      return 'tenantLifecycle.error.store'
     case 'ITEMS_REQUERIDOS':
       return 'store.checkout.error.emptyCart'
     case 'MONEDA_INCONSISTENTE':

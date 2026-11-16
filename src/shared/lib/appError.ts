@@ -32,9 +32,18 @@ export function dbErrorMentions(error: PostgrestLike, pattern: RegExp): boolean 
   return pattern.test(error?.message ?? '')
 }
 
+/**
+ * lifecycle.v1: lo que levanta el guardián de la base cuando EBIM MasterAdmin
+ * suspendió la cuenta (SQLSTATE `PT423`). Es transversal: cualquier escritura
+ * de cualquier pantalla puede recibirlo.
+ */
+export const TENANT_SUSPENDED_CODE = 'TENANT_SUSPENDED'
+const TENANT_SUSPENDED_SQLSTATE = 'PT423'
+
 export function codeFromDbError(error: PostgrestLike): string {
   const raw = (error?.message ?? '').trim()
   const business = /(?:^|[:\s])([A-Z][A-Z0-9_]{3,60}):\s/.exec(raw)?.[1]
+  if (!business && error?.code === TENANT_SUSPENDED_SQLSTATE) return TENANT_SUSPENDED_CODE
   return business ?? error?.code ?? INTERNAL_DB_CODE
 }
 
@@ -67,7 +76,13 @@ export class UiError extends AppError {
       ...(input.cause !== undefined ? { cause: input.cause } : {}),
     })
     this.name = 'UiError'
-    this.key = input.key
+    // Cuenta suspendida (lifecycle.v1): el mismo aviso claro en TODAS las
+    // pantallas, sin que cada feature tenga que conocer el código. Una feature
+    // que ya eligió un texto propio de lifecycle (la vitrina) lo conserva.
+    this.key =
+      input.code === TENANT_SUSPENDED_CODE && !input.key.startsWith('tenantLifecycle.')
+        ? 'tenantLifecycle.error'
+        : input.key
   }
 }
 

@@ -11,6 +11,49 @@ el recorrido SaaS P00–P17 queda cerrado)
 > (`claude-saas-opus/config/phases.json`), que se identifica siempre como «P0x-SaaS». No son la misma
 > serie: el P12 histórico es el framework de integraciones; el P12-SaaS es fulfillment y devoluciones.
 
+## Inventario y vínculo con EBIM MasterAdmin — `tenant-inventory.v1` (2026-11-16)
+
+- `GET /platform-provisioning/tenants` (scope `ecommerce:tenants:list`) lista todos los tenants
+  (identidad y estado, keyset por `organization_id`); `PUT /platform-provisioning/tenants/{id}/link`
+  (scope `ecommerce:tenants:link`) adopta un tenant existente: crea solo su registro de alta
+  (`origin = LINKED`) y desde ahí estado, entitlements y lifecycle lo resuelven. Migración
+  `20261116110000_tenant_inventory_and_link.sql`; detalle en `docs/platform-provisioning/TENANT_INVENTORY.md`.
+- Un alta cuyo tenant se borró responde 404 en estado y lifecycle (antes 200 `TENANT_MISSING`).
+- **No desplegado**: migración, secretos y función pendientes de la promoción a QAS.
+- Pruebas: `supabase/tests/platform-inventory-contract.test.ts`.
+
+## Suspensión y reactivación desde EBIM MasterAdmin — `lifecycle.v1` (2026-10-13, rebasado el 2026-11-16)
+
+- Rutas `PUT|GET /platform-provisioning/tenants/{id}/lifecycle` (scopes `ecommerce:lifecycle:write|read`),
+  migración `20261116100000_tenant_lifecycle.sql`. Detalle, configuración y exenciones en
+  `docs/platform-provisioning/LIFECYCLE.md`.
+- `SUSPENDED`: un trigger en las 166 tablas de negocio rechaza toda escritura (`TENANT_SUSPENDED`,
+  SQLSTATE `PT423` → HTTP 423); lectura, exportación y login siguen; vitrina con catálogo de solo
+  lectura y «Tienda no disponible temporalmente»; backoffice con «Cuenta suspendida». Exenta solo
+  `api_requests`. `tenants.status` NO se usa (cerraría la lectura).
+- Pruebas: `tenant-lifecycle-db.test.ts`, `platform-lifecycle-contract.test.ts`,
+  `src/features/tenant/lifecycle.test.ts`.
+
+## Promoción a QAS (2026-11-15, a pedido del operador: «sube a qas todo»)
+
+- `origin/dev` y `origin/qas` en `7843a8a` (avance rápido, sin merge): libreta de direcciones en el
+  checkout, recojo cercano con stock, mapa OpenStreetMap, Culqi por tienda + Culqi Checkout oficial,
+  comprobante (boleta con documento y nombre; factura con RUC válido, razón social y dirección fiscal),
+  catálogo avanzado y datos reales de miquimica.
+- Migraciones `20261113140000`, `20261115120000`, `20261115140000` (y `20261113120000`) aplicadas en QAS.
+- Funciones desplegadas con su configuración previa: `checkout` v17, `update-order-status` v27,
+  `payments-webhook` v9 (con verify_jwt); `create-order` v28, `api` v11 (sin verify_jwt). Humo: RUC/DNI
+  inválidos → `CAMPO_INVALIDO`; válidos pasan la validación.
+
+## Formulario oficial de Culqi y comprobante (2026-11-15)
+
+Con llave pública de la tienda, la tarjeta se escribe en la ventana de Culqi Checkout
+(`checkout.culqi.com/js/v4`, solo tarjetas; `pagarConCulqiCheckout` en `cardToken.ts`); sin llave,
+simulacro con campos propios. Boleta SIEMPRE con tipo y número de documento (DNI/CE/pasaporte) y
+nombre; factura con RUC (dígito verificador, `src/shared/lib/peruDocs.ts` y el borde), razón social y
+dirección fiscal. **Pendiente de verificar en navegador real** la ventana de Culqi (las pruebas usan un
+doble de `window.Culqi`).
+
 ## Mapa gratuito en la entrega (2026-11-15)
 
 Leaflet + OpenStreetMap + Nominatim (sin API key; 1 consulta/s, con cola y caché en

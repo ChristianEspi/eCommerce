@@ -3985,4 +3985,17 @@ export const es = {
   'planning.v2.seasonalWhy.menos_de_un_anio': 'menos de un año de historial',
   'planning.v2.seasonalWhy.pocos_pedidos': 'pocos pedidos en el año',
   'planning.v2.seasonalWhy.sin_ventas_en_el_anio': 'sin ventas en el último año',
+  // lifecycle.v1 · cuenta suspendida por EBIM MasterAdmin (vitrina y backoffice).
+  'tenantLifecycle.suspended.title': 'Cuenta suspendida',
+  'tenantLifecycle.suspended.nonPayment':
+    'Regularice el pago con su proveedor para reactivar la operación. Puede consultar y exportar sus datos; los cambios están bloqueados.',
+  'tenantLifecycle.suspended.manual':
+    'Su proveedor pausó la operación de esta cuenta. Puede consultar y exportar sus datos; los cambios están bloqueados.',
+  'tenantLifecycle.suspended.terminated':
+    'El servicio de esta cuenta terminó. Puede consultar y exportar sus datos; los cambios están bloqueados.',
+  'tenantLifecycle.store.title': 'Tienda no disponible temporalmente',
+  'tenantLifecycle.store.body': 'Puedes ver el catálogo, pero por ahora no es posible comprar.',
+  'tenantLifecycle.error':
+    'La cuenta está suspendida: puede consultar la información, pero los cambios están bloqueados hasta que se reactive.',
+  'tenantLifecycle.error.store': 'Tienda no disponible temporalmente: por ahora no es posible comprar.',
 } as const

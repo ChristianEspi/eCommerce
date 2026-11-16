@@ -13835,6 +13835,7 @@ export type Database = {
         Returns: Json
       }
       my_stores: { Args: never; Returns: Json }
+      my_tenant_lifecycle: { Args: never; Returns: Json }
       notification_email_claim: {
         Args: { p_limit?: number }
         Returns: {
@@ -13970,6 +13971,14 @@ export type Database = {
         }
         Returns: Json
       }
+      platform_apply_lifecycle: {
+        Args: {
+          p_command: Json
+          p_control_plane_tenant_id: string
+          p_meta: Json
+        }
+        Returns: Json
+      }
       platform_entitlements_use_jti: {
         Args: { p_expires_at: string; p_issuer: string; p_jti: string }
         Returns: boolean
@@ -13978,8 +13987,25 @@ export type Database = {
         Args: { p_control_plane_tenant_id: string }
         Returns: Json
       }
+      platform_get_lifecycle: {
+        Args: { p_control_plane_tenant_id: string }
+        Returns: Json
+      }
       platform_get_provisioning: {
         Args: { p_control_plane_tenant_id: string }
+        Returns: Json
+      }
+      platform_link_tenant: {
+        Args: {
+          p_control_plane_tenant_id: string
+          p_external_tenant_id: string
+          p_fallback_company: string
+          p_meta: Json
+        }
+        Returns: Json
+      }
+      platform_list_tenants: {
+        Args: { p_after: string; p_limit: number }
         Returns: Json
       }
       platform_provision_tenant: {
@@ -14383,6 +14409,10 @@ export type Database = {
       store_domain_claim: { Args: { p_store_id: string }; Returns: Json }
       store_navigation_for_slug: {
         Args: { p_channel_code?: string; p_store_slug: string }
+        Returns: Json
+      }
+      store_operational_for_slug: {
+        Args: { p_store_slug: string }
         Returns: Json
       }
       store_page_for_slug: {
