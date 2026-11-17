@@ -640,14 +640,14 @@ export const REFUND_REQUEST_RPC = 'payment_refund_request'
 export const RECONCILIATION_IMPORT_RPC = 'payment_reconciliation_import'
 export const RECONCILIATION_MATCH_RPC = 'payment_reconciliation_match'
 /** 2026-11-17 · «Confirmar cobro» de un medio sin pasarela (Yape, transferencia). */
-export const PAYMENT_CONFIRM_OFFLINE_RPC = 'payment_confirm_offline'
+export const PAYMENT_CONFIRM_OFFLINE_RPC = 'payment_confirm_offline' satisfies FunctionName
 /**
  * 2026-11-17 · Crédito sin huecos (20261118100000): la línea de cada cuenta,
  * el cobro en una transacción y el comprobante desde un pedido.
  */
-export const CREDIT_LINES_RPC = 'credit_lines'
-export const AR_REGISTER_RECEIPT_RPC = 'ar_register_receipt'
-export const INVOICE_CREATE_FOR_ORDER_RPC = 'invoice_create_for_order'
+export const CREDIT_LINES_RPC = 'credit_lines' satisfies FunctionName
+export const AR_REGISTER_RECEIPT_RPC = 'ar_register_receipt' satisfies FunctionName
+export const INVOICE_CREATE_FOR_ORDER_RPC = 'invoice_create_for_order' satisfies FunctionName
 /** Escribe (o quita) la llave secreta de la pasarela del medio en Vault. Nunca la lee. */
 export const PAYMENT_METHOD_SET_SECRET_RPC = 'payment_method_set_secret'
 

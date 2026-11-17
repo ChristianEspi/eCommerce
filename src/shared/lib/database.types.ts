@@ -597,6 +597,8 @@ export type Database = {
           order_id: string | null
           organization_id: string
           updated_at: string
+          void_reason: string | null
+          voided_at: string | null
         }
         Insert: {
           amount: number
@@ -614,6 +616,8 @@ export type Database = {
           order_id?: string | null
           organization_id: string
           updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
         }
         Update: {
           amount?: number
@@ -631,6 +635,8 @@ export type Database = {
           order_id?: string | null
           organization_id?: string
           updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
         }
         Relationships: [
           {
@@ -13307,6 +13313,18 @@ export type Database = {
         }
         Returns: Json
       }
+      ar_register_receipt: {
+        Args: {
+          p_amount: number
+          p_applications: Json
+          p_customer_id: string
+          p_method: string
+          p_receipt_number: string
+          p_received_at: string
+          p_reference: string
+        }
+        Returns: Json
+      }
       archive_my_order_schedule: {
         Args: { p_store_slug: string; p_template_id: string }
         Returns: undefined
@@ -13425,6 +13443,15 @@ export type Database = {
         Returns: Json
       }
       checkout_context: { Args: { p_store_slug: string }; Returns: Json }
+      checkout_credit_check: {
+        Args: {
+          p_account_id: string
+          p_amount: number
+          p_method_code: string
+          p_store_slug: string
+        }
+        Returns: Json
+      }
       checkout_fail: {
         Args: {
           p_code: string
@@ -13593,6 +13620,7 @@ export type Database = {
         }
         Returns: Json
       }
+      credit_lines: { Args: never; Returns: Json }
       current_buyer: { Args: never; Returns: Json }
       customer_aging: { Args: { p_customer: string }; Returns: Json }
       customer_deletion_usage: {
@@ -13804,6 +13832,10 @@ export type Database = {
       }
       inventory_availability: {
         Args: { p_items: Json; p_store_id: string }
+        Returns: Json
+      }
+      invoice_create_for_order: {
+        Args: { p_order_number: string }
         Returns: Json
       }
       invoice_request_issue: { Args: { p_invoice_id: string }; Returns: Json }
