@@ -553,6 +553,26 @@ describe('checkout', () => {
     expect(fake.state.invocations[0]?.body.idempotency_key).toMatch(/^[a-f0-9]{64}$/)
   })
 
+  it('el cupón y la tarjeta de regalo están en el resumen desde el primer paso', async () => {
+    const user = userEvent.setup()
+    const fake = backend()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(fake, '/s/casa-nordica/checkout')
+
+    // Primer paso: el campo ya está, dentro del bloque del resumen.
+    const cupon = await screen.findByLabelText(/Cupón de descuento/)
+    expect(cupon.closest('[data-checkout-codes]')).not.toBeNull()
+    expect(screen.getByLabelText(/Tarjeta de regalo/).closest('[data-checkout-codes]')).not.toBeNull()
+
+    await rellenarContacto(user)
+    await irAPagar(user)
+    // En el último paso, un Enter en el cupón no registra el pedido.
+    await user.type(screen.getByLabelText(/Cupón de descuento/), 'verano-25{Enter}')
+    // El envío es asíncrono: se le da tiempo a ocurrir antes de afirmar que no.
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    expect(fake.state.invocations).toHaveLength(0)
+  })
+
   it('el cupón viaja como TEXTO y sin un solo importe (P10)', async () => {
     const user = userEvent.setup()
     const fake = backend()
@@ -561,7 +581,7 @@ describe('checkout', () => {
 
     await rellenarContacto(user)
     await irAPagar(user)
-    // Resumen v2 · el cupón vive en el paso de pago, junto al total.
+    // 2026-11-17 · el cupón vive en el resumen, debajo del total.
     await user.type(screen.getByLabelText(/Cupón de descuento/), 'verano-25')
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
 

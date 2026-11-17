@@ -19,11 +19,14 @@ export function GiftCardField({
   registration,
   readCode,
   errorKey,
+  size = 'medium',
 }: {
   storeSlug: string
   registration: UseFormRegisterReturn
   readCode: () => string
   errorKey: MessageKey | null
+  /** `small` en el resumen del checkout, donde la columna es estrecha. */
+  size?: 'small' | 'medium'
 }) {
   const { t, locale } = useI18n()
   const check = useMutation({ mutationFn: (code: string) => fetchGiftCardBalance(storeSlug, code) })
@@ -36,6 +39,7 @@ export function GiftCardField({
       <Stack direction="row" sx={{ gap: 1, alignItems: 'stretch' }}>
         <TextField
           fullWidth
+          size={size}
           label={t('store.checkout.giftCard')}
           placeholder={t('store.checkout.giftCardPlaceholder')}
           error={Boolean(errorKey)}
@@ -47,6 +51,13 @@ export function GiftCardField({
             check.reset()
             void registration.onChange(event)
           }}
+          // Enter consulta el saldo, como el botón de al lado.
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter') return
+            event.preventDefault()
+            const code = readCode().trim()
+            if (code !== '') check.mutate(code)
+          }}
         />
         <Button
           type="button"
@@ -56,7 +67,7 @@ export function GiftCardField({
             const code = readCode().trim()
             if (code !== '') check.mutate(code)
           }}
-          sx={{ fontWeight: 800, flexShrink: 0, px: 2.5 }}
+          sx={{ fontWeight: 800, flexShrink: 0, px: size === 'small' ? 2 : 2.5 }}
         >
           {t('store.checkout.giftCardCheck')}
         </Button>

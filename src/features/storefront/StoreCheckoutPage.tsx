@@ -165,6 +165,15 @@ const CAMPOS: ReadonlyArray<ReadonlyArray<keyof CheckoutValues>> = [
   ['paymentMethodCode', 'purchaseOrderNumber', 'invoiceType', 'idType', 'taxId', 'legalName', 'fiscalAddress', 'costCenter', 'couponCode', 'giftCardCode'],
 ]
 
+/** Dos columnas desde tableta; una en el teléfono. */
+const GRILLA_COMPROBANTE = {
+  display: 'grid',
+  gap: 1.5,
+  gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
+} as const
+/** Un campo que ocupa las dos columnas (nombre, dirección fiscal). */
+const ANCHO_COMPLETO = { gridColumn: '1 / -1' } as const
+
 export function StoreCheckoutPage() {
   const { t, locale } = useI18n()
   const navigate = useNavigate()
@@ -726,6 +735,13 @@ export function StoreCheckoutPage() {
     // teclea: cada valor distinto es una llamada al servidor, y «b», «bi»,
     // «bie»… serían seis intentos fallidos por un código de seis letras. Aquí
     // el comprador ya dijo que había terminado.
+    const cupon = (getValues('couponCode') ?? '').trim()
+    setCuponCotizado(cupon === '' ? SIN_CUPONES : [cupon])
+    setCorreoCotizado((getValues('customerEmail') ?? '').trim())
+  }
+
+  /** «Aplicar» cotiza AHORA: quien teclea un código quiere ver si descuenta. */
+  const aplicarCupon = () => {
     const cupon = (getValues('couponCode') ?? '').trim()
     setCuponCotizado(cupon === '' ? SIN_CUPONES : [cupon])
     setCorreoCotizado((getValues('customerEmail') ?? '').trim())
@@ -1360,31 +1376,36 @@ export function StoreCheckoutPage() {
                     nombre, SIEMPRE. Factura: RUC (con dígito verificador), razón social y
                     dirección fiscal. El servidor vuelve a validar todo. */}
                 <Divider />
-                <Stack sx={{ gap: 1.5 }} data-checkout-invoice={watched.invoiceType ?? 'receipt'}>
-                  <Stack direction="row" sx={{ alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-                    <Typography component="h3" sx={{ fontSize: TS.label, fontWeight: 700, color: 'var(--muted)' }}>
-                      {t('store.checkout.invoiceTitle')}
-                    </Typography>
-                    <ToggleButtonGroup
-                      exclusive
-                      size="small"
-                      value={watched.invoiceType ?? 'receipt'}
-                      aria-label={t('store.checkout.invoiceTitle')}
-                      onChange={(_, next: 'receipt' | 'invoice' | null) => next && cambiarComprobante(next)}
-                      sx={{ '& .MuiToggleButton-root': { textTransform: 'none', fontWeight: 700, px: 2 } }}
-                    >
-                      <ToggleButton value="receipt">{t('store.checkout.invoiceReceipt')}</ToggleButton>
-                      <ToggleButton value="invoice">{t('store.checkout.invoiceInvoice')}</ToggleButton>
-                    </ToggleButtonGroup>
-                  </Stack>
+                {/* 2026-11-17 · Título arriba y el selector a lo ancho, con las
+                    dos opciones del mismo tamaño; debajo, una cuadrícula de dos
+                    columnas en la que boleta y factura se alinean igual. */}
+                <Stack sx={{ gap: 1.75 }} data-checkout-invoice={watched.invoiceType ?? 'receipt'}>
+                  <Typography component="h3" sx={{ fontSize: TS.body, fontWeight: 800 }}>
+                    {t('store.checkout.invoiceTitle')}
+                  </Typography>
+                  <ToggleButtonGroup
+                    exclusive
+                    fullWidth
+                    size="small"
+                    value={watched.invoiceType ?? 'receipt'}
+                    aria-label={t('store.checkout.invoiceTitle')}
+                    onChange={(_, next: 'receipt' | 'invoice' | null) => next && cambiarComprobante(next)}
+                    sx={{
+                      maxWidth: { sm: 420 },
+                      '& .MuiToggleButton-root': { textTransform: 'none', fontWeight: 800, py: 1 },
+                    }}
+                  >
+                    <ToggleButton value="receipt">{t('store.checkout.invoiceReceipt')}</ToggleButton>
+                    <ToggleButton value="invoice">{t('store.checkout.invoiceInvoice')}</ToggleButton>
+                  </ToggleButtonGroup>
                   {(watched.invoiceType ?? 'receipt') === 'receipt' ? (
-                    <Stack direction={{ xs: 'column', md: 'row' }} sx={{ gap: 1.5 }}>
+                    <Box sx={GRILLA_COMPROBANTE}>
                       <TextField
                         select
                         label={t('store.checkout.idType')}
                         value={watched.idType ?? 'dni'}
                         onChange={(evento) => setValue('idType', evento.target.value as 'dni' | 'ce' | 'passport', { shouldValidate: true })}
-                        sx={{ width: { md: 210 }, flexShrink: 0 }}
+                        fullWidth
                         slotProps={{ htmlInput: { 'aria-label': t('store.checkout.idType') } }}
                       >
                         <MenuItem value="dni">{t('store.checkout.idType.dni')}</MenuItem>
@@ -1394,8 +1415,8 @@ export function StoreCheckoutPage() {
                       <TextField
                         label={t('store.checkout.docNumber')}
                         required
+                        fullWidth
                         autoComplete="off"
-                        sx={{ width: { md: 190 }, flexShrink: 0 }}
                         error={Boolean(errors.taxId)}
                         helperText={errors.taxId ? t(errors.taxId.message as MessageKey) : undefined}
                         slotProps={{
@@ -1411,21 +1432,21 @@ export function StoreCheckoutPage() {
                         label={t('store.checkout.receiptName')}
                         required
                         fullWidth
+                        sx={ANCHO_COMPLETO}
                         autoComplete="name"
                         error={Boolean(errors.legalName)}
                         helperText={errors.legalName ? t(errors.legalName.message as MessageKey) : undefined}
                         slotProps={{ htmlInput: { maxLength: 200 } }}
                         {...register('legalName')}
                       />
-                    </Stack>
+                    </Box>
                   ) : (
-                    <>
-                      <Stack direction={{ xs: 'column', md: 'row' }} sx={{ gap: 1.5 }}>
+                    <Box sx={GRILLA_COMPROBANTE}>
                         <TextField
                           label={t('store.checkout.taxId')}
                           required
+                          fullWidth
                           autoComplete="off"
-                          sx={{ width: { md: 190 }, flexShrink: 0 }}
                           error={Boolean(errors.taxId)}
                           helperText={errors.taxId ? t(errors.taxId.message as MessageKey) : undefined}
                           slotProps={{ htmlInput: { maxLength: 11, inputMode: 'numeric', style: { fontFamily: 'monospace' } } }}
@@ -1441,25 +1462,25 @@ export function StoreCheckoutPage() {
                           slotProps={{ htmlInput: { maxLength: 200 } }}
                           {...register('legalName')}
                         />
-                      </Stack>
                       <TextField
                         label={t('store.checkout.fiscalAddress')}
                         required
                         fullWidth
+                        sx={ANCHO_COMPLETO}
                         autoComplete="off"
                         error={Boolean(errors.fiscalAddress)}
                         helperText={errors.fiscalAddress ? t(errors.fiscalAddress.message as MessageKey) : t('store.checkout.fiscalAddressHint')}
                         slotProps={{ htmlInput: { maxLength: 300 } }}
                         {...register('fiscalAddress')}
                       />
-                    </>
+                    </Box>
                   )}
                 </Stack>
 
                 {/* Orden de compra y centro de costo, lado a lado. N05 · la OC solo
                     si la cuenta la EXIGE; el centro de costo solo para empresa. */}
                 {(ordenDeCompraObligatoria || contextoComercial) && (
-                <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ gap: 1.5 }}>
+                <Box sx={GRILLA_COMPROBANTE}>
                 {ordenDeCompraObligatoria && (
                   <TextField
                     id="checkout-purchase-order"
@@ -1493,49 +1514,9 @@ export function StoreCheckoutPage() {
                       {...register('costCenter')}
                     />
                   )}
-                </Stack>
+                </Box>
                 )}
 
-                {/* P10 · el cupón, en el paso de pago y con su botón al lado. Lo
-                    que se manda es TEXTO: si descuenta y cuánto lo decide el
-                    servidor. «Aplicar» cotiza AHORA: quien teclea un código
-                    quiere ver si descuenta antes de confirmar. */}
-                {/* Sin texto de ayuda fijo: el botón se estira al alto del campo
-                    y quedan alineados, como en el diseño. El error sí se dice. */}
-                <Stack direction="row" sx={{ gap: 1, alignItems: 'stretch' }}>
-                  <TextField
-                    fullWidth
-                    label={t('store.checkout.coupon')}
-                    placeholder={t('store.checkout.couponPlaceholder')}
-                    error={Boolean(errors.couponCode)}
-                    {...(errors.couponCode ? { helperText: t(errors.couponCode.message as MessageKey) } : {})}
-                    inputProps={{ style: { textTransform: 'uppercase' } }}
-                    {...register('couponCode')}
-                  />
-                  <Button
-                    type="button"
-                    variant="outlined"
-                    onClick={() => {
-                      const cupon = (getValues('couponCode') ?? '').trim()
-                      setCuponCotizado(cupon === '' ? SIN_CUPONES : [cupon])
-                      setCorreoCotizado((getValues('customerEmail') ?? '').trim())
-                    }}
-                    sx={{ fontWeight: 800, flexShrink: 0, px: 2.5 }}
-                  >
-                    {t('store.checkout.couponApply')}
-                  </Button>
-                </Stack>
-
-                {/* 2026-11-12 · La tarjeta de regalo. El checkout la aceptaba
-                    desde P10, pero aquí no había dónde escribirla. */}
-                {storeSlug && (
-                  <GiftCardField
-                    storeSlug={storeSlug}
-                    registration={register('giftCardCode')}
-                    readCode={() => getValues('giftCardCode') ?? ''}
-                    errorKey={errors.giftCardCode ? (errors.giftCardCode.message as MessageKey) : null}
-                  />
-                )}
               </>
             )}
           </Stack>
@@ -1663,6 +1644,49 @@ export function StoreCheckoutPage() {
           }
           acciones={
             <>
+              {/* 2026-11-17 · El cupón y la tarjeta de regalo, debajo del
+                  TOTAL (lo pidió el operador): es el número que cambian, y así
+                  se ve el efecto sin cambiar de columna. Están en todos los
+                  pasos, no solo en el de pago: quien trae un código lo quiere
+                  probar en cuanto llega. Lo que se manda es TEXTO; si descuenta
+                  y cuánto lo decide el servidor al cotizar. */}
+              <Stack sx={{ gap: 1.25, mt: 2, pt: 2, borderTop: '1px solid var(--sf-line)' }} data-checkout-codes>
+                <Stack direction="row" sx={{ gap: 1, alignItems: 'stretch' }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label={t('store.checkout.coupon')}
+                    placeholder={t('store.checkout.couponPlaceholder')}
+                    error={Boolean(errors.couponCode)}
+                    {...(errors.couponCode ? { helperText: t(errors.couponCode.message as MessageKey) } : {})}
+                    inputProps={{ style: { textTransform: 'uppercase' } }}
+                    {...register('couponCode')}
+                    // Enter aplica el cupón, como el botón de al lado.
+                    onKeyDown={(evento) => {
+                      if (evento.key !== 'Enter') return
+                      evento.preventDefault()
+                      aplicarCupon()
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outlined"
+                    onClick={aplicarCupon}
+                    sx={{ fontWeight: 800, flexShrink: 0, px: 2 }}
+                  >
+                    {t('store.checkout.couponApply')}
+                  </Button>
+                </Stack>
+                {storeSlug && (
+                  <GiftCardField
+                    size="small"
+                    storeSlug={storeSlug}
+                    registration={register('giftCardCode')}
+                    readCode={() => getValues('giftCardCode') ?? ''}
+                    errorKey={errors.giftCardCode ? (errors.giftCardCode.message as MessageKey) : null}
+                  />
+                )}
+              </Stack>
               {priceChanged && (
                 <Chip
                   size="small"
