@@ -856,6 +856,13 @@ export type Database = {
             foreignKeyName: "assortment_items_product_fk"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "bundle_stock_alerts"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "assortment_items_product_fk"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -1238,6 +1245,13 @@ export type Database = {
             foreignKeyName: "bundle_items_bundle_master_fk"
             columns: ["bundle_product_id", "organization_id", "company_id"]
             isOneToOne: false
+            referencedRelation: "bundle_stock_alerts"
+            referencedColumns: ["product_id", "organization_id", "company_id"]
+          },
+          {
+            foreignKeyName: "bundle_items_bundle_master_fk"
+            columns: ["bundle_product_id", "organization_id", "company_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id", "organization_id", "company_id"]
           },
@@ -1282,6 +1296,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "admin_products"
             referencedColumns: ["id", "organization_id", "company_id"]
+          },
+          {
+            foreignKeyName: "bundle_items_component_master_fk"
+            columns: ["component_product_id", "organization_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "bundle_stock_alerts"
+            referencedColumns: ["product_id", "organization_id", "company_id"]
           },
           {
             foreignKeyName: "bundle_items_component_master_fk"
@@ -1389,8 +1410,12 @@ export type Database = {
           code: string
           company_id: string
           created_at: string
+          credit_block_after_days: number | null
           credit_limit: number | null
           credit_status: Database["public"]["Enums"]["credit_status"]
+          credit_status_auto: boolean
+          credit_status_manual_until: string | null
+          credit_watch_after_days: number | null
           customer_id: string
           customer_kind: Database["public"]["Enums"]["customer_kind"]
           id: string
@@ -1408,8 +1433,12 @@ export type Database = {
           code: string
           company_id: string
           created_at?: string
+          credit_block_after_days?: number | null
           credit_limit?: number | null
           credit_status?: Database["public"]["Enums"]["credit_status"]
+          credit_status_auto?: boolean
+          credit_status_manual_until?: string | null
+          credit_watch_after_days?: number | null
           customer_id: string
           customer_kind?: Database["public"]["Enums"]["customer_kind"]
           id?: string
@@ -1427,8 +1456,12 @@ export type Database = {
           code?: string
           company_id?: string
           created_at?: string
+          credit_block_after_days?: number | null
           credit_limit?: number | null
           credit_status?: Database["public"]["Enums"]["credit_status"]
+          credit_status_auto?: boolean
+          credit_status_manual_until?: string | null
+          credit_watch_after_days?: number | null
           customer_id?: string
           customer_kind?: Database["public"]["Enums"]["customer_kind"]
           id?: string
@@ -3959,6 +3992,13 @@ export type Database = {
             foreignKeyName: "demand_forecasts_product_fk"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "bundle_stock_alerts"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "demand_forecasts_product_fk"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -4776,6 +4816,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "admin_products"
             referencedColumns: ["id", "organization_id", "company_id"]
+          },
+          {
+            foreignKeyName: "inventory_levels_product_fk"
+            columns: ["product_id", "organization_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "bundle_stock_alerts"
+            referencedColumns: ["product_id", "organization_id", "company_id"]
           },
           {
             foreignKeyName: "inventory_levels_product_fk"
@@ -5808,6 +5855,13 @@ export type Database = {
             foreignKeyName: "order_items_product_fk"
             columns: ["product_id", "organization_id", "company_id"]
             isOneToOne: false
+            referencedRelation: "bundle_stock_alerts"
+            referencedColumns: ["product_id", "organization_id", "company_id"]
+          },
+          {
+            foreignKeyName: "order_items_product_fk"
+            columns: ["product_id", "organization_id", "company_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id", "organization_id", "company_id"]
           },
@@ -6142,6 +6196,13 @@ export type Database = {
             foreignKeyName: "order_suggestion_items_product_fk"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "bundle_stock_alerts"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "order_suggestion_items_product_fk"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -6341,6 +6402,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "admin_products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_template_items_product_fk"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "bundle_stock_alerts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "order_template_items_product_fk"
@@ -7603,6 +7671,13 @@ export type Database = {
             foreignKeyName: "product_attribute_values_master_fk"
             columns: ["product_id", "organization_id", "company_id"]
             isOneToOne: false
+            referencedRelation: "bundle_stock_alerts"
+            referencedColumns: ["product_id", "organization_id", "company_id"]
+          },
+          {
+            foreignKeyName: "product_attribute_values_master_fk"
+            columns: ["product_id", "organization_id", "company_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id", "organization_id", "company_id"]
           },
@@ -7824,6 +7899,13 @@ export type Database = {
             foreignKeyName: "product_images_master_fk"
             columns: ["product_id", "organization_id", "company_id"]
             isOneToOne: false
+            referencedRelation: "bundle_stock_alerts"
+            referencedColumns: ["product_id", "organization_id", "company_id"]
+          },
+          {
+            foreignKeyName: "product_images_master_fk"
+            columns: ["product_id", "organization_id", "company_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id", "organization_id", "company_id"]
           },
@@ -7906,6 +7988,13 @@ export type Database = {
             foreignKeyName: "product_relations_master_fk"
             columns: ["product_id", "organization_id", "company_id"]
             isOneToOne: false
+            referencedRelation: "bundle_stock_alerts"
+            referencedColumns: ["product_id", "organization_id", "company_id"]
+          },
+          {
+            foreignKeyName: "product_relations_master_fk"
+            columns: ["product_id", "organization_id", "company_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id", "organization_id", "company_id"]
           },
@@ -7922,6 +8011,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "admin_products"
             referencedColumns: ["id", "organization_id", "company_id"]
+          },
+          {
+            foreignKeyName: "product_relations_related_master_fk"
+            columns: ["related_product_id", "organization_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "bundle_stock_alerts"
+            referencedColumns: ["product_id", "organization_id", "company_id"]
           },
           {
             foreignKeyName: "product_relations_related_master_fk"
@@ -8019,6 +8115,13 @@ export type Database = {
             foreignKeyName: "product_reviews_product_fk"
             columns: ["product_id", "organization_id", "company_id"]
             isOneToOne: false
+            referencedRelation: "bundle_stock_alerts"
+            referencedColumns: ["product_id", "organization_id", "company_id"]
+          },
+          {
+            foreignKeyName: "product_reviews_product_fk"
+            columns: ["product_id", "organization_id", "company_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id", "organization_id", "company_id"]
           },
@@ -8094,6 +8197,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "admin_products"
             referencedColumns: ["id", "organization_id", "company_id"]
+          },
+          {
+            foreignKeyName: "product_uoms_master_fk"
+            columns: ["product_id", "organization_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "bundle_stock_alerts"
+            referencedColumns: ["product_id", "organization_id", "company_id"]
           },
           {
             foreignKeyName: "product_uoms_master_fk"
@@ -8230,6 +8340,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "admin_products"
             referencedColumns: ["id", "organization_id", "company_id"]
+          },
+          {
+            foreignKeyName: "product_variants_master_fk"
+            columns: ["product_id", "organization_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "bundle_stock_alerts"
+            referencedColumns: ["product_id", "organization_id", "company_id"]
           },
           {
             foreignKeyName: "product_variants_master_fk"
@@ -9183,6 +9300,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "admin_products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_items_product_fk"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "bundle_stock_alerts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "quote_items_product_fk"
@@ -10732,6 +10856,13 @@ export type Database = {
             foreignKeyName: "store_products_product_fk"
             columns: ["product_id", "organization_id", "company_id"]
             isOneToOne: false
+            referencedRelation: "bundle_stock_alerts"
+            referencedColumns: ["product_id", "organization_id", "company_id"]
+          },
+          {
+            foreignKeyName: "store_products_product_fk"
+            columns: ["product_id", "organization_id", "company_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id", "organization_id", "company_id"]
           },
@@ -12048,6 +12179,13 @@ export type Database = {
             foreignKeyName: "store_products_product_fk"
             columns: ["product_id", "organization_id", "company_id"]
             isOneToOne: false
+            referencedRelation: "bundle_stock_alerts"
+            referencedColumns: ["product_id", "organization_id", "company_id"]
+          },
+          {
+            foreignKeyName: "store_products_product_fk"
+            columns: ["product_id", "organization_id", "company_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id", "organization_id", "company_id"]
           },
@@ -12059,6 +12197,25 @@ export type Database = {
             referencedColumns: ["id", "organization_id", "company_id"]
           },
         ]
+      }
+      bundle_stock_alerts: {
+        Row: {
+          available_qty: number | null
+          company_id: string | null
+          kind: string | null
+          limiting_component: string | null
+          name: string | null
+          organization_id: string | null
+          product_id: string | null
+          reorder_point: number | null
+          sku: string | null
+          store_id: string | null
+          synced_at: string | null
+          variant_id: string | null
+          warehouse_code: string | null
+          warehouse_id: string | null
+        }
+        Relationships: []
       }
       content_page_overview: {
         Row: {
