@@ -12,6 +12,12 @@ export interface OrderTimelineInput {
   approvalStatus: string | null
   /** `unfulfilled` | `in_progress` | `partially_fulfilled` | `fulfilled`…, o `null`. */
   fulfillmentStatus: string | null
+  /**
+   * Contra entrega: se paga AL RECIBIR. El paso de pago va al final («Pago al
+   * recibir») y no queda «en curso» antes de que el pedido llegue: el comprador
+   * no tiene nada que hacer hasta entonces.
+   */
+  payOnDelivery?: boolean
 }
 
 /**
@@ -35,15 +41,22 @@ export function orderSteps(input: OrderTimelineInput): Array<{ key: string; esta
     pasos.push({ key: 'approval', estado: rechazado ? 'failed' : aprobado ? 'done' : 'current' })
   }
   const bloqueado = rechazado || cancelado || !aprobado
-  pasos.push({
-    key: 'payment',
-    estado: input.paid ? 'done' : bloqueado ? 'pending' : 'current',
-  })
+  const alRecibir = Boolean(input.payOnDelivery) && !input.paid
+  if (!alRecibir) {
+    pasos.push({
+      key: 'payment',
+      estado: input.paid ? 'done' : bloqueado ? 'pending' : 'current',
+    })
+  }
   pasos.push({
     key: 'shipping',
     estado: entregado ? 'done' : enCamino ? 'current' : 'pending',
   })
   pasos.push({ key: 'delivered', estado: entregado ? 'done' : 'pending' })
+  if (alRecibir) {
+    // Entregado y sin cobrar: el cobro es lo que falta, ahora sí en curso.
+    pasos.push({ key: 'paymentOnDelivery', estado: entregado && !bloqueado ? 'current' : 'pending' })
+  }
   if (cancelado) return pasos.map((paso) => (paso.estado === 'current' ? { ...paso, estado: 'pending' } : paso))
   return pasos
 }

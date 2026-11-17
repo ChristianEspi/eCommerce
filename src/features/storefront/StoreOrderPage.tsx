@@ -167,6 +167,15 @@ export function StoreOrderPage() {
   const estadoPago = tracked.data?.payment_status ?? fromState?.payment_status ?? null
   const yaPagado = estadoPago !== null && PAGADO.includes(estadoPago)
   const estadoAprobacion = tracked.data?.approval_status ?? fromState?.approval_status ?? null
+
+  /**
+   * 2026-11-17 · El medio de pago: el del PEDIDO (sobrevive a la recarga y al
+   * enlace) y, recién comprado, el que viene del checkout. Contra entrega
+   * (`cash`) cambia lo que se dice: no hay un pago pendiente que hacer ahora,
+   * se paga al recibir.
+   */
+  const medio = tracked.data?.payment_method ?? medioElegido
+  const contraEntrega = medio?.kind === 'cash' && !yaPagado
   const estadoEnvio = tracked.data?.fulfillment_status ?? null
 
   /**
@@ -229,7 +238,14 @@ export function StoreOrderPage() {
           {t('store.order.title')}
         </Typography>
         <Typography sx={{ color: 'var(--muted)', mt: 0.75 }}>
-          {yaPagado ? t('store.order.bodyPaid') : t('store.order.body')}
+          {yaPagado
+            ? t('store.order.bodyPaid')
+            : contraEntrega
+              ? t('store.order.bodyCashOnDelivery').replace(
+                  '{amount}',
+                  order ? formatMoney(Number(order.grand_total), order.currency, locale) : '',
+                )
+              : t('store.order.body')}
         </Typography>
 
         <Typography sx={{ mt: 2, fontSize: TS.label, color: 'var(--muted)', fontWeight: 700 }}>
@@ -253,7 +269,13 @@ export function StoreOrderPage() {
             convierte una compra pagada en una que parece deber dinero — y eso no
             se descubre revisando código, se descubre delante de un cliente. */}
         <Chip
-          label={yaPagado ? t('store.order.paid') : t('store.order.pending')}
+          label={
+            yaPagado
+              ? t('store.order.paid')
+              : contraEntrega
+                ? t('store.order.payOnDelivery')
+                : t('store.order.pending')
+          }
           size="small"
           sx={{
             mt: 1.5,
@@ -303,6 +325,7 @@ export function StoreOrderPage() {
             paid={yaPagado}
             approvalStatus={estadoAprobacion}
             fulfillmentStatus={estadoEnvio}
+            payOnDelivery={contraEntrega}
           />
         </Card>
       )}
@@ -377,15 +400,15 @@ export function StoreOrderPage() {
           numero de pedido y ninguna forma de completarlo. Por eso se repiten
           aqui aunque ya salieran en el checkout — este es el sitio al que se
           vuelve. */}
-      {medioElegido && (
+      {medio && (
         <Card sx={{ p: { xs: 2, md: 3 } }}>
           <Typography component="h2" sx={{ fontSize: TS.cardTitle, fontWeight: 800, mb: 1 }}>
             {t('store.order.payment')}
           </Typography>
           <Typography sx={{ fontSize: TS.body, fontWeight: 700 }}>
-            {medioElegido.display_name}
+            {medio.display_name}
           </Typography>
-          {medioElegido.instructions && (
+          {medio.instructions && (
             <Box
               sx={{
                 mt: 1,
@@ -394,7 +417,7 @@ export function StoreOrderPage() {
                 whiteSpace: 'pre-wrap',
               }}
             >
-              {medioElegido.instructions}
+              {medio.instructions}
             </Box>
           )}
         </Card>

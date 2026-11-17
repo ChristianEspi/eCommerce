@@ -2293,6 +2293,30 @@ describe('la confirmación sigue el estado real del pedido', () => {
 })
 
 /**
+ * 2026-11-17 · Contra entrega: la confirmación no dice «pendiente de pago».
+ */
+describe('confirmación de un pedido contra entrega', () => {
+  it('dice cuánto se paga al recibir y pone el pago al final de la línea', async () => {
+    const fake = backend()
+    fake.state.rpc.order_by_token = () => ({
+      order_number: 'EC-2', status: 'pending', payment_status: 'pending', approval_status: 'not_required',
+      fulfillment_status: 'unfulfilled', currency: 'PEN', placed_at: '2026-11-17T10:00:00Z', customer_name: 'Ana',
+      subtotal: '100.00', tax_total: '0.00', discount_total: '0.00', shipping_total: '0.00', grand_total: '100.00',
+      shipping_address: {}, deliveries: [], items: [{ sku: 'SILLA', name: 'Silla de roble', unit_price: '100.00', quantity: 1 }],
+      payment_method: { code: 'efectivo', kind: 'cash', display_name: 'Pago en efectivo', instructions: null },
+    })
+    renderStorefront(fake, `/s/casa-nordica/order/EC-2?t=${'b'.repeat(64)}`)
+
+    expect(await screen.findByText(/en efectivo al recibir tu pedido/)).toBeInTheDocument()
+    expect(screen.getByText('Pagas al recibir')).toBeInTheDocument()
+    expect(screen.queryByText('Pendiente de pago')).not.toBeInTheDocument()
+    expect(screen.getByText('Pago en efectivo')).toBeInTheDocument()
+    expect(document.querySelector('[data-step="payment"]')).toBeNull()
+    expect(document.querySelector('[data-step="paymentOnDelivery"]')).toHaveAttribute('data-state', 'pending')
+  })
+})
+
+/**
  * 2026-11-11 · Devoluciones desde la página del pedido (20261111130000).
  */
 describe('devoluciones desde la página del pedido', () => {

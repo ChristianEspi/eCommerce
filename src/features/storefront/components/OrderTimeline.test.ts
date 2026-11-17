@@ -5,6 +5,31 @@ const estados = (input: Parameters<typeof orderSteps>[0]) =>
   Object.fromEntries(orderSteps(input).map((paso) => [paso.key, paso.estado]))
 
 describe('línea de tiempo del pedido', () => {
+  it('contra entrega: el pago va al FINAL y no queda «en curso» antes de recibir', () => {
+    const base = { status: 'pending', paid: false, approvalStatus: 'not_required', payOnDelivery: true }
+    const pasos = orderSteps({ ...base, fulfillmentStatus: 'unfulfilled' })
+    expect(pasos.map((p) => p.key)).toEqual(['placed', 'shipping', 'delivered', 'paymentOnDelivery'])
+    expect(estados({ ...base, fulfillmentStatus: 'unfulfilled' })).toEqual({
+      placed: 'done',
+      shipping: 'pending',
+      delivered: 'pending',
+      paymentOnDelivery: 'pending',
+    })
+    expect(estados({ ...base, fulfillmentStatus: 'in_progress' }).shipping).toBe('current')
+    // Entregado y sin cobrar: ahora sí, el cobro es lo que falta.
+    expect(estados({ ...base, fulfillmentStatus: 'fulfilled' })).toMatchObject({
+      delivered: 'done',
+      paymentOnDelivery: 'current',
+    })
+    // Ya cobrado: vuelve la línea de siempre, con el pago hecho.
+    expect(orderSteps({ ...base, paid: true, fulfillmentStatus: 'fulfilled' }).map((p) => p.key)).toEqual([
+      'placed',
+      'payment',
+      'shipping',
+      'delivered',
+    ])
+  })
+
   it('sin aprobación el paso no existe; recién registrado, lo que sigue es pagar', () => {
     const pasos = orderSteps({ status: 'pending', paid: false, approvalStatus: 'not_required', fulfillmentStatus: 'unfulfilled' })
     expect(pasos.map((p) => p.key)).toEqual(['placed', 'payment', 'shipping', 'delivered'])
