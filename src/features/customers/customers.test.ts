@@ -261,9 +261,11 @@ describe('formulario de cuenta B2B y de sus reglas', () => {
         notes: null,
         credit_limit: '20000.00',
         payment_terms_days: 30,
+        credit_status: 'watch',
       })
       expect(form.credit_limit).toBe('20000.00')
       expect(form.payment_terms_days).toBe('30')
+      expect(form.credit_status).toBe('watch')
     })
   })
 

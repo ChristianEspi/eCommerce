@@ -273,6 +273,17 @@ export function createDbPorts(options: DbPortOptions): CheckoutPorts {
       }
     },
 
+    async checkCredit(input): Promise<void> {
+      // Con `service`: la cuenta ya la resolvió la SESIÓN en la etapa 2; aquí
+      // solo se compara con la línea, que el comprador no tiene por qué leer.
+      await service('checkout_credit_check', {
+        p_store_slug: input.storeSlug,
+        p_method_code: input.methodCode,
+        p_account_id: input.accountId,
+        p_amount: input.amount,
+      })
+    },
+
     async resolveApproval(accountId: string, amount: string): Promise<PurchaseApproval> {
       // Con el cliente del LLAMANTE, igual que `my_business_accounts`: el
       // limite de la persona sale de `ebim.user_id()` dentro de la funcion, y

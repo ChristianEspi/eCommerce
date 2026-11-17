@@ -160,6 +160,8 @@ export const businessAccountSchema = z.object({
   // Línea de crédito: `null` = compra al contado, que no es lo mismo que cero.
   credit_limit: moneyText.nullable().default(null),
   payment_terms_days: z.number().int().default(0),
+  /** Semáforo de crédito: `blocked` impide comprar; `watch` solo avisa. */
+  credit_status: z.enum(['ok', 'watch', 'blocked']).catch('ok'),
 })
 export type BusinessAccount = z.infer<typeof businessAccountSchema>
 
@@ -506,6 +508,7 @@ export const accountFormSchema = z
       .string()
       .trim()
       .refine((value) => value === '' || (/^\d{1,3}$/.test(value) && Number(value) <= 365), 'customers.error.terms'),
+    credit_status: z.enum(['ok', 'watch', 'blocked']),
   })
   // La base lo rechaza igual: un umbral sin control encendido es un número que
   // no decide nada y que alguien leerá como si decidiera.
@@ -531,6 +534,7 @@ export function accountToForm(account: BusinessAccount | null, customerName = ''
     notes: account?.notes ?? '',
     credit_limit: account?.credit_limit ?? '',
     payment_terms_days: account && account.payment_terms_days > 0 ? String(account.payment_terms_days) : '',
+    credit_status: account?.credit_status ?? 'ok',
   }
 }
 

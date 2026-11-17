@@ -1,9 +1,15 @@
+import AddRoundedIcon from '@mui/icons-material/AddRounded'
 import ReceiptRoundedIcon from '@mui/icons-material/ReceiptRounded'
 import {
   Alert,
   Box,
   Button,
   Card,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  TextField,
   Stack,
   Table,
   TableBody,
@@ -26,7 +32,12 @@ import { useFeedback } from '@/shared/ui/feedback-context'
 import { usePagedRows } from '@/shared/ui/usePagedRows'
 import { EmptyState, ErrorState } from '@/shared/ui/states'
 import { CreditError } from './errors'
-import { useInvoiceIssueStatuses, useInvoices, useRequestInvoiceIssue } from './hooks'
+import {
+  useCreateInvoiceForOrder,
+  useInvoiceIssueStatuses,
+  useInvoices,
+  useRequestInvoiceIssue,
+} from './hooks'
 import type { Invoice, InvoiceIssueStatus, InvoiceStatus } from './types'
 
 /**
@@ -57,6 +68,23 @@ export function InvoicesSection() {
   const { notify } = useFeedback()
   const canIssue = can('tenant.manage')
   const [serverError, setServerError] = useState<MessageKey | null>(null)
+  // 2026-11-17 · Generar el comprobante de un pedido (con sus líneas).
+  const crear = useCreateInvoiceForOrder()
+  const [generando, setGenerando] = useState(false)
+  const [numeroPedido, setNumeroPedido] = useState('')
+  const [errorGenerar, setErrorGenerar] = useState<MessageKey | null>(null)
+
+  async function generar() {
+    setErrorGenerar(null)
+    try {
+      await crear.mutateAsync(numeroPedido)
+      notify(t('credit.invoices.created').replace('{order}', numeroPedido.trim().toUpperCase()), 'success')
+      setGenerando(false)
+      setNumeroPedido('')
+    } catch (error) {
+      setErrorGenerar(error instanceof CreditError ? error.key : 'credit.error.generic')
+    }
+  }
 
   const issueByInvoice = useMemo(() => {
     const map = new Map<string, InvoiceIssueStatus>()
@@ -101,16 +129,24 @@ export function InvoicesSection() {
 
   return (
     <Stack spacing={2}>
-      <Typography sx={{ color: 'var(--muted)' }}>{t('credit.invoices.help')}</Typography>
-
-      <Alert severity="info">{t('credit.invoices.issueHelp')}</Alert>
+      <Typography sx={{ color: 'var(--muted)' }}>
+        {t('credit.invoices.help')} {t('credit.invoices.issueHelp')}
+      </Typography>
       {serverError && (
         <Alert severity="error" onClose={() => setServerError(null)}>
           {t(serverError)}
         </Alert>
       )}
 
-      <FilterBar>
+      <FilterBar
+        actions={
+          canIssue ? (
+            <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => setGenerando(true)}>
+              {t('credit.invoices.new')}
+            </Button>
+          ) : undefined
+        }
+      >
         <Box sx={{ minWidth: { xs: '100%', sm: 300 } }}>
           <SearchField
             value={search}
@@ -153,6 +189,11 @@ export function InvoicesSection() {
                     {/* Sin número todavía: la autoridad no ha contestado. Un
                         guion es más honesto que inventar un correlativo. */}
                     {invoice.number ? `${invoice.series}-${invoice.number}` : invoice.series}
+                    {!invoice.number && (
+                      <Typography sx={{ fontSize: 11, color: 'var(--muted)', fontWeight: 400 }}>
+                        {t('credit.invoices.unnumbered')}
+                      </Typography>
+                    )}
                   </TableCell>
                   <TableCell>{invoice.customer_name}</TableCell>
                   <TableCell>{invoice.issued_at.slice(0, 10)}</TableCell>
@@ -209,6 +250,37 @@ export function InvoicesSection() {
           />
         )}
       </Card>
+
+      <Dialog open={generando} onClose={() => setGenerando(false)} fullWidth maxWidth="xs">
+        <DialogTitle>{t('credit.invoices.new')}</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <Typography sx={{ fontSize: 14, color: 'var(--muted)' }}>{t('credit.invoices.newHelp')}</Typography>
+            {errorGenerar && <Alert severity="error">{t(errorGenerar)}</Alert>}
+            <TextField
+              autoFocus
+              fullWidth
+              label={t('credit.invoices.orderNumber')}
+              placeholder="EC-20261117-00046"
+              value={numeroPedido}
+              onChange={(event) => setNumeroPedido(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && numeroPedido.trim() !== '') void generar()
+              }}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setGenerando(false)}>{t('common.cancel')}</Button>
+          <Button
+            variant="contained"
+            disabled={crear.isPending || numeroPedido.trim() === ''}
+            onClick={() => void generar()}
+          >
+            {t('credit.invoices.generate')}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   )
 }
@@ -246,14 +318,19 @@ function IssueCell({
       : null
   // Se ofrece pedirla mientras no haya mensaje en la cola: sin solicitar, o
   // solicitada y a la espera de proveedor (volver a pedirla es idempotente).
+  const sinLineas = invoice.item_count === 0
   const offer =
     canIssue &&
+    !sinLineas &&
     invoice.status === 'pending' &&
     (state === 'not_requested' || state === 'pending_configuration')
 
   return (
     <Stack spacing={0.5} sx={{ alignItems: 'flex-start' }}>
       <StatusChip tone={tone} label={t(`credit.issueState.${state}` as MessageKey)} />
+      {sinLineas && invoice.status === 'pending' && (
+        <Typography sx={{ fontSize: 11, color: 'var(--red)' }}>{t('credit.invoices.noLines')}</Typography>
+      )}
       {blockedKey && (
         <Typography sx={{ fontSize: 11, color: 'var(--muted)' }}>{t(blockedKey)}</Typography>
       )}

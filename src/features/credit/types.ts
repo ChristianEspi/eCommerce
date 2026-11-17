@@ -10,6 +10,9 @@ export {
   INVOICE_ISSUE_STATUS_VIEW,
   INVOICE_REQUEST_ISSUE_RPC,
   CUSTOMER_AGING_RPC,
+  CREDIT_LINES_RPC,
+  AR_REGISTER_RECEIPT_RPC,
+  INVOICE_CREATE_FOR_ORDER_RPC,
 } from '@/shared/lib/db-schema'
 
 /**
@@ -43,8 +46,34 @@ export const arDocumentSchema = z.object({
   balance: money,
   customer_code: z.string().nullable().default(null),
   customer_name: z.string().nullable().default(null),
+  business_account_id: z.string().uuid().nullable().default(null),
+  /** Anulado (pedido cancelado): ya no se debe ni admite cobros. */
+  voided_at: z.string().nullable().default(null),
+  void_reason: z.string().nullable().default(null),
 })
 export type ArDocument = z.infer<typeof arDocumentSchema>
+
+/** La línea de crédito de una cuenta empresa, como la calcula la base. */
+export const creditLineSchema = z.object({
+  account_id: z.string().uuid(),
+  account_name: z.string(),
+  account_code: z.string().nullable().default(null),
+  customer_id: z.string().uuid(),
+  status: z.enum(CREDIT_STATUSES).catch('ok'),
+  limit: z.coerce.number().nullable().default(null),
+  terms_days: z.coerce.number().catch(0),
+  used: z.coerce.number().catch(0),
+  overdue: z.coerce.number().catch(0),
+  available: z.coerce.number().nullable().default(null),
+})
+export type CreditLine = z.infer<typeof creditLineSchema>
+
+export const receiptResultSchema = z.object({
+  receipt_number: z.string(),
+  applied: z.string(),
+  unapplied: z.string(),
+})
+export type ReceiptResult = z.infer<typeof receiptResultSchema>
 
 export const arReceiptSchema = z.object({
   id: z.string().uuid(),
@@ -89,6 +118,8 @@ export const invoiceSchema = z.object({
   tax_total: money,
   gross_total: money,
   reject_reason: z.string().nullable().default(null),
+  /** Cuántas líneas tiene: sin líneas no se puede emitir. */
+  item_count: z.coerce.number().catch(0),
 })
 export type Invoice = z.infer<typeof invoiceSchema>
 
@@ -132,7 +163,8 @@ const moneyInput = z
   .refine((value) => Number(value) > 0, 'credit.error.amount')
 
 export const receiptFormSchema = z.object({
-  receipt_number: z.string().trim().min(1, 'credit.error.number').max(60, 'credit.error.number'),
+  // Opcional: sin número, la base pone el correlativo del día (RC-AAAAMMDD-001).
+  receipt_number: z.string().trim().max(60, 'credit.error.number'),
   amount: moneyInput,
   received_at: z.string(),
   method: z.string().trim().max(60, 'credit.error.method'),
@@ -145,7 +177,7 @@ export function emptyReceiptForm(): ReceiptFormValues {
     receipt_number: '',
     amount: '',
     received_at: new Date().toISOString().slice(0, 10),
-    method: '',
+    method: 'transfer',
     reference: '',
   }
 }

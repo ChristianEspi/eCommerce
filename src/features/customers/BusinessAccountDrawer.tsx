@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   FormControlLabel,
+  MenuItem,
   Stack,
   Switch,
   Tab,
@@ -286,6 +287,28 @@ export function BusinessAccountDrawer({
                     {...register('payment_terms_days')}
                   />
                 </Stack>
+                {/* 2026-11-17 · El semáforo lo decide quien cobra: «Bloqueado»
+                    impide nuevas compras de la cuenta; «En vigilancia» solo
+                    avisa. Antes no había dónde cambiarlo. */}
+                <TextField
+                  select
+                  label={t('customers.field.creditStatus')}
+                  fullWidth
+                  disabled={!canWrite || watch('credit_limit').trim() === ''}
+                  value={watch('credit_status')}
+                  onChange={(event) =>
+                    setValue('credit_status', event.target.value as AccountFormValues['credit_status'], {
+                      shouldDirty: true,
+                    })
+                  }
+                  helperText={t(`customers.creditStatus.${watch('credit_status')}.hint` as MessageKey)}
+                >
+                  {(['ok', 'watch', 'blocked'] as const).map((value) => (
+                    <MenuItem key={value} value={value}>
+                      {t(`credit.lineStatus.${value}` as MessageKey)}
+                    </MenuItem>
+                  ))}
+                </TextField>
               </Stack>
 
               <TextField

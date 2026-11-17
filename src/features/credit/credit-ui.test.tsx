@@ -119,6 +119,9 @@ function backend(
     rpc: {
       effective_capabilities: () => makePlatformContext({ entitlements, source: 'hub' }),
       ...(options.requestIssue ? { invoice_request_issue: options.requestIssue } : {}),
+      // 2026-11-17 · el cobro es UNA llamada: recibo y aplicaciones juntos.
+      ar_register_receipt: () => ({ receipt_number: 'RC-20261117-001', applied: '1200.00', unapplied: '0.00' }),
+      invoice_create_for_order: () => ({ invoice_id: 'x', lines: 2 }),
     },
   })
 }
@@ -157,7 +160,7 @@ describe('la pantalla de cobranza', () => {
     expect(screen.getByText('Vencido 5 d')).toBeInTheDocument()
   })
 
-  it('arranca en «solo pendiente»: quien abre cobranza viene a cobrar', async () => {
+  it('arranca en «Pendientes»: lo pagado está en su propia pestaña', async () => {
     const user = userEvent.setup()
     pintar(backend())
     await screen.findByText('F001-100')
@@ -165,8 +168,16 @@ describe('la pantalla de cobranza', () => {
     // El documento saldado no está de entrada, pero el histórico está a un clic.
     expect(screen.queryByText('F001-050')).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Ver todo' }))
+    await user.click(screen.getByRole('tab', { name: 'Pagados' }))
     expect(await screen.findByText('F001-050')).toBeInTheDocument()
+    expect(screen.queryByText('F001-100')).not.toBeInTheDocument()
+  })
+
+  it('las cifras de arriba suman solo lo pendiente', async () => {
+    pintar(backend())
+    await screen.findByText('F001-100')
+    // 1000 + 500 por cobrar; el saldado (300) no cuenta.
+    expect(screen.getByRole('article', { name: 'Por cobrar' })).toHaveTextContent(/1,500\.00/)
   })
 
   it('sin el módulo contratado dice qué falta, no enseña una tabla vacía', async () => {
@@ -183,9 +194,9 @@ describe('el registro de un cobro', () => {
     const user = userEvent.setup()
     pintar(fake)
     await screen.findByText('F001-100')
-    // La acción es un ICONO: su nombre accesible lleva pegado el documento
-    // —«Registrar cobro: F001-1001»— para que no suene igual en veinte filas.
-    await user.click(screen.getAllByRole('button', { name: /^Registrar cobro:/ })[0]!)
+    // «Cobrar» es un botón con texto; su nombre accesible lleva pegado el
+    // documento —«Cobrar: F001-100»— para que no suene igual en veinte filas.
+    await user.click(screen.getByRole('button', { name: 'Cobrar: F001-100' }))
     // El cajón está abierto cuando ya se puede marcar qué documento cancela.
     await screen.findByRole('checkbox', { name: 'F001-100' })
     return user
@@ -195,40 +206,51 @@ describe('el registro de un cobro', () => {
     const fake = backend()
     const user = await abrirCobro(fake)
 
+    // Se abrió desde F001-100: llega marcada. Se cambia a la de 500.
+    await user.click(screen.getByRole('checkbox', { name: 'F001-100' }))
     await user.click(screen.getByRole('checkbox', { name: 'F001-200' }))
-    await user.type(screen.getByLabelText(/N.º de recibo/), 'R-001')
+    await user.clear(screen.getByLabelText(/^Importe/))
     await user.type(screen.getByLabelText(/^Importe/), '900')
 
-    // El aviso sale en la pantalla y el botón se apaga: si esto llegara a la
-    // base, el recibo YA estaría creado cuando la aplicación falla, y habría
-    // que explicar por qué quedó un cobro colgando.
-    expect(screen.getAllByText('El cobro supera la deuda marcada.').length).toBeGreaterThan(0)
+    // El aviso sale en la pantalla y el botón se apaga antes de molestar a la base.
+    expect(screen.getAllByText(/supera lo que se debe en las deudas marcadas/).length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: 'Registrar' })).toBeDisabled()
-    expect(fake.state.tables.ar_receipts).toHaveLength(0)
+    expect(fake.state.rpcCalls.some((c) => c.name === 'ar_register_receipt')).toBe(false)
   })
 
-  it('reparte de más antiguo a más nuevo y deja el resto sin aplicar', async () => {
+  it('se abre con la deuda marcada y su saldo propuesto', async () => {
+    await abrirCobro(backend())
+    expect(screen.getByRole('checkbox', { name: 'F001-100' })).toBeChecked()
+    expect(screen.getByLabelText(/^Importe/)).toHaveValue('1000.00')
+  })
+
+  it('reparte de más antiguo a más nuevo, en UNA llamada', async () => {
     const fake = backend()
     const user = await abrirCobro(fake)
 
-    await user.click(screen.getByRole('checkbox', { name: 'F001-100' }))
     await user.click(screen.getByRole('checkbox', { name: 'F001-200' }))
     await user.type(screen.getByLabelText(/N.º de recibo/), 'R-001')
+    await user.clear(screen.getByLabelText(/^Importe/))
     await user.type(screen.getByLabelText(/^Importe/), '1200')
     await user.click(screen.getByRole('button', { name: 'Registrar' }))
 
-    await vi.waitFor(() => expect(fake.state.tables.ar_receipts).toHaveLength(1))
-
-    const aplicaciones = (fake.state.tables.ar_applications ?? []) as Array<{
-      document_id: string
-      amount: string
-    }>
+    await vi.waitFor(() =>
+      expect(fake.state.rpcCalls.filter((c) => c.name === 'ar_register_receipt')).toHaveLength(1),
+    )
+    const llamada = fake.state.rpcCalls.find((c) => c.name === 'ar_register_receipt')!
     // 1200 sobre una deuda de 1000 + 500: el más viejo se cancela entero y el
-    // resto va al siguiente. Es el orden del oficio y el único que no obliga a
-    // preguntar a quien está cobrando.
-    expect(aplicaciones).toHaveLength(2)
-    expect(aplicaciones[0]).toMatchObject({ document_id: DOC_VIEJO, amount: '1000.00' })
-    expect(aplicaciones[1]).toMatchObject({ document_id: DOC_NUEVO, amount: '200.00' })
+    // resto va al siguiente. Es el orden del oficio.
+    expect(llamada.args).toMatchObject({
+      p_customer_id: CLIENTE,
+      p_receipt_number: 'R-001',
+      p_amount: '1200',
+      p_applications: [
+        { document_id: DOC_VIEJO, amount: '1000.00' },
+        { document_id: DOC_NUEVO, amount: '200.00' },
+      ],
+    })
+    // Ni una escritura directa en las tablas: la transacción es de la base.
+    expect(fake.state.tables.ar_receipts).toHaveLength(0)
   })
 
   it('solo ofrece aplicar a los documentos ABIERTOS del cliente', async () => {
@@ -273,6 +295,7 @@ describe('la emisión de un comprobante', () => {
     tax_total: '18.00',
     gross_total: '118.00',
     reject_reason: null,
+    invoice_items: [{ count: 2 }],
   }
 
   async function abrirComprobantes(fake: FakeSupabase) {
@@ -318,5 +341,31 @@ describe('la emisión de un comprobante', () => {
     const llamadas = fake.state.rpcCalls.filter((c) => c.name === 'invoice_request_issue')
     expect(llamadas).toEqual([{ name: 'invoice_request_issue', args: { p_invoice_id: FACTURA } }])
     expect(await screen.findByText('Emisión encolada')).toBeInTheDocument()
+  })
+
+  it('sin líneas no ofrece emitir y dice cómo arreglarlo', async () => {
+    const fake = backend({
+      entitlements: [...COBRANZA, 'ecommerce.invoicing'],
+      invoices: [{ ...factura, invoice_items: [{ count: 0 }] }],
+    })
+    await abrirComprobantes(fake)
+    expect(await screen.findByText('No tiene líneas: genéralo de nuevo desde su pedido.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Emitir comprobante F001' })).not.toBeInTheDocument()
+  })
+
+  it('«Generar comprobante» manda solo el número de pedido', async () => {
+    const fake = backend({
+      entitlements: [...COBRANZA, 'ecommerce.invoicing'],
+      invoices: [factura],
+    })
+    const user = await abrirComprobantes(fake)
+    await user.click(screen.getByRole('button', { name: 'Generar comprobante' }))
+    await user.type(await screen.findByLabelText('Número de pedido'), 'ec-20261117-00046')
+    await user.click(screen.getByRole('button', { name: 'Generar' }))
+    await vi.waitFor(() =>
+      expect(fake.state.rpcCalls.filter((c) => c.name === 'invoice_create_for_order')).toEqual([
+        { name: 'invoice_create_for_order', args: { p_order_number: 'EC-20261117-00046' } },
+      ]),
+    )
   })
 })

@@ -553,6 +553,19 @@ export interface CheckoutPorts {
    * no contamina B2C).
    */
   resolveApproval(accountId: string, amount: MoneyText): Promise<PurchaseApproval>
+  /**
+   * 2026-11-17 · ¿Alcanza la línea de crédito? Solo responde algo cuando el
+   * medio elegido es de familia `credit`; con cualquier otro no hace nada.
+   * Lanza CREDITO_EXCEDIDO / CREDITO_SIN_LINEA / CREDITO_SIN_CUENTA /
+   * CREDITO_BLOQUEADO. Opcional para que los dobles de prueba no tengan que
+   * implementarlo.
+   */
+  checkCredit?(input: {
+    storeSlug: string
+    methodCode: string
+    accountId: string | null
+    amount: MoneyText
+  }): Promise<void>
   placeOrder(input: {
     intentId: string
     request: CheckoutRequest

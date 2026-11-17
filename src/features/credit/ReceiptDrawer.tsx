@@ -4,6 +4,7 @@ import {
   Box,
   Button,
   Checkbox,
+  MenuItem,
   Stack,
   Table,
   TableBody,
@@ -20,7 +21,6 @@ import type { MessageKey } from '@/shared/i18n/messages'
 import { formatMoney } from '@/shared/lib/format'
 import { FieldRow, FormDrawer } from '@/shared/ui/FormDrawer'
 import { useFeedback } from '@/shared/ui/feedback-context'
-import type { CreditScope } from './api'
 import { CreditError } from './errors'
 import { useRegisterReceipt } from './hooks'
 import {
@@ -53,6 +53,9 @@ import {
  */
 
 /** Suma importes decimales en céntimos, para no pasar por el float. */
+/** Los medios con los que se suele cobrar una deuda a crédito. */
+const METODOS = ['transfer', 'deposit', 'wallet', 'cash', 'check', 'other'] as const
+
 function sumarCentimos(valores: string[]): number {
   return valores.reduce((total, valor) => total + Math.round(Number(valor) * 100), 0)
 }
@@ -60,14 +63,15 @@ function sumarCentimos(valores: string[]): number {
 export function ReceiptDrawer({
   open,
   documents,
-  scope,
+  initialDocumentId = null,
   canWrite,
   onClose,
 }: {
   open: boolean
   /** Los documentos abiertos del cliente elegido. */
   documents: ArDocument[]
-  scope: CreditScope | null
+  /** La deuda desde la que se pulsó «Cobrar»: llega marcada y con su saldo. */
+  initialDocumentId?: string | null
   canWrite: boolean
   onClose: () => void
 }) {
@@ -83,6 +87,7 @@ export function ReceiptDrawer({
     handleSubmit,
     reset,
     watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<ReceiptFormValues>({
     resolver: zodResolver(receiptFormSchema),
@@ -91,10 +96,15 @@ export function ReceiptDrawer({
 
   useEffect(() => {
     if (!open) return
-    reset(emptyReceiptForm())
-    setElegidos(new Set())
+    // Se abre desde una deuda: llega marcada y el importe propuesto es su
+    // saldo, que es lo que se cobra casi siempre. Se puede cambiar.
+    const inicial = documents.find((doc) => doc.id === initialDocumentId) ?? null
+    reset({ ...emptyReceiptForm(), amount: inicial ? inicial.balance : '' })
+    setElegidos(new Set(inicial ? [inicial.id] : []))
     setServerError(null)
-  }, [open, reset])
+    // Solo al abrir: los documentos se refrescan al cobrar y no deben pisar lo tecleado.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, reset, initialDocumentId])
 
   const cliente = documents[0] ?? null
   const importe = watch('amount')
@@ -110,6 +120,14 @@ export function ReceiptDrawer({
     : 0
   const sePasa = centimosCobro > 0 && centimosDeuda > 0 && centimosCobro > centimosDeuda
 
+  /** Marcar todo lo que debe y proponer ese importe. */
+  function cobrarTodo() {
+    setElegidos(new Set(documents.map((doc) => doc.id)))
+    setValue('amount', (sumarCentimos(documents.map((doc) => doc.balance)) / 100).toFixed(2), {
+      shouldValidate: true,
+    })
+  }
+
   function alternar(id: string) {
     setElegidos((previo) => {
       const siguiente = new Set(previo)
@@ -120,7 +138,11 @@ export function ReceiptDrawer({
   }
 
   async function submit(values: ReceiptFormValues) {
-    if (!scope || !cliente) return
+    if (!cliente) return
+    if (seleccion.length === 0) {
+      setServerError('credit.error.noDocuments')
+      return
+    }
     if (sePasa) {
       setServerError('credit.error.overpay')
       return
@@ -140,14 +162,17 @@ export function ReceiptDrawer({
     }
 
     try {
-      await register_.mutateAsync({
-        scope,
+      const result = await register_.mutateAsync({
         customerId: cliente.customer_id,
-        currency: cliente.currency,
         values,
         applications: aplicaciones,
       })
-      notify(t('credit.toast.receipt'), 'success')
+      notify(
+        (Number(result.unapplied) > 0 ? t('credit.toast.receiptUnapplied') : t('credit.toast.receipt'))
+          .replace('{number}', result.receipt_number)
+          .replace('{amount}', formatMoney(Number(result.unapplied), cliente.currency, locale)),
+        'success',
+      )
       onClose()
     } catch (error) {
       setServerError(error instanceof CreditError ? error.key : 'credit.error.generic')
@@ -186,11 +211,12 @@ export function ReceiptDrawer({
             <TextField
               fullWidth
               label={t('credit.field.receiptNumber')}
-              required
               disabled={!canWrite}
               error={Boolean(errors.receipt_number)}
               helperText={
-                errors.receipt_number ? t(errors.receipt_number.message as MessageKey) : undefined
+                errors.receipt_number
+                  ? t(errors.receipt_number.message as MessageKey)
+                  : t('credit.field.receiptNumberHint')
               }
               slotProps={{ inputLabel: { shrink: true } }}
               {...register('receipt_number')}
@@ -226,12 +252,20 @@ export function ReceiptDrawer({
               {...register('received_at')}
             />
             <TextField
+              select
               fullWidth
               label={t('credit.field.method')}
               disabled={!canWrite}
+              value={watch('method')}
+              onChange={(event) => setValue('method', event.target.value)}
               slotProps={{ inputLabel: { shrink: true } }}
-              {...register('method')}
-            />
+            >
+              {METODOS.map((metodo) => (
+                <MenuItem key={metodo} value={metodo}>
+                  {t(`credit.method.${metodo}` as MessageKey)}
+                </MenuItem>
+              ))}
+            </TextField>
           </FieldRow>
 
           {/* La referencia va sola: un numero de operacion o de cheque es
@@ -246,7 +280,14 @@ export function ReceiptDrawer({
           />
 
           <Box>
-            <Typography sx={{ fontWeight: 800, mb: 1 }}>{t('credit.receipt.apply')}</Typography>
+            <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+              <Typography sx={{ fontWeight: 800 }}>{t('credit.receipt.apply')}</Typography>
+              {documents.length > 1 && canWrite && (
+                <Button size="small" onClick={cobrarTodo}>
+                  {t('credit.receipt.all')}
+                </Button>
+              )}
+            </Stack>
             <Typography sx={{ color: 'var(--muted)', fontSize: 13, mb: 1 }}>
               {t('credit.receipt.applyHint')}
             </Typography>

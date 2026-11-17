@@ -12,6 +12,8 @@ import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { EmptyState } from '@/shared/ui/states'
 import { CollectionsSection } from './CollectionsSection'
 import { InvoicesSection } from './InvoicesSection'
+import { LinesSection } from './LinesSection'
+import { ReceiptsSection } from './ReceiptsSection'
 import { CreditAiSection } from './ai/CreditAiSection'
 
 /**
@@ -38,6 +40,12 @@ export function CreditPage() {
     () => [
       { id: 'cobranza', label: t('credit.tab.collections'), content: <CollectionsSection /> },
       {
+        id: 'lineas',
+        label: t('credit.tab.lines'),
+        content: <LinesSection currency={activeStore?.currency ?? 'PEN'} />,
+      },
+      { id: 'cobros', label: t('credit.tab.receipts'), content: <ReceiptsSection /> },
+      {
         id: 'comprobantes',
         label: t('credit.tab.invoices'),
         content: (
@@ -48,7 +56,7 @@ export function CreditPage() {
       },
       ...(conIA ? [{ id: 'analisis-ia', label: t('aiCredit.tab'), content: <CreditAiSection /> }] : []),
     ],
-    [t, conIA],
+    [t, conIA, activeStore?.currency],
   )
 
   if (status === 'loading') {

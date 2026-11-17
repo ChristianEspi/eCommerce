@@ -321,6 +321,11 @@ export function mapCheckoutCode(code: string): MessageKey {
       return 'store.checkout.error.spendingLimit'
     case 'CREDITO_BLOQUEADO':
       return 'store.checkout.error.creditBlocked'
+    case 'CREDITO_EXCEDIDO':
+      return 'store.checkout.error.creditExceeded'
+    case 'CREDITO_SIN_LINEA':
+    case 'CREDITO_SIN_CUENTA':
+      return 'store.checkout.error.creditUnavailable'
     case 'ORDEN_COMPRA_REQUERIDA':
       return 'store.checkout.error.purchaseOrderRequired'
     case 'ORDEN_COMPRA_INVALIDA':

@@ -416,6 +416,17 @@ export async function runCheckout(
         })
       }
 
+      // 2026-11-17 · Vender a crédito exige que la LÍNEA alcance. Antes de la
+      // tarjeta regalo y de la pasarela: rechazar aquí no deja nada que deshacer.
+      if (ports.checkCredit && input.paymentMethodCode) {
+        await ports.checkCredit({
+          storeSlug: input.storeSlug,
+          methodCode: input.paymentMethodCode,
+          accountId: account.accountId,
+          amount: payableTotal,
+        })
+      }
+
       // ¿Hace falta que alguien de la empresa firme esta compra? Se pregunta
       // aqui, y no en la etapa 2, por la misma razon que el limite: hasta que
       // no hay total no hay pregunta que hacer. Y solo si hay cuenta: un
