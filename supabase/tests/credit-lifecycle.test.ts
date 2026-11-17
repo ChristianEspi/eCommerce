@@ -332,3 +332,78 @@ describe('comprobante desde un pedido', () => {
     ).toMatch(/PEDIDO_NO_ENCONTRADO|SIN_PERMISO/)
   })
 })
+
+describe('lo que quedaba suelto', () => {
+  async function estadoCuenta() {
+    const [row] = await svc<{ status: string; auto: boolean }>(
+      `select credit_status::text as status, credit_status_auto as auto from public.business_accounts where id = $1`,
+      [cuenta],
+    )
+    return row
+  }
+
+  it('«Tu cuenta» del comprador da el mismo disponible que el checkout', async () => {
+    // Un Yape pendiente NO es deuda a crédito.
+    await comprar('yape', 1)
+    const r = await asRole(db, 'authenticated', shopper(COMPRADOR), async () =>
+      (await db.query<{ r: Row[] }>(`select public.my_account_statement() as r`)).rows[0]?.r,
+    )
+    const mia = (r ?? []).find((a) => a.account_id === cuenta)
+    const l = await linea()
+    expect(Number(mia?.credit_available)).toBe(Number(l?.available))
+    expect((mia?.documents as Row[]).every((d) => typeof d.order_number === 'string')).toBe(true)
+  })
+
+  it('la mora pasa sola a vigilancia y a bloqueo, y vuelve al cobrar', async () => {
+    await svc(`update public.business_accounts set credit_status = 'ok', credit_status_manual_until = null,
+                 credit_status_auto = false where id = $1`, [cuenta])
+    const { order } = await comprar('credito', 1)
+    const doc = await documentoDe(order.orderId)
+    await svc(`update public.ar_documents set issued_at = current_date - 60, due_at = current_date - 20 where id = $1`, [doc?.id])
+    expect(await estadoCuenta()).toMatchObject({ status: 'watch', auto: true })
+    await svc(`update public.ar_documents set issued_at = current_date - 90, due_at = current_date - 40 where id = $1`, [doc?.id])
+    expect(await estadoCuenta()).toMatchObject({ status: 'blocked', auto: true })
+
+    // Bloqueada: no compra.
+    expect((await fallo(() => comprar('credito', 1))).code).toBe('CREDITO_BLOQUEADO')
+
+    // Cobra todo lo abierto y vuelve sola.
+    const abiertos = await svc<{ id: string; balance: string }>(
+      `select id, balance::text from public.ar_documents where business_account_id = $1 and voided_at is null and balance > 0`,
+      [cuenta],
+    )
+    for (const a of abiertos) await cobrar(admin(), a.id, a.balance)
+    expect(await estadoCuenta()).toMatchObject({ status: 'ok', auto: false })
+  })
+
+  it('un cambio a mano se respeta: el sistema no lo pisa', async () => {
+    await svc(`update public.business_accounts set credit_status = 'blocked' where id = $1`, [cuenta])
+    const { rows } = await db.query<{ s: string }>(`select ebim.credit_refresh_status($1)::text as s`, [cuenta])
+    expect(rows[0]?.s).toBe('blocked')
+    await svc(`update public.business_accounts set credit_status = 'ok' where id = $1`, [cuenta])
+  })
+
+  it('cancelar con algo cobrado anula la deuda y dice cuánto devolver', async () => {
+    const { order } = await comprar('credito', 2)
+    const doc = await documentoDe(order.orderId)
+    await cobrar(admin(), String(doc?.id), '5.00')
+    await svc(`update public.orders set status = 'cancelled' where id = $1`, [order.orderId])
+    const despues = await documentoDe(order.orderId)
+    expect(despues?.reason).toMatch(/devolver 5\.00 PEN/)
+    const [ev] = await svc<{ code: string }>(
+      `select code from public.ops_events where code = 'COBRO_A_DEVOLVER' order by occurred_at desc limit 1`,
+    )
+    expect(ev?.code).toBe('COBRO_A_DEVOLVER')
+  })
+
+  it('el comprobante nace solo con la deuda a crédito y se anula si se cancela', async () => {
+    const { order } = await comprar('credito', 1)
+    const [inv] = await svc<{ status: string }>(`select status::text from public.invoices where order_id = $1`, [order.orderId])
+    const evs = await svc(`select code, message from public.ops_events where code = 'COMPROBANTE_NO_GENERADO'`)
+    expect(evs).toEqual([])
+    expect(inv?.status).toBe('pending')
+    await svc(`update public.orders set status = 'cancelled' where id = $1`, [order.orderId])
+    const [despues] = await svc<{ status: string }>(`select status::text from public.invoices where order_id = $1`, [order.orderId])
+    expect(despues?.status).toBe('cancelled')
+  })
+})

@@ -162,6 +162,11 @@ export const businessAccountSchema = z.object({
   payment_terms_days: z.number().int().default(0),
   /** Semáforo de crédito: `blocked` impide comprar; `watch` solo avisa. */
   credit_status: z.enum(['ok', 'watch', 'blocked']).catch('ok'),
+  /** El estado lo puso el sistema por mora (no una persona). */
+  credit_status_auto: z.boolean().catch(false),
+  /** Días de atraso para pasar sola a vigilancia / a bloqueo. `null` = nunca. */
+  credit_watch_after_days: z.number().int().nullable().default(15),
+  credit_block_after_days: z.number().int().nullable().default(30),
 })
 export type BusinessAccount = z.infer<typeof businessAccountSchema>
 
@@ -509,7 +514,22 @@ export const accountFormSchema = z
       .trim()
       .refine((value) => value === '' || (/^\d{1,3}$/.test(value) && Number(value) <= 365), 'customers.error.terms'),
     credit_status: z.enum(['ok', 'watch', 'blocked']),
+    credit_watch_after_days: z
+      .string()
+      .trim()
+      .refine((value) => value === '' || (/^\d{1,3}$/.test(value) && Number(value) >= 1 && Number(value) <= 365), 'customers.error.moraDays'),
+    credit_block_after_days: z
+      .string()
+      .trim()
+      .refine((value) => value === '' || (/^\d{1,3}$/.test(value) && Number(value) >= 1 && Number(value) <= 365), 'customers.error.moraDays'),
   })
+  .refine(
+    (values) =>
+      values.credit_watch_after_days === '' ||
+      values.credit_block_after_days === '' ||
+      Number(values.credit_block_after_days) >= Number(values.credit_watch_after_days),
+    { path: ['credit_block_after_days'], message: 'customers.error.moraOrder' },
+  )
   // La base lo rechaza igual: un umbral sin control encendido es un número que
   // no decide nada y que alguien leerá como si decidiera.
   .refine((values) => values.requires_approval || values.approval_threshold === '', {
@@ -535,6 +555,10 @@ export function accountToForm(account: BusinessAccount | null, customerName = ''
     credit_limit: account?.credit_limit ?? '',
     payment_terms_days: account && account.payment_terms_days > 0 ? String(account.payment_terms_days) : '',
     credit_status: account?.credit_status ?? 'ok',
+    credit_watch_after_days:
+      account === null ? '15' : account.credit_watch_after_days === null ? '' : String(account.credit_watch_after_days),
+    credit_block_after_days:
+      account === null ? '30' : account.credit_block_after_days === null ? '' : String(account.credit_block_after_days),
   }
 }
 

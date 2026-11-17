@@ -238,8 +238,9 @@ beforeAll(async () => {
   CLIENTE_SIN_DEUDA = await nuevoCliente('AL-DIA')
   CLIENTE_B = await nuevoCliente('DEUDOR-B', TENANT_B)
   await svc(
-    `insert into public.business_accounts (organization_id, company_id, customer_id, code, name, credit_status, credit_limit, payment_terms_days)
-     values ($1, $2, $3, 'CTA-D', 'Cuenta deudor', 'watch', 500, 30)`,
+    `insert into public.business_accounts (organization_id, company_id, customer_id, code, name, credit_status, credit_limit, payment_terms_days,
+       credit_watch_after_days, credit_block_after_days)
+     values ($1, $2, $3, 'CTA-D', 'Cuenta deudor', 'watch', 500, 30, null, null)`,
     [TENANT_A.organizationId, TENANT_A.companyId, CLIENTE],
   )
   await documento(CLIENTE, 'F001-1', '300.00', 45) // vencido 45 d

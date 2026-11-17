@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildTextSearchFilter } from '@/shared/lib/search'
 import { tryGetSupabaseClient, tryGetStorefrontClient } from '@/shared/lib/supabase'
 import { InventoryError, inventoryErrorFromDb } from './errors'
-import { ADMIN_PRODUCT_MASTERS_VIEW } from '@/shared/lib/db-schema'
+import { ADMIN_PRODUCT_MASTERS_VIEW, BUNDLE_STOCK_ALERTS_VIEW } from '@/shared/lib/db-schema'
 import {
   ADJUST_INVENTORY_RPC,
   AVAILABILITY_PUBLIC_RPC,
@@ -512,5 +512,12 @@ export async function fetchAlerts(storeId: string | null): Promise<InventoryAler
         : query.or(`warehouse_id.in.(${serving.join(',')}),store_id.eq.${storeId}`)
   const { data, error } = await query.limit(200)
   if (error) throw inventoryErrorFromDb(error)
-  return inventoryAlertSchema.array().parse(data ?? [])
+  // 2026-11-17 · Los kits: van por la tienda donde están publicados. Si la
+  // vista no existe todavía en la base, no tumba el resto de avisos.
+  const kits = await client()
+    .from(BUNDLE_STOCK_ALERTS_VIEW)
+    .select(`${ALERT_SELECT}, limiting_component`)
+    .eq('store_id', storeId)
+    .limit(100)
+  return inventoryAlertSchema.array().parse([...(data ?? []), ...(kits.error ? [] : (kits.data ?? []))])
 }

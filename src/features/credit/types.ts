@@ -60,6 +60,11 @@ export const creditLineSchema = z.object({
   account_code: z.string().nullable().default(null),
   customer_id: z.string().uuid(),
   status: z.enum(CREDIT_STATUSES).catch('ok'),
+  /** El estado lo puso el sistema por mora. */
+  auto: z.boolean().catch(false),
+  watch_after: z.coerce.number().nullable().catch(null),
+  block_after: z.coerce.number().nullable().catch(null),
+  max_days: z.coerce.number().catch(0),
   limit: z.coerce.number().nullable().default(null),
   terms_days: z.coerce.number().catch(0),
   used: z.coerce.number().catch(0),

@@ -71,11 +71,28 @@ export function codeLabel(t: Translate, code: string | null | undefined): string
  * tipos de actor, de proveedor, funciones de IA. `code.<grupo>.<valor>` y, si
  * no hay texto, el valor legible.
  */
-export type TermGroup = 'status' | 'domain' | 'actor' | 'providerKind' | 'aiFeature' | 'kind'
+export type TermGroup = 'status' | 'domain' | 'actor' | 'providerKind' | 'aiFeature' | 'kind' | 'stage'
 
 export function termLabel(t: Translate, group: TermGroup, value: string | null | undefined): string {
   if (!value) return '—'
   return lookup(t, `code.${group}.${value}`) ?? capitalize(readable(value))
+}
+
+/**
+ * Un texto libre que la base arma con códigos dentro («checkout_failed ·
+ * STOCK_INSUFICIENTE», «etapa reserve_inventory»): cada código se traduce en
+ * su sitio y el resto se deja como está.
+ */
+export function summaryLabel(t: Translate, text: string | null | undefined): string {
+  if (!text) return '—'
+  return text.replace(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\b[a-z]+(?:_[a-z]+)+\b/g, (code) => {
+    if (code === code.toUpperCase()) return codeLabel(t, code)
+    for (const group of ['stage', 'kind', 'status', 'domain'] as const) {
+      const found = lookup(t, `code.${group}.${code}`)
+      if (found) return found.toLowerCase() === found ? found : found.charAt(0).toLowerCase() + found.slice(1)
+    }
+    return readable(code)
+  }).replace(/^./, (c) => c.toUpperCase())
 }
 
 /** Un tipo de entidad (`payment_intent`, `shipment`) como sustantivo con mayúscula. */

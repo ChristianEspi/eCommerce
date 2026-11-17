@@ -12,7 +12,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useI18n } from '@/shared/i18n/i18n-context'
-import { entityLabel, termLabel } from '@/shared/i18n/codeLabels'
+import { entityLabel, summaryLabel, termLabel } from '@/shared/i18n/codeLabels'
 import { formatDateTime } from '@/shared/lib/format'
 import { SearchField } from '@/shared/ui/SearchField'
 import { EmptyState, ErrorState, UnauthorizedState } from '@/shared/ui/states'
@@ -102,7 +102,7 @@ export function TraceSection({
                       {entityLabel(t, step.entity_type)}
                     </Typography>
                     <Typography sx={{ fontSize: 12, color: 'var(--muted)' }}>
-                      {step.summary ?? '—'}
+                      {summaryLabel(t, step.summary)}
                     </Typography>
                   </TableCell>
                   <TableCell align="right">

@@ -301,7 +301,11 @@ export function BusinessAccountDrawer({
                       shouldDirty: true,
                     })
                   }
-                  helperText={t(`customers.creditStatus.${watch('credit_status')}.hint` as MessageKey)}
+                  helperText={
+                    account?.credit_status_auto && account.credit_status === watch('credit_status')
+                      ? t('customers.creditStatus.auto')
+                      : t(`customers.creditStatus.${watch('credit_status')}.hint` as MessageKey)
+                  }
                 >
                   {(['ok', 'watch', 'blocked'] as const).map((value) => (
                     <MenuItem key={value} value={value}>
@@ -309,6 +313,29 @@ export function BusinessAccountDrawer({
                     </MenuItem>
                   ))}
                 </TextField>
+                {/* Mora automática: a los N días de atraso de la deuda más
+                    vieja, la cuenta pasa sola a vigilancia; a los M, a bloqueo.
+                    Vacío = nunca. */}
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                  <TextField
+                    label={t('customers.field.watchAfter')}
+                    fullWidth
+                    disabled={!canWrite || watch('credit_limit').trim() === ''}
+                    error={Boolean(errors.credit_watch_after_days)}
+                    helperText={fieldError('credit_watch_after_days') ?? t('customers.field.moraHint')}
+                    inputProps={{ inputMode: 'numeric' }}
+                    {...register('credit_watch_after_days')}
+                  />
+                  <TextField
+                    label={t('customers.field.blockAfter')}
+                    fullWidth
+                    disabled={!canWrite || watch('credit_limit').trim() === ''}
+                    error={Boolean(errors.credit_block_after_days)}
+                    helperText={fieldError('credit_block_after_days') ?? t('customers.field.moraHint')}
+                    inputProps={{ inputMode: 'numeric' }}
+                    {...register('credit_block_after_days')}
+                  />
+                </Stack>
               </Stack>
 
               <TextField

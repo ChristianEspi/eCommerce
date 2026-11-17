@@ -267,7 +267,7 @@ describe('OrdersPage — listado', () => {
     expect(within(row).getByText('Ana Compradora')).toBeInTheDocument()
     expect(within(row).getByText('Pendiente')).toBeInTheDocument()
     expect(within(row).getByText('Sin cobrar')).toBeInTheDocument()
-    expect(within(row).getByText('Sin despachar')).toBeInTheDocument()
+    expect(within(row).getByText('Sin entregar')).toBeInTheDocument()
     expect(within(row).getByText(/236[,.]00/)).toBeInTheDocument()
   })
 
@@ -528,7 +528,7 @@ describe('OrdersPage — detalle en panel lateral', () => {
     await user.click(await screen.findByRole('option', { name: 'Entrega' }))
 
     // El mismo pedido, otro eje, otro punto de partida.
-    expect(within(drawer).getByText('Ahora: Sin despachar')).toBeInTheDocument()
+    expect(within(drawer).getByText('Ahora: Sin entregar')).toBeInTheDocument()
   })
 
   /**
@@ -587,8 +587,8 @@ describe('OrdersPage — detalle en panel lateral', () => {
     // con el mismo nombre en la misma pantalla: ahora cada una dice de qué habla.
     expect(options).toEqual([
       'En preparación',
-      'Despachado en parte',
-      'Despachado',
+      'Entregado en parte',
+      'Entregado',
       'Entrega anulada',
     ])
   })

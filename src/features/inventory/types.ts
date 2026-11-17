@@ -191,7 +191,7 @@ export const reservationSchema = z.object({
 })
 export type Reservation = z.infer<typeof reservationSchema>
 
-export const ALERT_KINDS = ['below_reorder', 'negative', 'stale', 'unmapped'] as const
+export const ALERT_KINDS = ['below_reorder', 'negative', 'stale', 'unmapped', 'bundle_low'] as const
 export type AlertKind = (typeof ALERT_KINDS)[number]
 
 export const inventoryAlertSchema = z.object({
@@ -206,6 +206,8 @@ export const inventoryAlertSchema = z.object({
   available_qty: quantityText.nullable().default(null),
   reorder_point: quantityText.nullable().default(null),
   synced_at: z.string().nullable().default(null),
+  /** Solo en `bundle_low`: el componente que deja armar pocos kits. */
+  limiting_component: z.string().nullable().default(null),
 })
 export type InventoryAlert = z.infer<typeof inventoryAlertSchema>
 
@@ -219,6 +221,7 @@ export const ALERT_SEVERITY: Record<AlertKind, number> = {
   negative: 40,
   unmapped: 30,
   stale: 20,
+  bundle_low: 15,
   below_reorder: 10,
 }
 

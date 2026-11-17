@@ -34,3 +34,11 @@ describe('códigos de máquina en pantalla', () => {
     expect(codeLabel(es, 'kind.checkout_failed')).toBe('Compra fallida')
   })
 })
+
+describe('resúmenes con códigos dentro', () => {
+  it('traduce cada código en su sitio', async () => {
+    const { summaryLabel } = await import('./codeLabels')
+    expect(summaryLabel(es, 'etapa reserve_inventory')).toBe('Etapa reserva de stock')
+    expect(summaryLabel(es, 'checkout_failed · STOCK_INSUFICIENTE')).toBe('Compra fallida · Stock insuficiente')
+  })
+})

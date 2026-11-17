@@ -369,7 +369,8 @@ export async function deleteExternalId(id: string): Promise<void> {
 
 const ACCOUNT_SELECT =
   'id, customer_id, code, name, is_active, requires_approval, approval_threshold::text, ' +
-  'purchase_order_required, notes, credit_limit::text, payment_terms_days, credit_status'
+  'purchase_order_required, notes, credit_limit::text, payment_terms_days, credit_status, ' +
+  'credit_status_auto, credit_watch_after_days, credit_block_after_days'
 
 export async function fetchBusinessAccounts(): Promise<BusinessAccount[]> {
   const { data, error } = await client().from(BUSINESS_ACCOUNTS_TABLE).select(ACCOUNT_SELECT).order('name')
@@ -408,6 +409,10 @@ export async function saveBusinessAccount(input: {
     credit_limit: nullable(input.values.credit_limit),
     payment_terms_days: Number(input.values.payment_terms_days || 0),
     credit_status: input.values.credit_status,
+    credit_watch_after_days:
+      input.values.credit_watch_after_days === '' ? null : Number(input.values.credit_watch_after_days),
+    credit_block_after_days:
+      input.values.credit_block_after_days === '' ? null : Number(input.values.credit_block_after_days),
   }
 
   // Devuelve la fila: tras el alta, el cajón pasa a editarla para añadir

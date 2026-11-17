@@ -136,7 +136,19 @@ export function LinesSection({ currency }: { currency: string }) {
                       {dinero(line.overdue)}
                     </TableCell>
                     <TableCell>
-                      <StatusChip tone={tono(line)} label={t(`credit.lineStatus.${line.status}` as MessageKey)} />
+                      <Stack spacing={0.25} sx={{ alignItems: 'flex-start' }}>
+                        <StatusChip tone={tono(line)} label={t(`credit.lineStatus.${line.status}` as MessageKey)} />
+                        {line.auto && (
+                          <Typography sx={{ fontSize: 11, color: 'var(--muted)' }}>
+                            {t('credit.lines.auto').replace('{n}', String(line.max_days))}
+                          </Typography>
+                        )}
+                        {!line.auto && line.max_days > 0 && (
+                          <Typography sx={{ fontSize: 11, color: 'var(--muted)' }}>
+                            {t('credit.lines.maxDays').replace('{n}', String(line.max_days))}
+                          </Typography>
+                        )}
+                      </Stack>
                     </TableCell>
                   </TableRow>
                 ))}

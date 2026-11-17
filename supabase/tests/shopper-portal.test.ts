@@ -143,6 +143,12 @@ beforeAll(async () => {
              $4, 'B-0001', 'pending', 'pending', 'PEN', 'sur@empresa.test', 999, 0, 0, 0, 999, now())`,
     [TENANT_A.organizationId, TENANT_A.companyId, storeId, cuentaB],
   )
+  // 2026-11-17 · La deuda del estado de cuenta es la deuda A CRÉDITO: los dos
+  // pedidos pendientes se vendieron a crédito y tienen su documento por cobrar,
+  // como los deja el checkout al atar el cobro.
+  await db.query(
+    `select ebim.ar_document_for_order(o.id) from public.orders o where o.order_number in ('A-0001', 'B-0001')`,
+  )
 
   // Dos cupones: uno abierto a la tienda y otro dirigido SOLO a la cuenta B.
   const [promoAbierta] = await svc<{ id: string }>(

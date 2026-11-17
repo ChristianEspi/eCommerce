@@ -312,8 +312,8 @@ describe('Rastro', () => {
       HILO,
     )
     expect(await screen.findByText('Compra')).toBeInTheDocument()
-    expect(screen.getByText('etapa reserve_inventory')).toBeInTheDocument()
-    expect(screen.getByText('checkout_failed · STOCK_INSUFICIENTE')).toBeInTheDocument()
+    expect(screen.getByText('Etapa reserva de stock')).toBeInTheDocument()
+    expect(screen.getByText('Compra fallida · Stock insuficiente')).toBeInTheDocument()
   })
 })
 

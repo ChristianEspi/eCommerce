@@ -1475,3 +1475,26 @@ describe('cobrado + servido = entregado (20261111140000)', () => {
     expect(o?.s).toBe('fulfilled')
   })
 })
+
+describe('kits casi agotados (2026-11-17)', () => {
+  it('avisa cuando el componente más escaso deja armar 5 o menos, y dice cuál', async () => {
+    // Jabón x2 por kit: 6 en Lima → 3 kits. Camiseta roja x1: 50 → 50 kits.
+    await svc(
+      `insert into public.inventory_levels
+         (organization_id, company_id, warehouse_id, store_id, product_id, variant_id, on_hand_qty)
+       values ($1, $2, $3, $4, $5, null, 6), ($1, $2, $3, $4, $6, $7, 50)`,
+      [TENANT_A.organizationId, TENANT_A.companyId, lima, storeA, jabon, camiseta, camisetaRoja],
+    )
+    const rows = await asRole(db, 'authenticated', claimsFor(TENANT_A), async () =>
+      (await db.query<Row>(`select sku, available_qty::text as kits, limiting_component from public.bundle_stock_alerts`)).rows,
+    )
+    expect(rows).toEqual([{ sku: 'A-KIT', kits: '3', limiting_component: 'Jabón' }])
+
+    // Con existencia de sobra, no avisa.
+    await svc(`update public.inventory_levels set on_hand_qty = 100 where product_id = $1`, [jabon])
+    const despues = await asRole(db, 'authenticated', claimsFor(TENANT_A), async () =>
+      (await db.query<Row>(`select sku from public.bundle_stock_alerts`)).rows,
+    )
+    expect(despues).toEqual([])
+  })
+})

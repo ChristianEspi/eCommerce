@@ -212,6 +212,8 @@ export const INVENTORY_MOVEMENTS_TABLE = 'inventory_movements'
 export const INVENTORY_RESERVATIONS_TABLE = 'inventory_reservations'
 export const INVENTORY_RESERVATION_ITEMS_TABLE = 'inventory_reservation_items'
 export const INVENTORY_ALERTS_VIEW = 'inventory_alerts'
+/** 2026-11-17 · Kits que su componente más escaso deja armar 5 o menos. */
+export const BUNDLE_STOCK_ALERTS_VIEW = 'bundle_stock_alerts'
 
 // --- Carrito, intentos de compra y hechos (P07-SaaS, migraciones 100000-100400)
 // Sin `satisfies` por la misma razón que las anteriores: `database.types.ts` se
