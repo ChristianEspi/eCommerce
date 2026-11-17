@@ -41,6 +41,16 @@ const ORDER_REFRESH_MS = 30_000
  * refresca mientras el pedido siga en curso: lo mueve la tienda, no el
  * comprador.
  */
+/** «Botica Miraflores (Av. Larco 1200, Miraflores)»: el punto y dónde está. */
+function lugarDeRecojo(punto: { name: string; address: Record<string, unknown> }): string {
+  const texto = (clave: string) => {
+    const valor = punto.address[clave]
+    return typeof valor === 'string' ? valor.trim() : ''
+  }
+  const donde = [texto('address'), texto('district') || texto('city')].filter(Boolean).join(', ')
+  return donde ? `${punto.name} (${donde})` : punto.name
+}
+
 export function StoreOrderPage() {
   const { t, locale } = useI18n()
   const { store, storeSlug } = useStorefront()
@@ -179,6 +189,33 @@ export function StoreOrderPage() {
   const estadoEnvio = tracked.data?.fulfillment_status ?? null
 
   /**
+   * 2026-11-17 · Recojo en tienda. Todas las entregas del pedido son `pickup`:
+   * entonces no se «coordina la entrega» ni va «en camino»; se prepara, queda
+   * listo en un punto con nombre y dirección, y se recoge.
+   */
+  const entregas = tracked.data?.deliveries ?? []
+  const recojo = entregas.length > 0 && entregas.every((entrega) => entrega.strategy === 'pickup')
+  const listoParaRecoger = recojo && entregas.some((entrega) => entrega.state === 'ready')
+  const recogido = recojo && (estadoEnvio === 'fulfilled' || order?.status === 'fulfilled')
+  const punto = recojo ? (entregas[0]?.pickup_point ?? null) : null
+  const lugar = punto ? lugarDeRecojo(punto) : ''
+  const montoTotal = order ? formatMoney(Number(order.grand_total), order.currency, locale) : ''
+
+  /** Lo que se le dice al comprador bajo el título: QUÉ pasa ahora y qué hará él. */
+  const mensaje = (() => {
+    if (recojo) {
+      if (recogido) return t('store.order.bodyPickedUp')
+      if (listoParaRecoger) return t('store.order.bodyReadyPickup').replace('{place}', lugar)
+      if (contraEntrega) return t('store.order.bodyCashOnPickup').replace('{amount}', montoTotal).replace('{place}', lugar)
+      if (yaPagado) return t('store.order.bodyPaidPickup').replace('{place}', lugar)
+      return t('store.order.bodyPickup').replace('{place}', lugar)
+    }
+    if (yaPagado) return t('store.order.bodyPaid')
+    if (contraEntrega) return t('store.order.bodyCashOnDelivery').replace('{amount}', montoTotal)
+    return t('store.order.body')
+  })()
+
+  /**
    * Resumen v2 · Repetir el pedido.
    *
    * Solo con los ids de producto, que trae la respuesta del checkout y no el
@@ -238,14 +275,7 @@ export function StoreOrderPage() {
           {t('store.order.title')}
         </Typography>
         <Typography sx={{ color: 'var(--muted)', mt: 0.75 }}>
-          {yaPagado
-            ? t('store.order.bodyPaid')
-            : contraEntrega
-              ? t('store.order.bodyCashOnDelivery').replace(
-                  '{amount}',
-                  order ? formatMoney(Number(order.grand_total), order.currency, locale) : '',
-                )
-              : t('store.order.body')}
+          {mensaje}
         </Typography>
 
         <Typography sx={{ mt: 2, fontSize: TS.label, color: 'var(--muted)', fontWeight: 700 }}>
@@ -273,7 +303,7 @@ export function StoreOrderPage() {
             yaPagado
               ? t('store.order.paid')
               : contraEntrega
-                ? t('store.order.payOnDelivery')
+                ? t(recojo ? 'store.order.payOnPickup' : 'store.order.payOnDelivery')
                 : t('store.order.pending')
           }
           size="small"
@@ -326,6 +356,8 @@ export function StoreOrderPage() {
             approvalStatus={estadoAprobacion}
             fulfillmentStatus={estadoEnvio}
             payOnDelivery={contraEntrega}
+            pickup={recojo}
+            pickupReady={listoParaRecoger}
           />
         </Card>
       )}

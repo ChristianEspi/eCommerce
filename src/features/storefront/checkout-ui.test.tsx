@@ -2295,6 +2295,34 @@ describe('la confirmación sigue el estado real del pedido', () => {
 /**
  * 2026-11-17 · Contra entrega: la confirmación no dice «pendiente de pago».
  */
+describe('confirmación de un pedido para recoger en tienda', () => {
+  it('pagado: dice dónde se recoge y no habla de envío', async () => {
+    const fake = backend()
+    fake.state.rpc.order_by_token = () => ({
+      order_number: 'EC-3', status: 'paid', payment_status: 'paid', approval_status: 'not_required',
+      fulfillment_status: 'unfulfilled', currency: 'PEN', placed_at: '2026-11-17T10:00:00Z', customer_name: 'Ana',
+      subtotal: '100.00', tax_total: '0.00', discount_total: '0.00', shipping_total: '0.00', grand_total: '100.00',
+      shipping_address: {}, items: [{ sku: 'SILLA', name: 'Silla de roble', unit_price: '100.00', quantity: 1 }],
+      payment_method: { code: 'tarjeta', kind: 'card', display_name: 'Tarjeta', instructions: null },
+      deliveries: [{
+        sequence: 1, method_name: 'Recojo en botica', strategy: 'pickup', state: 'pending',
+        promised_from: '2026-11-17', promised_to: '2026-11-18',
+        pickup_point: { name: 'Botica Miraflores', address: { address: 'Av. Larco 1200', district: 'Miraflores' } },
+        tracking_number: null, tracking_url: null,
+      }],
+    })
+    renderStorefront(fake, `/s/casa-nordica/order/EC-3?t=${'c'.repeat(64)}`)
+
+    expect(
+      await screen.findByText(/listo para recoger en Botica Miraflores \(Av\. Larco 1200, Miraflores\)/),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/coordinar la entrega/)).not.toBeInTheDocument()
+    expect(document.querySelector('[data-step="shipping"]')).toBeNull()
+    expect(document.querySelector('[data-step="preparing"]')).toHaveAttribute('data-state', 'current')
+    expect(document.querySelector('[data-step="readyForPickup"]')).toHaveAttribute('data-state', 'pending')
+  })
+})
+
 describe('confirmación de un pedido contra entrega', () => {
   it('dice cuánto se paga al recibir y pone el pago al final de la línea', async () => {
     const fake = backend()

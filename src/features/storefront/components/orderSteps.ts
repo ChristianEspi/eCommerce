@@ -18,6 +18,13 @@ export interface OrderTimelineInput {
    * no tiene nada que hacer hasta entonces.
    */
   payOnDelivery?: boolean
+  /**
+   * 2026-11-17 · Recojo en tienda: no hay «En camino» ni «Entregado», hay
+   * «Preparando», «Listo para recoger» y «Recogido».
+   */
+  pickup?: boolean
+  /** Alguna entrega del recojo ya está lista (`ready`) en el punto. */
+  pickupReady?: boolean
 }
 
 /**
@@ -48,14 +55,27 @@ export function orderSteps(input: OrderTimelineInput): Array<{ key: string; esta
       estado: input.paid ? 'done' : bloqueado ? 'pending' : 'current',
     })
   }
-  pasos.push({
-    key: 'shipping',
-    estado: entregado ? 'done' : enCamino ? 'current' : 'pending',
-  })
-  pasos.push({ key: 'delivered', estado: entregado ? 'done' : 'pending' })
-  if (alRecibir) {
-    // Entregado y sin cobrar: el cobro es lo que falta, ahora sí en curso.
-    pasos.push({ key: 'paymentOnDelivery', estado: entregado && !bloqueado ? 'current' : 'pending' })
+  if (input.pickup) {
+    const listo = entregado || Boolean(input.pickupReady)
+    // Se prepara en cuanto no hay nada antes que lo frene: cobrado, o con el
+    // cobro al recoger.
+    const puedePreparar = !bloqueado && (input.paid || alRecibir)
+    pasos.push({ key: 'preparing', estado: listo ? 'done' : puedePreparar ? 'current' : 'pending' })
+    pasos.push({ key: 'readyForPickup', estado: entregado ? 'done' : listo ? 'current' : 'pending' })
+    pasos.push({ key: 'pickedUp', estado: entregado ? 'done' : 'pending' })
+    if (alRecibir) {
+      pasos.push({ key: 'paymentOnPickup', estado: listo && !bloqueado ? 'current' : 'pending' })
+    }
+  } else {
+    pasos.push({
+      key: 'shipping',
+      estado: entregado ? 'done' : enCamino ? 'current' : 'pending',
+    })
+    pasos.push({ key: 'delivered', estado: entregado ? 'done' : 'pending' })
+    if (alRecibir) {
+      // Entregado y sin cobrar: el cobro es lo que falta, ahora sí en curso.
+      pasos.push({ key: 'paymentOnDelivery', estado: entregado && !bloqueado ? 'current' : 'pending' })
+    }
   }
   if (cancelado) return pasos.map((paso) => (paso.estado === 'current' ? { ...paso, estado: 'pending' } : paso))
   return pasos
