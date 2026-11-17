@@ -11,6 +11,23 @@ import type { ReactNode } from 'react'
  * datos en rejilla etiqueta/valor, y una línea de tiempo con fecha y origen.
  */
 
+const HEADING_SX = {
+  fontSize: 12,
+  fontWeight: 800,
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase',
+  color: 'var(--muted)',
+} as const
+
+/** El título de una sección de un panel, suelto (cuando la sección no es un `DetailSection`). */
+export function DetailHeading({ children }: { children: ReactNode }) {
+  return (
+    <Typography component="h3" sx={HEADING_SX}>
+      {children}
+    </Typography>
+  )
+}
+
 /** Una sección con su título; `aside` va a la derecha del título (un chip, un botón). */
 export function DetailSection({
   title,
@@ -24,18 +41,7 @@ export function DetailSection({
   return (
     <Stack component="section" spacing={1.25}>
       <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
-        <Typography
-          component="h3"
-          sx={{
-            fontSize: 12,
-            fontWeight: 800,
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase',
-            color: 'var(--muted)',
-          }}
-        >
-          {title}
-        </Typography>
+        <DetailHeading>{title}</DetailHeading>
         {aside}
       </Stack>
       {children}

@@ -65,3 +65,27 @@ export function codeLabel(t: Translate, code: string | null | undefined): string
   if (!/[_\s]/.test(code) && /\d/.test(code)) return code
   return capitalize(readable(code))
 }
+
+/**
+ * Un valor de un vocabulario cerrado: estados de cola o de circuito, dominios,
+ * tipos de actor, de proveedor, funciones de IA. `code.<grupo>.<valor>` y, si
+ * no hay texto, el valor legible.
+ */
+export type TermGroup = 'status' | 'domain' | 'actor' | 'providerKind' | 'aiFeature' | 'kind'
+
+export function termLabel(t: Translate, group: TermGroup, value: string | null | undefined): string {
+  if (!value) return '—'
+  return lookup(t, `code.${group}.${value}`) ?? capitalize(readable(value))
+}
+
+/** Un tipo de entidad (`payment_intent`, `shipment`) como sustantivo con mayúscula. */
+export function entityLabel(t: Translate, type: string | null | undefined): string {
+  if (!type) return '—'
+  return capitalize(lookup(t, `activity.entity.${type}`) ?? readable(type))
+}
+
+/** Un rol de miembro (`owner`, `orders`). */
+export function roleLabel(t: Translate, role: string | null | undefined): string {
+  if (!role) return '—'
+  return lookup(t, `settings.members.role.${role}`) ?? capitalize(readable(role))
+}

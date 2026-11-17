@@ -333,7 +333,7 @@ describe('Integraciones — la salud', () => {
   it('enseña los disyuntores abiertos y ofrece cerrarlos', async () => {
     renderPage(backend())
     expect(await screen.findByText('erp-pedidos')).toBeInTheDocument()
-    expect(await screen.findByText('open · 5/5')).toBeInTheDocument()
+    expect(await screen.findByText('Abierto · 5/5')).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: 'Cerrar circuito' })).toBeInTheDocument()
   })
 
@@ -371,10 +371,10 @@ describe('Integraciones — la cola', () => {
 
   it('enseña intentos, disyuntor e HILO sin calcular nada aqui', async () => {
     await abrirCola(backend())
-    expect(await screen.findByText('event.publish')).toBeInTheDocument()
+    expect(await screen.findByText('Publicación de evento')).toBeInTheDocument()
     expect(await screen.findByText('Intento 6/6')).toBeInTheDocument()
     expect(await screen.findByText(HILO)).toBeInTheDocument()
-    expect(await screen.findByText('open')).toBeInTheDocument()
+    expect(await screen.findByText('Abierto')).toBeInTheDocument()
   })
 
   it('el detalle avisa de que el contenido va saneado y se registra', async () => {
@@ -423,7 +423,7 @@ describe('Integraciones — webhooks', () => {
   it('lista destinos con su suscripcion y su variable de secreto', async () => {
     await abrirWebhooks(backend())
     // Dos veces: la suscripción del destino y el evento de la entrega.
-    expect(await screen.findAllByText('order.created')).toHaveLength(2)
+    expect(await screen.findAllByText('Pedido recibido')).toHaveLength(2)
     // Lo que se ve es el NOMBRE de la variable, nunca un secreto.
     expect(await screen.findByText(/EBIM_WEBHOOK_SECRET_ERP/)).toBeInTheDocument()
   })
@@ -440,7 +440,7 @@ describe('Integraciones — webhooks', () => {
       await screen.findByLabelText('Nombre de la variable del secreto'),
       'EBIM_WEBHOOK_SECRET_NUEVO',
     )
-    await user.click(await screen.findByLabelText('order.created'))
+    await user.click(await screen.findByLabelText(/Pedido recibido/))
 
     // Un destino en claro no se puede ni intentar: el botón sigue apagado.
     const guardar = await screen.findByRole('button', { name: 'Guardar' })

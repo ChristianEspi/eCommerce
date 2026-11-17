@@ -19,6 +19,7 @@ import { useState } from 'react'
 import { useCapabilities } from '@/features/capabilities/capabilities-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { codeLabel } from '@/shared/i18n/codeLabels'
 import { formatDateTime, formatRelative } from '@/shared/lib/format'
 import { StatusChip } from '@/shared/ui/StatusChip'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
@@ -93,7 +94,7 @@ function FeedRow({
         {feed.last_run_at && (
           <Typography sx={{ fontSize: 12, color: 'var(--muted)', mt: 0.5 }}>
             {formatRelative(feed.last_run_at, locale)}
-            {feed.last_error_code ? ` · ${feed.last_error_code}` : ''}
+            {feed.last_error_code ? ` · ${codeLabel(t, feed.last_error_code)}` : ''}
           </Typography>
         )}
       </TableCell>

@@ -14,6 +14,7 @@ import {
 import { useState } from 'react'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { roleLabel } from '@/shared/i18n/codeLabels'
 import { AppIcon } from '@/shared/ui/AppIcon'
 import { R, T } from '@/theme/tokens'
 import { SelectField } from '@/shared/ui/SelectField'
@@ -153,7 +154,7 @@ export function CompanySwitcher() {
         const membership = memberships.find((item) => item.company_id === companyId)
         return (
           <MenuItem key={companyId} value={companyId}>
-            {companyId.slice(0, 8)} · {membership?.role ?? '—'}
+            {companyId.slice(0, 8)} · {roleLabel(t, membership?.role)}
           </MenuItem>
         )
       })}

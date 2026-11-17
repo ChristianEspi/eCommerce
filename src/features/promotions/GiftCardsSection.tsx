@@ -19,6 +19,7 @@ import {
 } from '@mui/material'
 import { useState } from 'react'
 import { useTenant } from '@/features/tenant/tenant-context'
+import { DetailHeading } from '@/shared/ui/DetailBlocks'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { formatDate, formatDateTime } from '@/shared/lib/format'
@@ -330,7 +331,7 @@ export function GiftCardsSection() {
         {selected && (
           <Stack spacing={3}>
             <Stack spacing={0.5}>
-              <Typography variant="subtitle2">{t('promotions.field.balance')}</Typography>
+              <DetailHeading>{t('promotions.field.balance')}</DetailHeading>
               <Typography sx={{ fontSize: 24, fontWeight: 800 }}>
                 {selected.balance} {selected.currency}
               </Typography>
@@ -341,7 +342,7 @@ export function GiftCardsSection() {
             </Stack>
 
             <Stack spacing={1.5}>
-              <Typography variant="subtitle2">{t('promotions.giftCards.move')}</Typography>
+              <DetailHeading>{t('promotions.giftCards.move')}</DetailHeading>
               <Typography sx={{ color: 'var(--muted)', fontSize: 13 }}>
                 {t('promotions.giftCards.moveHint')}
               </Typography>
@@ -394,7 +395,7 @@ export function GiftCardsSection() {
             </Stack>
 
             <Stack spacing={1}>
-              <Typography variant="subtitle2">{t('promotions.giftCards.ledger')}</Typography>
+              <DetailHeading>{t('promotions.giftCards.ledger')}</DetailHeading>
               <Table size="small">
                 <TableHead>
                   <TableRow>

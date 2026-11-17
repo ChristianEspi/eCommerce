@@ -14,6 +14,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { termLabel } from '@/shared/i18n/codeLabels'
 import { RowActions } from '@/shared/ui/RowActions'
 import { StatusChip } from '@/shared/ui/StatusChip'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
@@ -106,7 +107,7 @@ function TablaTraza({ filas }: { filas: readonly AiInteraction[] }) {
               <TableCell sx={{ whiteSpace: 'nowrap', fontSize: 12, color: 'var(--muted)' }}>
                 {new Date(fila.created_at).toLocaleString(locale === 'en' ? 'en-US' : 'es-PE')}
               </TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>{fila.feature}</TableCell>
+              <TableCell sx={{ fontWeight: 700 }}>{termLabel(t, 'aiFeature', fila.feature)}</TableCell>
               <TableCell sx={{ maxWidth: 320 }}>
                 <Typography noWrap sx={{ fontSize: 13 }}>
                   {fila.prompt_excerpt ?? '—'}
@@ -137,7 +138,7 @@ function TablaTraza({ filas }: { filas: readonly AiInteraction[] }) {
                     {
                       id: 'up',
                       icon: <ThumbUpRoundedIcon fontSize="small" />,
-                      label: `${t('ai.trace.useful')}: ${fila.feature}`,
+                      label: `${t('ai.trace.useful')}: ${termLabel(t, 'aiFeature', fila.feature)}`,
                       tone: fila.feedback === 1 ? 'accent' : 'neutral',
                       disabled: opinar.isPending,
                       onClick: () => opinar.mutate({ id: fila.id, value: 1 }),
@@ -145,7 +146,7 @@ function TablaTraza({ filas }: { filas: readonly AiInteraction[] }) {
                     {
                       id: 'down',
                       icon: <ThumbDownRoundedIcon fontSize="small" />,
-                      label: `${t('ai.trace.useless')}: ${fila.feature}`,
+                      label: `${t('ai.trace.useless')}: ${termLabel(t, 'aiFeature', fila.feature)}`,
                       tone: fila.feedback === -1 ? 'danger' : 'neutral',
                       disabled: opinar.isPending,
                       onClick: () => opinar.mutate({ id: fila.id, value: -1 }),

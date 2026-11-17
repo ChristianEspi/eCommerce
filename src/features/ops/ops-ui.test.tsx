@@ -253,7 +253,7 @@ describe('Incidentes', () => {
   it('enseña el código, el mensaje ya redactado y las repeticiones', async () => {
     window.history.replaceState(null, '', '#incidentes')
     renderOps(backend())
-    const fila = (await screen.findByText('STOCK_INSUFICIENTE')).closest('tr')
+    const fila = (await screen.findByText('Stock insuficiente')).closest('tr')
     const celdas = within(fila as HTMLElement)
     expect(celdas.getByText('no quedaban unidades')).toBeInTheDocument()
     expect(celdas.getByText('×3')).toBeInTheDocument()
@@ -311,7 +311,7 @@ describe('Rastro', () => {
       await screen.findByPlaceholderText('Pega un identificador de rastro'),
       HILO,
     )
-    expect(await screen.findByText('checkout')).toBeInTheDocument()
+    expect(await screen.findByText('Compra')).toBeInTheDocument()
     expect(screen.getByText('etapa reserve_inventory')).toBeInTheDocument()
     expect(screen.getByText('checkout_failed · STOCK_INSUFICIENTE')).toBeInTheDocument()
   })
@@ -321,7 +321,7 @@ describe('Auditoría', () => {
   it('enseña actor, acción y entidad, y no ofrece editar nada', async () => {
     window.history.replaceState(null, '', '#auditoria')
     renderOps(backend())
-    const fila = (await screen.findByText('feature_flag.updated')).closest('tr')
+    const fila = (await screen.findByText('Cambio en opción del sistema')).closest('tr')
     const celdas = within(fila as HTMLElement)
     expect(celdas.getByText('ana@negocio.com')).toBeInTheDocument()
     expect(celdas.getByText('payments')).toBeInTheDocument()
