@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  confirmOfflinePayment,
   deletePaymentMethod,
   fetchPaymentAttempts,
   fetchPaymentEvents,
@@ -13,6 +14,7 @@ import {
   matchReconciliation,
   requestRefund,
   savePaymentMethod,
+  type ConfirmOfflineInput,
   type IntentFilter,
   type MethodScope,
   type RefundRequestInput,
@@ -130,6 +132,14 @@ export function useRequestRefund() {
   const invalidate = useInvalidatePayments()
   return useMutation({
     mutationFn: (input: RefundRequestInput) => requestRefund(input),
+    onSuccess: invalidate,
+  })
+}
+
+export function useConfirmOfflinePayment() {
+  const invalidate = useInvalidatePayments()
+  return useMutation({
+    mutationFn: (input: ConfirmOfflineInput) => confirmOfflinePayment(input),
     onSuccess: invalidate,
   })
 }

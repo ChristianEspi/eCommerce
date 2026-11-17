@@ -639,6 +639,8 @@ export const CART_RECOVERY_UNSUBSCRIBE_RPC = 'cart_recovery_unsubscribe'
 export const REFUND_REQUEST_RPC = 'payment_refund_request'
 export const RECONCILIATION_IMPORT_RPC = 'payment_reconciliation_import'
 export const RECONCILIATION_MATCH_RPC = 'payment_reconciliation_match'
+/** 2026-11-17 · «Confirmar cobro» de un medio sin pasarela (Yape, transferencia). */
+export const PAYMENT_CONFIRM_OFFLINE_RPC = 'payment_confirm_offline'
 /** Escribe (o quita) la llave secreta de la pasarela del medio en Vault. Nunca la lee. */
 export const PAYMENT_METHOD_SET_SECRET_RPC = 'payment_method_set_secret'
 

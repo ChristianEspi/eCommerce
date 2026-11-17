@@ -6917,10 +6917,12 @@ export type Database = {
       payment_methods: {
         Row: {
           capture_mode: Database["public"]["Enums"]["payment_capture_mode"]
+          checkout_public_key: string | null
           code: string
           company_id: string
           created_at: string
           display_name: string
+          has_secret: boolean
           id: string
           instructions: string | null
           is_active: boolean
@@ -6930,15 +6932,19 @@ export type Database = {
           provider_code: string | null
           provider_kind: Database["public"]["Enums"]["integration_kind"]
           public_config: Json
+          secret_hint: string | null
+          secret_set_at: string | null
           store_id: string
           updated_at: string
         }
         Insert: {
           capture_mode?: Database["public"]["Enums"]["payment_capture_mode"]
+          checkout_public_key?: string | null
           code: string
           company_id: string
           created_at?: string
           display_name: string
+          has_secret?: boolean
           id?: string
           instructions?: string | null
           is_active?: boolean
@@ -6948,15 +6954,19 @@ export type Database = {
           provider_code?: string | null
           provider_kind?: Database["public"]["Enums"]["integration_kind"]
           public_config?: Json
+          secret_hint?: string | null
+          secret_set_at?: string | null
           store_id: string
           updated_at?: string
         }
         Update: {
           capture_mode?: Database["public"]["Enums"]["payment_capture_mode"]
+          checkout_public_key?: string | null
           code?: string
           company_id?: string
           created_at?: string
           display_name?: string
+          has_secret?: boolean
           id?: string
           instructions?: string | null
           is_active?: boolean
@@ -6966,6 +6976,8 @@ export type Database = {
           provider_code?: string | null
           provider_kind?: Database["public"]["Enums"]["integration_kind"]
           public_config?: Json
+          secret_hint?: string | null
+          secret_set_at?: string | null
           store_id?: string
           updated_at?: string
         }
@@ -7084,6 +7096,8 @@ export type Database = {
           created_at: string
           id: string
           is_active: boolean
+          latitude: number | null
+          longitude: number | null
           name: string
           opening_hours: Json
           organization_id: string
@@ -7101,6 +7115,8 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          latitude?: number | null
+          longitude?: number | null
           name: string
           opening_hours?: Json
           organization_id: string
@@ -7118,6 +7134,8 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          latitude?: number | null
+          longitude?: number | null
           name?: string
           opening_hours?: Json
           organization_id?: string
@@ -12643,6 +12661,7 @@ export type Database = {
       }
       public_payment_methods: {
         Row: {
+          checkout_public_key: string | null
           code: string | null
           display_name: string | null
           instructions: string | null
@@ -12652,6 +12671,7 @@ export type Database = {
           store_id: string | null
         }
         Insert: {
+          checkout_public_key?: string | null
           code?: string | null
           display_name?: string | null
           instructions?: string | null
@@ -12661,6 +12681,7 @@ export type Database = {
           store_id?: string | null
         }
         Update: {
+          checkout_public_key?: string | null
           code?: string | null
           display_name?: string | null
           instructions?: string | null
@@ -13690,6 +13711,10 @@ export type Database = {
         Args: { p_amount: number; p_gift_card_id: string; p_reference: string }
         Returns: Json
       }
+      import_business_account_users: {
+        Args: { p_account_id: string; p_dry_run?: boolean; p_rows: Json }
+        Returns: Json
+      }
       import_catalog_categories: {
         Args: { p_dry_run?: boolean; p_rows: Json; p_store_id: string }
         Returns: Json
@@ -13700,6 +13725,10 @@ export type Database = {
       }
       import_catalog_vocabulary: {
         Args: { p_dry_run?: boolean; p_sheets: Json }
+        Returns: Json
+      }
+      import_customers: {
+        Args: { p_dry_run?: boolean; p_rows: Json }
         Returns: Json
       }
       integration_circuit_reset: {
@@ -13783,6 +13812,10 @@ export type Database = {
         Returns: Json
       }
       my_account_statement: { Args: never; Returns: Json }
+      my_assortment_blocked: {
+        Args: { p_product_ids: string[]; p_store_slug: string }
+        Returns: string[]
+      }
       my_business_accounts: { Args: never; Returns: Json }
       my_business_order_detail: { Args: { p_order_id: string }; Returns: Json }
       my_business_orders: {
@@ -13917,6 +13950,10 @@ export type Database = {
         }
         Returns: Json
       }
+      payment_confirm_offline: {
+        Args: { p_intent_id: string; p_note?: string; p_reference?: string }
+        Returns: Json
+      }
       payment_intent_attach_order: {
         Args: { p_intent_id: string; p_order_id: string }
         Returns: Json
@@ -13930,6 +13967,10 @@ export type Database = {
           p_order_id?: string
           p_store_slug: string
         }
+        Returns: Json
+      }
+      payment_method_set_secret: {
+        Args: { p_method_id: string; p_secret: string }
         Returns: Json
       }
       payment_reconciliation_import: {
@@ -13962,6 +14003,10 @@ export type Database = {
           p_status: string
         }
         Returns: Json
+      }
+      payment_secret_for_intent: {
+        Args: { p_intent_id: string }
+        Returns: string
       }
       platform_apply_entitlements: {
         Args: {

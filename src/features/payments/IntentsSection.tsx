@@ -9,7 +9,6 @@ import {
   Button,
   Card,
   Chip,
-  Divider,
   Stack,
   Table,
   TableBody,
@@ -24,14 +23,18 @@ import { useTenant } from '@/features/tenant/tenant-context'
 import { PaymentIntentAiToggle } from './ai/PaymentsAiSection'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
-import { formatDateTime } from '@/shared/lib/format'
+import { formatDateTime, formatMoney } from '@/shared/lib/format'
+import { codeLabel, eventLabel } from '@/shared/i18n/codeLabels'
+import { DetailFacts, DetailSection, DetailTimeline } from '@/shared/ui/DetailBlocks'
 import { FormDrawer } from '@/shared/ui/FormDrawer'
 import { SearchField } from '@/shared/ui/SearchField'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState, ErrorState } from '@/shared/ui/states'
 import { PaymentsError } from './errors'
+import { canConfirmOffline } from './api'
 import {
+  useConfirmOfflinePayment,
   usePaymentAttempts,
   usePaymentEvents,
   usePaymentIntents,
@@ -65,8 +68,9 @@ const STATUS_COLOR: Record<string, 'default' | 'success' | 'warning' | 'error' |
  *   código de error  el del proveedor, SIN traducir: es el que ellos entienden
  *
  * Lo que NO sale: ni un secreto, ni el sobre crudo del proveedor, ni un token.
- * Y ningún botón que mueva un cobro a mano — no hay policy que lo permitiera y
- * un botón que siempre falla es peor que ningún botón.
+ * Un cobro de PASARELA no se mueve a mano. Uno sin pasarela (Yape,
+ * transferencia) sí: «Confirmar cobro» llama a `payment_confirm_offline`, que
+ * escribe el cobro con quién lo confirmó y pone el pedido en pagado.
  *
  * La devolución es lo único que se puede pedir desde aquí, con su clave de
  * idempotencia generada en el navegador: pulsar dos veces devuelve una vez.
@@ -83,6 +87,8 @@ export function IntentsSection() {
   const [refundAmount, setRefundAmount] = useState('')
   const [refundReason, setRefundReason] = useState('')
   const [refundKey, setRefundKey] = useState('')
+  const [confirmReference, setConfirmReference] = useState('')
+  const [confirmNote, setConfirmNote] = useState('')
 
   const intents = usePaymentIntents({ storeId: activeStore?.id ?? null, status, term })
   const attempts = usePaymentAttempts(selected?.intent_id ?? null)
@@ -91,6 +97,7 @@ export function IntentsSection() {
   const paymentIds = useMemo(() => (payments.data ?? []).map((p) => p.id), [payments.data])
   const refunds = useRefundsOf(paymentIds)
   const requestRefund = useRequestRefund()
+  const confirmOffline = useConfirmOfflinePayment()
 
   const list = intents.data ?? []
   const isEmpty = !intents.isPending && !intents.isError && list.length === 0
@@ -100,6 +107,8 @@ export function IntentsSection() {
     setSelected(intent)
     setRefundAmount('')
     setRefundReason('')
+    setConfirmReference('')
+    setConfirmNote('')
     // Una clave por apertura del panel: es lo que ancla ESTA devolución.
     setRefundKey(newIdempotencyKey('refund'))
   }
@@ -116,6 +125,28 @@ export function IntentsSection() {
       notify(t('payments.refund.created'), 'success')
       setRefundAmount('')
       setRefundReason('')
+    } catch (error) {
+      const key: MessageKey =
+        error instanceof PaymentsError ? error.key : 'payments.error.generic'
+      notify(t(key), 'error')
+    }
+  }
+
+  async function submitConfirm() {
+    if (!selected) return
+    try {
+      await confirmOffline.mutateAsync({
+        intentId: selected.intent_id,
+        reference: confirmReference,
+        note: confirmNote,
+      })
+      notify(t('payments.confirm.done'), 'success')
+      setSelected({
+        ...selected,
+        status: 'captured',
+        amount_captured: selected.amount,
+        provider_reference: confirmReference.trim() || selected.provider_reference,
+      })
     } catch (error) {
       const key: MessageKey =
         error instanceof PaymentsError ? error.key : 'payments.error.generic'
@@ -245,79 +276,137 @@ export function IntentsSection() {
       >
         {selected && (
           <Stack spacing={3}>
-            <Stack spacing={0.5}>
-              <Typography variant="subtitle2">{t('payments.detail.summary')}</Typography>
-              <Typography sx={{ color: 'var(--muted)' }}>
-                {selected.amount} {selected.currency} ·{' '}
-                {t(`payments.status.${selected.status}` as MessageKey)}
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}>
+              <Typography sx={{ fontSize: 28, fontWeight: 800 }} className="tnum">
+                {formatMoney(Number(selected.amount), selected.currency, locale)}
               </Typography>
-              <Typography sx={{ color: 'var(--muted)' }}>
-                {t('payments.field.reference')}: {selected.provider_reference ?? '—'}
-              </Typography>
-              {selected.last_error_code && (
-                <Alert severity="warning">
-                  {t('payments.field.providerCode')}: {selected.last_error_code}
-                </Alert>
-              )}
+              <StatusChip
+                tone={STATUS_COLOR[selected.status] ?? 'default'}
+                label={t(`payments.status.${selected.status}` as MessageKey)}
+              />
             </Stack>
 
-            <Divider />
+            <DetailFacts
+              facts={[
+                { label: t('payments.field.method'), value: selected.method_name },
+                { label: t('payments.field.order'), value: selected.order_number ?? t('payments.intents.noOrder') },
+                {
+                  label: t('payments.detail.captured'),
+                  value: formatMoney(Number(selected.amount_captured), selected.currency, locale),
+                },
+                { label: t('payments.field.reference'), value: selected.provider_reference ?? '—' },
+                ...(selected.customer_email
+                  ? [{ label: t('payments.detail.customer'), value: selected.customer_email }]
+                  : []),
+                { label: t('payments.detail.created'), value: formatDateTime(selected.created_at, locale) },
+              ]}
+            />
 
-            <Stack spacing={1}>
-              <Typography variant="subtitle2">{t('payments.detail.attempts')}</Typography>
-              {(attempts.data ?? []).length === 0 && (
-                <Typography sx={{ color: 'var(--muted)' }}>{t('payments.detail.none')}</Typography>
-              )}
-              {(attempts.data ?? []).map((attempt) => (
-                <Stack key={attempt.id} direction="row" spacing={1} alignItems="center">
-                  <StatusChip label={`#${attempt.attempt_no}`} />
-                  <Typography variant="body2">{attempt.operation}</Typography>
-                  <StatusChip
-                    tone={attempt.status === 'succeeded' ? 'success' : 'error'}
-                    label={t(`payments.attempt.${attempt.status}` as MessageKey)}
-                  />
-                  <Typography variant="body2" sx={{ color: 'var(--muted)' }}>
-                    {attempt.provider_result_code ?? attempt.error_code ?? ''}
-                  </Typography>
-                </Stack>
-              ))}
-            </Stack>
+            {selected.last_error_code && (
+              <Alert severity="warning">
+                {t('payments.detail.lastError')}: {codeLabel(t, selected.last_error_code)}
+              </Alert>
+            )}
 
-            <Divider />
-
-            <Stack spacing={1}>
-              <Typography variant="subtitle2">{t('payments.detail.timeline')}</Typography>
-              {(events.data ?? []).map((event) => (
-                <Stack key={event.id} direction="row" spacing={1} alignItems="center">
-                  <Typography variant="body2" sx={{ color: 'var(--muted)', minWidth: 140 }}>
-                    {formatDateTime(event.created_at, locale)}
-                  </Typography>
-                  <Typography variant="body2">{event.event_type}</Typography>
-                  <StatusChip
-                    label={t(`payments.source.${event.source}` as MessageKey)}
-                  />
-                  {event.source === 'provider_webhook' && (
-                    <StatusChip
-                      tone={event.signature_verified ? 'success' : 'error'}
-                      label={t(
-                        event.signature_verified
-                          ? 'payments.detail.signed'
-                          : 'payments.detail.unsigned',
-                      )}
-                    />
+            {canConfirmOffline(selected) && (
+              <DetailSection title={t('payments.confirm.title')}>
+                <Stack spacing={1.5} data-confirm-offline>
+                  <Alert severity="info">
+                    {t('payments.confirm.help')
+                      .replace('{amount}', formatMoney(Number(selected.amount), selected.currency, locale))
+                      .replace('{method}', selected.method_name ?? '')}
+                  </Alert>
+                  {canRefund ? (
+                    <>
+                      <Box
+                        sx={{
+                          display: 'grid',
+                          gap: 1.5,
+                          gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                        }}
+                      >
+                        <TextField
+                          label={t('payments.confirm.reference')}
+                          value={confirmReference}
+                          onChange={(event) => setConfirmReference(event.target.value)}
+                          size="small"
+                          inputProps={{ maxLength: 120 }}
+                        />
+                        <TextField
+                          label={t('payments.confirm.note')}
+                          value={confirmNote}
+                          onChange={(event) => setConfirmNote(event.target.value)}
+                          size="small"
+                          inputProps={{ maxLength: 500 }}
+                        />
+                      </Box>
+                      <Box>
+                        <Button
+                          variant="contained"
+                          disabled={confirmOffline.isPending}
+                          onClick={() => void submitConfirm()}
+                        >
+                          {t('payments.confirm.action')}
+                        </Button>
+                      </Box>
+                    </>
+                  ) : (
+                    <Typography sx={{ color: 'var(--muted)' }}>
+                      {t('payments.confirm.noPermission')}
+                    </Typography>
                   )}
                 </Stack>
-              ))}
-            </Stack>
+              </DetailSection>
+            )}
 
-            <Divider />
+            <DetailSection title={t('payments.detail.attempts')}>
+              <DetailTimeline
+                empty={t('payments.detail.none')}
+                entries={(attempts.data ?? []).map((attempt) => ({
+                  id: attempt.id,
+                  title: `${attempt.attempt_no}. ${eventLabel(t, attempt.operation)}`,
+                  tone: attempt.status === 'succeeded' ? 'success' : attempt.status === 'pending' ? 'default' : 'error',
+                  when: formatDateTime(attempt.created_at, locale),
+                  meta: [
+                    t(`payments.attempt.${attempt.status}` as MessageKey),
+                    attempt.provider_result_code ?? (attempt.error_code ? codeLabel(t, attempt.error_code) : null),
+                  ]
+                    .filter(Boolean)
+                    .join(' · '),
+                }))}
+              />
+            </DetailSection>
 
-            <Stack spacing={1.5}>
-              <Typography variant="subtitle2">{t('payments.detail.refunds')}</Typography>
+            <DetailSection title={t('payments.detail.timeline')}>
+              <DetailTimeline
+                empty={t('payments.detail.none')}
+                entries={(events.data ?? []).map((event) => ({
+                  id: event.id,
+                  title: eventLabel(t, event.event_type),
+                  tone: /(failed|expired|cancelled)$/.test(event.event_type)
+                    ? 'error'
+                    : /(captured|succeeded)$/.test(event.event_type)
+                      ? 'success'
+                      : 'default',
+                  when: formatDateTime(event.created_at, locale),
+                  meta: [
+                    t(`payments.source.${event.source}` as MessageKey),
+                    event.source === 'provider_webhook'
+                      ? t(event.signature_verified ? 'payments.detail.signed' : 'payments.detail.unsigned')
+                      : null,
+                    event.note,
+                  ]
+                    .filter(Boolean)
+                    .join(' · '),
+                }))}
+              />
+            </DetailSection>
+
+            <DetailSection title={t('payments.detail.refunds')}>
               {(refunds.data ?? []).map((refund) => (
                 <Stack key={refund.id} direction="row" spacing={1} alignItems="center">
-                  <Typography variant="body2">
-                    {refund.amount} {refund.currency}
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                    {formatMoney(Number(refund.amount), refund.currency, locale)}
                   </Typography>
                   <StatusChip
                     label={t(`payments.refund.${refund.status}` as MessageKey)}
@@ -327,10 +416,17 @@ export function IntentsSection() {
                   </Typography>
                 </Stack>
               ))}
+              {(refunds.data ?? []).length === 0 && !refundable && (
+                <Typography sx={{ color: 'var(--muted)', fontSize: 14 }}>
+                  {t('payments.detail.noRefunds')}
+                </Typography>
+              )}
 
               {refundable && canRefund && (
                 <Stack spacing={1.5}>
-                  <Alert severity="info">{t('payments.refund.help')}</Alert>
+                  <Alert severity="info">
+                    {t(selected.provider_code ? 'payments.refund.help' : 'payments.refund.helpOffline')}
+                  </Alert>
                   <TextField
                     label={t('payments.field.refundAmount')}
                     value={refundAmount}
@@ -359,7 +455,7 @@ export function IntentsSection() {
                   {t('payments.refund.noPermission')}
                 </Typography>
               )}
-            </Stack>
+            </DetailSection>
 
             {/* Fase 08: explicar el cobro con IA. Solo lee; se monta al pulsar. */}
             <PaymentIntentAiToggle
