@@ -463,6 +463,8 @@ export const RESERVE_INVENTORY_RPC = 'reserve_inventory'
 export const RELEASE_RESERVATION_RPC = 'release_inventory_reservation'
 export const COMMIT_RESERVATION_RPC = 'commit_inventory_reservation'
 export const ADJUST_INVENTORY_RPC = 'adjust_inventory'
+/** 2026-11-18 · Traslado entre almacenes: las dos patas en una transacción. */
+export const INVENTORY_TRANSFER_RPC = 'inventory_transfer'
 export const SET_INVENTORY_POLICY_RPC = 'set_inventory_policy'
 export const SEED_INVENTORY_RPC = 'seed_inventory_from_catalog'
 

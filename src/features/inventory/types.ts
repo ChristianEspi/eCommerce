@@ -21,6 +21,7 @@ export {
   INVENTORY_MOVEMENTS_TABLE,
   INVENTORY_RESERVATIONS_TABLE,
   INVENTORY_ALERTS_VIEW,
+  INVENTORY_TRANSFER_RPC,
   PRODUCTS_TABLE,
   PRODUCT_VARIANTS_TABLE,
   INVENTORY_AVAILABILITY_RPC,
@@ -341,6 +342,34 @@ export const movementFormSchema = z
     message: 'inventory.error.sign',
   })
 export type MovementFormValues = z.infer<typeof movementFormSchema>
+
+/**
+ * 2026-11-18 · Trasladar entre almacenes. La cantidad es siempre positiva: la
+ * dirección la dicen el origen y el destino, no el signo.
+ */
+export const transferFormSchema = z
+  .object({
+    from_warehouse_id: z.string().uuid('inventory.error.warehouse'),
+    to_warehouse_id: z.string().uuid('inventory.error.transferTo'),
+    product_id: z.string().uuid('inventory.error.product'),
+    variant_id: z.string().uuid().nullable().default(null),
+    quantity: z
+      .number({ invalid_type_error: 'inventory.error.quantity' })
+      .positive('inventory.error.transferQuantity'),
+    reason: z.string().trim().max(500).optional().default(''),
+  })
+  .refine((v) => v.from_warehouse_id !== v.to_warehouse_id, {
+    path: ['to_warehouse_id'],
+    message: 'inventory.error.transferSame',
+  })
+export type TransferFormValues = z.infer<typeof transferFormSchema>
+
+/** El stock de UN producto en UN almacén, para enseñarlo mientras se escribe. */
+export interface StockLevel {
+  on_hand: number
+  reserved: number
+  available: number
+}
 
 export const policyFormSchema = z.object({
   warehouse_id: z.string().uuid('inventory.error.warehouse'),

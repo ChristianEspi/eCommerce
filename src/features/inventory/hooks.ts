@@ -7,6 +7,7 @@ import {
   fetchLevels,
   fetchMovements,
   fetchReservations,
+  fetchStockLevel,
   fetchStockVariants,
   fetchStoreWarehouses,
   fetchWarehouses,
@@ -16,6 +17,7 @@ import {
   searchStockProducts,
   seedInventory,
   setInventoryPolicy,
+  transferInventory,
   unlinkStoreWarehouse,
   type StockProduct,
   type StockVariant,
@@ -149,6 +151,19 @@ export function useUnlinkStoreWarehouse() {
 export function useAdjustInventory() {
   const invalidate = useInvalidateInventory()
   return useMutation({ mutationFn: adjustInventory, onSuccess: invalidate })
+}
+
+export function useStockLevel(warehouseId: string | null, productId: string | null, variantId: string | null) {
+  return useQuery({
+    queryKey: [...INVENTORY_KEY, 'level', warehouseId, productId, variantId] as const,
+    queryFn: () => fetchStockLevel(warehouseId!, productId!, variantId),
+    enabled: Boolean(warehouseId && productId),
+  })
+}
+
+export function useTransferInventory() {
+  const invalidate = useInvalidateInventory()
+  return useMutation({ mutationFn: transferInventory, onSuccess: invalidate })
 }
 
 export function useSetInventoryPolicy() {
