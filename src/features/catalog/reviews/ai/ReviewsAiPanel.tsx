@@ -2,7 +2,8 @@ import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded'
 import ExpandLessRoundedIcon from '@mui/icons-material/ExpandLessRounded'
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded'
 import RateReviewRoundedIcon from '@mui/icons-material/RateReviewRounded'
-import { Alert, Box, Button, Card, Chip, Skeleton, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, Card, Chip, Skeleton, Stack, Typography } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { formatMetric } from '@/features/admin/dashboard/aiAnalyst'
@@ -137,14 +138,15 @@ function Body({
             ))}
           </Stack>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-            <TextField
+            <Field
               size="small"
               fullWidth
+              rule="text"
+              maxLength={MAX_REVIEWS_QUESTION}
               label={t('aiReviews.ask.label')}
               placeholder={t('aiReviews.ask.placeholder')}
               value={question}
               onChange={(event) => setQuestion(event.target.value.slice(0, MAX_REVIEWS_QUESTION))}
-              inputProps={{ maxLength: MAX_REVIEWS_QUESTION }}
             />
             <Button
               variant="contained"

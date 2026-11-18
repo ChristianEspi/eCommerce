@@ -18,7 +18,6 @@ import {
   TableHead,
   TableRow,
   Tabs,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useMemo, useState } from 'react'
@@ -28,6 +27,7 @@ import type { MessageKey } from '@/shared/i18n/messages'
 import { downloadWorkbook } from '@/shared/lib/excel'
 import { complaintsBook } from './exportExcel'
 import { formatDate, formatDateTime } from '@/shared/lib/format'
+import { Field } from '@/shared/ui/Field'
 import { PageHeader } from '@/shared/ui/PageHeader'
 import { SearchField } from '@/shared/ui/SearchField'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
@@ -241,8 +241,10 @@ export function ComplaintsPage() {
                     <Typography sx={{ whiteSpace: 'pre-line' }}>{abierta.response}</Typography>
                   </Alert>
                 ) : puedeResponder ? (
-                  <TextField
+                  <Field
                     label={t('complaints.response')}
+                    rule="longText"
+                    maxLength={3000}
                     multiline
                     minRows={4}
                     value={respuesta}

@@ -9,9 +9,9 @@ import {
   MenuItem,
   Skeleton,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { AiFeedbackButtons } from '@/features/ai/AiFeedbackButtons'
@@ -147,8 +147,10 @@ function AssistantBody({
 
       {canAsk && (
         <Stack spacing={1.25}>
-          <TextField
+          <Field
             size="small"
+            rule="longText"
+            maxLength={MAX_PROMO_BRIEF}
             multiline
             minRows={2}
             label={t('aiPromotions.brief')}
@@ -156,7 +158,6 @@ function AssistantBody({
             helperText={t('aiPromotions.briefHelp')}
             value={brief}
             onChange={(event) => setBrief(event.target.value.slice(0, MAX_PROMO_BRIEF))}
-            inputProps={{ maxLength: MAX_PROMO_BRIEF }}
           />
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' } }}>
             <SelectField

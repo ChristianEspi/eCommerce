@@ -10,9 +10,9 @@ import {
   MenuItem,
   Stack,
   Switch,
-  TextField,
   Typography,
 } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useEffect, useState } from 'react'
 import { StoreAssetField } from '@/features/admin/settings/StoreAssetField'
 import { PromotionVideoField } from './PromotionVideoField'
@@ -370,8 +370,10 @@ export function PromotionDrawer({
       }
     >
       <Stack spacing={2.5}>
-        <TextField
+        <Field
           label={t('promotions.field.code')}
+          rule="lowerCode"
+          maxLength={41}
           value={values.code}
           onChange={(event) => set('code', event.target.value)}
           error={Boolean(errors.code)}
@@ -380,8 +382,10 @@ export function PromotionDrawer({
           size="small"
           fullWidth
         />
-        <TextField
+        <Field
           label={t('promotions.field.name')}
+          rule="text"
+          maxLength={160}
           value={values.name}
           onChange={(event) => set('name', event.target.value)}
           error={Boolean(errors.name)}
@@ -421,8 +425,9 @@ export function PromotionDrawer({
           onChange={(next) => set('videoUrl', next)}
         />
 
-        <TextField
+        <Field
           label={t('promotions.field.description')}
+          rule="longText"
           value={values.description}
           onChange={(event) => set('description', event.target.value)}
           multiline
@@ -476,8 +481,10 @@ export function PromotionDrawer({
 
         {/* Los campos del descuento dependen del TIPO. Ver la decisión 1. */}
         {(values.kind === 'percentage' || values.kind === 'bundle') && (
-          <TextField
+          <Field
             label={t('promotions.field.percent')}
+            rule="percent"
+            help={t('help.promotions.percent')}
             value={values.valuePercent}
             onChange={(event) => set('valuePercent', event.target.value)}
             error={Boolean(errors.valuePercent)}
@@ -487,8 +494,9 @@ export function PromotionDrawer({
           />
         )}
         {(values.kind === 'fixed_amount' || values.kind === 'bundle') && (
-          <TextField
+          <Field
             label={`${t('promotions.field.amount')} (${currency})`}
+            rule="money"
             value={values.valueAmount}
             onChange={(event) => set('valueAmount', event.target.value)}
             error={Boolean(errors.valueAmount)}
@@ -499,8 +507,10 @@ export function PromotionDrawer({
         )}
         {values.kind === 'x_for_y' && (
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <TextField
+            <Field
               label={t('promotions.field.buyQuantity')}
+              rule="integer"
+              help={t('help.promotions.buyQuantity')}
               value={values.buyQuantity}
               onChange={(event) => set('buyQuantity', event.target.value)}
               error={Boolean(errors.buyQuantity)}
@@ -508,8 +518,9 @@ export function PromotionDrawer({
               size="small"
               fullWidth
             />
-            <TextField
+            <Field
               label={t('promotions.field.freeQuantity')}
+              rule="integer"
               value={values.freeQuantity}
               onChange={(event) => set('freeQuantity', event.target.value)}
               error={Boolean(errors.freeQuantity)}
@@ -524,8 +535,9 @@ export function PromotionDrawer({
         )}
 
         {(values.kind === 'percentage' || values.kind === 'volume_tier') && (
-          <TextField
+          <Field
             label={`${t('promotions.field.cap')} (${currency})`}
+            rule="money"
             value={values.maxDiscountAmount}
             onChange={(event) => set('maxDiscountAmount', event.target.value)}
             error={Boolean(errors.maxDiscountAmount)}
@@ -540,8 +552,9 @@ export function PromotionDrawer({
         </Divider>
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-          <TextField
+          <Field
             label={`${t('promotions.field.minSubtotal')} (${currency})`}
+            rule="money"
             value={values.minSubtotal}
             onChange={(event) => set('minSubtotal', event.target.value)}
             error={Boolean(errors.minSubtotal)}
@@ -549,8 +562,10 @@ export function PromotionDrawer({
             size="small"
             fullWidth
           />
-          <TextField
+          <Field
             label={t('promotions.field.minQuantity')}
+            rule="decimal"
+            help={t('help.promotions.minQuantity')}
             value={values.minQuantity}
             onChange={(event) => set('minQuantity', event.target.value)}
             error={Boolean(errors.minQuantity)}
@@ -561,7 +576,7 @@ export function PromotionDrawer({
         </Stack>
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-          <TextField
+          <Field
             type="datetime-local"
             label={t('promotions.field.validFrom')}
             value={values.validFrom}
@@ -572,7 +587,7 @@ export function PromotionDrawer({
             size="small"
             fullWidth
           />
-          <TextField
+          <Field
             type="datetime-local"
             label={t('promotions.field.validTo')}
             value={values.validTo}
@@ -586,8 +601,9 @@ export function PromotionDrawer({
         </Stack>
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-          <TextField
+          <Field
             label={t('promotions.field.usageLimit')}
+            rule="integer"
             value={values.usageLimit}
             onChange={(event) => set('usageLimit', event.target.value)}
             error={Boolean(errors.usageLimit)}
@@ -595,8 +611,9 @@ export function PromotionDrawer({
             size="small"
             fullWidth
           />
-          <TextField
+          <Field
             label={t('promotions.field.usageLimitPerCustomer')}
+            rule="integer"
             value={values.usageLimitPerCustomer}
             onChange={(event) => set('usageLimitPerCustomer', event.target.value)}
             error={Boolean(errors.usageLimitPerCustomer)}
@@ -613,8 +630,10 @@ export function PromotionDrawer({
         </Divider>
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-          <TextField
+          <Field
             label={t('promotions.field.priority')}
+            rule="integer"
+            maxLength={4}
             type="number"
             value={values.priority}
             onChange={(event) => set('priority', Number(event.target.value))}
@@ -623,8 +642,10 @@ export function PromotionDrawer({
             size="small"
             fullWidth
           />
-          <TextField
+          <Field
             label={t('promotions.field.stackGroup')}
+            rule="lowerCode"
+            maxLength={41}
             value={values.stackGroup}
             onChange={(event) => set('stackGroup', event.target.value)}
             error={Boolean(errors.stackGroup)}
@@ -791,9 +812,11 @@ export function PromotionDrawer({
                 </SelectField>
               )}
               {promotion.kind === 'bundle' && (
-                <TextField
+                <Field
                   size="small"
                   label={t('promotions.field.requiredQuantity')}
+                  rule="decimal"
+                  help={t('help.promotions.requiredQuantity')}
                   value={scopeQuantity}
                   onChange={(event) => setScopeQuantity(event.target.value)}
                 />
@@ -874,15 +897,19 @@ export function PromotionDrawer({
               ))}
             </Stack>
             <Stack direction="row" spacing={1}>
-              <TextField
+              <Field
                 size="small"
                 label={t('promotions.field.minQuantity')}
+                rule="decimal"
+                help={t('help.promotions.tierQuantity')}
                 value={tierQuantity}
                 onChange={(event) => setTierQuantity(event.target.value)}
               />
-              <TextField
+              <Field
                 size="small"
                 label={t('promotions.field.percent')}
+                rule="percent"
+                help={t('help.promotions.tierPercent')}
                 value={tierPercent}
                 onChange={(event) => setTierPercent(event.target.value)}
               />

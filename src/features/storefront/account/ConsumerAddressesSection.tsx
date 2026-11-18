@@ -13,12 +13,14 @@ import {
   DialogTitle,
   FormControlLabel,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import type { MessageKey } from '@/shared/i18n/messages'
+import { matchesRule, type FieldRuleKind } from '@/shared/lib/fieldRules'
+import { Field } from '@/shared/ui/Field'
 import { BrandLoader } from '@/shared/ui/BrandLoader'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState, ErrorState } from '@/shared/ui/states'
@@ -281,17 +283,63 @@ function SavedAddressCard({ storeSlug, address, onEdit }: { storeSlug: string; a
   )
 }
 
-const FIELDS = [
-  { key: 'label', labelKey: 'account.consumer.addresses.label', required: true, max: 60, autoComplete: 'off' },
-  { key: 'address', labelKey: 'store.checkout.address', required: true, max: 300, autoComplete: 'street-address' },
-  { key: 'reference', labelKey: 'store.checkout.reference', required: false, max: 200, autoComplete: 'off' },
-  { key: 'city', labelKey: 'store.checkout.city', required: false, max: 120, autoComplete: 'address-level2' },
-  { key: 'region', labelKey: 'store.checkout.region', required: false, max: 120, autoComplete: 'address-level1' },
-  { key: 'postal_code', labelKey: 'store.checkout.postalCode', required: false, max: 12, autoComplete: 'postal-code' },
-  { key: 'country', labelKey: 'store.checkout.country', required: false, max: 2, autoComplete: 'country' },
-  { key: 'recipient', labelKey: 'account.consumer.addresses.recipient', required: false, max: 120, autoComplete: 'name' },
-  { key: 'phone', labelKey: 'account.consumer.profile.phone', required: false, max: 40, autoComplete: 'tel' },
-] as const
+/**
+ * Los campos de la libreta. `rule` dice qué se deja teclear y qué forma debe
+ * tener; `formatKey`, el aviso cuando la forma no cuadra.
+ */
+const FIELDS: readonly {
+  key: 'label' | 'address' | 'reference' | 'city' | 'region' | 'postal_code' | 'country' | 'recipient' | 'phone'
+  labelKey: MessageKey
+  required: boolean
+  max: number
+  autoComplete: string
+  rule: FieldRuleKind
+  formatKey?: MessageKey
+  helpKey?: MessageKey
+}[] = [
+  { key: 'label', labelKey: 'account.consumer.addresses.label', required: true, max: 60, autoComplete: 'off', rule: 'text' },
+  { key: 'address', labelKey: 'store.checkout.address', required: true, max: 300, autoComplete: 'street-address', rule: 'text' },
+  { key: 'reference', labelKey: 'store.checkout.reference', required: false, max: 200, autoComplete: 'off', rule: 'text' },
+  { key: 'city', labelKey: 'store.checkout.city', required: false, max: 120, autoComplete: 'address-level2', rule: 'text' },
+  { key: 'region', labelKey: 'store.checkout.region', required: false, max: 120, autoComplete: 'address-level1', rule: 'text' },
+  {
+    key: 'postal_code',
+    labelKey: 'store.checkout.postalCode',
+    required: false,
+    max: 12,
+    autoComplete: 'postal-code',
+    rule: 'postalCode',
+    formatKey: 'field.error.postalCode',
+  },
+  {
+    key: 'country',
+    labelKey: 'store.checkout.country',
+    required: false,
+    max: 2,
+    autoComplete: 'country',
+    rule: 'country',
+    formatKey: 'sfHelp.addresses.error.country',
+    helpKey: 'sfHelp.checkout.country',
+  },
+  {
+    key: 'recipient',
+    labelKey: 'account.consumer.addresses.recipient',
+    required: false,
+    max: 120,
+    autoComplete: 'name',
+    rule: 'personName',
+    formatKey: 'field.error.personName',
+  },
+  {
+    key: 'phone',
+    labelKey: 'account.consumer.profile.phone',
+    required: false,
+    max: 40,
+    autoComplete: 'tel',
+    rule: 'phone',
+    formatKey: 'field.error.phone',
+  },
+]
 
 type FieldKey = (typeof FIELDS)[number]['key']
 
@@ -334,11 +382,18 @@ function AddressDialog({
     },
   })
 
+  // Vacío no es error de forma: lo obligatorio lo vigila `missing`.
+  const badFormat = (key: FieldKey, rule: FieldRuleKind) => {
+    const value = values[key].trim()
+    return value !== '' && !matchesRule(rule, value)
+  }
+
   const submit = (event: FormEvent) => {
     event.preventDefault()
     const missing = values.label.trim() === '' || values.address.trim().length < 3
-    setInvalid(missing)
-    if (!missing) save.mutate()
+    const malformed = FIELDS.some((field) => badFormat(field.key, field.rule))
+    setInvalid(missing || malformed)
+    if (!missing && !malformed) save.mutate()
   }
 
   return (
@@ -371,17 +426,26 @@ function AddressDialog({
             {save.isError && <Alert severity="error">{t('account.consumer.addresses.error')}</Alert>}
             {FIELDS.map((field) => {
               const empty = field.required && invalid && (field.key === 'address' ? values.address.trim().length < 3 : values[field.key].trim() === '')
+              const wrong = invalid && !empty && Boolean(field.formatKey) && badFormat(field.key, field.rule)
               return (
-                <TextField
+                <Field
                   key={field.key}
                   id={`libreta-${field.key}`}
                   label={t(field.labelKey)}
                   required={field.required}
                   value={values[field.key]}
-                  error={empty}
-                  helperText={empty ? t('account.consumer.addresses.required') : undefined}
+                  error={empty || wrong}
+                  helperText={
+                    empty
+                      ? t('account.consumer.addresses.required')
+                      : wrong && field.formatKey
+                        ? t(field.formatKey)
+                        : undefined
+                  }
                   autoComplete={field.autoComplete}
-                  slotProps={{ htmlInput: { maxLength: field.max } }}
+                  rule={field.rule}
+                  maxLength={field.max}
+                  help={field.helpKey ? t(field.helpKey) : undefined}
                   onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}
                   fullWidth
                 />

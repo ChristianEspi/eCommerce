@@ -1,9 +1,10 @@
-import { Button, FormControlLabel, Stack, Switch, TextField, Typography } from '@mui/material'
+import { Button, FormControlLabel, Stack, Switch, Typography } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { installmentFor, type StoreInstallments } from '@/features/storefront/productDetail'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { formatMoney } from '@/shared/lib/format'
 import { useFeedback } from '@/shared/ui/feedback-context'
+import { Field } from '@/shared/ui/Field'
 import { useSaveStoreInstallments, useStoreInstallments } from './installments'
 
 /**
@@ -71,9 +72,12 @@ export function InstallmentsSection({ storeId, canManage }: { storeId: string | 
       />
       {enabled ? (
         <Stack sx={{ gap: 2, maxWidth: 640 }}>
-            <TextField
+            <Field
               fullWidth
               type="number"
+              rule="integer"
+              maxLength={2}
+              help={t('help.admin.installments.count')}
               label={t('settings.installments.count')}
               value={count}
               disabled={busy}
@@ -81,8 +85,11 @@ export function InstallmentsSection({ storeId, canManage }: { storeId: string | 
               error={!(Number.isInteger(cuotas) && cuotas >= 2 && cuotas <= 36)}
               onChange={(event) => setCount(event.target.value)}
             />
-            <TextField
+            <Field
               fullWidth
+              rule="text"
+              maxLength={60}
+              help={t('help.admin.installments.provider')}
               label={t('settings.installments.provider')}
               placeholder={t('settings.installments.providerPlaceholder')}
               value={provider}
@@ -90,9 +97,11 @@ export function InstallmentsSection({ storeId, canManage }: { storeId: string | 
               inputProps={{ maxLength: 60 }}
               onChange={(event) => setProvider(event.target.value)}
             />
-            <TextField
+            <Field
               fullWidth
               type="number"
+              rule="money"
+              help={t('help.admin.installments.min')}
               label={t('settings.installments.min')}
               helperText={t('common.optional')}
               value={minAmount}

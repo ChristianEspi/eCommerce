@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Alert, Box, Button, FormControlLabel, Stack, Switch, TextField } from '@mui/material'
+import { Alert, Box, Button, FormControlLabel, Stack, Switch } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useEffect, useState, type ChangeEvent } from 'react'
 import { useForm } from 'react-hook-form'
 import { slugify } from '@/shared/lib/slug'
@@ -138,9 +139,11 @@ export function CategoryDrawer({
           {!canWrite && <Alert severity="info">{t('catalog.products.unauthorized')}</Alert>}
           {serverError && <Alert severity="error">{t(serverError)}</Alert>}
 
-          <TextField
+          <Field
             label={t('catalog.field.name')}
             fullWidth
+            rule="text"
+            maxLength={160}
             autoFocus
             disabled={!canWrite}
             error={Boolean(errors.name)}
@@ -152,9 +155,12 @@ export function CategoryDrawer({
             })}
           />
 
-          <TextField
+          <Field
             label={t('catalog.field.slug')}
             fullWidth
+            rule="slug"
+            maxLength={62}
+            help={t('help.catalog.slug')}
             disabled={!canWrite}
             error={Boolean(errors.slug)}
             helperText={fieldError('slug') ?? t('catalog.field.slug.help')}

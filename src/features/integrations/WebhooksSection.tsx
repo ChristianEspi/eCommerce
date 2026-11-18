@@ -19,9 +19,9 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useState } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { eventLabel, termLabel } from '@/shared/i18n/codeLabels'
@@ -122,28 +122,31 @@ function NewEndpointDialog({ open, onClose }: { open: boolean; onClose: () => vo
               {t(create.error instanceof IntegrationsError ? create.error.key : 'integrations.error.generic')}
             </Alert>
           )}
-          <TextField
+          <Field
+            rule="lowerCode" maxLength={61}
             label={t('integrations.webhooks.name')}
             value={name}
             onChange={(event) => setName(event.target.value)}
             helperText={t('integrations.webhooks.nameHelp')}
             fullWidth
           />
-          <TextField
+          <Field
+            rule="url" maxLength={500} help={t('help.integrations.webhooks.url')}
             label={t('integrations.webhooks.url')}
             value={url}
             onChange={(event) => setUrl(event.target.value)}
             helperText={t('integrations.webhooks.urlHelp')}
             fullWidth
           />
-          <TextField
+          <Field
+            rule="code" maxLength={81} help={t('integrations.webhooks.secretRefHelp')}
             label={t('integrations.webhooks.secretRef')}
             value={secretRef}
             onChange={(event) => setSecretRef(event.target.value)}
-            helperText={t('integrations.webhooks.secretRefHelp')}
             fullWidth
           />
-          <TextField
+          <Field
+            rule="text" maxLength={300}
             label={t('integrations.webhooks.description')}
             value={description}
             onChange={(event) => setDescription(event.target.value)}

@@ -19,7 +19,6 @@ import {
   TableHead,
   TableRow,
   Tabs,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useState } from 'react'
@@ -29,6 +28,7 @@ import { formatDateTime } from '@/shared/lib/format'
 import { SearchField } from '@/shared/ui/SearchField'
 import { EmptyState, ErrorState, UnauthorizedState } from '@/shared/ui/states'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
+import { Field } from '@/shared/ui/Field'
 import { useDebouncedValue } from '@/shared/lib/useDebouncedValue'
 import { isForbidden } from './errors'
 import { useIncidents, useResolveIncident } from './hooks'
@@ -195,11 +195,13 @@ export function IncidentsSection({ onTrace }: { onTrace: (correlationId: string)
           <Typography sx={{ color: 'var(--muted)', mb: 2 }}>
             {t('ops.incidents.resolveBody')}
           </Typography>
-          <TextField
+          <Field
             autoFocus
             fullWidth
             multiline
             minRows={2}
+            rule="longText"
+            maxLength={1000}
             label={t('ops.incidents.note')}
             value={note}
             onChange={(event) => setNote(event.target.value)}

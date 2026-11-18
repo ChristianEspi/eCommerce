@@ -9,8 +9,8 @@ import {
   MenuItem,
   Stack,
   Switch,
-  TextField,
 } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useState } from 'react'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -86,18 +86,19 @@ export function SourceDialog({
           )}
           {touched && problem && <Alert severity="warning">{t(problem)}</Alert>}
 
-          <TextField
+          <Field
+            rule="text" maxLength={80}
             label={t('integrations.sources.field.name')}
             value={draft.name}
             onChange={(event) => set('name', event.target.value.slice(0, 80))}
             placeholder="ERP central"
             required
           />
-          <TextField
+          <Field
+            rule="url" help={t('integrations.sources.field.baseUrlHelp')}
             label={t('integrations.sources.field.baseUrl')}
             value={draft.baseUrl}
             onChange={(event) => set('baseUrl', event.target.value)}
-            helperText={t('integrations.sources.field.baseUrlHelp')}
             error={touched && !isPublicHttpsUrl(draft.baseUrl)}
             required
           />
@@ -114,15 +115,16 @@ export function SourceDialog({
           </SelectField>
 
           {auth === 'api_key' && (
-            <TextField
+            <Field
+              rule="code" maxLength={61} help={t('integrations.sources.field.headerHelp')}
               label={t('integrations.sources.field.header')}
               value={draft.authHeader}
               onChange={(event) => set('authHeader', event.target.value.trim())}
-              helperText={t('integrations.sources.field.headerHelp')}
             />
           )}
           {(auth === 'basic' || auth === 'oauth2') && (
-            <TextField
+            <Field
+              rule="text" maxLength={200} help={t(auth === 'basic' ? 'help.integrations.sources.username' : 'help.integrations.sources.clientId')}
               label={t(auth === 'basic' ? 'integrations.sources.field.username' : 'integrations.sources.field.clientId')}
               value={draft.authUsername}
               onChange={(event) => set('authUsername', event.target.value)}
@@ -131,13 +133,15 @@ export function SourceDialog({
           )}
           {auth === 'oauth2' && (
             <>
-              <TextField
+              <Field
+                rule="url" help={t('help.integrations.sources.tokenUrl')}
                 label={t('integrations.sources.field.tokenUrl')}
                 value={draft.oauthTokenUrl}
                 onChange={(event) => set('oauthTokenUrl', event.target.value)}
                 error={touched && !isPublicHttpsUrl(draft.oauthTokenUrl)}
               />
-              <TextField
+              <Field
+                rule="text" maxLength={300} help={t('help.integrations.sources.scope')}
                 label={t('integrations.sources.field.scope')}
                 value={draft.oauthScope}
                 onChange={(event) => set('oauthScope', event.target.value)}
@@ -145,7 +149,8 @@ export function SourceDialog({
             </>
           )}
           {auth !== 'none' && (
-            <TextField
+            <Field
+              maxLength={1024}
               type="password"
               label={t(secretLabel)}
               value={draft.secret}
@@ -159,14 +164,16 @@ export function SourceDialog({
             />
           )}
 
-          <TextField
+          <Field
+            rule="integer" maxLength={2} help={t('help.integrations.sources.timeout')}
             type="number"
             label={t('integrations.sources.field.timeout')}
             value={draft.timeoutSeconds}
             onChange={(event) => set('timeoutSeconds', Math.min(60, Math.max(5, Number(event.target.value) || 20)))}
             slotProps={{ htmlInput: { min: 5, max: 60 } }}
           />
-          <TextField
+          <Field
+            rule="longText" maxLength={500}
             label={t('integrations.sources.field.description')}
             value={draft.description}
             onChange={(event) => set('description', event.target.value.slice(0, 500))}

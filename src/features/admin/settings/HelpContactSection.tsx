@@ -1,13 +1,14 @@
 import AddRoundedIcon from '@mui/icons-material/AddRounded'
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
-import { Alert, Box, Button, IconButton, MenuItem, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, IconButton, MenuItem, Stack, Typography } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { SOCIAL_NETWORKS, type SocialNetwork } from '@/features/storefront/identity'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { LoadingState } from '@/shared/ui/states'
-import { helpContactSchema, useHelpContact, useSaveHelpContact, type HelpContact } from './helpContact'
+import { helpContactSchemaFor, useHelpContact, useSaveHelpContact, type HelpContact } from './helpContact'
 import { SelectField } from '@/shared/ui/SelectField'
+import { Field } from '@/shared/ui/Field'
 
 const VACIO: HelpContact = {
   legal_name: '',
@@ -58,7 +59,7 @@ export function HelpContactSection({ storeId, canManage }: { storeId: string | n
 
   if (actual.isPending) return <LoadingState />
 
-  const check = helpContactSchema.safeParse(v)
+  const check = helpContactSchemaFor(actual.data?.tax_id).safeParse(v)
   const malo = (campo: keyof HelpContact) =>
     !check.success && check.error.issues.some((issue) => issue.path[0] === campo)
   const libres = SOCIAL_NETWORKS.filter((n) => !v.social_links.some((l) => l.network === n))
@@ -70,11 +71,11 @@ export function HelpContactSection({ storeId, canManage }: { storeId: string | n
           se comían el borde de la tarjeta). Se lee de arriba abajo, en el orden
           en que aparece en el pie y en el Libro de Reclamaciones. */}
       <Stack sx={{ gap: 2, maxWidth: 640 }}>
-        <TextField fullWidth label={t('settings.help.legalName')} value={v.legal_name} onChange={(e) => set('legal_name', e.target.value)} error={malo('legal_name')} disabled={!canManage} />
-        <TextField fullWidth label={t('settings.help.taxId')} value={v.tax_id} onChange={(e) => set('tax_id', e.target.value)} error={malo('tax_id')} disabled={!canManage} />
-        <TextField fullWidth label={t('settings.help.whatsapp')} placeholder="+51 900 000 001" value={v.whatsapp_phone} onChange={(e) => set('whatsapp_phone', e.target.value)} error={malo('whatsapp_phone')} disabled={!canManage} />
-        <TextField fullWidth label={t('settings.help.note')} placeholder={t('settings.help.notePlaceholder')} value={v.help_note} onChange={(e) => set('help_note', e.target.value)} error={malo('help_note')} disabled={!canManage} />
-        <TextField fullWidth multiline minRows={3} label={t('settings.help.hours')} placeholder={t('settings.help.hoursPlaceholder')} value={v.business_hours} onChange={(e) => set('business_hours', e.target.value)} error={malo('business_hours')} disabled={!canManage} />
+        <Field fullWidth rule="text" maxLength={160} help={t('help.admin.contact.legalName')} label={t('settings.help.legalName')} value={v.legal_name} onChange={(e) => set('legal_name', e.target.value)} error={malo('legal_name')} disabled={!canManage} />
+        <Field fullWidth rule="ruc" help={t('field.help.ruc')} label={t('settings.help.taxId')} value={v.tax_id} onChange={(e) => set('tax_id', e.target.value)} error={malo('tax_id')} helperText={malo('tax_id') ? t('field.error.ruc') : undefined} disabled={!canManage} />
+        <Field fullWidth rule="phone" help={t('help.admin.contact.whatsapp')} label={t('settings.help.whatsapp')} placeholder="+51 900 000 001" value={v.whatsapp_phone} onChange={(e) => set('whatsapp_phone', e.target.value)} error={malo('whatsapp_phone')} disabled={!canManage} />
+        <Field fullWidth rule="text" maxLength={160} help={t('help.admin.contact.note')} label={t('settings.help.note')} placeholder={t('settings.help.notePlaceholder')} value={v.help_note} onChange={(e) => set('help_note', e.target.value)} error={malo('help_note')} disabled={!canManage} />
+        <Field fullWidth multiline minRows={3} rule="longText" maxLength={240} label={t('settings.help.hours')} placeholder={t('settings.help.hoursPlaceholder')} value={v.business_hours} onChange={(e) => set('business_hours', e.target.value)} error={malo('business_hours')} disabled={!canManage} />
       </Stack>
 
       <Box sx={{ maxWidth: 640 }}>
@@ -88,7 +89,7 @@ export function HelpContactSection({ storeId, canManage }: { storeId: string | n
                   <MenuItem key={n} value={n}>{NOMBRE_RED[n]}</MenuItem>
                 ))}
               </SelectField>
-              <TextField size="small" fullWidth placeholder="https://" value={link.url} disabled={!canManage}
+              <Field size="small" fullWidth rule="url" maxLength={300} help={t('help.admin.contact.socialUrl')} placeholder="https://" value={link.url} disabled={!canManage}
                 error={!/^https:\/\/\S+$/.test(link.url)}
                 onChange={(e) => set('social_links', v.social_links.map((l, j) => (j === i ? { ...l, url: e.target.value } : l)))} />
               <IconButton aria-label={`${t('settings.help.removeSocial')} ${NOMBRE_RED[link.network]}`} disabled={!canManage}

@@ -7,9 +7,9 @@ import {
   MenuItem,
   Stack,
   Switch,
-  TextField,
   Typography,
 } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -134,7 +134,8 @@ export function ChannelDrawer({
           {esDefecto && <Alert severity="info">{t('channels.defaultLocked')}</Alert>}
 
           <FieldRow>
-            <TextField
+            <Field
+              rule="lowerCode" maxLength={41} help={t('help.channels.code')}
               label={t('channels.field.code')}
               required
               disabled={!canWrite}
@@ -146,7 +147,8 @@ export function ChannelDrawer({
               sx={{ width: { xs: '100%', sm: 190 }, flexShrink: 0 }}
               {...register('code')}
             />
-            <TextField
+            <Field
+              rule="text" maxLength={120}
               fullWidth
               label={t('channels.field.name')}
               required

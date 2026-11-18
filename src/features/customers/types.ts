@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { DOC_TYPES, detectDocType, isValidDocument, matchesRule, zRule, type DocType } from '@/shared/lib/fieldRules'
 import { moneyText } from '@/shared/lib/money'
 
 /**
@@ -94,6 +95,8 @@ export const customerSchema = z.object({
   name: z.string().min(1),
   legal_name: z.string().nullable().default(null),
   tax_id: z.string().nullable().default(null),
+  /** 2026-11-18 · ruc | dni | ce | passport. La base lo deduce si falta. */
+  tax_id_type: z.enum(['ruc', 'dni', 'ce', 'passport']).nullable().default(null),
   email: z.string().nullable().default(null),
   phone: z.string().nullable().default(null),
   segment_id: z.string().uuid().nullable().default(null),
@@ -371,24 +374,71 @@ const optionalEmail = z
   .max(160, 'customers.error.email')
   .refine((value) => value === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), 'customers.error.email')
 
+/** Teléfono opcional: dígitos, «+» inicial, espacios y guiones (6–20). */
+const optionalPhone = zRule('phone', 'field.error.phone')
+
 const amountField = z
   .string()
   .trim()
   .refine((value) => value === '' || /^\d{1,12}(\.\d{1,2})?$/.test(value), 'customers.error.amount')
 
-export const customerFormSchema = z.object({
+const customerFormObject = z.object({
   kind: z.enum(CUSTOMER_KINDS),
   code: codeField,
   name: z.string().trim().min(1, 'customers.error.name').max(200, 'customers.error.name'),
   legal_name: z.string().trim().max(200, 'customers.error.name'),
-  tax_id: z.string().trim().max(40, 'customers.error.taxId'),
+  tax_id_type: z.union([z.enum(['ruc', 'dni', 'ce', 'passport']), z.literal('')]),
+  tax_id: z.string().trim().max(15, 'customers.error.taxId'),
   email: optionalEmail,
-  phone: z.string().trim().max(40, 'customers.error.phone'),
+  phone: optionalPhone,
   segment_id: z.string().trim(),
   is_active: z.boolean(),
   notes: z.string().trim().max(2000, 'customers.error.notes'),
 })
-export type CustomerFormValues = z.infer<typeof customerFormSchema>
+export type CustomerFormValues = z.infer<typeof customerFormObject>
+
+const DOC_ERROR: Record<DocType, string> = {
+  ruc: 'field.error.ruc',
+  dni: 'field.error.dni',
+  ce: 'field.error.ce',
+  passport: 'field.error.passport',
+}
+
+/**
+ * 2026-11-18 · El documento se valida según su tipo y el nombre de una persona
+ * solo admite letras. Un documento YA guardado que no cumpla (los RUC
+ * inventados de los datos de ejemplo) no bloquea editar el resto de la ficha:
+ * se valida entero en cuanto se cambia el número o el tipo.
+ */
+export function customerFormSchemaFor(saved?: { tax_id: string | null; tax_id_type: string | null } | null) {
+  return customerFormObject.superRefine((values, ctx) => {
+    if (values.kind === 'person' && values.name && !matchesRule('personName', values.name)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['name'], message: 'field.error.personName' })
+    }
+    const number = values.tax_id
+    if (!number) return
+    const type = values.tax_id_type
+    if (!type || !DOC_TYPES.includes(type)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['tax_id_type'], message: 'field.error.document' })
+      return
+    }
+    const unchanged =
+      saved != null &&
+      number === (saved.tax_id ?? '').trim() &&
+      type === (saved.tax_id_type ?? detectDocType(saved.tax_id))
+    if (!unchanged && !isValidDocument(type, number)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['tax_id'], message: DOC_ERROR[type] })
+    }
+  })
+}
+
+/** Un cliente nuevo: sin documento guardado que respetar. */
+export const customerFormSchema = customerFormSchemaFor(null)
+
+/** El tipo que se propone cuando aún no hay: empresa → RUC, persona → DNI. */
+export function defaultDocType(kind: CustomerFormValues['kind']): DocType {
+  return kind === 'person' ? 'dni' : 'ruc'
+}
 
 export function customerToForm(customer: Customer | null): CustomerFormValues {
   return {
@@ -397,6 +447,8 @@ export function customerToForm(customer: Customer | null): CustomerFormValues {
     name: customer?.name ?? '',
     legal_name: customer?.legal_name ?? '',
     tax_id: customer?.tax_id ?? '',
+    tax_id_type:
+      customer?.tax_id_type ?? detectDocType(customer?.tax_id) ?? defaultDocType(customer?.kind ?? 'company'),
     email: customer?.email ?? '',
     phone: customer?.phone ?? '',
     segment_id: customer?.segment_id ?? '',
@@ -408,13 +460,13 @@ export function customerToForm(customer: Customer | null): CustomerFormValues {
 export const addressFormSchema = z
   .object({
     label: z.string().trim().min(1, 'customers.error.label').max(120, 'customers.error.label'),
-    recipient: z.string().trim().max(120, 'customers.error.name'),
-    phone: z.string().trim().max(40, 'customers.error.phone'),
+    recipient: zRule('personName', 'customers.error.name', { max: 120 }),
+    phone: optionalPhone,
     line1: z.string().trim().min(3, 'customers.error.line1').max(240, 'customers.error.line1'),
     line2: z.string().trim().max(240, 'customers.error.line1'),
     city: z.string().trim().max(120, 'customers.error.name'),
     region: z.string().trim().max(120, 'customers.error.name'),
-    postal_code: z.string().trim().max(20, 'customers.error.postalCode'),
+    postal_code: zRule('postalCode', 'field.error.postalCode'),
     country: z
       .string()
       .trim()
@@ -470,9 +522,9 @@ export function addressToForm(address: CustomerAddress | null, fallbackCountry =
 
 export const contactFormSchema = z
   .object({
-    name: z.string().trim().min(1, 'customers.error.name').max(120, 'customers.error.name'),
+    name: zRule('personName', 'customers.error.name', { required: true, max: 120 }),
     email: optionalEmail,
-    phone: z.string().trim().max(40, 'customers.error.phone'),
+    phone: optionalPhone,
     role_title: z.string().trim().max(80, 'customers.error.name'),
     is_primary: z.boolean(),
     is_active: z.boolean(),
@@ -587,6 +639,7 @@ export const accountUserFormSchema = z.object({
     .string()
     .trim()
     .min(1, 'customers.error.email')
+    .max(160, 'customers.error.email')
     .refine((value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), 'customers.error.email')
     // Contrato §13: `@ebim.pe` nunca es actor de negocio de un tenant. La base
     // lo rechaza con un CHECK; decirlo aquí evita un error críptico.

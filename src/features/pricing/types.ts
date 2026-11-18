@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ruleFor, sanitizeDecimal } from '@/shared/lib/fieldRules'
 import { moneyText } from '@/shared/lib/money'
 
 /**
@@ -290,6 +291,16 @@ const codeField = z
   .min(1, 'pricing.error.code')
   .max(41, 'pricing.error.code')
   .regex(/^[a-z0-9][a-z0-9_-]*$/, 'pricing.error.code')
+
+/**
+ * Lo que se deja teclear en «Desde cantidad»: `numeric(18,6)`, con los mismos
+ * 10 enteros y 6 decimales que valida `decimalField`. La regla `decimal` de la
+ * suite corta en 4 decimales.
+ */
+export const MIN_QUANTITY_FIELD_RULE = ruleFor('decimal', {
+  maxLength: 17,
+  sanitize: (value) => sanitizeDecimal(value, 6),
+})
 
 const decimalField = z
   .string()

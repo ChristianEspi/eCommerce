@@ -1,7 +1,8 @@
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded'
 import ExpandLessRoundedIcon from '@mui/icons-material/ExpandLessRounded'
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded'
-import { Alert, Box, Button, MenuItem, Skeleton, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, MenuItem, Skeleton, Stack, Typography } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { AiFeedbackButtons } from '@/features/ai/AiFeedbackButtons'
@@ -193,8 +194,10 @@ function Body({
             )}
           </Stack>
           {task !== 'translate' && (
-            <TextField
+            <Field
               size="small"
+              rule="longText"
+              maxLength={MAX_CMS_BRIEF}
               multiline
               minRows={2}
               label={t('aiCms.brief')}
@@ -202,7 +205,6 @@ function Body({
               helperText={t('aiCms.briefHelp')}
               value={brief}
               onChange={(event) => setBrief(event.target.value.slice(0, MAX_CMS_BRIEF))}
-              inputProps={{ maxLength: MAX_CMS_BRIEF }}
             />
           )}
           {!ready && (

@@ -10,13 +10,13 @@ import {
   Radio,
   RadioGroup,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
+import { Field } from '@/shared/ui/Field'
 import { TS } from '@/theme/tokens'
 import { fetchReturnOptions, requestReturn, type OrderRef } from './api'
 import { SelectField } from '@/shared/ui/SelectField'
@@ -163,8 +163,10 @@ export function OrderReturnsSection({ storeSlug, orderNumber, token }: OrderRef)
               ))}
             </RadioGroup>
 
-            <TextField
+            <Field
               label={t('store.returns.note')}
+              rule="longText"
+              maxLength={2000}
               multiline
               minRows={2}
               value={note}

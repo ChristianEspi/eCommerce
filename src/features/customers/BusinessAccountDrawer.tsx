@@ -8,13 +8,13 @@ import {
   Switch,
   Tab,
   Tabs,
-  TextField,
   Typography,
 } from '@mui/material'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { Field } from '@/shared/ui/Field'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { EntityPicker, type PickerOption } from '@/shared/ui/EntityPicker'
 import { FormDrawer } from '@/shared/ui/FormDrawer'
@@ -202,8 +202,10 @@ export function BusinessAccountDrawer({
                 />
               )}
 
-              <TextField
+              <Field
                 label={t('customers.field.name')}
+                rule="text"
+                maxLength={200}
                 fullWidth
                 disabled={!canWrite}
                 error={Boolean(errors.name)}
@@ -211,8 +213,11 @@ export function BusinessAccountDrawer({
                 {...register('name')}
               />
 
-              <TextField
+              <Field
                 label={t('customers.field.code')}
+                rule="code"
+                maxLength={41}
+                help={t('help.customers.code')}
                 fullWidth
                 disabled={!canWrite || Boolean(account)}
                 error={Boolean(errors.code)}
@@ -235,13 +240,14 @@ export function BusinessAccountDrawer({
                 label={t('customers.field.requiresApproval')}
               />
 
-              <TextField
+              <Field
                 label={t('customers.field.approvalThreshold')}
+                rule="money"
+                help={t('help.customers.approvalThreshold')}
                 fullWidth
                 disabled={!canWrite || !watch('requires_approval')}
                 error={Boolean(errors.approval_threshold)}
                 helperText={fieldError('approval_threshold') ?? t('customers.field.thresholdHint')}
-                inputProps={{ inputMode: 'decimal' }}
                 {...register('approval_threshold')}
               />
 
@@ -264,33 +270,36 @@ export function BusinessAccountDrawer({
                   <Typography sx={{ color: 'var(--muted)', fontSize: 13 }}>{t('customers.credit.help')}</Typography>
                 </Box>
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                  <TextField
+                  <Field
                     label={t('customers.field.creditLimit')}
+                    rule="money"
+                    help={t('help.customers.creditLimit')}
                     fullWidth
                     disabled={!canWrite}
                     error={Boolean(errors.credit_limit)}
                     helperText={fieldError('credit_limit') ?? t('customers.field.creditLimitHint')}
-                    inputProps={{ inputMode: 'decimal' }}
                     {...register('credit_limit', {
                       onChange: (event: { target: { value: string } }) => {
                         if (event.target.value.trim() === '') setValue('payment_terms_days', '')
                       },
                     })}
                   />
-                  <TextField
+                  <Field
                     label={t('customers.field.paymentTerms')}
+                    rule="integer"
+                    maxLength={3}
+                    help={t('help.customers.paymentTerms')}
                     fullWidth
                     disabled={!canWrite || watch('credit_limit').trim() === ''}
                     error={Boolean(errors.payment_terms_days)}
                     helperText={fieldError('payment_terms_days') ?? t('customers.field.paymentTermsHint')}
-                    inputProps={{ inputMode: 'numeric' }}
                     {...register('payment_terms_days')}
                   />
                 </Stack>
                 {/* 2026-11-17 · El semáforo lo decide quien cobra: «Bloqueado»
                     impide nuevas compras de la cuenta; «En vigilancia» solo
                     avisa. Antes no había dónde cambiarlo. */}
-                <TextField
+                <Field
                   select
                   label={t('customers.field.creditStatus')}
                   fullWidth
@@ -312,34 +321,39 @@ export function BusinessAccountDrawer({
                       {t(`credit.lineStatus.${value}` as MessageKey)}
                     </MenuItem>
                   ))}
-                </TextField>
+                </Field>
                 {/* Mora automática: a los N días de atraso de la deuda más
                     vieja, la cuenta pasa sola a vigilancia; a los M, a bloqueo.
                     Vacío = nunca. */}
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                  <TextField
+                  <Field
                     label={t('customers.field.watchAfter')}
+                    rule="integer"
+                    maxLength={3}
+                    help={t('help.customers.watchAfter')}
                     fullWidth
                     disabled={!canWrite || watch('credit_limit').trim() === ''}
                     error={Boolean(errors.credit_watch_after_days)}
                     helperText={fieldError('credit_watch_after_days') ?? t('customers.field.moraHint')}
-                    inputProps={{ inputMode: 'numeric' }}
                     {...register('credit_watch_after_days')}
                   />
-                  <TextField
+                  <Field
                     label={t('customers.field.blockAfter')}
+                    rule="integer"
+                    maxLength={3}
+                    help={t('help.customers.blockAfter')}
                     fullWidth
                     disabled={!canWrite || watch('credit_limit').trim() === ''}
                     error={Boolean(errors.credit_block_after_days)}
                     helperText={fieldError('credit_block_after_days') ?? t('customers.field.moraHint')}
-                    inputProps={{ inputMode: 'numeric' }}
                     {...register('credit_block_after_days')}
                   />
                 </Stack>
               </Stack>
 
-              <TextField
+              <Field
                 label={t('customers.field.notes')}
+                rule="longText"
                 fullWidth
                 multiline
                 minRows={2}

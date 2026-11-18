@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { matchesRule } from '@/shared/lib/fieldRules'
 
 export {
   SALES_REPS_TABLE,
@@ -64,9 +65,18 @@ export type SalesRep = z.infer<typeof salesRepSchema>
 
 export const salesRepFormSchema = z.object({
   employee_code: employeeCode,
-  full_name: z.string().trim().min(1, 'sales.error.name').max(160, 'sales.error.name'),
+  full_name: z
+    .string()
+    .trim()
+    .min(1, 'sales.error.name')
+    .max(160, 'sales.error.name')
+    .refine((value) => value === '' || matchesRule('personName', value), 'field.error.personName'),
   email: optionalEmail,
-  phone: z.string().trim().max(40, 'sales.error.phone'),
+  phone: z
+    .string()
+    .trim()
+    .max(40, 'sales.error.phone')
+    .refine((value) => value === '' || matchesRule('phone', value), 'field.error.phone'),
   /** Cadena vacía = sin jefe. El `select` no puede emitir `null`. */
   manager_id: z.string(),
   status: z.enum(MEMBER_STATUSES),
@@ -353,7 +363,10 @@ export const goalFormSchema = z
     sales_rep_id: z.string(),
     territory_id: z.string(),
     metric: z.enum(GOAL_METRICS),
-    currency: z.string().trim(),
+    currency: z
+      .string()
+      .trim()
+      .refine((value) => value === '' || matchesRule('currency', value), 'sales.error.currency'),
     period_start: z.string().min(1, 'sales.error.date'),
     period_end: z.string().min(1, 'sales.error.date'),
     target_value: z

@@ -14,9 +14,9 @@ import {
   MenuItem,
   Skeleton,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useId, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react'
 import { formatMetric } from '@/features/admin/dashboard/aiAnalyst'
 import { AiFeedbackButtons } from '@/features/ai/AiFeedbackButtons'
@@ -401,8 +401,8 @@ function DraftEditor({ draft }: { draft: ExplainDraft }) {
       <Alert severity="info" icon={<EditNoteRoundedIcon fontSize="small" />}>
         {t('aiExplain.draft.notice')}
       </Alert>
-      <TextField fullWidth size="small" label={t('aiExplain.draft.subject')} value={subject} onChange={(e) => setSubject(e.target.value)} />
-      <TextField fullWidth multiline minRows={6} label={t('aiExplain.draft.body')} value={body} onChange={(e) => setBody(e.target.value)} />
+      <Field fullWidth size="small" rule="text" maxLength={160} label={t('aiExplain.draft.subject')} value={subject} onChange={(e) => setSubject(e.target.value)} />
+      <Field fullWidth multiline minRows={6} rule="longText" maxLength={1600} label={t('aiExplain.draft.body')} value={body} onChange={(e) => setBody(e.target.value)} />
       {draft.points.length > 0 && (
         <AiBlock title={t('aiExplain.draft.points')}>
           <Stack component="ul" spacing={0.25} sx={{ m: 0, pl: 2 }}>
@@ -474,9 +474,11 @@ function DraftSection({
               </MenuItem>
             ))}
           </SelectField>
-          <TextField
+          <Field
             fullWidth
             size="small"
+            rule="longText"
+            maxLength={MAX_DRAFT_NOTES + 50}
             multiline
             maxRows={4}
             label={t('aiExplain.draft.notes')}
@@ -484,7 +486,6 @@ function DraftSection({
             onChange={(e) => setNotes(e.target.value)}
             error={tooLong}
             helperText={tooLong ? t('aiOrders.ask.tooLong') : t('aiExplain.draft.notesHelp')}
-            inputProps={{ maxLength: MAX_DRAFT_NOTES + 50 }}
           />
         </Stack>
       )}
@@ -689,16 +690,17 @@ function ExplainPanelBody({
             </Stack>
             <Box component="form" onSubmit={onSubmit} noValidate>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'flex-start' } }}>
-                <TextField
+                <Field
                   fullWidth
                   size="small"
+                  rule="longText"
+                  maxLength={MAX_EXPLAIN_QUESTION + 50}
                   label={t('aiExplain.ask.label')}
                   placeholder={t(`${ns}.ask.placeholder` as MessageKey)}
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
                   error={tooLong}
                   helperText={tooLong ? t('aiOrders.ask.tooLong') : t('aiExplain.costHint')}
-                  inputProps={{ maxLength: MAX_EXPLAIN_QUESTION + 50 }}
                 />
                 <Button
                   type="submit"

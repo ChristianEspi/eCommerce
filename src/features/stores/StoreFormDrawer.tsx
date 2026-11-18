@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Alert, Box, Button, MenuItem, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, MenuItem, Stack, Typography } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -133,7 +134,8 @@ export function StoreFormDrawer({
           {serverError && <Alert severity="error">{t(serverError)}</Alert>}
           {!store && <Alert severity="info">{t('storesAdmin.draftNotice')}</Alert>}
 
-          <TextField
+          <Field
+            rule="text" maxLength={200}
             label={t('storesAdmin.field.name')}
             required
             error={Boolean(errors.name)}
@@ -144,7 +146,8 @@ export function StoreFormDrawer({
           />
 
           <FieldRow>
-            <TextField
+            <Field
+              rule="slug" maxLength={62} help={t('help.stores.slug')}
               fullWidth
               label={t('storesAdmin.field.slug')}
               required
@@ -184,7 +187,8 @@ export function StoreFormDrawer({
           )}
 
           {domainEnabled && (
-            <TextField
+            <Field
+              rule="hostname" help={t('help.stores.domain')}
               label={t('storesAdmin.field.domain')}
               error={Boolean(errors.domain)}
               helperText={errors.domain ? t(errors.domain.message as MessageKey) : t('storesAdmin.field.domainHint')}

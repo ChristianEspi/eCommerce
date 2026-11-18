@@ -11,12 +11,12 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { Field } from '@/shared/ui/Field'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { formatMoney } from '@/shared/lib/format'
 import { FieldRow, FormDrawer } from '@/shared/ui/FormDrawer'
@@ -208,8 +208,11 @@ export function ReceiptDrawer({
           {serverError && <Alert severity="error">{t(serverError)}</Alert>}
 
           <FieldRow>
-            <TextField
+            <Field
               fullWidth
+              rule="code"
+              maxLength={60}
+              help={t('help.credit.receiptNumber')}
               label={t('credit.field.receiptNumber')}
               disabled={!canWrite}
               error={Boolean(errors.receipt_number)}
@@ -224,8 +227,9 @@ export function ReceiptDrawer({
             {/* El importe es el dato que se comprueba contra la deuda marcada:
                 ancho fijo para que no baile cuando aparece el aviso de que se
                 pasa. */}
-            <TextField
+            <Field
               label={t('credit.field.amount')}
+              rule="money"
               required
               disabled={!canWrite}
               error={Boolean(errors.amount) || sePasa}
@@ -243,7 +247,7 @@ export function ReceiptDrawer({
           </FieldRow>
 
           <FieldRow>
-            <TextField
+            <Field
               fullWidth
               type="date"
               label={t('credit.field.receivedAt')}
@@ -251,7 +255,7 @@ export function ReceiptDrawer({
               slotProps={{ inputLabel: { shrink: true } }}
               {...register('received_at')}
             />
-            <TextField
+            <Field
               select
               fullWidth
               label={t('credit.field.method')}
@@ -265,13 +269,15 @@ export function ReceiptDrawer({
                   {t(`credit.method.${metodo}` as MessageKey)}
                 </MenuItem>
               ))}
-            </TextField>
+            </Field>
           </FieldRow>
 
           {/* La referencia va sola: un numero de operacion o de cheque es
               largo y a media fila se lee a trozos. */}
-          <TextField
+          <Field
             fullWidth
+            rule="text"
+            maxLength={120}
             label={t('credit.field.reference')}
             disabled={!canWrite}
             helperText={t('credit.field.referenceHint')}

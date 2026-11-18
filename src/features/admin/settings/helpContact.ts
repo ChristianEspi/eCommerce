@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { z } from 'zod'
+import { matchesRule } from '@/shared/lib/fieldRules'
 import { tryGetSupabaseClient } from '@/shared/lib/supabase'
 import { SOCIAL_NETWORKS, sanitizeSocialLinks, type SocialLink } from '@/features/storefront/identity'
 
@@ -37,7 +38,8 @@ const rowSchema = z.object({
 /** Las mismas reglas que los CHECK de la base, para avisar en el campo. */
 export const helpContactSchema = z.object({
   legal_name: z.string().trim().refine((v) => v === '' || (v.length >= 2 && v.length <= 160)),
-  tax_id: z.string().trim().refine((v) => v === '' || /^[0-9A-Za-z-]{5,20}$/.test(v)),
+  // El RUC del negocio: once dígitos con dígito verificador (más estricto que el CHECK).
+  tax_id: z.string().trim().refine((v) => v === '' || matchesRule('ruc', v)),
   whatsapp_phone: z.string().trim().refine((v) => v === '' || /^\+?[0-9][0-9 ]{5,19}$/.test(v)),
   help_note: z.string().trim().max(160),
   business_hours: z.string().trim().max(240),
@@ -51,6 +53,18 @@ export const helpContactSchema = z.object({
     .max(6)
     .refine((links) => new Set(links.map((l) => l.network)).size === links.length),
 })
+
+/**
+ * El RUC ya guardado no se vuelve a exigir con dígito verificador: hay tiendas
+ * de ejemplo con RUC inventados y no deben quedarse sin poder guardar el resto
+ * de la sección. En cuanto se cambia, se valida entero.
+ */
+export function helpContactSchemaFor(savedTaxId: string | null | undefined) {
+  const saved = (savedTaxId ?? '').trim()
+  return helpContactSchema.extend({
+    tax_id: z.string().trim().refine((v) => v === '' || v === saved || matchesRule('ruc', v)),
+  })
+}
 
 const key = (storeId: string | null) => ['admin', 'help-contact', storeId] as const
 

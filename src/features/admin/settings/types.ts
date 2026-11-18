@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { matchesRule } from '@/shared/lib/fieldRules'
 import { BRAND_FONTS, BRAND_RADII, DENSITIES } from '@/theme/tokens'
 import {
   homeLayoutField,
@@ -248,7 +249,10 @@ export const storeFormSchema = z.object({
   contact_phone: z
     .string()
     .trim()
-    .refine((value) => value === '' || (value.length >= 4 && value.length <= 40), 'settings.error.phone'),
+    .refine(
+      (value) => value === '' || (value.length >= 4 && value.length <= 40 && matchesRule('phone', value)),
+      'settings.error.phone',
+    ),
   contact_address: z
     .string()
     .trim()

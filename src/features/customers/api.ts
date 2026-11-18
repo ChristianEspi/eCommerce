@@ -89,7 +89,7 @@ function nullable(value: string): string | null {
 // ---------------------------------------------------------------------------
 
 const CUSTOMER_SELECT =
-  'id, kind, code, name, legal_name, tax_id, email, phone, segment_id, is_active, notes'
+  'id, kind, code, name, legal_name, tax_id, tax_id_type, email, phone, segment_id, is_active, notes'
 
 export interface CustomerPage {
   rows: Customer[]
@@ -174,6 +174,7 @@ export async function saveCustomer(input: {
     name: input.values.name,
     legal_name: nullable(input.values.legal_name),
     tax_id: nullable(input.values.tax_id),
+    tax_id_type: input.values.tax_id && input.values.tax_id_type ? input.values.tax_id_type : null,
     email: nullable(input.values.email.toLowerCase()),
     phone: nullable(input.values.phone),
     segment_id: nullable(input.values.segment_id),

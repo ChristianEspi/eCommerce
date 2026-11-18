@@ -15,7 +15,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useEffect, useState } from 'react'
@@ -28,6 +27,7 @@ import { ConfirmDeleteDialog } from '@/shared/ui/ConfirmDeleteDialog'
 import { FormDrawer } from '@/shared/ui/FormDrawer'
 import { RowActions } from '@/shared/ui/RowActions'
 import { SelectField } from '@/shared/ui/SelectField'
+import { Field } from '@/shared/ui/Field'
 import { StatusChip } from '@/shared/ui/StatusChip'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { useFeedback } from '@/shared/ui/feedback-context'
@@ -278,38 +278,50 @@ export function PickupPointsSection() {
         }
       >
         <Stack spacing={2}>
-          <TextField
+          <Field
+            rule="lowerCode"
+            maxLength={41}
+            help={t('help.fulfillment.pickupCode')}
             label={t('fulfillment.field.code')}
             value={values.code}
             disabled={Boolean(values.id)}
             onChange={(e) => setValues((v) => ({ ...v, code: e.target.value }))}
             helperText={t('fulfillment.field.codeHelp')}
           />
-          <TextField
+          <Field
+            rule="text"
+            maxLength={120}
             label={t('fulfillment.field.methodName')}
             value={values.name}
             onChange={(e) => setValues((v) => ({ ...v, name: e.target.value }))}
           />
-          <TextField
+          <Field
+            rule="text"
             label={t('fulfillment.pickup.address')}
             value={values.address}
             onChange={(e) => setValues((v) => ({ ...v, address: e.target.value }))}
           />
-          <TextField
+          <Field
+            rule="text"
+            maxLength={120}
             label={t('fulfillment.pickup.district')}
             value={values.district}
             onChange={(e) => setValues((v) => ({ ...v, district: e.target.value }))}
             helperText={t('fulfillment.pickup.districtHelp')}
           />
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <TextField
+            <Field
               fullWidth
+              rule="text"
+              maxLength={120}
               label={t('fulfillment.pickup.city')}
               value={values.city}
               onChange={(e) => setValues((v) => ({ ...v, city: e.target.value }))}
             />
-            <TextField
+            <Field
               fullWidth
+              rule="text"
+              maxLength={120}
               label={t('fulfillment.pickup.region')}
               value={values.region}
               onChange={(e) => setValues((v) => ({ ...v, region: e.target.value }))}
@@ -366,12 +378,16 @@ export function PickupPointsSection() {
               </MenuItem>
             ))}
           </SelectField>
-          <TextField
+          <Field
+            rule="phone"
             label={t('fulfillment.pickup.phone')}
             value={values.contactPhone}
             onChange={(e) => setValues((v) => ({ ...v, contactPhone: e.target.value }))}
           />
-          <TextField
+          <Field
+            rule="integer"
+            maxLength={4}
+            help={t('help.fulfillment.pickupPosition')}
             label={t('fulfillment.pickup.position')}
             type="number"
             value={values.position}

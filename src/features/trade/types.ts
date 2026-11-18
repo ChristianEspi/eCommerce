@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { matchesRule } from '@/shared/lib/fieldRules'
 
 export {
   QUOTES_TABLE,
@@ -105,9 +106,18 @@ const quantityInput = z
 
 export const quoteFormSchema = z
   .object({
-    quote_number: z.string().trim().min(1, 'trade.error.number').max(60, 'trade.error.number'),
+    quote_number: z
+      .string()
+      .trim()
+      .min(1, 'trade.error.number')
+      .max(60, 'trade.error.number')
+      .refine((value) => value === '' || matchesRule('sku', value), 'help.trade.error.quoteNumber'),
     customer_id: z.string().uuid('trade.error.customer'),
-    currency: z.string().trim().length(3, 'trade.error.currency'),
+    currency: z
+      .string()
+      .trim()
+      .length(3, 'trade.error.currency')
+      .refine((value) => matchesRule('currency', value), 'trade.error.currency'),
     issued_at: z.string().min(1, 'trade.error.date'),
     valid_until: z.string().min(1, 'trade.error.date'),
     notes: z.string().trim().max(2000, 'trade.error.notes'),

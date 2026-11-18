@@ -41,6 +41,16 @@ export type FieldRuleKind =
   | 'percent'
   /** Código interno: letras, dígitos, guion, guion bajo y punto. Sin espacios. */
   | 'code'
+  /** Código que la base guarda en minúsculas: letras, dígitos, guion y guion bajo. */
+  | 'lowerCode'
+  /** Importe que puede ser negativo (ajustes de saldo), 2 decimales. */
+  | 'signedMoney'
+  /** Decimal con 6 cifras (factores de conversión, cantidades `numeric(18,6)`). */
+  | 'decimal6'
+  /** Dominio sin esquema: tienda.miempresa.com */
+  | 'hostname'
+  /** Ruta relativa de una API: /v1/stock?page=1 */
+  | 'apiPath'
   /** SKU / referencia de producto: como `code` más la barra. */
   | 'sku'
   /** Identificador en una URL: minúsculas, dígitos y guiones. */
@@ -140,6 +150,19 @@ export const FIELD_RULES: Record<FieldRuleKind, FieldRule> = {
   money: { maxLength: 15, inputMode: 'decimal', sanitize: (v) => sanitizeDecimal(v, 2) },
   percent: { maxLength: 6, inputMode: 'decimal', sanitize: (v) => sanitizeDecimal(v, 2) },
   code: { maxLength: 40, inputMode: 'text', sanitize: (v) => v.replace(/[^A-Za-z0-9._-]+/g, '') },
+  lowerCode: {
+    maxLength: 41,
+    inputMode: 'text',
+    sanitize: (v) => v.toLowerCase().replace(/[^a-z0-9_-]+/g, ''),
+  },
+  signedMoney: { maxLength: 16, inputMode: 'text', sanitize: (v) => sanitizeDecimal(v, 2, true) },
+  decimal6: { maxLength: 20, inputMode: 'decimal', sanitize: (v) => sanitizeDecimal(v, 6) },
+  hostname: {
+    maxLength: 253,
+    inputMode: 'url',
+    sanitize: (v) => v.toLowerCase().replace(/[^a-z0-9.-]+/g, ''),
+  },
+  apiPath: { maxLength: 300, inputMode: 'url', sanitize: (v) => v.replace(/\s+/g, '') },
   sku: { maxLength: 64, inputMode: 'text', sanitize: (v) => v.replace(/[^A-Za-z0-9._/-]+/g, '') },
   slug: {
     maxLength: 80,
@@ -277,6 +300,16 @@ export function matchesRule(kind: FieldRuleKind, value: string): boolean {
       return /^[A-Za-z0-9._-]+$/.test(v)
     case 'sku':
       return /^[A-Za-z0-9._/-]+$/.test(v)
+    case 'lowerCode':
+      return /^[a-z0-9][a-z0-9_-]*$/.test(v)
+    case 'signedMoney':
+      return /^-?\d+(\.\d{1,2})?$/.test(v)
+    case 'decimal6':
+      return /^\d+(\.\d{1,6})?$/.test(v)
+    case 'hostname':
+      return /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/.test(v)
+    case 'apiPath':
+      return /^\/[^\s]*$/.test(v)
     case 'slug':
       return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(v)
     case 'personName':

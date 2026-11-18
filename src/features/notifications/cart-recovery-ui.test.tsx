@@ -169,7 +169,9 @@ describe('Configuración → Recordatorio de carrito', () => {
     const fake = pintar()
     const espera = await screen.findByLabelText('Esperar (horas sin actividad)')
     await user.clear(espera)
-    await user.type(espera, '200')
+    // El campo admite 2 cifras (regla `integer`): «200» ya no se puede
+    // teclear; 99 sigue fuera de la ventana de 1 a 72 horas.
+    await user.type(espera, '99')
 
     expect(screen.getByText(/Revisa la ventana/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Guardar recordatorios' })).toBeDisabled()

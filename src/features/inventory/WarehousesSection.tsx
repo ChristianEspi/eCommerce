@@ -21,7 +21,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useEffect, useMemo, useState } from 'react'
@@ -52,6 +51,7 @@ import {
   type Warehouse,
   type WarehouseFormValues,
 } from './types'
+import { Field } from '@/shared/ui/Field'
 import { SelectField } from '@/shared/ui/SelectField'
 
 /**
@@ -378,15 +378,20 @@ function WarehouseDrawer({
       <Stack spacing={2}>
         {serverError && <Alert severity="error">{t(serverError)}</Alert>}
 
-        <TextField
+        <Field
           label={t('inventory.field.code')}
+          rule="code"
+          maxLength={31}
+          help={t('help.inventory.warehouseCode')}
           {...register('code')}
           error={Boolean(errors.code)}
           helperText={errors.code ? t(errors.code.message as MessageKey) : undefined}
           fullWidth
         />
-        <TextField
+        <Field
           label={t('inventory.field.name')}
+          rule="text"
+          maxLength={160}
           {...register('name')}
           error={Boolean(errors.name)}
           helperText={errors.name ? t(errors.name.message as MessageKey) : undefined}
@@ -424,9 +429,11 @@ function WarehouseDrawer({
 
         {source === 'erp' && (
           <>
-            <TextField
+            <Field
               label={t('inventory.field.staleMinutes')}
               type="number"
+              rule="integer"
+              help={t('help.inventory.staleMinutes')}
               {...register('stale_minutes', { setValueAs: (v) => (v === '' ? null : Number(v)) })}
               error={Boolean(errors.stale_minutes)}
               helperText={
@@ -454,18 +461,23 @@ function WarehouseDrawer({
           </>
         )}
 
-        <TextField
+        <Field
           label={t('inventory.field.priority')}
           type="number"
+          rule="integer"
+          maxLength={4}
+          help={t('help.inventory.priority')}
           {...register('priority', { valueAsNumber: true })}
           helperText={t('inventory.field.priorityHelp')}
           fullWidth
         />
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-          <TextField label={t('inventory.field.city')} {...register('city')} fullWidth />
-          <TextField
+          <Field label={t('inventory.field.city')} rule="text" maxLength={120} {...register('city')} fullWidth />
+          <Field
             label={t('inventory.field.country')}
+            rule="country"
+            help={t('help.inventory.country')}
             {...register('country')}
             error={Boolean(errors.country)}
             helperText={errors.country ? t(errors.country.message as MessageKey) : undefined}

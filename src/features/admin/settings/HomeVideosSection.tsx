@@ -4,7 +4,8 @@ import CancelRoundedIcon from '@mui/icons-material/CancelRounded'
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
 import VideoCallRoundedIcon from '@mui/icons-material/VideoCallRounded'
-import { Alert, Box, Button, Chip, IconButton, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, Chip, IconButton, Stack, Typography } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useEffect, useRef, useState } from 'react'
 import { HOME_VIDEO_RULES, type HomeVideoIssue } from '@/features/storefront/homeVideos'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -295,7 +296,8 @@ export function HomeVideosSection({
                 ) : null}
               </Box>
               <Stack spacing={1.25} sx={{ flex: 1, minWidth: 0 }}>
-                <TextField
+                <Field
+                  rule="text" maxLength={HOME_VIDEO_RULES.titleMax}
                   size="small"
                   fullWidth
                   label={`${t('settings.videos.titleLabel')} ${i + 1}`}

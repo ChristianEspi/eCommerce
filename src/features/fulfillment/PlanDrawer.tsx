@@ -12,7 +12,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useEffect, useMemo, useState } from 'react'
@@ -44,6 +43,7 @@ import {
   type PlanStop,
 } from './routing-types'
 import { SelectField } from '@/shared/ui/SelectField'
+import { Field } from '@/shared/ui/Field'
 
 /**
  * La hoja de ruta: cabecera, paradas y firma de cada entrega.
@@ -239,7 +239,10 @@ export function PlanDrawer({
           <FieldRow>
             {/* Codigo corto a la izquierda y la fecha con su mitad: el input
                 nativo de fecha no baja de unos 140 px sin recortarse. */}
-            <TextField
+            <Field
+              rule="code"
+              maxLength={41}
+              help={t('help.fulfillment.planCode')}
               label={t('fulfillment.field.planCode')}
               required
               disabled={!puedeEditar}
@@ -249,7 +252,7 @@ export function PlanDrawer({
               sx={{ width: { xs: '100%', sm: 180 }, flexShrink: 0 }}
               {...register('code')}
             />
-            <TextField
+            <Field
               fullWidth
               type="date"
               label={t('fulfillment.field.planDate')}
@@ -283,10 +286,14 @@ export function PlanDrawer({
                 </SelectField>
               )}
             />
-            <TextField
+            <Field
               fullWidth
+              rule="personName"
+              maxLength={160}
               label={t('fulfillment.field.driver')}
               disabled={!puedeEditar}
+              error={Boolean(errors.driver_name)}
+              helperText={errors.driver_name ? t(errors.driver_name.message as MessageKey) : undefined}
               slotProps={{ inputLabel: { shrink: true } }}
               {...register('driver_name')}
             />

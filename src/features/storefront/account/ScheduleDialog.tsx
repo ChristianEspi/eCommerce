@@ -6,13 +6,13 @@ import {
   DialogTitle,
   MenuItem,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useState, type ReactNode } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { SCHEDULE_INTERVALS, isoDateFromToday, scheduleFormError } from '../scheduledOrders'
+import { Field } from '@/shared/ui/Field'
 import { SelectField } from '@/shared/ui/SelectField'
 
 export interface ScheduleFormValues {
@@ -100,7 +100,7 @@ export function ScheduleDialog({
             </Typography>
           )}
           {notice}
-          <TextField
+          <Field
             label={t('account.schedules.form.name')}
             value={name}
             onChange={(event) => setName(event.target.value)}
@@ -108,7 +108,9 @@ export function ScheduleDialog({
             required
             error={touched && error === 'name'}
             helperText={touched && error === 'name' ? t(FIELD_ERROR.name) : undefined}
-            slotProps={{ htmlInput: { maxLength: 120 }, inputLabel: { shrink: true } }}
+            rule="text"
+            maxLength={120}
+            slotProps={{ inputLabel: { shrink: true } }}
           />
           <SelectField
             label={t('account.schedules.form.interval')}
@@ -124,7 +126,7 @@ export function ScheduleDialog({
             ))}
           </SelectField>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <TextField
+            <Field
               type="date"
               label={t('account.schedules.form.nextRunOn')}
               value={nextRunOn}
@@ -135,7 +137,7 @@ export function ScheduleDialog({
               helperText={touched && error === 'nextRunOn' ? t(FIELD_ERROR.nextRunOn) : undefined}
               slotProps={{ htmlInput: { min: floor }, inputLabel: { shrink: true } }}
             />
-            <TextField
+            <Field
               type="date"
               label={t('account.schedules.form.endsOn')}
               value={endsOn}

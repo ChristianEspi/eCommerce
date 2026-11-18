@@ -12,7 +12,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { Controller, useForm } from 'react-hook-form'
@@ -23,6 +22,7 @@ import { EntityPicker, type PickerOption } from '@/shared/ui/EntityPicker'
 import { FieldRow, FormDrawer } from '@/shared/ui/FormDrawer'
 import { RowActions } from '@/shared/ui/RowActions'
 import { useFeedback } from '@/shared/ui/feedback-context'
+import { Field } from '@/shared/ui/Field'
 import type { TradeScope } from './api'
 import { AssortmentAssignmentsPanel } from './AssortmentAssignmentsPanel'
 import { TradeError } from './errors'
@@ -179,7 +179,10 @@ export function AssortmentDrawer({
           <FieldRow>
             {/* Un codigo de surtido son dos palabras cortas: a ancho fijo, para
                 que el nombre —que si es largo— se quede con el resto. */}
-            <TextField
+            <Field
+              rule="code"
+              maxLength={41}
+              help={t('help.trade.assortmentCode')}
               label={t('trade.field.code')}
               required
               disabled={!canWrite}
@@ -191,8 +194,10 @@ export function AssortmentDrawer({
               sx={{ width: { xs: '100%', sm: 190 }, flexShrink: 0 }}
               {...register('code')}
             />
-            <TextField
+            <Field
               fullWidth
+              rule="text"
+              maxLength={120}
               label={t('trade.field.name')}
               required
               disabled={!canWrite}

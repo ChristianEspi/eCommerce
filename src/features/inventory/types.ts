@@ -282,6 +282,9 @@ export type ReservationResult = z.infer<typeof reservationResultSchema>
 // Formularios
 // ---------------------------------------------------------------------------
 
+/** Tope de una cantidad de inventario: `numeric(18,6)` admite 12 cifras enteras. */
+const MAX_QUANTITY = 1e12
+
 export const warehouseFormSchema = z
   .object({
     code: z
@@ -327,7 +330,9 @@ export const movementFormSchema = z
     kind: z.enum(MANUAL_MOVEMENT_KINDS),
     quantity: z
       .number({ invalid_type_error: 'inventory.error.quantity' })
-      .refine((value) => value !== 0, 'inventory.error.quantity'),
+      .refine((value) => value !== 0, 'inventory.error.quantity')
+      // `numeric(18,6)`: hasta 12 enteros, con o sin signo.
+      .refine((value) => Math.abs(value) < MAX_QUANTITY, 'inventory.error.quantity'),
     reason: z.string().trim().max(500).optional().default(''),
   })
   // «Traslado enviado: 5» quiere decir que salen cinco. Pedir que se escriba
@@ -355,7 +360,8 @@ export const transferFormSchema = z
     variant_id: z.string().uuid().nullable().default(null),
     quantity: z
       .number({ invalid_type_error: 'inventory.error.quantity' })
-      .positive('inventory.error.transferQuantity'),
+      .positive('inventory.error.transferQuantity')
+      .lt(MAX_QUANTITY, 'inventory.error.quantity'),
     reason: z.string().trim().max(500).optional().default(''),
   })
   .refine((v) => v.from_warehouse_id !== v.to_warehouse_id, {
@@ -375,8 +381,8 @@ export const policyFormSchema = z.object({
   warehouse_id: z.string().uuid('inventory.error.warehouse'),
   product_id: z.string().uuid('inventory.error.product'),
   variant_id: z.string().uuid().nullable().default(null),
-  safety_stock: z.number().min(0, 'inventory.error.quantity'),
-  reorder_point: z.number().min(0, 'inventory.error.quantity'),
+  safety_stock: z.number().min(0, 'inventory.error.quantity').lt(MAX_QUANTITY, 'inventory.error.quantity'),
+  reorder_point: z.number().min(0, 'inventory.error.quantity').lt(MAX_QUANTITY, 'inventory.error.quantity'),
 })
 export type PolicyFormValues = z.infer<typeof policyFormSchema>
 

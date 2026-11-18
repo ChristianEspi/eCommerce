@@ -15,7 +15,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
@@ -30,9 +29,11 @@ import { PanelHint } from './VariantsPanel'
 import { useAddBundleItem, useBundleItems, useDeleteBundleItem, useUnits, useVariants } from './hooks'
 import {
   assemblableUnits,
+  FACTOR_FIELD_RULE,
   bundleItemFormSchema,
   type BundleItemFormValues,
 } from './types'
+import { Field } from '@/shared/ui/Field'
 import type { PimProduct, ProductCandidate } from '../types'
 import { SelectField } from '@/shared/ui/SelectField'
 
@@ -351,9 +352,10 @@ function BundleItemForm({
             </SelectField>
           )}
 
-          <TextField
+          <Field
             size="small"
             fullWidth
+            rule={FACTOR_FIELD_RULE}
             label={t('pim.field.quantity')}
             error={Boolean(errors.quantity)}
             helperText={fieldError('quantity')}

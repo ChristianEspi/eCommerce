@@ -24,12 +24,12 @@ import {
   Divider,
   IconButton,
   Stack,
-  TextField,
   ToggleButton,
   ToggleButtonGroup,
   Tooltip,
   Typography,
 } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import TextAlign from '@tiptap/extension-text-align'
@@ -448,8 +448,9 @@ export function RichTextEditor({
       <Dialog open={linkDraft !== null} onClose={() => setLinkDraft(null)} fullWidth maxWidth="xs">
         <DialogTitle>{t('content.editor.link')}</DialogTitle>
         <DialogContent>
-          <TextField
+          <Field
             autoFocus
+            rule="url"
             fullWidth
             size="small"
             margin="dense"

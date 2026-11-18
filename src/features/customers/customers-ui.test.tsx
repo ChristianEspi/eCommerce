@@ -239,7 +239,25 @@ describe('Clientes — la pantalla', () => {
     expect(within(drawer).queryByLabelText('Razón social')).not.toBeInTheDocument()
     expect(within(drawer).getByLabelText('Nombre completo')).toBeInTheDocument()
     expect(within(drawer).getByLabelText('Documento de identidad')).toBeInTheDocument()
-    expect(within(drawer).getByText('DNI, carné de extranjería o pasaporte.')).toBeInTheDocument()
+    // 2026-11-18 · El tipo de documento ya no es una pista de texto: es un
+    // selector, y para una persona propone DNI.
+    expect(within(drawer).getByRole('combobox', { name: 'Tipo de documento' })).toHaveTextContent('DNI')
+  })
+
+  it('el documento se valida según su tipo', async () => {
+    const user = userEvent.setup()
+    renderCustomers(backend())
+    await screen.findByText('Acme')
+
+    await user.click(screen.getByRole('button', { name: 'Nuevo cliente' }))
+    const drawer = await screen.findByRole('dialog')
+    // Empresa → RUC: solo 11 dígitos y con dígito verificador.
+    const numero = within(drawer).getByLabelText('Documento fiscal')
+    await user.type(numero, '20-1000-4721-9999')
+    expect(numero).toHaveValue('20100047219')
+    await user.type(within(drawer).getByLabelText('Nombre'), 'Ferretería Lima')
+    await user.click(within(drawer).getByRole('button', { name: 'Guardar' }))
+    expect(await within(drawer).findByText(/El RUC tiene 11 dígitos/)).toBeInTheDocument()
   })
 
   it('la ficha dice si el cliente ya tiene cuenta B2B, para no mentir por omisión', async () => {

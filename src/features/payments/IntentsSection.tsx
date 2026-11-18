@@ -15,13 +15,13 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useMemo, useState } from 'react'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { PaymentIntentAiToggle } from './ai/PaymentsAiSection'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { Field } from '@/shared/ui/Field'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { formatDateTime, formatMoney } from '@/shared/lib/format'
 import { codeLabel, eventLabel } from '@/shared/i18n/codeLabels'
@@ -325,19 +325,22 @@ export function IntentsSection() {
                           gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
                         }}
                       >
-                        <TextField
+                        <Field
                           label={t('payments.confirm.reference')}
+                          rule="text"
+                          maxLength={120}
+                          help={t('help.payments.confirmReference')}
                           value={confirmReference}
                           onChange={(event) => setConfirmReference(event.target.value)}
                           size="small"
-                          inputProps={{ maxLength: 120 }}
                         />
-                        <TextField
+                        <Field
                           label={t('payments.confirm.note')}
+                          rule="longText"
+                          maxLength={500}
                           value={confirmNote}
                           onChange={(event) => setConfirmNote(event.target.value)}
                           size="small"
-                          inputProps={{ maxLength: 500 }}
                         />
                       </Box>
                       <Box>
@@ -427,15 +430,19 @@ export function IntentsSection() {
                   <Alert severity="info">
                     {t(selected.provider_code ? 'payments.refund.help' : 'payments.refund.helpOffline')}
                   </Alert>
-                  <TextField
+                  <Field
                     label={t('payments.field.refundAmount')}
+                    rule="money"
+                    help={t('help.payments.refundAmount')}
                     value={refundAmount}
                     onChange={(event) => setRefundAmount(event.target.value)}
                     placeholder={refundable.amount}
                     size="small"
                   />
-                  <TextField
+                  <Field
                     label={t('payments.field.refundReason')}
+                    rule="text"
+                    maxLength={1000}
                     value={refundReason}
                     onChange={(event) => setRefundReason(event.target.value)}
                     size="small"

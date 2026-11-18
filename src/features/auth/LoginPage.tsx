@@ -8,7 +8,6 @@ import {
   IconButton,
   InputAdornment,
   Stack,
-  TextField,
 } from '@mui/material'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -16,16 +15,18 @@ import { Link as RouterLink, Navigate, useLocation } from 'react-router-dom'
 import { z } from 'zod'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
+import { Field } from '@/shared/ui/Field'
 import { LoadingState } from '@/shared/ui/states'
 import { R } from '@/theme/tokens'
 import { AuthShell, CTA_SX, FieldLabel, ROUNDED_FIELD_SX } from './AuthShell'
 import { AuthActionError, signInWithPassword } from './authApi'
+import { PASSWORD_MAX_LENGTH } from './passwordPolicy'
 import { returnPathFrom, storefrontSlugOf } from './returnTo'
 import { useSessionContext } from './session-context'
 
 const schema = z.object({
-  email: z.string().min(1, 'auth.required.email').email('auth.invalid.email'),
-  password: z.string().min(1, 'auth.required.password'),
+  email: z.string().min(1, 'auth.required.email').max(254, 'auth.invalid.email').email('auth.invalid.email'),
+  password: z.string().min(1, 'auth.required.password').max(PASSWORD_MAX_LENGTH, 'sfHelp.auth.error.passwordTooLong'),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -112,9 +113,10 @@ export function LoginPage() {
         <Stack spacing={2.25}>
           <Box>
             <FieldLabel htmlFor="login-email">{t('auth.email')}</FieldLabel>
-            <TextField
+            <Field
               id="login-email"
               type="email"
+              rule="email"
               fullWidth
               autoComplete="email"
               error={Boolean(errors.email)}
@@ -126,8 +128,9 @@ export function LoginPage() {
 
           <Box>
             <FieldLabel htmlFor="login-password">{t('auth.password')}</FieldLabel>
-            <TextField
+            <Field
               id="login-password"
+              maxLength={PASSWORD_MAX_LENGTH}
               type={showPassword ? 'text' : 'password'}
               fullWidth
               autoComplete="current-password"

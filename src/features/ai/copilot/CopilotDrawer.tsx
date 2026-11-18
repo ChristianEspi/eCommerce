@@ -16,10 +16,10 @@ import {
   IconButton,
   Skeleton,
   Stack,
-  TextField,
   Tooltip,
   Typography,
 } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { Link as RouterLink, useLocation } from 'react-router-dom'
 import { useCapabilities } from '@/features/capabilities/capabilities-context'
@@ -383,8 +383,10 @@ export function CopilotDrawer() {
       <Divider />
       <Box component="form" onSubmit={onSubmit} noValidate sx={{ px: 2, pt: 1.5, pb: 2, bgcolor: 'var(--card)' }}>
         <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-end' }}>
-          <TextField
+          <Field
             inputRef={inputRef}
+            rule="longText"
+            maxLength={COPILOT_MAX_QUESTION + 50}
             fullWidth
             multiline
             maxRows={4}
@@ -397,7 +399,6 @@ export function CopilotDrawer() {
             disabled={!canAsk}
             error={tooLong}
             helperText={tooLong ? t('copilot.input.tooLong') : t('copilot.input.hint')}
-            inputProps={{ maxLength: COPILOT_MAX_QUESTION + 50 }}
           />
           <IconButton
             type="submit"

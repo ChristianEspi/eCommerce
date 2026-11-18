@@ -8,9 +8,9 @@ import {
   CardContent,
   MenuItem,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useQueryClient } from '@tanstack/react-query'
 import { useState, type ChangeEvent } from 'react'
 import { useForm } from 'react-hook-form'
@@ -167,7 +167,8 @@ export function OnboardingPage() {
               )}
 
               <Stack spacing={2.5}>
-                <TextField
+                <Field
+                  rule="text" maxLength={200}
                   label={t('onboarding.businessName')}
                   fullWidth
                   autoFocus
@@ -182,7 +183,8 @@ export function OnboardingPage() {
                   })}
                 />
 
-                <TextField
+                <Field
+                  rule="slug" maxLength={62} help={t('help.onboarding.storeSlug')}
                   label={t('onboarding.storeSlug')}
                   fullWidth
                   error={Boolean(errors.storeSlug)}

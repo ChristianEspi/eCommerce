@@ -10,7 +10,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useEffect, useMemo, useState } from 'react'
@@ -24,6 +23,7 @@ import { FieldRow, FormDrawer } from '@/shared/ui/FormDrawer'
 import { RowActions } from '@/shared/ui/RowActions'
 import { StatusChip } from '@/shared/ui/StatusChip'
 import { useFeedback } from '@/shared/ui/feedback-context'
+import { Field } from '@/shared/ui/Field'
 import type { TradeScope } from './api'
 import { TradeError } from './errors'
 import {
@@ -250,8 +250,11 @@ export function QuoteDrawer({
           {quote && !editable && <Alert severity="info">{t('trade.quotes.closed')}</Alert>}
 
           <FieldRow>
-            <TextField
+            <Field
               fullWidth
+              rule="sku"
+              maxLength={60}
+              help={t('help.trade.quoteNumber')}
               label={t('trade.field.number')}
               required
               disabled={!puedeEditar}
@@ -264,11 +267,14 @@ export function QuoteDrawer({
             />
             {/* Tres letras: ancho fijo y sin encoger. Dejarla crecer hasta la
                 mitad del cajón le da a «PEN» la importancia del número. */}
-            <TextField
+            <Field
+              rule="currency"
+              help={t('help.trade.currency')}
               label={t('trade.field.currency')}
               required
               disabled={!puedeEditar}
               error={Boolean(errors.currency)}
+              helperText={errors.currency ? t(errors.currency.message as MessageKey) : undefined}
               slotProps={{ inputLabel: { shrink: true } }}
               sx={{ width: { xs: '100%', sm: 130 }, flexShrink: 0 }}
               {...register('currency')}
@@ -278,7 +284,7 @@ export function QuoteDrawer({
           {/* Las dos fechas a mitad y mitad. Antes iban a 2/12 cada una y el
               input nativo de fecha no baja de ~140 px: se salía del panel. */}
           <FieldRow>
-            <TextField
+            <Field
               fullWidth
               type="date"
               label={t('trade.field.issuedAt')}
@@ -286,7 +292,7 @@ export function QuoteDrawer({
               slotProps={{ inputLabel: { shrink: true } }}
               {...register('issued_at')}
             />
-            <TextField
+            <Field
               fullWidth
               type="date"
               label={t('trade.field.validUntil')}
@@ -305,7 +311,7 @@ export function QuoteDrawer({
                   buscador que usa `features/customers`; no se escribe otro. */}
               <input type="hidden" {...register('customer_id')} />
               {quote ? (
-                <TextField
+                <Field
                   fullWidth
                   label={t('trade.field.customer')}
                   value={quote.customer_name ?? quote.customer_id}
@@ -334,12 +340,15 @@ export function QuoteDrawer({
               )}
           </Box>
 
-          <TextField
+          <Field
             fullWidth
             multiline
             minRows={2}
+            rule="longText"
             label={t('trade.field.notes')}
             disabled={!puedeEditar}
+            error={Boolean(errors.notes)}
+            helperText={errors.notes ? t(errors.notes.message as MessageKey) : undefined}
             slotProps={{ inputLabel: { shrink: true } }}
             {...register('notes')}
           />
@@ -418,8 +427,10 @@ export function QuoteDrawer({
                     {t('trade.quotes.addLine')}
                   </Typography>
                   <FieldRow>
-                    <TextField
+                    <Field
                       size="small"
+                      rule="decimal"
+                      help={t('help.trade.quantity')}
                       label={t('trade.field.quantity')}
                       value={cantidad}
                       onChange={(event) => setCantidad(event.target.value)}
@@ -427,8 +438,9 @@ export function QuoteDrawer({
                       slotProps={{ inputLabel: { shrink: true } }}
                       sx={{ width: { xs: '100%', sm: 120 }, flexShrink: 0 }}
                     />
-                    <TextField
+                    <Field
                       size="small"
+                      rule="money"
                       label={t('trade.field.unitPrice')}
                       value={precio}
                       onChange={(event) => setPrecio(event.target.value)}

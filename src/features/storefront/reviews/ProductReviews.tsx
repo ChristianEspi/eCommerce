@@ -11,13 +11,13 @@ import {
   Pagination,
   Rating,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useEffect, useId, useState, type FormEvent } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useSessionContext } from '@/features/auth/session-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { Field } from '@/shared/ui/Field'
 import { TS } from '@/theme/tokens'
 import {
   BODY_MAX,
@@ -408,16 +408,17 @@ function ReviewForm({
         )}
       </Box>
 
-      <TextField
+      <Field
         size="small"
         label={t('store.reviews.form.headline')}
         value={draft.title}
         onChange={(event) => update('title', event.target.value)}
         error={Boolean(errors.title)}
         helperText={errors.title ? t(errors.title) : undefined}
-        inputProps={{ maxLength: TITLE_MAX }}
+        rule="text"
+        maxLength={TITLE_MAX}
       />
-      <TextField
+      <Field
         size="small"
         multiline
         minRows={3}
@@ -426,17 +427,19 @@ function ReviewForm({
         onChange={(event) => update('body', event.target.value)}
         error={Boolean(errors.body)}
         helperText={errors.body ? t(errors.body) : `${draft.body.trim().length}/${BODY_MAX}`}
-        inputProps={{ maxLength: BODY_MAX }}
+        rule="longText"
+        maxLength={BODY_MAX}
         required
       />
-      <TextField
+      <Field
         size="small"
         label={t('store.reviews.form.displayName')}
         value={draft.displayName}
         onChange={(event) => update('displayName', event.target.value)}
         error={Boolean(errors.displayName)}
         helperText={errors.displayName ? t(errors.displayName) : t('store.reviews.form.displayNameHelp')}
-        inputProps={{ maxLength: 40 }}
+        rule="text"
+        maxLength={40}
       />
 
       <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>{t('store.reviews.form.moderation')}</Typography>

@@ -12,7 +12,6 @@ import {
   MenuItem,
   Skeleton,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useState } from 'react'
@@ -35,6 +34,7 @@ import {
 } from './salesAi'
 import { useFollowUp, useVisitPrep, useVisitSignals } from './useSalesAi'
 import { SelectField } from '@/shared/ui/SelectField'
+import { Field } from '@/shared/ui/Field'
 
 function PrepView({ data }: { data: VisitPrep }) {
   const { t } = useI18n()
@@ -109,17 +109,21 @@ function DraftEditor({ draft }: { draft: FollowUpDraft }) {
       <Alert severity="info" icon={<EditNoteRoundedIcon fontSize="small" />}>
         {t('aiSales.draft.notice')}
       </Alert>
-      <TextField
+      <Field
         fullWidth
         size="small"
+        rule="text"
+        maxLength={160}
         label={t('aiSales.draft.subject')}
         value={subject}
         onChange={(e) => setSubject(e.target.value)}
       />
-      <TextField
+      <Field
         fullWidth
         multiline
         minRows={6}
+        rule="longText"
+        maxLength={1600}
         label={t('aiSales.draft.body')}
         value={body}
         onChange={(e) => setBody(e.target.value)}
@@ -311,7 +315,7 @@ export function VisitAiDrawer({
             <Typography sx={{ fontSize: 12, color: 'var(--muted)' }}>{t('aiSales.followUp.help')}</Typography>
             {canAsk && (
               <Stack spacing={1.25}>
-                <TextField
+                <Field
                   fullWidth
                   multiline
                   minRows={2}
@@ -322,7 +326,8 @@ export function VisitAiDrawer({
                   onChange={(e) => setNotes(e.target.value)}
                   error={notesTooLong}
                   helperText={notesTooLong ? t('aiSales.followUp.notesTooLong') : t('aiSales.costHint')}
-                  inputProps={{ maxLength: MAX_FOLLOW_UP_NOTES + 50 }}
+                  rule="longText"
+                  maxLength={MAX_FOLLOW_UP_NOTES + 50}
                 />
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' } }}>
                   <SelectField

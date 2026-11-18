@@ -41,18 +41,28 @@ export { CREATE_ORDER_FUNCTION, CHECKOUT_FUNCTION }
  * el propio motor escribió en el carrito. Por eso el cuerpo del checkout no
  * lleva ningún importe, y hay un test que lo comprueba sobre el cuerpo entero.
  */
+/** Nombre de persona: letras, espacios, apóstrofo, punto y guion (regla `personName`). */
+const PERSON_NAME = /^[\p{L}\p{M}\s'.-]+$/u
+
 export const checkoutSchema = z.object({
-  customerName: z.string().trim().min(2, 'store.checkout.error.name').max(200, 'store.checkout.error.name'),
+  customerName: z
+    .string()
+    .trim()
+    .min(2, 'store.checkout.error.name')
+    .max(200, 'store.checkout.error.name')
+    .regex(PERSON_NAME, 'store.checkout.error.name'),
   customerEmail: z
     .string()
     .trim()
     .toLowerCase()
+    .max(254, 'store.checkout.error.email')
     .regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, 'store.checkout.error.email'),
   customerPhone: z
     .string()
     .trim()
     .min(6, 'store.checkout.error.phone')
-    .max(40, 'store.checkout.error.phone'),
+    .max(40, 'store.checkout.error.phone')
+    .regex(/^\+?[\d\s\-()]+$/, 'store.checkout.error.phone'),
   address: z
     .string()
     .trim()
@@ -69,7 +79,12 @@ export const checkoutSchema = z.object({
    */
   city: z.string().trim().max(120, 'store.checkout.error.address').optional(),
   region: z.string().trim().max(120, 'store.checkout.error.address').optional(),
-  postalCode: z.string().trim().max(12, 'store.checkout.error.address').optional(),
+  postalCode: z
+    .string()
+    .trim()
+    .max(12, 'store.checkout.error.address')
+    .regex(/^[A-Za-z0-9 -]*$/, 'store.checkout.error.address')
+    .optional(),
   country: z
     .string()
     .trim()
@@ -113,19 +128,34 @@ export const checkoutSchema = z.object({
    * ni importe, ni campaña, ni «ya aplicado». Cuánto descuenta —o si descuenta
    * algo— lo decide el servidor cuando ya tiene la fila delante y bloqueada.
    */
-  couponCode: z.string().trim().max(40, 'store.checkout.error.coupon').optional(),
+  couponCode: z
+    .string()
+    .trim()
+    .max(40, 'store.checkout.error.coupon')
+    .regex(/^[A-Za-z0-9._-]*$/, 'store.checkout.error.coupon')
+    .optional(),
   /**
    * El código de una tarjeta de regalo (2026-11-12). Es un MEDIO de pago: el
    * checkout gasta como mucho el total y pide el resto al medio elegido. Viaja
    * el texto; el saldo lo decide el servidor al cobrar.
    */
-  giftCardCode: z.string().trim().max(40, 'store.checkout.error.giftCard').optional(),
+  giftCardCode: z
+    .string()
+    .trim()
+    .max(40, 'store.checkout.error.giftCard')
+    .regex(/^[A-Za-z0-9._-]*$/, 'store.checkout.error.giftCard')
+    .optional(),
   /**
    * N05 · El número de orden de compra, cuando la cuenta de empresa la exige.
    * Una REFERENCIA del comprador: ni identidad ni importe. Que sea obligatoria
    * lo decide la cuenta en el servidor; la pantalla solo lo avisa antes.
    */
-  purchaseOrderNumber: z.string().trim().max(60, 'store.checkout.error.purchaseOrder').optional(),
+  purchaseOrderNumber: z
+    .string()
+    .trim()
+    .max(60, 'store.checkout.error.purchaseOrder')
+    .regex(/^[A-Za-z0-9._/-]*$/, 'store.checkout.error.purchaseOrder')
+    .optional(),
   /**
    * Resumen v2 · El comprobante: boleta o factura.
    *
@@ -164,7 +194,9 @@ export const checkoutSchema = z.object({
   if (values.invoiceType === 'receipt') {
     if (!values.idType) issue('idType', 'store.checkout.error.docNumber')
     else if (!values.taxId || !isValidReceiptId(values.idType, values.taxId)) issue('taxId', 'store.checkout.error.docNumber')
-    if (!values.legalName || values.legalName.length < 3) issue('legalName', 'store.checkout.error.receiptName')
+    if (!values.legalName || values.legalName.length < 3 || !PERSON_NAME.test(values.legalName)) {
+      issue('legalName', 'store.checkout.error.receiptName')
+    }
   }
 })
 export type CheckoutValues = z.infer<typeof checkoutSchema>

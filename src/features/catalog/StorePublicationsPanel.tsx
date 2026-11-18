@@ -13,7 +13,6 @@ import {
   InputAdornment,
   MenuItem,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -42,6 +41,7 @@ import {
   useUnpublishProduct,
   useUpdatePublication,
 } from './useProducts'
+import { Field } from '@/shared/ui/Field'
 import { SelectField } from '@/shared/ui/SelectField'
 
 const STATUS_LABEL: Record<ProductStatus, MessageKey> = {
@@ -348,9 +348,12 @@ function PublicationCard({
         >
           {serverError && <Alert severity="error">{t(serverError)}</Alert>}
 
-          <TextField
+          <Field
             label={t('catalog.field.slug')}
             fullWidth
+            rule="slug"
+            maxLength={62}
+            help={t('help.catalog.slug')}
             value={values.slug}
             onChange={(event) => change('slug', event.target.value)}
             error={Boolean(errors.slug)}
@@ -368,9 +371,10 @@ function PublicationCard({
           />
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <TextField
+            <Field
               label={t('catalog.field.price')}
               fullWidth
+              rule="money"
               value={values.price}
               onChange={(event) => change('price', event.target.value)}
               error={Boolean(errors.price)}

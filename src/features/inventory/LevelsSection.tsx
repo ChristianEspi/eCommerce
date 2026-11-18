@@ -17,7 +17,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
@@ -58,6 +57,7 @@ import {
   type MovementFormValues,
   type PolicyFormValues,
 } from './types'
+import { Field } from '@/shared/ui/Field'
 import { SelectField } from '@/shared/ui/SelectField'
 
 /**
@@ -583,9 +583,10 @@ function MovementDrawer({
               ))}
             </SelectField>
 
-            <TextField
+            <Field
               label={t('inventory.field.quantity')}
               type="number"
+              rule="signedDecimal"
               {...register('quantity', { valueAsNumber: true })}
               error={Boolean(errors.quantity)}
               helperText={
@@ -600,7 +601,15 @@ function MovementDrawer({
               fullWidth
             />
 
-            <TextField label={t('inventory.field.reason')} {...register('reason')} multiline minRows={2} fullWidth />
+            <Field
+              label={t('inventory.field.reason')}
+              rule="longText"
+              maxLength={500}
+              {...register('reason')}
+              multiline
+              minRows={2}
+              fullWidth
+            />
           </>
         ) : (
           <>
@@ -630,9 +639,10 @@ function MovementDrawer({
             {avisoNoAbastece(destino)}
             <StockPanel id={destino} />
 
-            <TextField
+            <Field
               label={t('inventory.field.quantity')}
               type="number"
+              rule="decimal"
               inputProps={{ min: 0 }}
               {...traslado.register('quantity', { valueAsNumber: true })}
               error={Boolean(traslado.formState.errors.quantity)}
@@ -650,8 +660,10 @@ function MovementDrawer({
               fullWidth
             />
 
-            <TextField
+            <Field
               label={t('inventory.field.reason')}
+              rule="longText"
+              maxLength={500}
               {...traslado.register('reason')}
               multiline
               minRows={2}
@@ -736,9 +748,11 @@ function PolicyDrawer({
     >
       <Stack spacing={2}>
         {serverError && <Alert severity="error">{t(serverError)}</Alert>}
-        <TextField
+        <Field
           label={t('inventory.field.safety')}
           type="number"
+          rule="decimal"
+          help={t('help.inventory.safetyStock')}
           {...register('safety_stock', { valueAsNumber: true })}
           error={Boolean(errors.safety_stock)}
           helperText={
@@ -748,9 +762,11 @@ function PolicyDrawer({
           }
           fullWidth
         />
-        <TextField
+        <Field
           label={t('inventory.field.reorder')}
           type="number"
+          rule="decimal"
+          help={t('help.inventory.reorderPoint')}
           {...register('reorder_point', { valueAsNumber: true })}
           error={Boolean(errors.reorder_point)}
           helperText={

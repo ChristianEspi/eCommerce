@@ -14,9 +14,10 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
+import { matchesRule } from '@/shared/lib/fieldRules'
 import { useState } from 'react'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { DetailHeading } from '@/shared/ui/DetailBlocks'
@@ -80,6 +81,8 @@ export function GiftCardsSection() {
   const [amount, setAmount] = useState('')
   const [expiresAt, setExpiresAt] = useState('')
   const [email, setEmail] = useState('')
+  // Opcional, pero si se escribe tiene que ser un correo: es a quien se entrega.
+  const emailInvalid = email.trim() !== '' && !matchesRule('email', email)
   const [notes, setNotes] = useState('')
   const [issued, setIssued] = useState<IssuedGiftCard | null>(null)
   const [selected, setSelected] = useState<GiftCard | null>(null)
@@ -273,7 +276,7 @@ export function GiftCardsSection() {
             <Button
               variant="contained"
               onClick={() => void submitIssue()}
-              disabled={issue.isPending || amount.trim() === ''}
+              disabled={issue.isPending || amount.trim() === '' || emailInvalid}
             >
               {t('promotions.giftCards.issue')}
             </Button>
@@ -282,14 +285,15 @@ export function GiftCardsSection() {
       >
         <Stack spacing={2.5}>
           <Alert severity="info">{t('promotions.giftCards.issueHint')}</Alert>
-          <TextField
+          <Field
             label={`${t('promotions.field.amount')} (${activeStore?.currency ?? ''})`}
+            rule="money"
             value={amount}
             onChange={(event) => setAmount(event.target.value)}
             size="small"
             fullWidth
           />
-          <TextField
+          <Field
             type="datetime-local"
             label={t('promotions.field.expires')}
             value={expiresAt}
@@ -299,16 +303,20 @@ export function GiftCardsSection() {
             size="small"
             fullWidth
           />
-          <TextField
+          <Field
             label={t('promotions.field.issuedTo')}
+            rule="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            helperText={t('promotions.hint.issuedTo')}
+            error={emailInvalid}
+            helperText={emailInvalid ? t('field.error.email') : t('promotions.hint.issuedTo')}
             size="small"
             fullWidth
           />
-          <TextField
+          <Field
             label={t('promotions.field.notes')}
+            rule="longText"
+            maxLength={1000}
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
             multiline
@@ -347,16 +355,20 @@ export function GiftCardsSection() {
                 {t('promotions.giftCards.moveHint')}
               </Typography>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                <TextField
+                <Field
                   size="small"
                   label={t('promotions.field.amount')}
+                  rule="signedMoney"
+                  help={t('help.promotions.giftCardAdjust')}
                   value={adjustAmount}
                   onChange={(event) => setAdjustAmount(event.target.value)}
                   sx={{ minWidth: 140 }}
                 />
-                <TextField
+                <Field
                   size="small"
                   label={t('promotions.field.reason')}
+                  rule="text"
+                  help={t('help.promotions.giftCardReason')}
                   value={reason}
                   onChange={(event) => setReason(event.target.value)}
                   fullWidth

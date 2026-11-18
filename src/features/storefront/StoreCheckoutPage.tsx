@@ -17,7 +17,6 @@ import {
   MenuItem,
   FormControlLabel,
   Stack,
-  TextField,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
@@ -31,6 +30,7 @@ import { useQuotedCart } from './cart/useQuotedCart'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { useDocumentMeta } from '@/shared/seo/useDocumentMeta'
+import { Field } from '@/shared/ui/Field'
 import { PageHeader } from '@/shared/ui/PageHeader'
 import { EmptyState } from '@/shared/ui/states'
 import { formatMoney } from '@/shared/lib/format'
@@ -1116,9 +1116,11 @@ export function StoreCheckoutPage() {
           <Stack sx={{ gap: 2 }}>
             {paso === 0 && (
               <>
-                <TextField
+                <Field
                   label={t('store.checkout.name')}
                   autoComplete="name"
+                  rule="personName"
+                  maxLength={200}
                   required
                   error={Boolean(errors.customerName)}
                   helperText={
@@ -1132,10 +1134,11 @@ export function StoreCheckoutPage() {
                     el comprador ya decidió y solo quiere terminar. El nombre y la
                     dirección sí se quedan a lo ancho, que es lo que piden. */}
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                  <TextField
+                  <Field
                     label={t('store.checkout.email')}
                     type="email"
                     autoComplete="email"
+                    rule="email"
                     required
                     fullWidth
                     error={Boolean(errors.customerEmail)}
@@ -1146,10 +1149,12 @@ export function StoreCheckoutPage() {
                     }
                     {...register('customerEmail')}
                   />
-                  <TextField
+                  <Field
                     label={t('store.checkout.phone')}
                     type="tel"
                     autoComplete="tel"
+                    rule="phone"
+                    maxLength={40}
                     required
                     sx={{ width: { xs: '100%', sm: 220 }, flexShrink: 0 }}
                     error={Boolean(errors.customerPhone)}
@@ -1235,9 +1240,11 @@ export function StoreCheckoutPage() {
                     </Stack>
                   </Box>
                 )}
-                <TextField
+                <Field
                   label={t('store.checkout.address')}
                   autoComplete="street-address"
+                  rule="text"
+                  maxLength={300}
                   required
                   error={Boolean(errors.address)}
                   helperText={errors.address ? t(errors.address.message as MessageKey) : ' '}
@@ -1247,36 +1254,48 @@ export function StoreCheckoutPage() {
                     sin zonas configuradas no tiene por qué pedirlos, y exigirlos
                     rompería el checkout mínimo que funciona desde P06. */}
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                  <TextField
+                  <Field
                     fullWidth
                     label={t('store.checkout.city')}
                     autoComplete="address-level2"
+                    rule="text"
+                    maxLength={120}
                     {...register('city')}
                   />
-                  <TextField
+                  <Field
                     fullWidth
                     label={t('store.checkout.region')}
                     autoComplete="address-level1"
+                    rule="text"
+                    maxLength={120}
                     {...register('region')}
                   />
                 </Stack>
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                  <TextField
+                  <Field
                     fullWidth
                     label={t('store.checkout.postalCode')}
                     autoComplete="postal-code"
+                    rule="postalCode"
+                    maxLength={12}
+                    error={Boolean(errors.postalCode)}
+                    helperText={errors.postalCode ? t(errors.postalCode.message as MessageKey) : undefined}
                     {...register('postalCode')}
                   />
-                  <TextField
+                  <Field
                     fullWidth
                     label={t('store.checkout.country')}
                     autoComplete="country"
-                    inputProps={{ maxLength: 2, style: { textTransform: 'uppercase' } }}
+                    rule="country"
+                    help={t('sfHelp.checkout.country')}
+                    error={Boolean(errors.country)}
+                    helperText={errors.country ? t(errors.country.message as MessageKey) : undefined}
                     {...register('country')}
                   />
                 </Stack>
-                <TextField
+                <Field
                   label={t('store.checkout.reference')}
+                  rule="text"
                   error={Boolean(errors.reference)}
                   helperText={
                     errors.reference
@@ -1307,14 +1326,15 @@ export function StoreCheckoutPage() {
                       sx={{ flexShrink: 0, mr: 0 }}
                     />
                     {guardarDireccion && (
-                      <TextField
+                      <Field
                         size="small"
                         fullWidth
                         label={t('store.checkout.addressLabel')}
                         placeholder={t('store.checkout.addressLabelHint')}
                         value={nombreDireccion}
                         onChange={(evento) => setNombreDireccion(evento.target.value)}
-                        slotProps={{ htmlInput: { maxLength: 60 } }}
+                        rule="text"
+                        maxLength={60}
                       />
                     )}
                   </Stack>
@@ -1400,69 +1420,71 @@ export function StoreCheckoutPage() {
                   </ToggleButtonGroup>
                   {(watched.invoiceType ?? 'receipt') === 'receipt' ? (
                     <Box sx={GRILLA_COMPROBANTE}>
-                      <TextField
+                      <Field
                         select
                         label={t('store.checkout.idType')}
                         value={watched.idType ?? 'dni'}
                         onChange={(evento) => setValue('idType', evento.target.value as 'dni' | 'ce' | 'passport', { shouldValidate: true })}
                         fullWidth
+                        help={t('field.help.docType')}
                         slotProps={{ htmlInput: { 'aria-label': t('store.checkout.idType') } }}
                       >
                         <MenuItem value="dni">{t('store.checkout.idType.dni')}</MenuItem>
                         <MenuItem value="ce">{t('store.checkout.idType.ce')}</MenuItem>
                         <MenuItem value="passport">{t('store.checkout.idType.passport')}</MenuItem>
-                      </TextField>
-                      <TextField
+                      </Field>
+                      <Field
                         label={t('store.checkout.docNumber')}
                         required
                         fullWidth
                         autoComplete="off"
+                        // El número sigue al tipo elegido: con DNI solo 8 dígitos,
+                        // con carné o pasaporte letras y dígitos.
+                        rule={watched.idType ?? 'dni'}
+                        help={t(`field.help.${watched.idType ?? 'dni'}`)}
                         error={Boolean(errors.taxId)}
                         helperText={errors.taxId ? t(errors.taxId.message as MessageKey) : undefined}
-                        slotProps={{
-                          htmlInput: {
-                            maxLength: 15,
-                            inputMode: (watched.idType ?? 'dni') === 'dni' ? 'numeric' : 'text',
-                            style: { fontFamily: 'monospace' },
-                          },
-                        }}
+                        slotProps={{ htmlInput: { style: { fontFamily: 'monospace' } } }}
                         {...register('taxId')}
                       />
-                      <TextField
+                      <Field
                         label={t('store.checkout.receiptName')}
                         required
                         fullWidth
                         sx={ANCHO_COMPLETO}
                         autoComplete="name"
+                        rule="personName"
+                        maxLength={200}
                         error={Boolean(errors.legalName)}
                         helperText={errors.legalName ? t(errors.legalName.message as MessageKey) : undefined}
-                        slotProps={{ htmlInput: { maxLength: 200 } }}
                         {...register('legalName')}
                       />
                     </Box>
                   ) : (
                     <Box sx={GRILLA_COMPROBANTE}>
-                        <TextField
+                        <Field
                           label={t('store.checkout.taxId')}
                           required
                           fullWidth
                           autoComplete="off"
                           error={Boolean(errors.taxId)}
                           helperText={errors.taxId ? t(errors.taxId.message as MessageKey) : undefined}
-                          slotProps={{ htmlInput: { maxLength: 11, inputMode: 'numeric', style: { fontFamily: 'monospace' } } }}
+                          rule="ruc"
+                          help={t('field.help.ruc')}
+                          slotProps={{ htmlInput: { style: { fontFamily: 'monospace' } } }}
                           {...register('taxId')}
                         />
-                        <TextField
+                        <Field
                           label={t('store.checkout.legalName')}
                           required
                           fullWidth
                           autoComplete="organization"
+                          rule="text"
                           error={Boolean(errors.legalName)}
                           helperText={errors.legalName ? t(errors.legalName.message as MessageKey) : undefined}
-                          slotProps={{ htmlInput: { maxLength: 200 } }}
                           {...register('legalName')}
                         />
-                      <TextField
+                      <Field
                         label={t('store.checkout.fiscalAddress')}
                         required
                         fullWidth
@@ -1470,7 +1492,8 @@ export function StoreCheckoutPage() {
                         autoComplete="off"
                         error={Boolean(errors.fiscalAddress)}
                         helperText={errors.fiscalAddress ? t(errors.fiscalAddress.message as MessageKey) : t('store.checkout.fiscalAddressHint')}
-                        slotProps={{ htmlInput: { maxLength: 300 } }}
+                        rule="text"
+                        maxLength={300}
                         {...register('fiscalAddress')}
                       />
                     </Box>
@@ -1482,7 +1505,7 @@ export function StoreCheckoutPage() {
                 {(ordenDeCompraObligatoria || contextoComercial) && (
                 <Box sx={GRILLA_COMPROBANTE}>
                 {ordenDeCompraObligatoria && (
-                  <TextField
+                  <Field
                     id="checkout-purchase-order"
                     label={t('store.checkout.purchaseOrder')}
                     required
@@ -1495,12 +1518,13 @@ export function StoreCheckoutPage() {
                         ? t(errors.purchaseOrderNumber.message as MessageKey)
                         : t('store.checkout.purchaseOrderHelp')
                     }
-                    slotProps={{ htmlInput: { maxLength: 60 } }}
+                    rule="sku"
+                    maxLength={60}
                     {...register('purchaseOrderNumber')}
                   />
                 )}
                   {contextoComercial && (
-                    <TextField
+                    <Field
                       label={t('store.checkout.costCenter')}
                       fullWidth
                       autoComplete="off"
@@ -1510,7 +1534,8 @@ export function StoreCheckoutPage() {
                           ? t(errors.costCenter.message as MessageKey)
                           : t('store.checkout.costCenterHelp')
                       }
-                      slotProps={{ htmlInput: { maxLength: 60 } }}
+                      rule="text"
+                      maxLength={60}
                       {...register('costCenter')}
                     />
                   )}
@@ -1652,11 +1677,14 @@ export function StoreCheckoutPage() {
                   y cuánto lo decide el servidor al cotizar. */}
               <Stack sx={{ gap: 1.25, mt: 2, pt: 2, borderTop: '1px solid var(--sf-line)' }} data-checkout-codes>
                 <Stack direction="row" sx={{ gap: 1, alignItems: 'stretch' }}>
-                  <TextField
+                  <Field
                     fullWidth
                     size="small"
                     label={t('store.checkout.coupon')}
                     placeholder={t('store.checkout.couponPlaceholder')}
+                    rule="code"
+                    maxLength={40}
+                    help={t('sfHelp.checkout.coupon')}
                     error={Boolean(errors.couponCode)}
                     {...(errors.couponCode ? { helperText: t(errors.couponCode.message as MessageKey) } : {})}
                     inputProps={{ style: { textTransform: 'uppercase' } }}

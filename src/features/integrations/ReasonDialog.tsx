@@ -4,9 +4,9 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  TextField,
   Typography,
 } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
 
@@ -57,7 +57,8 @@ export function ReasonDialog({
       <DialogTitle>{title}</DialogTitle>
       <DialogContent>
         <Typography sx={{ color: 'var(--muted)', mb: 2 }}>{body}</Typography>
-        <TextField
+        <Field
+          rule="longText" maxLength={500}
           autoFocus
           fullWidth
           multiline

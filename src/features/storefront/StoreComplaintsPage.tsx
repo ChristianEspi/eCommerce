@@ -10,7 +10,6 @@ import {
   Radio,
   RadioGroup,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useMutation } from '@tanstack/react-query'
@@ -20,7 +19,9 @@ import { Link } from 'react-router-dom'
 import { z } from 'zod'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
+import { isValidDocument, matchesRule, type DocType } from '@/shared/lib/fieldRules'
 import { formatDate } from '@/shared/lib/format'
+import { Field } from '@/shared/ui/Field'
 import { useDocumentMeta } from '@/shared/seo/useDocumentMeta'
 import { TS } from '@/theme/tokens'
 import {
@@ -34,6 +35,13 @@ import {
 import { useStorefront } from './hooks'
 import { privateMeta } from './seo'
 import { SelectField } from '@/shared/ui/SelectField'
+
+/** El tipo del libro (`pasaporte`, en castellano en la base) con el nombre de su regla de campo. */
+function docRule(type: (typeof DOC_TYPES)[number]): DocType {
+  return type === 'pasaporte' ? 'passport' : type
+}
+
+const personName = (value: string) => matchesRule('personName', value)
 
 /**
  * Libro de Reclamaciones virtual de la tienda (2026-10-02).
@@ -49,7 +57,7 @@ import { SelectField } from '@/shared/ui/SelectField'
 const schema = z
   .object({
     kind: z.enum(COMPLAINT_KINDS),
-    consumer_name: z.string().trim().min(2).max(160),
+    consumer_name: z.string().trim().min(2).max(160).refine(personName),
     doc_type: z.enum(DOC_TYPES),
     doc_number: z.string().trim().regex(/^[0-9A-Za-z-]{6,20}$/),
     consumer_email: z.string().trim().email().max(254),
@@ -66,12 +74,14 @@ const schema = z
       .string()
       .trim()
       .regex(/^(\d{1,7}([.,]\d{1,2})?)?$/),
-    order_reference: z.string().trim().max(40),
+    order_reference: z.string().trim().max(40).regex(/^[A-Za-z0-9._-]*$/),
     detail: z.string().trim().min(10).max(3000),
     request: z.string().trim().min(5).max(2000),
     accept: z.literal(true),
   })
-  .refine((v) => !v.is_minor || v.guardian_name.length >= 2, { path: ['guardian_name'] })
+  .refine((v) => !v.is_minor || (v.guardian_name.length >= 2 && personName(v.guardian_name)), { path: ['guardian_name'] })
+  // El número con la forma de su tipo: un DNI de 8 dígitos, un RUC con su dígito verificador.
+  .refine((v) => isValidDocument(docRule(v.doc_type), v.doc_number), { path: ['doc_number'] })
 
 type Form = z.input<typeof schema>
 
@@ -132,6 +142,7 @@ export function StoreComplaintsPage() {
       }),
   })
   const menor = watch('is_minor')
+  const reglaDoc = docRule(watch('doc_type'))
   const e = formState.errors
   const err = (campo: keyof Form) => (e[campo] ? t('store.complaints.invalid') : undefined)
 
@@ -178,7 +189,7 @@ export function StoreComplaintsPage() {
       </Seccion>
 
       <Seccion titulo={`2. ${t('store.complaints.consumer')}`}>
-        <TextField label={t('store.complaints.field.name')} required {...register('consumer_name')} error={!!e.consumer_name} helperText={err('consumer_name')} />
+        <Field label={t('store.complaints.field.name')} rule="personName" maxLength={160} required {...register('consumer_name')} error={!!e.consumer_name} helperText={err('consumer_name')} />
         <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ gap: 2 }}>
           <Controller
             control={control}
@@ -193,13 +204,22 @@ export function StoreComplaintsPage() {
               </SelectField>
             )}
           />
-          <TextField label={t('store.complaints.field.docNumber')} required fullWidth {...register('doc_number')} error={!!e.doc_number} helperText={err('doc_number')} />
+          <Field
+            label={t('store.complaints.field.docNumber')}
+            rule={reglaDoc}
+            help={t(`field.help.${reglaDoc}`)}
+            required
+            fullWidth
+            {...register('doc_number')}
+            error={!!e.doc_number}
+            helperText={e.doc_number ? t(`field.error.${reglaDoc}`) : undefined}
+          />
         </Stack>
         <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ gap: 2 }}>
-          <TextField label={t('store.complaints.field.email')} type="email" required fullWidth {...register('consumer_email')} error={!!e.consumer_email} helperText={err('consumer_email')} />
-          <TextField label={t('store.complaints.field.phone')} fullWidth {...register('consumer_phone')} error={!!e.consumer_phone} helperText={err('consumer_phone')} />
+          <Field label={t('store.complaints.field.email')} type="email" rule="email" required fullWidth {...register('consumer_email')} error={!!e.consumer_email} helperText={err('consumer_email')} />
+          <Field label={t('store.complaints.field.phone')} rule="phone" maxLength={21} fullWidth {...register('consumer_phone')} error={!!e.consumer_phone} helperText={err('consumer_phone')} />
         </Stack>
-        <TextField label={t('store.complaints.field.address')} {...register('consumer_address')} error={!!e.consumer_address} />
+        <Field label={t('store.complaints.field.address')} rule="text" maxLength={240} {...register('consumer_address')} error={!!e.consumer_address} />
         <Controller
           control={control}
           name="is_minor"
@@ -211,7 +231,7 @@ export function StoreComplaintsPage() {
           )}
         />
         {menor ? (
-          <TextField label={t('store.complaints.field.guardian')} required {...register('guardian_name')} error={!!e.guardian_name} helperText={err('guardian_name')} />
+          <Field label={t('store.complaints.field.guardian')} rule="personName" maxLength={160} required {...register('guardian_name')} error={!!e.guardian_name} helperText={err('guardian_name')} />
         ) : null}
       </Seccion>
 
@@ -228,10 +248,24 @@ export function StoreComplaintsPage() {
           )}
         />
         <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ gap: 2 }}>
-          <TextField label={t('store.complaints.field.amount')} inputMode="decimal" sx={{ minWidth: 200 }} {...register('amount')} error={!!e.amount} helperText={err('amount')} />
-          <TextField label={t('store.complaints.field.order')} fullWidth {...register('order_reference')} />
+          <Field
+            label={t('store.complaints.field.amount')}
+            rule="money"
+            maxLength={10}
+            help={t('sfHelp.complaints.amount')}
+            sx={{ minWidth: 200 }} {...register('amount')} error={!!e.amount} helperText={err('amount')} />
+          <Field
+            label={t('store.complaints.field.order')}
+            rule="code"
+            maxLength={40}
+            help={t('sfHelp.complaints.order')}
+            fullWidth
+            {...register('order_reference')}
+            error={!!e.order_reference}
+            helperText={err('order_reference')}
+          />
         </Stack>
-        <TextField label={t('store.complaints.field.itemDescription')} required multiline minRows={2} {...register('item_description')} error={!!e.item_description} helperText={err('item_description')} />
+        <Field label={t('store.complaints.field.itemDescription')} rule="longText" maxLength={500} required multiline minRows={2} {...register('item_description')} error={!!e.item_description} helperText={err('item_description')} />
       </Seccion>
 
       <Seccion titulo={`4. ${t('store.complaints.detail')}`}>
@@ -259,8 +293,8 @@ export function StoreComplaintsPage() {
             </RadioGroup>
           )}
         />
-        <TextField label={t('store.complaints.field.detail')} required multiline minRows={4} {...register('detail')} error={!!e.detail} helperText={err('detail') ?? t('store.complaints.field.detail.help')} />
-        <TextField label={t('store.complaints.field.request')} required multiline minRows={3} {...register('request')} error={!!e.request} helperText={err('request')} />
+        <Field label={t('store.complaints.field.detail')} rule="longText" maxLength={3000} required multiline minRows={4} {...register('detail')} error={!!e.detail} helperText={err('detail') ?? t('store.complaints.field.detail.help')} />
+        <Field label={t('store.complaints.field.request')} rule="longText" maxLength={2000} required multiline minRows={3} {...register('request')} error={!!e.request} helperText={err('request')} />
       </Seccion>
 
       <Controller

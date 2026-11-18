@@ -10,7 +10,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useMemo, useState } from 'react'
@@ -42,6 +41,7 @@ import {
 } from './types'
 import { FulfillmentAiToggle } from './ai/FulfillmentAiSection'
 import { SelectField } from '@/shared/ui/SelectField'
+import { Field } from '@/shared/ui/Field'
 
 /**
  * De la clave de un hecho a su nombre.
@@ -265,8 +265,10 @@ export function FulfillmentDrawer({
                   ))}
                 </SelectField>
                 {needsReason && (
-                  <TextField
+                  <Field
                     size="small"
+                    rule="longText"
+                    maxLength={1000}
                     label={t('fulfillment.field.reason')}
                     value={reason}
                     onChange={(event) => setReason(event.target.value)}
@@ -326,8 +328,10 @@ export function FulfillmentDrawer({
 
             {fulfillment.strategy === 'ship' && (
               <Stack spacing={1}>
-                <TextField
+                <Field
                   size="small"
+                  rule="text"
+                  maxLength={60}
                   label={t('fulfillment.field.serviceCode')}
                   value={serviceCode}
                   disabled={!canOperate}
@@ -421,9 +425,11 @@ export function FulfillmentDrawer({
                       </MenuItem>
                     ))}
                   </SelectField>
-                  <TextField
+                  <Field
                     size="small"
                     fullWidth
+                    rule="longText"
+                    maxLength={1000}
                     label={t('fulfillment.field.trackingNote')}
                     value={noteText}
                     disabled={!canOperate}

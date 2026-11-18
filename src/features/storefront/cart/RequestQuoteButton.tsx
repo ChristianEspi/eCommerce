@@ -1,10 +1,11 @@
 import RequestQuoteRoundedIcon from '@mui/icons-material/RequestQuoteRounded'
-import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, TextField, Typography } from '@mui/material'
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, Typography } from '@mui/material'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useSessionContext } from '@/features/auth/session-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { Field } from '@/shared/ui/Field'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { useCommerceContext } from '../commerce/context'
 import { mapQuoteRequestCode, myQuotesKey, newRequestKey, quoteErrorCode, requestQuote } from '../quotes'
@@ -95,8 +96,10 @@ export function RequestQuoteButton({ storeSlug, lines }: { storeSlug: string; li
               <Typography variant="body2" sx={{ color: 'var(--muted)' }}>
                 {t('store.cart.requestQuote.body').replace('{count}', String(lines.length))}
               </Typography>
-              <TextField
+              <Field
                 label={t('store.cart.requestQuote.notes')}
+                rule="longText"
+                maxLength={MAX_NOTES}
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
                 multiline

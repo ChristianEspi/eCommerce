@@ -346,7 +346,7 @@ export function orNull(value: string | null): string | null {
 /** Sinónimo: el término y sus expansiones, separadas por comas. */
 export const synonymFormSchema = z.object({
   term: z.string().trim().min(2, 'content.error.term').max(60, 'content.error.term'),
-  expansions: z.string().trim().min(2, 'content.error.expansions'),
+  expansions: z.string().trim().min(2, 'content.error.expansions').max(750, 'field.error.tooLong'),
   is_active: z.boolean(),
 })
 export type SynonymFormValues = z.infer<typeof synonymFormSchema>

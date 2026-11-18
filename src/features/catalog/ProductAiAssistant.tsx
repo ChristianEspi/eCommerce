@@ -8,7 +8,6 @@ import {
   Chip,
   CircularProgress,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useState } from 'react'
@@ -17,6 +16,7 @@ import { useAiFeature } from '@/features/ai/hooks'
 import type { AiErrorKind } from '@/features/ai/result'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
+import { Field } from '@/shared/ui/Field'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import {
   aEntradaDeAtributo,
@@ -477,8 +477,10 @@ function Comparacion({
             {t('aiPim.suggestion')}
           </Typography>
           {onEditar && decision !== 'applied' ? (
-            <TextField
+            <Field
               value={sugerida}
+              rule={multilinea ? 'longText' : 'text'}
+              maxLength={multilinea ? 8000 : 240}
               onChange={(event) => onEditar(event.target.value)}
               fullWidth
               size="small"

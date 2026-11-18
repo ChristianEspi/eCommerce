@@ -15,11 +15,11 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useState } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { Field } from '@/shared/ui/Field'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState } from '@/shared/ui/states'
@@ -147,20 +147,23 @@ export function ApprovalRulesPanel({
           {error && <Alert severity="error">{t(error)}</Alert>}
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-            <TextField
+            <Field
               size="small"
               fullWidth
+              rule="text"
+              maxLength={120}
               label={t('customers.field.ruleName')}
               value={values.name}
               onChange={(event) => set('name', event.target.value)}
             />
-            <TextField
+            <Field
               size="small"
               fullWidth
+              rule="money"
+              help={t('help.customers.ruleMinAmount')}
               label={t('customers.field.minAmount')}
               value={values.min_amount}
               onChange={(event) => set('min_amount', event.target.value)}
-              inputProps={{ inputMode: 'decimal' }}
             />
             <SelectField
               size="small"
@@ -272,12 +275,13 @@ export function ApprovalRulesPanel({
           {t('customers.approval.simulatorHelp')}
         </Typography>
         <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-          <TextField
+          <Field
             size="small"
+            rule="money"
+            help={t('help.customers.simulateAmount')}
             label={t('customers.field.amount')}
             value={amount}
             onChange={(event) => setAmount(event.target.value)}
-            inputProps={{ inputMode: 'decimal' }}
           />
           <Button onClick={() => void simulate()} disabled={check.isPending}>
             {t('customers.approval.check')}

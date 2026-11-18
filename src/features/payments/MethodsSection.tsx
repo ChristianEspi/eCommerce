@@ -18,12 +18,12 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { Field } from '@/shared/ui/Field'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { ConfirmDeleteDialog } from '@/shared/ui/ConfirmDeleteDialog'
 import { FormDrawer } from '@/shared/ui/FormDrawer'
@@ -334,15 +334,20 @@ export function MethodsSection() {
         }
       >
         <Stack spacing={2}>
-          <TextField
+          <Field
             label={t('payments.field.code')}
+            rule="lowerCode"
+            maxLength={41}
+            help={t('help.payments.code')}
             value={values.code}
             disabled={Boolean(values.id)}
-            onChange={(event) => setValues((v) => ({ ...v, code: event.target.value }))}
+            onChange={(event) => setValues((v) => ({ ...v, code: event.target.value.toLowerCase() }))}
             helperText={t('payments.field.codeHelp')}
           />
-          <TextField
+          <Field
             label={t('payments.field.methodName')}
+            rule="text"
+            maxLength={120}
             value={values.displayName}
             onChange={(event) => setValues((v) => ({ ...v, displayName: event.target.value }))}
           />
@@ -404,8 +409,10 @@ export function MethodsSection() {
               <Typography variant="body2" sx={{ color: 'var(--muted)' }}>
                 {t('payments.culqi.help')}
               </Typography>
-              <TextField
+              <Field
                 label={t('payments.culqi.publicKey')}
+                rule="code"
+                maxLength={120}
                 value={values.publicKey}
                 onChange={(event) => setValues((v) => ({ ...v, publicKey: event.target.value }))}
                 helperText={t('payments.culqi.publicKeyHelp')}
@@ -421,8 +428,10 @@ export function MethodsSection() {
                   <Alert severity="warning">{t('payments.culqi.secretMissing')}</Alert>
                 )
               )}
-              <TextField
+              <Field
                 label={t('payments.culqi.secretKey')}
+                rule="code"
+                maxLength={120}
                 type="password"
                 value={values.secretKey}
                 disabled={values.clearSecret}
@@ -451,17 +460,21 @@ export function MethodsSection() {
               {mezcla && <Alert severity="error">{t('payments.culqi.mismatch')}</Alert>}
             </Stack>
           )}
-          <TextField
+          <Field
             label={t('payments.field.instructions')}
+            rule="longText"
             value={values.instructions}
             multiline
             minRows={2}
             onChange={(event) => setValues((v) => ({ ...v, instructions: event.target.value }))}
             helperText={t('payments.field.instructionsHelp')}
           />
-          <TextField
+          <Field
             label={t('payments.field.position')}
             type="number"
+            rule="integer"
+            maxLength={4}
+            help={t('help.payments.position')}
             value={values.position}
             onChange={(event) =>
               setValues((v) => ({ ...v, position: Number(event.target.value) || 0 }))

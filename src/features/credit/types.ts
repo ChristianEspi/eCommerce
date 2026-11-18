@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { zRule } from '@/shared/lib/fieldRules'
 import type { InvoiceIssueState } from '@/domain/ports/invoicing'
 
 export {
@@ -169,7 +170,7 @@ const moneyInput = z
 
 export const receiptFormSchema = z.object({
   // Opcional: sin número, la base pone el correlativo del día (RC-AAAAMMDD-001).
-  receipt_number: z.string().trim().max(60, 'credit.error.number'),
+  receipt_number: zRule('code', 'field.error.code', { max: 60 }),
   amount: moneyInput,
   received_at: z.string(),
   method: z.string().trim().max(60, 'credit.error.method'),

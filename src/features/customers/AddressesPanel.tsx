@@ -16,11 +16,11 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useState } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { Field } from '@/shared/ui/Field'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState } from '@/shared/ui/states'
@@ -147,73 +147,88 @@ export function AddressesPanel({
           {error && <Alert severity="error">{t(error)}</Alert>}
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-            <TextField
+            <Field
               size="small"
               fullWidth
+              rule="text"
+              maxLength={120}
               label={t('customers.field.label')}
               value={values.label}
               onChange={(event) => set('label', event.target.value)}
             />
-            <TextField
+            <Field
               size="small"
               fullWidth
+              rule="personName"
               label={t('customers.field.recipient')}
               value={values.recipient}
               onChange={(event) => set('recipient', event.target.value)}
             />
           </Stack>
 
-          <TextField
+          <Field
             size="small"
             fullWidth
+            rule="text"
+            maxLength={240}
             label={t('customers.field.line1')}
             value={values.line1}
             onChange={(event) => set('line1', event.target.value)}
           />
-          <TextField
+          <Field
             size="small"
             fullWidth
+            rule="text"
+            maxLength={240}
             label={t('customers.field.line2')}
             value={values.line2}
             onChange={(event) => set('line2', event.target.value)}
           />
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-            <TextField
+            <Field
               size="small"
               fullWidth
+              rule="text"
+              maxLength={120}
               label={t('customers.field.city')}
               value={values.city}
               onChange={(event) => set('city', event.target.value)}
             />
-            <TextField
+            <Field
               size="small"
               fullWidth
+              rule="text"
+              maxLength={120}
               label={t('customers.field.region')}
               value={values.region}
               onChange={(event) => set('region', event.target.value)}
             />
-            <TextField
+            <Field
               size="small"
               fullWidth
+              rule="postalCode"
               label={t('customers.field.postalCode')}
               value={values.postal_code}
               onChange={(event) => set('postal_code', event.target.value)}
             />
-            <TextField
+            <Field
               size="small"
               fullWidth
+              rule="country"
+              help={t('help.customers.country')}
               label={t('customers.field.country')}
               value={values.country}
               onChange={(event) => set('country', event.target.value.toUpperCase())}
-              inputProps={{ maxLength: 2, spellCheck: false }}
+              inputProps={{ spellCheck: false }}
             />
           </Stack>
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-            <TextField
+            <Field
               size="small"
               fullWidth
+              rule="phone"
               label={t('customers.field.phone')}
               value={values.phone}
               onChange={(event) => set('phone', event.target.value)}
@@ -237,17 +252,21 @@ export function AddressesPanel({
           </Stack>
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-            <TextField
+            <Field
               size="small"
               fullWidth
+              rule="text"
+              maxLength={60}
               label={t('customers.field.verificationSource')}
               value={values.verification_source}
               onChange={(event) => set('verification_source', event.target.value)}
               helperText={t('customers.field.verificationSourceHint')}
             />
-            <TextField
+            <Field
               size="small"
               fullWidth
+              rule="text"
+              maxLength={120}
               label={t('customers.field.externalRef')}
               value={values.external_ref}
               onChange={(event) => set('external_ref', event.target.value)}

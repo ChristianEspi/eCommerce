@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { matchesRule, zRule } from '@/shared/lib/fieldRules'
 
 export {
   DELIVERY_VEHICLES_TABLE,
@@ -92,7 +93,11 @@ export const planFormSchema = z.object({
   plan_date: z.string().min(1, 'fulfillment.error.date'),
   /** Cadena vacía = sin vehículo asignado todavía. */
   vehicle_id: z.string(),
-  driver_name: z.string().trim().max(160, 'fulfillment.error.driver'),
+  driver_name: z
+    .string()
+    .trim()
+    .max(160, 'fulfillment.error.driver')
+    .refine((value) => value === '' || matchesRule('personName', value), 'field.error.personName'),
 })
 export type PlanFormValues = z.infer<typeof planFormSchema>
 
@@ -116,8 +121,12 @@ export function emptyPlanForm(): PlanFormValues {
 export const podFormSchema = z
   .object({
     outcome: z.enum(POD_OUTCOMES),
-    received_by: z.string().trim().max(160, 'fulfillment.error.receivedBy'),
-    document_id: z.string().trim().max(40, 'fulfillment.error.documentId'),
+    received_by: z
+      .string()
+      .trim()
+      .max(160, 'fulfillment.error.receivedBy')
+      .refine((value) => value === '' || matchesRule('personName', value), 'field.error.personName'),
+    document_id: zRule('document', 'help.fulfillment.error.documentId'),
     reason: z.string().trim().max(400, 'fulfillment.error.reason'),
   })
   .refine((values) => values.outcome === 'delivered' || values.reason.length > 0, {

@@ -22,6 +22,7 @@ import { PricingError } from './errors'
 import { simulatePrice } from './api'
 import { useChannels, useProductSearch, useProductVariants, useSegments } from './hooks'
 import type { PriceQuoteResult, PricedProduct } from './types'
+import { Field } from '@/shared/ui/Field'
 import { SelectField } from '@/shared/ui/SelectField'
 
 /**
@@ -210,8 +211,9 @@ export function SimulatorSection() {
             spacing={1.5}
             sx={{ alignItems: { sm: 'center' } }}
           >
-            <TextField
+            <Field
               size="small"
+              rule="integer"
               label={t('pricing.field.quantity')}
               value={quantity}
               onChange={(event) => setQuantity(event.target.value)}

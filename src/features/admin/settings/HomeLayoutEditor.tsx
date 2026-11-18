@@ -4,7 +4,8 @@ import DragIndicatorRoundedIcon from '@mui/icons-material/DragIndicatorRounded'
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded'
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined'
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
-import { Box, Button, Checkbox, IconButton, Stack, TextField, Typography } from '@mui/material'
+import { Box, Button, Checkbox, IconButton, Stack, Typography } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useRef, useState } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -515,7 +516,8 @@ function ListaOrdenable({
           // Resumen v2 · El tope de productos vive en el panel: la fila solo lo DICE.
           extra={
             SECTIONS_WITH_MAX_ITEMS.has(afinando.id) ? (
-              <TextField
+              <Field
+                rule="integer" maxLength={2} help={t('help.admin.home.maxItems')}
                 size="small"
                 type="number"
                 fullWidth

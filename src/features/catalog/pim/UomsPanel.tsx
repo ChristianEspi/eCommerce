@@ -18,7 +18,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useMemo, useState } from 'react'
@@ -33,10 +32,12 @@ import { PanelHint } from './VariantsPanel'
 import { useProductUoms, useSaveProductUom, useUnits } from './hooks'
 import {
   effectiveUomPrice,
+  FACTOR_FIELD_RULE,
   productUomFormSchema,
   type ProductUom,
   type ProductUomFormValues,
 } from './types'
+import { Field } from '@/shared/ui/Field'
 import type { PimProduct } from '../types'
 import { SelectField } from '@/shared/ui/SelectField'
 
@@ -289,9 +290,11 @@ function UomForm({
             ))}
           </SelectField>
 
-          <TextField
+          <Field
             size="small"
             fullWidth
+            rule={FACTOR_FIELD_RULE}
+            help={t('help.catalog.uomFactor')}
             label={t('pim.field.factor')}
             // La unidad base es factor 1 por CHECK en la base; el campo se
             // bloquea en vez de dejar escribir algo que se va a rechazar.
@@ -302,9 +305,10 @@ function UomForm({
             {...register('factor')}
           />
 
-          <TextField
+          <Field
             size="small"
             fullWidth
+            rule="money"
             label={`${t('common.price')} (${currency})`}
             error={Boolean(errors.price)}
             helperText={fieldError('price') ?? t('pim.uoms.priceHelp')}

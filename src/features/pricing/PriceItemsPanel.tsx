@@ -47,7 +47,8 @@ import {
   type ResolvedPriceRow,
 } from './importCsv'
 import { priceImportColumns, priceTemplateBook } from './priceTemplate'
-import type { PriceList, PriceListItem, PricedProduct } from './types'
+import { MIN_QUANTITY_FIELD_RULE, type PriceList, type PriceListItem, type PricedProduct } from './types'
+import { Field } from '@/shared/ui/Field'
 import { SelectField } from '@/shared/ui/SelectField'
 
 /**
@@ -315,24 +316,29 @@ export function PriceItemsPanel({ list, canWrite }: { list: PriceList; canWrite:
           </Stack>
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-            <TextField
+            <Field
               size="small"
               fullWidth
+              rule={MIN_QUANTITY_FIELD_RULE}
+              help={t('help.pricing.minQuantity')}
               label={t('pricing.field.minQuantity')}
               value={minQuantity}
               onChange={(event) => setMinQuantity(event.target.value)}
               helperText={t('pricing.field.minQuantityHint')}
             />
-            <TextField
+            <Field
               size="small"
               fullWidth
+              rule="money"
               label={t('pricing.field.unitPrice')}
               value={unitPrice}
               onChange={(event) => setUnitPrice(event.target.value)}
             />
-            <TextField
+            <Field
               size="small"
               fullWidth
+              rule="money"
+              help={t('help.pricing.compareAt')}
               label={t('pricing.field.compareAt')}
               value={compareAt}
               onChange={(event) => setCompareAt(event.target.value)}

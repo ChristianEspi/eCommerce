@@ -15,7 +15,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useMutation } from '@tanstack/react-query'
@@ -27,6 +26,7 @@ import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { IMPORT_ACCEPT, WorkbookReadError, downloadWorkbook, readImportText } from '@/shared/lib/excel'
 import { useDocumentMeta } from '@/shared/seo/useDocumentMeta'
+import { Field } from '@/shared/ui/Field'
 import { SectionTabs } from '@/shared/ui/SectionTabs'
 import { EmptyState, LoadingState } from '@/shared/ui/states'
 import { TS } from '@/theme/tokens'
@@ -247,23 +247,25 @@ export function QuickOrderView({ storeId, storeSlug }: { storeId: string; storeS
               >
                 {index + 1}
               </Typography>
-              <TextField
+              <Field
                 size="small"
                 label={t('store.quickOrder.field.sku')}
                 value={row.sku}
                 onChange={(event) => editRow(row.id, { sku: event.target.value })}
-                slotProps={{ htmlInput: { maxLength: 120, 'aria-label': `${t('store.quickOrder.field.sku')} · ${label}` } }}
+                rule="sku"
+                maxLength={120}
+                slotProps={{ htmlInput: { 'aria-label': `${t('store.quickOrder.field.sku')} · ${label}` } }}
                 sx={{ flex: 2, minWidth: 0 }}
               />
-              <TextField
+              <Field
                 size="small"
                 label={t('store.quickOrder.field.quantity')}
                 value={row.quantity}
                 onChange={(event) => editRow(row.id, { quantity: event.target.value })}
+                rule="integer"
+                maxLength={5}
                 slotProps={{
                   htmlInput: {
-                    inputMode: 'numeric',
-                    maxLength: 5,
                     'aria-label': `${t('store.quickOrder.field.quantity')} · ${label}`,
                   },
                 }}
@@ -299,11 +301,13 @@ export function QuickOrderView({ storeId, storeSlug }: { storeId: string; storeS
 
       <Box sx={{ border: '1px dashed var(--border)', borderRadius: 2, p: 2 }}>
         <Stack spacing={1.5}>
-          <TextField
+          <Field
             label={t('store.quickOrder.paste.label')}
             helperText={t('store.quickOrder.paste.help')}
             value={pasted}
             onChange={(event) => setPasted(event.target.value)}
+            rule="longText"
+            maxLength={20000}
             multiline
             minRows={3}
             placeholder={'SKU-001;12\nSKU-002;4'}

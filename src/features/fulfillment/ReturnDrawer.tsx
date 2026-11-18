@@ -11,7 +11,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useEffect, useState } from 'react'
@@ -39,6 +38,7 @@ import {
   type ReturnRow,
 } from './types'
 import { SelectField } from '@/shared/ui/SelectField'
+import { Field } from '@/shared/ui/Field'
 
 interface LineDraft {
   condition: ReturnCondition
@@ -238,13 +238,13 @@ export function ReturnDrawer({
                         )}
                       </TableCell>
                       <TableCell align="right">
-                        <TextField
+                        <Field
                           size="small"
+                          rule="money"
                           value={draft.refundAmount}
                           disabled={!editable}
                           inputProps={{
                             'aria-label': t('returns.field.refund'),
-                            inputMode: 'decimal',
                           }}
                           onChange={(event) =>
                             setDrafts((current) => ({
@@ -271,8 +271,9 @@ export function ReturnDrawer({
 
             {state === 'requested' && (
               <Stack spacing={1}>
-                <TextField
+                <Field
                   size="small"
+                  rule="longText"
                   label={t('returns.field.decisionNote')}
                   value={note}
                   disabled={!canOperate}

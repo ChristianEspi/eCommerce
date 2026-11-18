@@ -8,7 +8,6 @@ import {
   MenuItem,
   Stack,
   Switch,
-  TextField,
   Typography,
 } from '@mui/material'
 import { Controller, type UseFormReturn } from 'react-hook-form'
@@ -18,6 +17,7 @@ import { TS } from '@/theme/tokens'
 import { BRAND_LOCKUPS, IDENTITY_LIMITS, type BrandLockup } from '@/features/storefront/identity'
 import type { StoreFormValues } from './types'
 import { SelectField } from '@/shared/ui/SelectField'
+import { Field } from '@/shared/ui/Field'
 
 /**
  * Identidad de la cabecera y barra de avisos (Storefront V3 · P01).
@@ -134,8 +134,10 @@ export function StoreIdentitySection({
                 direction="row"
                 sx={{ gap: 1, alignItems: 'flex-start' }}
               >
-                <TextField
+                <Field
                   fullWidth
+                  rule="text"
+                  maxLength={IDENTITY_LIMITS.announcementTextMax}
                   size="small"
                   slotProps={{ inputLabel: { shrink: true } }}
                   label={t('settings.identity.announcementText').replace(

@@ -229,7 +229,7 @@ describe('el registro de un cobro', () => {
     const user = await abrirCobro(fake)
 
     await user.click(screen.getByRole('checkbox', { name: 'F001-200' }))
-    await user.type(screen.getByLabelText(/N.º de recibo/), 'R-001')
+    await user.type(screen.getByRole('textbox', { name: /N.º de recibo/ }), 'R-001')
     await user.clear(screen.getByLabelText(/^Importe/))
     await user.type(screen.getByLabelText(/^Importe/), '1200')
     await user.click(screen.getByRole('button', { name: 'Registrar' }))

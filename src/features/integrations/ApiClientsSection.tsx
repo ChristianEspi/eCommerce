@@ -17,9 +17,9 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useState } from 'react'
 import { API_SCOPES, API_VERSION } from '@/domain'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -241,7 +241,8 @@ export function ApiClientsSection() {
                 {t(create.error instanceof IntegrationsError ? create.error.key : 'integrations.error.generic')}
               </Alert>
             )}
-            <TextField
+            <Field
+              rule="text" maxLength={120} help={t('help.integrations.api.name')}
               label={t('integrations.api.name')}
               value={name}
               onChange={(event) => setName(event.target.value)}

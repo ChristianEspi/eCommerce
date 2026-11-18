@@ -9,7 +9,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  TextField,
   Stack,
   Table,
   TableBody,
@@ -21,6 +20,7 @@ import {
 import { useMemo, useState } from 'react'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { Field } from '@/shared/ui/Field'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { formatMoney } from '@/shared/lib/format'
 import { FilterBar } from '@/shared/ui/FilterBar'
@@ -257,9 +257,11 @@ export function InvoicesSection() {
           <Stack spacing={2} sx={{ pt: 1 }}>
             <Typography sx={{ fontSize: 14, color: 'var(--muted)' }}>{t('credit.invoices.newHelp')}</Typography>
             {errorGenerar && <Alert severity="error">{t(errorGenerar)}</Alert>}
-            <TextField
+            <Field
               autoFocus
               fullWidth
+              rule="code"
+              help={t('help.credit.orderNumber')}
               label={t('credit.invoices.orderNumber')}
               placeholder="EC-20261117-00046"
               value={numeroPedido}

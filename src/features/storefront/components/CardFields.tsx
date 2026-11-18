@@ -1,6 +1,7 @@
 import LockRoundedIcon from '@mui/icons-material/LockRounded'
-import { Alert, Box, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Box, Stack, Typography } from '@mui/material'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { Field } from '@/shared/ui/Field'
 import { TS } from '@/theme/tokens'
 import { esSimulacroDePago, pareceTarjeta, soloDigitos, type DatosTarjeta } from '../cardToken'
 
@@ -70,7 +71,7 @@ export function CardFields({
         </Alert>
       )}
 
-      <TextField
+      <Field
         label={t('store.card.number')}
         value={datos.numero}
         onChange={(evento) => cambiar('numero', evento.target.value)}
@@ -78,35 +79,41 @@ export function CardFields({
         autoComplete="cc-number"
         error={numeroMal || Boolean(error)}
         helperText={numeroMal ? t('store.card.numberInvalid') : ' '}
-        inputProps={{ inputMode: 'numeric', maxLength: 23 }}
+        // Solo dígitos: el token se arma con los dígitos de todos modos.
+        rule="integer"
+        maxLength={19}
       />
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-        <TextField
+        <Field
           label={t('store.card.month')}
           value={datos.mes}
           onChange={(evento) => cambiar('mes', evento.target.value)}
           placeholder="09"
           autoComplete="cc-exp-month"
-          inputProps={{ inputMode: 'numeric', maxLength: 2 }}
+          rule="integer"
+          maxLength={2}
           sx={{ flex: 1 }}
         />
-        <TextField
+        <Field
           label={t('store.card.year')}
           value={datos.anio}
           onChange={(evento) => cambiar('anio', evento.target.value)}
           placeholder="2028"
           autoComplete="cc-exp-year"
-          inputProps={{ inputMode: 'numeric', maxLength: 4 }}
+          rule="integer"
+          maxLength={4}
           sx={{ flex: 1 }}
         />
-        <TextField
+        <Field
           label={t('store.card.cvv')}
           value={datos.cvv}
           onChange={(evento) => cambiar('cvv', evento.target.value)}
           placeholder="123"
           autoComplete="cc-csc"
-          inputProps={{ inputMode: 'numeric', maxLength: 4 }}
+          rule="integer"
+          maxLength={4}
+          help={t('sfHelp.card.cvv')}
           sx={{ flex: 1 }}
         />
       </Stack>

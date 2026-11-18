@@ -196,7 +196,11 @@ describe('Mis datos', () => {
     const update = vi.spyOn(fake.auth, 'updateUser')
     renderWithProviders(<ConsumerProfileSection />, { session })
 
-    await user.type(await screen.findByLabelText('Teléfono'), 'llámame')
+    // El campo ya no deja teclear letras (regla `phone`): de «llámame 12»
+    // solo entran los dígitos, y «12» sigue sin ser un teléfono.
+    const telefono = await screen.findByLabelText('Teléfono')
+    await user.type(telefono, 'llámame 12')
+    expect(telefono).toHaveValue('12')
     await user.click(screen.getByRole('button', { name: 'Guardar' }))
 
     expect(await screen.findByText(/Teléfono no válido/)).toBeInTheDocument()

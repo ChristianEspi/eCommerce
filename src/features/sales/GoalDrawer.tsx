@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Alert, Box, Button, MenuItem, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, MenuItem, Stack, Typography } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -17,6 +17,7 @@ import {
   type GoalFormValues,
 } from './types'
 import { SelectField } from '@/shared/ui/SelectField'
+import { Field } from '@/shared/ui/Field'
 
 /**
  * Alta y edición de una meta.
@@ -212,7 +213,9 @@ export function GoalDrawer({
                 son tres letras, y así métrica y objetivo se reparten solos lo
                 que sobra tanto si aparece como si no. */}
             {metric === 'amount' && (
-              <TextField
+              <Field
+                rule="currency"
+                help={t('help.sales.currency')}
                 label={t('sales.field.currency')}
                 disabled={!canWrite}
                 error={Boolean(errors.currency)}
@@ -223,8 +226,10 @@ export function GoalDrawer({
               />
             )}
 
-            <TextField
+            <Field
               fullWidth
+              rule="money"
+              help={t('help.sales.target')}
               label={t('sales.field.target')}
               required
               disabled={!canWrite}
@@ -242,7 +247,7 @@ export function GoalDrawer({
           {/* Las dos fechas a mitad y mitad: el input nativo de fecha no baja
               de ~140 px y a menos de media fila se recortaba. */}
           <FieldRow>
-            <TextField
+            <Field
               fullWidth
               type="date"
               label={t('sales.field.periodStart')}
@@ -250,7 +255,7 @@ export function GoalDrawer({
               slotProps={{ inputLabel: { shrink: true } }}
               {...register('period_start')}
             />
-            <TextField
+            <Field
               fullWidth
               type="date"
               label={t('sales.field.periodEnd')}

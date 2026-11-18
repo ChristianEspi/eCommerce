@@ -1,5 +1,6 @@
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded'
-import { Alert, Box, Card, FormControlLabel, Stack, Switch, TextField, Typography } from '@mui/material'
+import { Alert, Box, Card, FormControlLabel, Stack, Switch, Typography } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useMemo, useState } from 'react'
 import { toStoreContent } from '@/features/storefront/content'
 import { ContentBlocks } from '@/features/storefront/components/ContentBlocks'
@@ -79,7 +80,7 @@ export function PreviewSection({ pageId }: { pageId: string | null }) {
   return (
     <Stack spacing={2}>
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ sm: 'center' }}>
-        <TextField
+        <Field
           type="datetime-local"
           size="small"
           label={t('content.preview.at')}
