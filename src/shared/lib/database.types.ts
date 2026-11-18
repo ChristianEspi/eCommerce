@@ -3380,6 +3380,7 @@ export type Database = {
           phone: string | null
           segment_id: string | null
           tax_id: string | null
+          tax_id_type: string | null
           tier: Database["public"]["Enums"]["customer_tier"] | null
           updated_at: string
           visit_frequency: Database["public"]["Enums"]["visit_frequency"] | null
@@ -3402,6 +3403,7 @@ export type Database = {
           phone?: string | null
           segment_id?: string | null
           tax_id?: string | null
+          tax_id_type?: string | null
           tier?: Database["public"]["Enums"]["customer_tier"] | null
           updated_at?: string
           visit_frequency?:
@@ -3426,6 +3428,7 @@ export type Database = {
           phone?: string | null
           segment_id?: string | null
           tax_id?: string | null
+          tax_id_type?: string | null
           tier?: Database["public"]["Enums"]["customer_tier"] | null
           updated_at?: string
           visit_frequency?:
