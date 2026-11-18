@@ -1,4 +1,4 @@
-import { Button, FormControlLabel, Grid, Stack, Switch, TextField, Typography } from '@mui/material'
+import { Button, FormControlLabel, Stack, Switch, TextField, Typography } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { installmentFor, type StoreInstallments } from '@/features/storefront/productDetail'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -70,8 +70,7 @@ export function InstallmentsSection({ storeId, canManage }: { storeId: string | 
         label={t('settings.installments.enabled')}
       />
       {enabled ? (
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={3}>
+        <Stack sx={{ gap: 2, maxWidth: 640 }}>
             <TextField
               fullWidth
               type="number"
@@ -82,8 +81,6 @@ export function InstallmentsSection({ storeId, canManage }: { storeId: string | 
               error={!(Number.isInteger(cuotas) && cuotas >= 2 && cuotas <= 36)}
               onChange={(event) => setCount(event.target.value)}
             />
-          </Grid>
-          <Grid item xs={12} sm={5}>
             <TextField
               fullWidth
               label={t('settings.installments.provider')}
@@ -93,8 +90,6 @@ export function InstallmentsSection({ storeId, canManage }: { storeId: string | 
               inputProps={{ maxLength: 60 }}
               onChange={(event) => setProvider(event.target.value)}
             />
-          </Grid>
-          <Grid item xs={12} sm={4}>
             <TextField
               fullWidth
               type="number"
@@ -105,8 +100,7 @@ export function InstallmentsSection({ storeId, canManage }: { storeId: string | 
               inputProps={{ min: 0, step: '0.01' }}
               onChange={(event) => setMinAmount(event.target.value)}
             />
-          </Grid>
-        </Grid>
+        </Stack>
       ) : null}
       {ejemplo ? (
         <Typography sx={{ fontSize: 13, color: 'var(--muted)' }}>

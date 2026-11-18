@@ -1,6 +1,6 @@
 import AddRoundedIcon from '@mui/icons-material/AddRounded'
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
-import { Alert, Box, Button, Grid, IconButton, MenuItem, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, IconButton, MenuItem, Stack, TextField, Typography } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { SOCIAL_NETWORKS, type SocialNetwork } from '@/features/storefront/identity'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -66,25 +66,18 @@ export function HelpContactSection({ storeId, canManage }: { storeId: string | n
 
   return (
     <Stack sx={{ gap: 2.5 }}>
-      <Grid container spacing={2}>
-        <Grid item xs={12} md={8}>
-          <TextField fullWidth label={t('settings.help.legalName')} value={v.legal_name} onChange={(e) => set('legal_name', e.target.value)} error={malo('legal_name')} disabled={!canManage} />
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <TextField fullWidth label={t('settings.help.taxId')} value={v.tax_id} onChange={(e) => set('tax_id', e.target.value)} error={malo('tax_id')} disabled={!canManage} />
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <TextField fullWidth label={t('settings.help.whatsapp')} placeholder="+51 900 000 001" value={v.whatsapp_phone} onChange={(e) => set('whatsapp_phone', e.target.value)} error={malo('whatsapp_phone')} disabled={!canManage} />
-        </Grid>
-        <Grid item xs={12} md={8}>
-          <TextField fullWidth label={t('settings.help.note')} placeholder={t('settings.help.notePlaceholder')} value={v.help_note} onChange={(e) => set('help_note', e.target.value)} error={malo('help_note')} disabled={!canManage} />
-        </Grid>
-        <Grid item xs={12}>
-          <TextField fullWidth multiline minRows={3} label={t('settings.help.hours')} placeholder={t('settings.help.hoursPlaceholder')} value={v.business_hours} onChange={(e) => set('business_hours', e.target.value)} error={malo('business_hours')} disabled={!canManage} />
-        </Grid>
-      </Grid>
+      {/* Una sola columna de ancho cómodo (sin `Grid`: sus márgenes negativos
+          se comían el borde de la tarjeta). Se lee de arriba abajo, en el orden
+          en que aparece en el pie y en el Libro de Reclamaciones. */}
+      <Stack sx={{ gap: 2, maxWidth: 640 }}>
+        <TextField fullWidth label={t('settings.help.legalName')} value={v.legal_name} onChange={(e) => set('legal_name', e.target.value)} error={malo('legal_name')} disabled={!canManage} />
+        <TextField fullWidth label={t('settings.help.taxId')} value={v.tax_id} onChange={(e) => set('tax_id', e.target.value)} error={malo('tax_id')} disabled={!canManage} />
+        <TextField fullWidth label={t('settings.help.whatsapp')} placeholder="+51 900 000 001" value={v.whatsapp_phone} onChange={(e) => set('whatsapp_phone', e.target.value)} error={malo('whatsapp_phone')} disabled={!canManage} />
+        <TextField fullWidth label={t('settings.help.note')} placeholder={t('settings.help.notePlaceholder')} value={v.help_note} onChange={(e) => set('help_note', e.target.value)} error={malo('help_note')} disabled={!canManage} />
+        <TextField fullWidth multiline minRows={3} label={t('settings.help.hours')} placeholder={t('settings.help.hoursPlaceholder')} value={v.business_hours} onChange={(e) => set('business_hours', e.target.value)} error={malo('business_hours')} disabled={!canManage} />
+      </Stack>
 
-      <Box>
+      <Box sx={{ maxWidth: 640 }}>
         <Typography sx={{ fontWeight: 700, mb: 1 }}>{t('settings.help.social')}</Typography>
         <Stack sx={{ gap: 1.25 }}>
           {v.social_links.map((link, i) => (

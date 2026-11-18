@@ -583,6 +583,7 @@ export function SettingsPage() {
                       icon={<SupportAgentRoundedIcon />}
                       title={t('settings.help.title')}
                       subtitle={t('settings.help.subtitle')}
+                      padded
                     >
                       <HelpContactSection storeId={storeId} canManage={canManage} />
                     </SectionCard>
@@ -591,6 +592,7 @@ export function SettingsPage() {
                       icon={<CreditCardRoundedIcon />}
                       title={t('settings.installments.title')}
                       subtitle={t('settings.installments.subtitle')}
+                      padded
                     >
                       <InstallmentsSection storeId={storeId} canManage={canManage} />
                     </SectionCard>
