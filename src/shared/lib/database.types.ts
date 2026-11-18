@@ -13991,6 +13991,17 @@ export type Database = {
         Args: { p_items: Json; p_store_id: string }
         Returns: Json
       }
+      inventory_transfer: {
+        Args: {
+          p_from_warehouse_id: string
+          p_product_id: string
+          p_quantity?: number
+          p_reason?: string
+          p_to_warehouse_id: string
+          p_variant_id?: string
+        }
+        Returns: Json
+      }
       invoice_create_for_order: {
         Args: { p_order_number: string }
         Returns: Json
