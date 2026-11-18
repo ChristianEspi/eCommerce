@@ -7,8 +7,20 @@
  * ninguna esté vacía y que el inglés no sea un copiar/pegar del español.
  */
 import type { MessageKey } from "./messages"
+import { fieldHelpEnStorefront } from './fields/storefront.en'
+import { fieldHelpEnCustomers } from './fields/customers.en'
+import { fieldHelpEnCatalog } from './fields/catalog.en'
+import { fieldHelpEnOperations } from './fields/operations.en'
+import { fieldHelpEnMarketing } from './fields/marketing.en'
+import { fieldHelpEnAdmin } from './fields/admin.en'
 
 export const en: Readonly<Record<MessageKey, string>> = {
+  ...fieldHelpEnStorefront,
+  ...fieldHelpEnCustomers,
+  ...fieldHelpEnCatalog,
+  ...fieldHelpEnOperations,
+  ...fieldHelpEnMarketing,
+  ...fieldHelpEnAdmin,
     'common.loading': 'Loading…',
     'common.retry': 'Try again',
     'common.refresh': 'Refresh',
@@ -17,6 +29,38 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'common.empty.title': 'Nothing here yet',
     'common.empty.body': 'Once there is data, it will show up on this screen.',
     'common.search': 'Search',
+    'common.help': 'Help',
+    'common.help.about': 'Help: {field}',
+    'field.docType': 'Document type',
+    'field.docType.ruc': 'RUC (tax ID)',
+    'field.docType.dni': 'DNI (national ID)',
+    'field.docType.ce': 'Foreigner ID card',
+    'field.docType.passport': 'Passport',
+    'field.docNumber': 'Document number',
+    'field.error.required': 'This field is required.',
+    'field.error.ruc': 'A RUC has 11 digits, starts with 10, 15, 16, 17 or 20 and its last digit must check out. Please review it.',
+    'field.error.dni': 'A DNI has exactly 8 digits.',
+    'field.error.ce': 'A foreigner ID card has 8 to 12 letters or digits.',
+    'field.error.passport': 'A passport has 6 to 15 letters or digits.',
+    'field.error.document': 'Choose the document type and enter a number in its format.',
+    'field.error.phone': 'Enter a phone of 6 to 20 characters: digits, spaces, dashes and a leading +.',
+    'field.error.email': 'Enter a valid email, like name@company.com.',
+    'field.error.url': 'Enter a full address starting with https://',
+    'field.error.integer': 'Enter a whole number, no decimals.',
+    'field.error.decimal': 'Enter a number, using a dot or comma for decimals.',
+    'field.error.money': 'Enter an amount with up to 2 decimals.',
+    'field.error.percent': 'Enter a percentage between 0 and 100.',
+    'field.error.code': 'Only letters, digits, dot, dash and underscore, no spaces.',
+    'field.error.personName': 'Use letters only: no numbers or symbols.',
+    'field.error.postalCode': 'A postal code has 3 to 10 characters.',
+    'field.error.tooLong': 'Too long: {max} characters at most.',
+    'field.help.ruc': 'Peruvian tax ID (SUNAT): 11 digits. Companies start with 20; self-employed people with 10.',
+    'field.help.dni': 'Peruvian national ID: 8 digits, no dots or dashes.',
+    'field.help.ce': 'Foreigner ID card: 8 to 12 letters or digits, as printed on the card.',
+    'field.help.passport': 'Passport number: 6 to 15 letters or digits.',
+    'field.help.docType': 'Choose the document the person or company has. An invoice needs a RUC; a receipt only needs a DNI, foreigner ID card or passport.',
+    'field.help.phone': 'Include the country code if abroad (for example +51). Digits, spaces and dashes only.',
+    'field.help.email': 'The email that receives notices. Example: purchasing@company.com',
     'common.searchOption': 'Search the list…',
     'common.noMatches': 'No option matches',
     'search.open': 'Search everything',

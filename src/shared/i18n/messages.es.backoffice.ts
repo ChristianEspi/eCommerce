@@ -11,9 +11,20 @@
  * de imports de la vitrina y falla si algún archivo que un visitante puede
  * cargar usa uno de estos namespaces.
  *
- * Namespaces: nav, activity, code, admin, exports, taxes, diagnostics, onboarding, picker, pim, mail, payments, promotions, appearance, returns, ops, catalogImport, customersImport, storesAdmin, aiAnalyst, aiPim, aiOrders, aiQuotes, aiExplain, aiCredit, aiPayments, aiFulfillment, aiContent, aiPromotions, aiCms, aiReviews, aiOps, aiIntegrations, copilot.
+ * Namespaces: nav, activity, code, admin, exports, taxes, diagnostics, onboarding, picker, pim, mail, payments, promotions, appearance, returns, ops, catalogImport, customersImport, storesAdmin, aiAnalyst, aiPim, aiOrders, aiQuotes, aiExplain, aiCredit, aiPayments, aiFulfillment, aiContent, aiPromotions, aiCms, aiReviews, aiOps, aiIntegrations, copilot, help.
  */
+import { fieldHelpEsCustomers } from './fields/customers.es'
+import { fieldHelpEsCatalog } from './fields/catalog.es'
+import { fieldHelpEsOperations } from './fields/operations.es'
+import { fieldHelpEsMarketing } from './fields/marketing.es'
+import { fieldHelpEsAdmin } from './fields/admin.es'
+
 export const esBackoffice = {
+  ...fieldHelpEsCustomers,
+  ...fieldHelpEsCatalog,
+  ...fieldHelpEsOperations,
+  ...fieldHelpEsMarketing,
+  ...fieldHelpEsAdmin,
   'nav.dashboard': 'Inicio',
   'nav.group.catalog': 'Catálogo',
   'nav.group.inventory': 'Inventario',
