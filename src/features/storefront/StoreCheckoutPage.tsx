@@ -802,6 +802,8 @@ export function StoreCheckoutPage() {
               montoCentimos: Math.round((totalAPagar ?? Number(subtotal)) * 100),
               moneda: currency,
               titulo: store.name,
+              logoUrl: store.logo_url,
+              colorAcento: store.accent_color,
             })
           : await tokenizarTarjeta({ ...tarjeta, email: input.values.customerEmail }, null)
 

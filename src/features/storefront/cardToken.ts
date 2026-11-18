@@ -168,6 +168,43 @@ export interface CulqiCheckoutInput {
   readonly montoCentimos: number
   readonly moneda: string
   readonly titulo: string
+  /**
+   * La marca de la tienda en la ventana de Culqi (2026-11-18): su logo (URL
+   * `https`, la firmada de la vitrina) y su color de acento para la banda, el
+   * botón y el precio. Sin ellos, la ventana sale con el estilo de Culqi.
+   */
+  readonly logoUrl?: string | null
+  readonly colorAcento?: string | null
+}
+
+/** Negro o blanco, el que se lea mejor sobre el acento (contraste WCAG). */
+export function textoSobre(hex: string): '#FFFFFF' | '#111111' {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim())
+  if (!m) return '#FFFFFF'
+  const n = parseInt(m[1]!, 16)
+  const canal = (v: number) => {
+    const c = v / 255
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  }
+  const l = 0.2126 * canal((n >> 16) & 255) + 0.7152 * canal((n >> 8) & 255) + 0.0722 * canal(n & 255)
+  // Contraste contra blanco (1.05 / (l + 0.05)) frente a contra negro ((l + 0.05) / 0.05).
+  return 1.05 / (l + 0.05) >= (l + 0.05) / 0.05 ? '#FFFFFF' : '#111111'
+}
+
+/** El bloque `style` de Culqi Checkout v4 con la marca de la tienda; vacío si no hay nada que poner. */
+export function estiloCulqi(logoUrl?: string | null, colorAcento?: string | null): Record<string, string> {
+  const estilo: Record<string, string> = {}
+  if (logoUrl && /^https:\/\//i.test(logoUrl)) estilo.logo = logoUrl
+  const acento = colorAcento && /^#[0-9a-f]{6}$/i.test(colorAcento.trim()) ? colorAcento.trim() : null
+  if (acento) {
+    estilo.bannerColor = acento
+    estilo.buttonBackground = acento
+    estilo.buttonTextColor = textoSobre(acento)
+    estilo.menuColor = acento
+    estilo.linksColor = acento
+    estilo.priceColor = acento
+  }
+  return estilo
 }
 
 let cargandoCheckout: Promise<void> | null = null
@@ -217,10 +254,12 @@ export async function pagarConCulqiCheckout(input: CulqiCheckoutInput): Promise<
     currency: input.moneda,
     amount: Math.max(1, Math.round(input.montoCentimos)),
   })
+  const estilo = estiloCulqi(input.logoUrl, input.colorAcento)
   culqi.options?.({
     lang: 'auto',
     installments: false,
     paymentMethods: { tarjeta: true, yape: false, bancaMovil: false, agente: false, billetera: false, cuotealo: false },
+    ...(Object.keys(estilo).length > 0 ? { style: estilo } : {}),
   })
 
   return new Promise<string>((resolve, reject) => {
