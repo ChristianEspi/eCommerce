@@ -14014,7 +14014,7 @@ export type Database = {
         Args: { p_decision: string; p_reason?: string; p_review_id: string }
         Returns: Json
       }
-      my_account_statement: { Args: never; Returns: Json }
+      my_account_statement: { Args: { p_store_slug?: string }; Returns: Json }
       my_assortment_blocked: {
         Args: { p_product_ids: string[]; p_store_slug: string }
         Returns: string[]

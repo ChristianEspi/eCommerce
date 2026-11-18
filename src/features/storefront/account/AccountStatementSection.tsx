@@ -36,9 +36,12 @@ import { fetchMyStatement, myStatementKey, type AccountStatement } from '../port
  * compra al contado y la segunda tiene el crédito agotado. Por eso `null` se
  * dice con palabras y no con un cero.
  */
-export function AccountStatementSection() {
+export function AccountStatementSection({ storeSlug }: { storeSlug?: string | null }) {
   const { t } = useI18n()
-  const query = useQuery({ queryKey: myStatementKey(), queryFn: fetchMyStatement })
+  const query = useQuery({
+    queryKey: myStatementKey(storeSlug),
+    queryFn: () => fetchMyStatement(storeSlug),
+  })
 
   if (query.isPending) return <BrandLoader />
   if (query.isError) return <ErrorState error={query.error} onRetry={() => void query.refetch()} />

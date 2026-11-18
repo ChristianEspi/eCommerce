@@ -9,7 +9,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
-import { TENANT_A, asRole, createTestDatabase, expectFailure } from './harness.ts'
+import { TENANT_A, TENANT_B, asRole, createTestDatabase, expectFailure } from './harness.ts'
 
 type Row = Record<string, unknown>
 
@@ -50,6 +50,16 @@ async function statement(sub: string): Promise<Array<Record<string, unknown>>> {
   return asShopper(sub, async () => {
     const result = await db.query<{ s: Array<Record<string, unknown>> }>(
       'select public.my_account_statement() as s',
+    )
+    return result.rows[0]!.s
+  })
+}
+
+async function statementIn(sub: string, storeSlug: string): Promise<Array<Record<string, unknown>>> {
+  return asShopper(sub, async () => {
+    const result = await db.query<{ s: Array<Record<string, unknown>> }>(
+      'select public.my_account_statement($1) as s',
+      [storeSlug],
     )
     return result.rows[0]!.s
   })
@@ -234,6 +244,53 @@ describe('estado de cuenta', () => {
       asRole(db, 'anon', null, () => db.query('select public.my_account_statement()')),
     )
     expect(message).toMatch(/permission denied|denegado/i)
+  })
+
+  it('desde una tienda solo salen las cuentas con SU vendedor', async () => {
+    // El comprador A también es cliente de OTRO vendedor (tenant B).
+    await svc(`select public.bootstrap_tenant($1, $2, $3, $4, $5, $6, $7, $8, 'PEN')`, [
+      TENANT_B.organizationId,
+      TENANT_B.companyId,
+      TENANT_B.slug,
+      `Cuenta ${TENANT_B.slug}`,
+      TENANT_B.adminEmail,
+      TENANT_B.ownerId,
+      TENANT_B.storeSlug,
+      `Tienda ${TENANT_B.slug}`,
+    ])
+    const [cliente] = await svc<{ id: string }>(
+      `insert into public.customers (organization_id, company_id, kind, code, name, legal_name)
+       values ($1, $2, 'company', 'norte-en-b', 'Botica Norte (B)', 'Botica Norte (B)') returning id`,
+      [TENANT_B.organizationId, TENANT_B.companyId],
+    )
+    const [cuenta] = await svc<{ id: string }>(
+      `insert into public.business_accounts
+         (organization_id, company_id, customer_id, customer_kind, code, name, is_active)
+       values ($1, $2, $3, 'company', 'norte-en-b', 'Botica Norte en B', true) returning id`,
+      [TENANT_B.organizationId, TENANT_B.companyId, cliente!.id],
+    )
+    await svc(
+      `insert into public.business_account_users
+         (organization_id, company_id, business_account_id, user_id, email, role, status)
+       values ($1, $2, $3, $4, $5, 'admin', 'active')`,
+      [TENANT_B.organizationId, TENANT_B.companyId, cuenta!.id, COMPRADOR_A, `${COMPRADOR_A}@empresa.test`],
+    )
+
+    // Sin tienda, las dos; en cada tienda, la suya.
+    expect((await statement(COMPRADOR_A)).map((r) => r.account_name).sort()).toEqual([
+      'Botica Norte',
+      'Botica Norte en B',
+    ])
+    expect((await statementIn(COMPRADOR_A, TENANT_A.storeSlug)).map((r) => r.account_name)).toEqual([
+      'Botica Norte',
+    ])
+    expect((await statementIn(COMPRADOR_A, TENANT_B.storeSlug)).map((r) => r.account_name)).toEqual([
+      'Botica Norte en B',
+    ])
+    // Una tienda que no existe no devuelve nada.
+    expect(await statementIn(COMPRADOR_A, 'no-existe')).toEqual([])
+    // Y el comprador B, que no es cliente de B, no ve nada allí.
+    expect(await statementIn(COMPRADOR_B, TENANT_B.storeSlug)).toEqual([])
   })
 
   it('lo pagado sin confirmar va aparte: ni es deuda ni usa la linea', async () => {

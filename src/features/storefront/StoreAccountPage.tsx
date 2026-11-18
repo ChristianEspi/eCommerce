@@ -369,7 +369,7 @@ export function StoreAccountPage() {
                 },
               ]
             : []),
-          { id: 'estado', label: t('account.tab.statement'), content: <AccountStatementSection /> },
+          { id: 'estado', label: t('account.tab.statement'), content: <AccountStatementSection storeSlug={storefront?.storeSlug} /> },
           // Los cupones son de UNA tienda: sin tienda resuelta no hay a quien
           // preguntarle, y la pestaña no se ofrece en vez de fallar dentro.
           ...(storefront
