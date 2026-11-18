@@ -233,6 +233,39 @@ describe('estado de cuenta', () => {
     )
     expect(message).toMatch(/permission denied|denegado/i)
   })
+
+  it('lo pagado sin confirmar va aparte: ni es deuda ni usa la linea', async () => {
+    // A-0003: pagado por transferencia, la tienda aun no lo confirma (sin
+    // documento a credito). A-0004: igual pero cancelado, no cuenta.
+    await svc(
+      `insert into public.orders
+         (organization_id, company_id, store_id, channel_id, business_account_id, order_number,
+          status, payment_status, currency, customer_email, subtotal, tax_total, shipping_total,
+          discount_total, grand_total, placed_at)
+       values
+         ($1, $2, $3, (select c.id from public.channels c where c.store_id = $3 and c.is_default),
+          $4, 'A-0003', 'pending', 'pending', 'PEN', 'norte@empresa.test', 250, 0, 0, 0, 250,
+          now() - interval '2 days'),
+         ($1, $2, $3, (select c.id from public.channels c where c.store_id = $3 and c.is_default),
+          $4, 'A-0004', 'cancelled', 'pending', 'PEN', 'norte@empresa.test', 70, 0, 0, 0, 70,
+          now() - interval '1 days')`,
+      [TENANT_A.organizationId, TENANT_A.companyId, storeId, cuentaA],
+    )
+
+    const [cuenta] = await statement(COMPRADOR_A)
+    const pendientes = cuenta?.pending_payments as Array<Record<string, unknown>>
+
+    expect(pendientes.map((p) => p.order_number)).toEqual(['A-0003'])
+    expect(Number(cuenta?.pending_payments_total)).toBe(250)
+    // La deuda a credito (A-0001) no se repite aqui ni cambia.
+    expect(Number(cuenta?.balance_due)).toBe(800)
+    expect(Number(cuenta?.credit_available)).toBe(4200)
+
+    // Y B no ve lo pendiente de A.
+    const [deB] = await statement(COMPRADOR_B)
+    expect(deB?.pending_payments).toEqual([])
+    expect(Number(deB?.pending_payments_total)).toBe(0)
+  })
 })
 
 describe('cupones', () => {

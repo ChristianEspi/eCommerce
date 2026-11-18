@@ -58,6 +58,16 @@ export interface StatementDocument {
   payment_status: string
 }
 
+/** Un pedido pagado con un medio que el vendedor confirma a mano (transferencia, Yape…). */
+export interface StatementPendingPayment {
+  order_id: string
+  order_number: string
+  placed_at: string
+  total: string
+  currency: string
+  method: string | null
+}
+
 export interface AccountStatement {
   account_id: string
   account_name: string
@@ -70,6 +80,9 @@ export interface AccountStatement {
   documents: StatementDocument[]
   purchased_12m: string
   paid_12m: string
+  /** 2026-11-18 · Ausentes contra una base anterior: se leen como vacío. */
+  pending_payments?: StatementPendingPayment[]
+  pending_payments_total?: string
   currency: string | null
 }
 
