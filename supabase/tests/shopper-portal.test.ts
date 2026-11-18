@@ -16,6 +16,8 @@ type Row = Record<string, unknown>
 /** Dos compradores de dos empresas distintas del MISMO tenant. */
 const COMPRADOR_A = '0d000000-0000-4000-8000-00000000a001'
 const COMPRADOR_B = '0d000000-0000-4000-8000-00000000b001'
+/** Compra para sí: sin empresa (2026-11-18). */
+const CONSUMIDOR = '0d000000-0000-4000-8000-00000000c001'
 
 let db: PGlite
 let storeId = ''
@@ -288,6 +290,33 @@ describe('cupones', () => {
     await svc(`update public.coupons set valid_to = now() + interval '30 days' where id = $1`, [
       cuponDirigido,
     ])
+  })
+
+  // 2026-11-18 · «Mis cupones» del consumidor.
+  it('el consumidor ve los cupones abiertos, nunca los dirigidos a una empresa', async () => {
+    const suyos = (await coupons(CONSUMIDOR)).map((row) => row.code)
+    expect(suyos).toContain('ABIERTO10')
+    expect(suyos).not.toContain('SOLOSUR20')
+  })
+
+  it('al consumidor los usos que le quedan se le cuentan por su correo', async () => {
+    const [cupon] = await svc<{ id: string; promotion_id: string }>(
+      `update public.coupons set usage_limit_per_customer = 2 where code = 'ABIERTO10' returning id, promotion_id`,
+    )
+    const [pedido] = await svc<{ id: string }>(`select id from public.orders limit 1`)
+    await svc(
+      `insert into public.promotion_redemptions
+         (organization_id, company_id, store_id, promotion_id, coupon_id, order_id, customer_email, discount_amount, currency)
+       values ($1, $2, $3, $4, $5, $6, $7, 1, 'PEN')`,
+      [TENANT_A.organizationId, TENANT_A.companyId, storeId, cupon!.promotion_id, cupon!.id, pedido!.id, `${CONSUMIDOR}@comprador.test`],
+    )
+    try {
+      const abierto = (await coupons(CONSUMIDOR)).find((row) => row.code === 'ABIERTO10')
+      expect(abierto?.remaining_uses).toBe(1)
+    } finally {
+      await svc(`delete from public.promotion_redemptions where coupon_id = $1`, [cupon!.id])
+      await svc(`update public.coupons set usage_limit_per_customer = null where id = $1`, [cupon!.id])
+    }
   })
 
   it('sin sesion no hay cupones: un cupon es una llave', async () => {

@@ -12,6 +12,7 @@ import { FavoritesView } from '../StoreFavoritesPage'
 import { greetingName, profileFromSession } from '../consumer'
 import { ConsumerAddressesSection } from './ConsumerAddressesSection'
 import { ConsumerProfileSection } from './ConsumerProfileSection'
+import { MyCouponsSection } from './MyCouponsSection'
 import { MyOrdersSection } from './MyOrdersSection'
 
 /**
@@ -26,7 +27,7 @@ import { MyOrdersSection } from './MyOrdersSection'
  * el SERVIDOR (`my_business_accounts`): con cuenta de empresa activa, el portal
  * B2B de siempre, intacto; sin ella, esto.
  *
- * Cinco pestañas y no cinco pantallas, con `SectionTabs` y `#hash` como el resto
+ * Seis pestañas y no seis pantallas, con `SectionTabs` y `#hash` como el resto
  * de la suite: «mira mis pedidos» se comparte como enlace.
  */
 export function ConsumerAccount({
@@ -71,6 +72,13 @@ export function ConsumerAccount({
             content: <ConsumerAddressesSection storeSlug={storeSlug} />,
           },
         ]
+      : []),
+    // 2026-11-18 · Los cupones que le sirven a quien compra para sí: los
+    // abiertos a todos y a su canal (`my_coupons` ya distingue consumidor de
+    // empresa). Es la misma sección del portal B2B. `cupones` es el mismo
+    // #hash que allí, para que un enlace «mira tus cupones» valga para los dos.
+    ...(storeId
+      ? [{ id: 'cupones', label: t('account.tab.coupons'), content: <MyCouponsSection storeId={storeId} /> }]
       : []),
     { id: 'avisos', label: t('account.tab.notifications'), content: <StoreNotificationsSection /> },
   ]

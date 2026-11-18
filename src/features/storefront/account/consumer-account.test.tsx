@@ -398,3 +398,41 @@ describe('Mis direcciones · libreta (N06)', () => {
     expect(within(dialogo).getByLabelText(/Nombre \(Casa/)).toHaveValue('')
   })
 })
+
+/**
+ * 2026-11-18 · «Mis cupones» también para quien compra para sí. La pestaña es
+ * la del portal B2B; lo que cambia es que `my_coupons` ya le responde.
+ */
+describe('Mis cupones del consumidor', () => {
+  it('la cuenta ofrece la pestaña y enseña el código de los cupones que le sirven', async () => {
+    const { ConsumerAccount } = await import('./ConsumerAccount')
+    const fake = createFakeSupabase({
+      session: makeSession({ withTenantClaims: false }),
+      rpc: {
+        my_consumer_orders: () => [],
+        my_coupons: () => [
+          {
+            code: 'MIQ002',
+            promotion_name: 'Bienvenida 10%',
+            promotion_description: null,
+            kind: 'percentage',
+            value_percent: '10',
+            value_amount: null,
+            min_subtotal: null,
+            valid_to: '2026-12-31T23:59:59.000Z',
+            remaining_uses: 1,
+          },
+        ],
+      },
+    })
+    holder.client = fake
+    const user = userEvent.setup()
+    renderWithProviders(<ConsumerAccount storeSlug="tienda-a" storeId={STORE_A} pendingAccountNames={[]} />, {
+      session: fake.state.session,
+    })
+
+    await user.click(await screen.findByRole('tab', { name: 'Mis cupones' }))
+    expect(await screen.findByText('MIQ002')).toBeInTheDocument()
+    expect(fake.state.rpcCalls.find((c) => c.name === 'my_coupons')?.args).toEqual({ p_store_id: STORE_A })
+  })
+})
