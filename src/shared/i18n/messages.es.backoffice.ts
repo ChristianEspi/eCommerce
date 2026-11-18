@@ -2916,4 +2916,7 @@ export const esBackoffice = {
   'code.stage.create_order': 'creación del pedido',
   'code.stage.publish_events': 'publicación de eventos',
   'code.stage.notify': 'aviso al comprador',
+  'code.model.historic_v1': 'Según su historial',
+  'code.model.history_seasonal_v2': 'Historial y temporada',
+  'code.model.naive_v1': 'Básico (última compra)',
 } as const

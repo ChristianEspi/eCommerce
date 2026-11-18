@@ -74,7 +74,7 @@ export function GenerateDrawer({
 
   const customers = useCustomerOptions({
     term: customerSearch,
-    enabled: open && customerSearch.trim().length >= 2,
+    enabled: open,
   })
 
   const opciones = useMemo<PickerOption[]>(
@@ -147,6 +147,7 @@ export function GenerateDrawer({
         {serverError && <Alert severity="error">{t(serverError)}</Alert>}
 
         <EntityPicker
+          minChars={0}
           label={t('planning.field.customer')}
           placeholder={t('planning.generate.searchCustomer')}
           term={customerSearch}

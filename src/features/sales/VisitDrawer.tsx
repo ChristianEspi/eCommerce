@@ -47,7 +47,7 @@ export function VisitDrawer({
 
   const customers = useCustomerOptions({
     term: customerSearch,
-    enabled: open && customerSearch.trim().length >= 2,
+    enabled: open,
   })
 
   const opcionesCliente = useMemo<PickerOption[]>(
@@ -185,6 +185,7 @@ export function VisitDrawer({
                 campo más, y el desplegable solo decide cuál se escribe. */}
             <input type="hidden" {...register('customer_id')} />
             <EntityPicker
+          minChars={0}
               label={t('sales.field.customerName')}
               term={customerSearch}
               onTermChange={setCustomerSearch}

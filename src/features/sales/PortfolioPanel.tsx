@@ -62,7 +62,7 @@ export function PortfolioPanel({
   const assign = useAssignCustomer()
   const remove = useRemoveFromPortfolio()
 
-  const options = useCustomerOptions({ term: search, enabled: search.trim().length >= 2 })
+  const options = useCustomerOptions({ term: search, enabled: true })
 
   const opciones = useMemo<PickerOption[]>(
     () => (options.data ?? []).map((c) => ({ id: c.id, primary: c.name, secondary: c.code })),
@@ -157,6 +157,7 @@ export function PortfolioPanel({
       {canWrite && (
         <Stack spacing={1.5}>
           <EntityPicker
+          minChars={0}
             label={t('sales.field.customerName')}
             placeholder={t('sales.portfolio.search')}
             term={search}

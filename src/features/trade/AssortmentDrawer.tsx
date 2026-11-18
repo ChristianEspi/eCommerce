@@ -75,7 +75,7 @@ export function AssortmentDrawer({
   const removeItem = useRemoveAssortmentItem()
 
   const products = useTradeProductSearch(
-    open && productSearch.trim().length >= 2 ? (scope?.storeId ?? null) : null,
+    open ? (scope?.storeId ?? null) : null,
     productSearch,
   )
 
@@ -285,6 +285,7 @@ export function AssortmentDrawer({
               {canWrite && (
                 <Stack spacing={1.5} sx={{ mt: 2 }}>
                   <EntityPicker
+          minChars={0}
                     label={t('trade.field.product')}
                     placeholder={t('trade.assortments.searchProduct')}
                     term={productSearch}

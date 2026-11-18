@@ -108,10 +108,10 @@ export function QuoteDrawer({
 
   const customers = useCustomerOptions({
     term: customerSearch,
-    enabled: open && customerSearch.trim().length >= 2,
+    enabled: open,
   })
   const products = useTradeProductSearch(
-    open && productSearch.trim().length >= 2 ? (scope?.storeId ?? null) : null,
+    open ? (scope?.storeId ?? null) : null,
     productSearch,
   )
 
@@ -314,6 +314,7 @@ export function QuoteDrawer({
                 />
               ) : (
                 <EntityPicker
+          minChars={0}
                   label={t('trade.field.customer')}
                   placeholder={t('trade.quotes.searchCustomer')}
                   term={customerSearch}
@@ -444,6 +445,7 @@ export function QuoteDrawer({
                         de verdad necesita ancho para leer nombres largos. */}
                     <Box sx={{ flex: 1, minWidth: 0, width: '100%' }}>
                       <EntityPicker
+          minChars={0}
                         label={t('trade.field.product')}
                         placeholder={t('trade.quotes.searchProduct')}
                         term={productSearch}

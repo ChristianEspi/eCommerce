@@ -9,6 +9,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { termLabel } from '@/shared/i18n/codeLabels'
 import { FormDrawer } from '@/shared/ui/FormDrawer'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { ErrorState } from '@/shared/ui/states'
@@ -41,7 +42,7 @@ export function SuggestionDrawer({
     <FormDrawer
       open={open}
       title={suggestion?.customer_name ?? t('planning.suggestions.title')}
-      subtitle={suggestion ? `${suggestion.model_code} · ${suggestion.generated_at.slice(0, 10)}` : undefined}
+      subtitle={suggestion ? `${termLabel(t, 'model', suggestion.model_code)} · ${suggestion.generated_at.slice(0, 10)}` : undefined}
       onClose={onClose}
       width={620}
       actions={<Button onClick={onClose}>{t('common.close')}</Button>}

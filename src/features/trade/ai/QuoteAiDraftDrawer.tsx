@@ -154,7 +154,7 @@ export function QuoteAiDraftDrawer({
   const create = useCreateQuoteFromDraft()
   const suggest = useAssortmentSuggestions(locale)
 
-  const customers = useCustomerOptions({ term: customerSearch, enabled: open && customerSearch.trim().length >= 2 })
+  const customers = useCustomerOptions({ term: customerSearch, enabled: open })
   const customerOptions = useMemo<PickerOption[]>(
     () => (customers.data ?? []).map((c) => ({ id: c.id, primary: c.name, secondary: c.code })),
     [customers.data],
@@ -416,6 +416,7 @@ export function QuoteAiDraftDrawer({
             </RadioGroup>
           )}
           <EntityPicker
+          minChars={0}
             label={t('aiQuotes.customer.search')}
             term={customerSearch}
             onTermChange={setCustomerSearch}

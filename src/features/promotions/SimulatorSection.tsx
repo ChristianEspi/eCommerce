@@ -78,6 +78,7 @@ function ProductoDeLinea({
 
   return (
     <EntityPicker
+          minChars={0}
       label={t('promotions.simulator.product')}
       placeholder={t('promotions.hint.target')}
       term={term}
@@ -174,7 +175,7 @@ export function SimulatorSection() {
   const customerYaElegido = customer !== null && customer.primary === customerDebounced
   const customers = useCustomerOptions({
     term: customerDebounced,
-    enabled: !customerYaElegido && customerDebounced.trim().length >= 2,
+    enabled: !customerYaElegido,
   })
   const customerOptions: PickerOption[] = (customers.data ?? []).map((fila) => ({
     id: fila.id,
@@ -288,6 +289,7 @@ export function SimulatorSection() {
                 en «Opcional. Hace f…» y la ayuda ocupaba tres líneas. */}
             <Box>
               <EntityPicker
+          minChars={0}
                 label={t('promotions.simulator.customer')}
                 placeholder={t('promotions.hint.simulatorCustomerPlaceholder')}
                 term={customerTerm}

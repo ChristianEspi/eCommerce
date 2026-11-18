@@ -71,7 +71,7 @@ export function codeLabel(t: Translate, code: string | null | undefined): string
  * tipos de actor, de proveedor, funciones de IA. `code.<grupo>.<valor>` y, si
  * no hay texto, el valor legible.
  */
-export type TermGroup = 'status' | 'domain' | 'actor' | 'providerKind' | 'aiFeature' | 'kind' | 'stage'
+export type TermGroup = 'status' | 'domain' | 'actor' | 'providerKind' | 'aiFeature' | 'kind' | 'stage' | 'model'
 
 export function termLabel(t: Translate, group: TermGroup, value: string | null | undefined): string {
   if (!value) return '—'

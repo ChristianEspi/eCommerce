@@ -7045,4 +7045,7 @@ export const en: Readonly<Record<MessageKey, string>> = {
   'code.stage.create_order': 'order creation',
   'code.stage.publish_events': 'event publishing',
   'code.stage.notify': 'buyer notification',
+  'code.model.historic_v1': 'From purchase history',
+  'code.model.history_seasonal_v2': 'History and season',
+  'code.model.naive_v1': 'Basic (last purchase)',
 }

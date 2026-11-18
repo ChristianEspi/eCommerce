@@ -88,7 +88,7 @@ export function RouteDrawer({
 
   const customers = useCustomerOptions({
     term: customerSearch,
-    enabled: open && customerSearch.trim().length >= 2,
+    enabled: open,
   })
 
   const opcionesCliente = useMemo<PickerOption[]>(
@@ -389,6 +389,7 @@ export function RouteDrawer({
               {canWrite && (
                 <Stack spacing={1.5} sx={{ mt: 2 }}>
                   <EntityPicker
+          minChars={0}
                     label={t('sales.field.customerName')}
                     placeholder={t('sales.routes.searchCustomer')}
                     term={customerSearch}

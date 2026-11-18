@@ -196,7 +196,10 @@ describe('el listado de sugerencias', () => {
 
     // Sin modelo a la vista, la cifra no tiene procedencia y no se puede
     // retirar un modelo que sugiere mal sin borrar lo que ya sugirió.
-    expect(screen.getAllByText('historic_v1')).toHaveLength(2)
+    const modelos = screen.getAllByText('Según su historial')
+    expect(modelos).toHaveLength(2)
+    // El código sigue a mano para quien compara generaciones.
+    expect(modelos[0]).toHaveAttribute('title', 'historic_v1')
   })
 
   it('una sugerencia ACEPTADA no ofrece avanzar a ningún sitio', async () => {
