@@ -1,6 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  addAudience,
   addChannelAudience,
+  fetchAudiences,
+  removeAudience,
   addScope,
   addTier,
   adjustGiftCard,
@@ -30,7 +33,7 @@ import {
   type PromotionScopeIds,
   type ScopeInput,
 } from './api'
-import type { PromotionFormValues, PromotionScope, ScopeKind } from './types'
+import type { PromotionFormValues, TargetAudienceKind, PromotionScope, ScopeKind } from './types'
 
 /**
  * Estado de promociones en el cliente.
@@ -223,6 +226,33 @@ export function useAddChannelAudience(scope: PromotionScopeIds | null) {
     },
     onSuccess: invalidate,
   })
+}
+
+export const audiencesKey = (promotionId: string | null) =>
+  [...PROMOTIONS_KEY, 'audiences', promotionId] as const
+
+export function useAudiences(promotionId: string | null) {
+  return useQuery({
+    queryKey: audiencesKey(promotionId),
+    queryFn: () => fetchAudiences(promotionId),
+    enabled: promotionId !== null,
+  })
+}
+
+export function useAddAudience(scope: PromotionScopeIds | null) {
+  const invalidate = useInvalidatePromotions()
+  return useMutation({
+    mutationFn: (input: { promotionId: string; kind: TargetAudienceKind; targetId: string }) => {
+      if (!scope) throw new Error('SIN_TIENDA')
+      return addAudience(scope, input)
+    },
+    onSuccess: invalidate,
+  })
+}
+
+export function useRemoveAudience() {
+  const invalidate = useInvalidatePromotions()
+  return useMutation({ mutationFn: removeAudience, onSuccess: invalidate })
 }
 
 export function useCoupons(storeId: string | null, term: string) {

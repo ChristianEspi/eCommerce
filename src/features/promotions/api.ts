@@ -28,6 +28,9 @@ import {
   promotionEventSchema,
   promotionSchema,
   promotionScopeSchema,
+  promotionAudienceSchema,
+  type TargetAudienceKind,
+  type PromotionAudience,
   promotionTierSchema,
   simulationSchema,
   type Coupon,
@@ -450,6 +453,56 @@ export async function addChannelAudience(
     audience_kind: 'channel',
     channel_id: input.channelId,
   })
+  if (error) throw promotionsErrorFromDb(error)
+}
+
+/** A quién le vale la campaña (2026-11-18). Sin filas = toda la tienda. */
+export async function fetchAudiences(promotionId: string | null): Promise<PromotionAudience[]> {
+  if (!promotionId) return []
+  const { data, error } = await client()
+    .from(PROMOTION_AUDIENCES_TABLE)
+    .select('id, promotion_id, audience_kind, channel_id, segment_id, customer_id, business_account_id, customers(name), business_accounts(name)')
+    .eq('promotion_id', promotionId)
+    .order('created_at', { ascending: true })
+  if (error) throw promotionsErrorFromDb(error)
+  return (data ?? []).map((row) => {
+    const r = row as Record<string, unknown>
+    const nombre = (embed: unknown) => {
+      const v = Array.isArray(embed) ? embed[0] : embed
+      return v && typeof v === 'object' && 'name' in v ? String((v as { name: unknown }).name) : null
+    }
+    return promotionAudienceSchema.parse({
+      ...r,
+      customer_name: nombre(r.customers),
+      account_name: nombre(r.business_accounts),
+    })
+  })
+}
+
+const AUDIENCE_COLUMN: Record<TargetAudienceKind, string> = {
+  channel: 'channel_id',
+  segment: 'segment_id',
+  customer: 'customer_id',
+  business_account: 'business_account_id',
+}
+
+export async function addAudience(
+  scope: PromotionScopeIds,
+  input: { promotionId: string; kind: TargetAudienceKind; targetId: string },
+): Promise<void> {
+  const { error } = await client().from(PROMOTION_AUDIENCES_TABLE).insert({
+    organization_id: scope.organizationId,
+    company_id: scope.companyId,
+    store_id: scope.storeId,
+    promotion_id: input.promotionId,
+    audience_kind: input.kind,
+    [AUDIENCE_COLUMN[input.kind]]: input.targetId,
+  })
+  if (error) throw promotionsErrorFromDb(error)
+}
+
+export async function removeAudience(id: string): Promise<void> {
+  const { error } = await client().from(PROMOTION_AUDIENCES_TABLE).delete().eq('id', id)
   if (error) throw promotionsErrorFromDb(error)
 }
 

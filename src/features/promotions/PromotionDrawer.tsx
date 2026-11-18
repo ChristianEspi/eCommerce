@@ -36,6 +36,7 @@ import {
   useScopes,
   useTiers,
 } from './hooks'
+import { PromotionAudiencePanel } from './PromotionAudiencePanel'
 import type { PromotionScopeIds } from './api'
 import { PromotionAiAssistant } from './ai/PromotionAiAssistant'
 import {
@@ -872,6 +873,9 @@ export function PromotionDrawer({
             </Stack>
           </Stack>
         )}
+
+        {/* 2026-11-18 · «Dirigida a»: sin destinatarios, toda la tienda. */}
+        {promotion && <PromotionAudiencePanel promotionId={promotion.id} scope={scope} />}
 
         {promotion?.kind === 'volume_tier' && (
           <>

@@ -158,6 +158,26 @@ export const promotionTierSchema = z.object({
 })
 export type PromotionTier = z.infer<typeof promotionTierSchema>
 
+/**
+ * «Dirigida a» (2026-11-18). `all` lo admite la base y se pinta si alguien lo
+ * guardó, pero no se ofrece: sin destinatarios la campaña ya vale para todos.
+ */
+export const TARGET_AUDIENCE_KINDS = ['channel', 'segment', 'customer', 'business_account'] as const satisfies readonly AudienceKind[]
+export type TargetAudienceKind = (typeof TARGET_AUDIENCE_KINDS)[number]
+
+export const promotionAudienceSchema = z.object({
+  id: z.string(),
+  promotion_id: z.string(),
+  audience_kind: z.enum(AUDIENCE_KINDS),
+  channel_id: z.string().nullable().default(null),
+  segment_id: z.string().nullable().default(null),
+  customer_id: z.string().nullable().default(null),
+  business_account_id: z.string().nullable().default(null),
+  customer_name: z.string().nullable().default(null),
+  account_name: z.string().nullable().default(null),
+})
+export type PromotionAudience = z.infer<typeof promotionAudienceSchema>
+
 export const couponSchema = z.object({
   id: z.string(),
   promotion_id: z.string(),
