@@ -16,6 +16,7 @@ import {
 import { useState } from 'react'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { codeLabel } from '@/shared/i18n/codeLabels'
 import { formatDateTime } from '@/shared/lib/format'
 import { StatusChip } from '@/shared/ui/StatusChip'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
@@ -125,7 +126,7 @@ export function RunsDialog({ feedId, onClose }: { feedId: string | null; onClose
                     />
                     {run.error_code && (
                       <Typography sx={{ fontSize: 12, color: 'var(--muted)', mt: 0.5, wordBreak: 'break-word' }}>
-                        {run.error_code}
+                        {codeLabel(t, run.error_code)}
                         {run.error_message ? ` · ${run.error_message}` : ''}
                       </Typography>
                     )}

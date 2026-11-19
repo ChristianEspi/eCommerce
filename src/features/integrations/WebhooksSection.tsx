@@ -19,11 +19,12 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useState } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { eventLabel, termLabel } from '@/shared/i18n/codeLabels'
 import { formatDateTime } from '@/shared/lib/format'
 import { SearchField } from '@/shared/ui/SearchField'
 import { EmptyState, ErrorState, UnauthorizedState } from '@/shared/ui/states'
@@ -121,28 +122,31 @@ function NewEndpointDialog({ open, onClose }: { open: boolean; onClose: () => vo
               {t(create.error instanceof IntegrationsError ? create.error.key : 'integrations.error.generic')}
             </Alert>
           )}
-          <TextField
+          <Field
+            rule="lowerCode" maxLength={61}
             label={t('integrations.webhooks.name')}
             value={name}
             onChange={(event) => setName(event.target.value)}
             helperText={t('integrations.webhooks.nameHelp')}
             fullWidth
           />
-          <TextField
+          <Field
+            rule="url" maxLength={500} help={t('help.integrations.webhooks.url')}
             label={t('integrations.webhooks.url')}
             value={url}
             onChange={(event) => setUrl(event.target.value)}
             helperText={t('integrations.webhooks.urlHelp')}
             fullWidth
           />
-          <TextField
+          <Field
+            rule="code" maxLength={81} help={t('integrations.webhooks.secretRefHelp')}
             label={t('integrations.webhooks.secretRef')}
             value={secretRef}
             onChange={(event) => setSecretRef(event.target.value)}
-            helperText={t('integrations.webhooks.secretRefHelp')}
             fullWidth
           />
-          <TextField
+          <Field
+            rule="text" maxLength={300}
             label={t('integrations.webhooks.description')}
             value={description}
             onChange={(event) => setDescription(event.target.value)}
@@ -168,7 +172,14 @@ function NewEndpointDialog({ open, onClose }: { open: boolean; onClose: () => vo
                     }
                   />
                 }
-                label={eventType}
+                label={
+                  <span>
+                    {eventLabel(t, eventType)}
+                    <Typography component="span" sx={{ fontSize: 12, color: 'var(--muted)', ml: 0.75 }}>
+                      {eventType}
+                    </Typography>
+                  </span>
+                }
               />
             ))}
           </Stack>
@@ -300,7 +311,7 @@ export function WebhooksSection() {
                   <TableCell>
                     <Stack direction="row" sx={{ gap: 0.5, flexWrap: 'wrap' }}>
                       {(byEndpoint.get(endpoint.id) ?? []).map((eventType) => (
-                        <StatusChip key={eventType} label={eventType} />
+                        <StatusChip key={eventType} label={eventLabel(t, eventType)} />
                       ))}
                     </Stack>
                   </TableCell>
@@ -373,7 +384,7 @@ export function WebhooksSection() {
                 <TableRow key={delivery.id}>
                   <TableCell>{formatDateTime(delivery.created_at, locale)}</TableCell>
                   <TableCell>
-                    <Typography sx={{ fontSize: 13 }}>{delivery.event_type}</Typography>
+                    <Typography sx={{ fontSize: 13 }}>{eventLabel(t, delivery.event_type)}</Typography>
                     {delivery.is_replay && (
                       <StatusChip tone="warning" label={t('integrations.webhooks.replayed')} />
                     )}
@@ -388,7 +399,11 @@ export function WebhooksSection() {
                             ? 'error'
                             : 'default'
                       }
-                      label={String(delivery.last_status_code ?? delivery.status)}
+                      label={
+                        delivery.last_status_code !== null && delivery.last_status_code !== undefined
+                          ? `HTTP ${delivery.last_status_code}`
+                          : termLabel(t, 'status', delivery.status)
+                      }
                     />
                     {delivery.last_error && (
                       <Typography sx={{ fontSize: 12, color: 'var(--muted)' }}>

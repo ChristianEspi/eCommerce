@@ -212,6 +212,8 @@ export const INVENTORY_MOVEMENTS_TABLE = 'inventory_movements'
 export const INVENTORY_RESERVATIONS_TABLE = 'inventory_reservations'
 export const INVENTORY_RESERVATION_ITEMS_TABLE = 'inventory_reservation_items'
 export const INVENTORY_ALERTS_VIEW = 'inventory_alerts'
+/** 2026-11-17 · Kits que su componente más escaso deja armar 5 o menos. */
+export const BUNDLE_STOCK_ALERTS_VIEW = 'bundle_stock_alerts' satisfies ViewName
 
 // --- Carrito, intentos de compra y hechos (P07-SaaS, migraciones 100000-100400)
 // Sin `satisfies` por la misma razón que las anteriores: `database.types.ts` se
@@ -461,6 +463,8 @@ export const RESERVE_INVENTORY_RPC = 'reserve_inventory'
 export const RELEASE_RESERVATION_RPC = 'release_inventory_reservation'
 export const COMMIT_RESERVATION_RPC = 'commit_inventory_reservation'
 export const ADJUST_INVENTORY_RPC = 'adjust_inventory'
+/** 2026-11-18 · Traslado entre almacenes: las dos patas en una transacción. */
+export const INVENTORY_TRANSFER_RPC = 'inventory_transfer' satisfies FunctionName
 export const SET_INVENTORY_POLICY_RPC = 'set_inventory_policy'
 export const SEED_INVENTORY_RPC = 'seed_inventory_from_catalog'
 
@@ -544,6 +548,8 @@ export const MY_PURCHASED_PRODUCTS_RPC = 'my_purchased_products_for_slug' satisf
 // estado y sociedad antes de guardar. `my_effective_business_account_for_slug`
 // la usa el checkout (Edge Function), no la vitrina.
 export const MY_STORE_BUSINESS_ACCOUNTS_RPC = 'my_store_business_accounts' satisfies FunctionName
+/** 2026-11-16 · Qué productos NO puede comprar la cuenta B2B de la sesión por su surtido. */
+export const MY_ASSORTMENT_BLOCKED_RPC = 'my_assortment_blocked'
 export const SELECT_STORE_BUSINESS_ACCOUNT_RPC = 'select_store_business_account' satisfies FunctionName
 
 // --- Cierre A3 · cotizaciones del comprador (migración 20260914101000) -------
@@ -637,6 +643,15 @@ export const CART_RECOVERY_UNSUBSCRIBE_RPC = 'cart_recovery_unsubscribe'
 export const REFUND_REQUEST_RPC = 'payment_refund_request'
 export const RECONCILIATION_IMPORT_RPC = 'payment_reconciliation_import'
 export const RECONCILIATION_MATCH_RPC = 'payment_reconciliation_match'
+/** 2026-11-17 · «Confirmar cobro» de un medio sin pasarela (Yape, transferencia). */
+export const PAYMENT_CONFIRM_OFFLINE_RPC = 'payment_confirm_offline' satisfies FunctionName
+/**
+ * 2026-11-17 · Crédito sin huecos (20261118100000): la línea de cada cuenta,
+ * el cobro en una transacción y el comprobante desde un pedido.
+ */
+export const CREDIT_LINES_RPC = 'credit_lines' satisfies FunctionName
+export const AR_REGISTER_RECEIPT_RPC = 'ar_register_receipt' satisfies FunctionName
+export const INVOICE_CREATE_FOR_ORDER_RPC = 'invoice_create_for_order' satisfies FunctionName
 /** Escribe (o quita) la llave secreta de la pasarela del medio en Vault. Nunca la lee. */
 export const PAYMENT_METHOD_SET_SECRET_RPC = 'payment_method_set_secret'
 

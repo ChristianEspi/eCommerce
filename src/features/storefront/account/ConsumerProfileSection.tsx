@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Alert, Box, Button, Card, CardContent, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, Card, CardContent, Stack, Typography } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -7,11 +7,17 @@ import { AuthActionError, updateProfile } from '@/features/auth/authApi'
 import { useSessionContext } from '@/features/auth/session-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
+import { matchesRule } from '@/shared/lib/fieldRules'
+import { Field } from '@/shared/ui/Field'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { profileFromSession } from '../consumer'
 
 const schema = z.object({
-  fullName: z.string().trim().max(120, 'account.consumer.profile.nameTooLong'),
+  fullName: z
+    .string()
+    .trim()
+    .max(120, 'account.consumer.profile.nameTooLong')
+    .refine((value) => value === '' || matchesRule('personName', value), 'field.error.personName'),
   phone: z
     .string()
     .trim()
@@ -75,24 +81,28 @@ export function ConsumerProfileSection() {
 
             {serverError && <Alert severity="error">{t(serverError)}</Alert>}
 
-            <TextField
+            <Field
               label={t('account.consumer.profile.email')}
+              rule="email"
               value={profile.email}
               slotProps={{ input: { readOnly: true } }}
               helperText={t('account.consumer.profile.emailHint')}
               fullWidth
             />
-            <TextField
+            <Field
               label={t('account.consumer.profile.name')}
               autoComplete="name"
+              rule="personName"
               error={Boolean(errors.fullName)}
               helperText={message(errors.fullName?.message)}
               fullWidth
               {...register('fullName')}
             />
-            <TextField
+            <Field
               label={t('account.consumer.profile.phone')}
               autoComplete="tel"
+              rule="phone"
+              maxLength={40}
               type="tel"
               error={Boolean(errors.phone)}
               helperText={message(errors.phone?.message) ?? t('account.consumer.profile.phoneHint')}

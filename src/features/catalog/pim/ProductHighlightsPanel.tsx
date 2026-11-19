@@ -1,6 +1,7 @@
 import AddRoundedIcon from '@mui/icons-material/AddRounded'
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
-import { Button, IconButton, Stack, TextField, Typography } from '@mui/material'
+import { Button, IconButton, Stack, Typography } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { z } from 'zod'
@@ -70,9 +71,11 @@ export function ProductHighlightsPanel({ productId, canWrite }: { productId: str
       </Typography>
       {items.map((value, index) => (
         <Stack key={index} direction="row" sx={{ gap: 1, alignItems: 'center' }}>
-          <TextField
+          <Field
             size="small"
             fullWidth
+            rule="text"
+            maxLength={MAX_HIGHLIGHT_LENGTH}
             value={value}
             disabled={!canWrite}
             inputProps={{ maxLength: MAX_HIGHLIGHT_LENGTH, 'aria-label': `${t('catalog.highlights.item')} ${index + 1}` }}

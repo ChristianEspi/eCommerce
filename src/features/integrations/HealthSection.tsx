@@ -2,6 +2,7 @@ import { StatusChip } from '@/shared/ui/StatusChip'
 import { Button, Card, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material'
 import { useState } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { eventLabel, termLabel } from '@/shared/i18n/codeLabels'
 import { formatDateTime } from '@/shared/lib/format'
 import { ErrorState, EmptyState, UnauthorizedState } from '@/shared/ui/states'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
@@ -115,12 +116,12 @@ export function HealthSection() {
               {data.circuits.map((circuit) => (
                 <TableRow key={circuit.id}>
                   <TableCell>{circuit.provider_code}</TableCell>
-                  <TableCell>{circuit.operation}</TableCell>
+                  <TableCell>{eventLabel(t, circuit.operation)}</TableCell>
                   <TableCell>{circuit.target_label}</TableCell>
                   <TableCell>
                     <StatusChip
                       tone={circuit.state === 'open' ? 'error' : 'warning'}
-                      label={`${circuit.state} · ${circuit.consecutive_fail}/${circuit.threshold}`}
+                      label={`${termLabel(t, 'status', circuit.state)} · ${circuit.consecutive_fail}/${circuit.threshold}`}
                     />
                   </TableCell>
                   <TableCell align="right">
@@ -160,7 +161,7 @@ export function HealthSection() {
                       {provider.provider_name}
                     </Typography>
                     <Typography sx={{ fontSize: 12, color: 'var(--muted)' }}>
-                      {provider.provider_kind}
+                      {termLabel(t, 'providerKind', provider.provider_kind)}
                       {!provider.is_active && ` · ${t('integrations.health.inactive')}`}
                     </Typography>
                   </TableCell>

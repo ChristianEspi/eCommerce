@@ -1,3 +1,4 @@
+import { fetchAssortmentBlocked } from '../commerce/assortment'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { fetchPublicAvailability } from '@/features/inventory/api'
 import type { PublicProduct, PublicVariant } from '../types'
@@ -225,12 +226,32 @@ export function CartProvider({
    * de stock del checkout, con la fila bloqueada. Bloquear una venta porque una
    * consulta consultiva no contestó sería cambiar un mal final por uno peor.
    */
+  // Por qué no se añadió lo último (lo lee el aviso de «añadir al carrito»).
+  const rechazo = useRef<'stock' | 'assortment' | null>(null)
+
   const add = useCallback(
     async (
       product: PublicProduct,
       quantity = 1,
       variant: PublicVariant | null = null,
     ): Promise<boolean> => {
+      rechazo.current = null
+      // 2026-11-16 · El surtido de la empresa: un producto fuera de él no entra
+      // al carrito, venga de la tarjeta, la ficha, la vista rápida o «volver a
+      // pedir» — este es el punto común a todos. Cortesía, no autoridad: la base
+      // lo vuelve a exigir al crear el pedido, así que si la consulta falla se sigue.
+      if (authenticated) {
+        try {
+          const bloqueados = await fetchAssortmentBlocked(storeSlug, [product.product_id])
+          if (bloqueados.includes(product.product_id)) {
+            rechazo.current = 'assortment'
+            return false
+          }
+        } catch (error) {
+          console.error('[carrito] no se pudo comprobar el surtido', error)
+        }
+      }
+
       const enCarrito =
         cart.lines.find(
           (line) =>
@@ -250,7 +271,10 @@ export function CartProvider({
           ],
         })
         // `unknown` es «no lo sé» —un ERP que no contestó— y no «no hay».
-        if (fila && !fila.unknown && !fila.in_stock) return false
+        if (fila && !fila.unknown && !fila.in_stock) {
+          rechazo.current = 'stock'
+          return false
+        }
       } catch (error) {
         console.error('[carrito] no se pudo comprobar la existencia', error)
       }
@@ -271,7 +295,7 @@ export function CartProvider({
       })
       return true
     },
-    [cart.lines, storeSlug],
+    [cart.lines, storeSlug, authenticated],
   )
 
   const setQuantity = useCallback(
@@ -312,6 +336,7 @@ export function CartProvider({
       forgetServerCart,
       synced,
       add,
+      lastRejection: () => rechazo.current,
       setQuantity,
       remove,
       clear,

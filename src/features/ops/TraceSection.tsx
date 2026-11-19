@@ -12,6 +12,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { entityLabel, summaryLabel, termLabel } from '@/shared/i18n/codeLabels'
 import { formatDateTime } from '@/shared/lib/format'
 import { SearchField } from '@/shared/ui/SearchField'
 import { EmptyState, ErrorState, UnauthorizedState } from '@/shared/ui/states'
@@ -94,21 +95,21 @@ export function TraceSection({
                 <TableRow key={`${step.entity_id ?? 'x'}-${index}`}>
                   <TableCell>{formatDateTime(step.occurred_at, locale)}</TableCell>
                   <TableCell>
-                    <StatusChip label={step.domain} />
+                    <StatusChip label={termLabel(t, 'domain', step.domain)} />
                   </TableCell>
                   <TableCell>
                     <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
-                      {step.entity_type ?? '—'}
+                      {entityLabel(t, step.entity_type)}
                     </Typography>
                     <Typography sx={{ fontSize: 12, color: 'var(--muted)' }}>
-                      {step.summary ?? '—'}
+                      {summaryLabel(t, step.summary)}
                     </Typography>
                   </TableCell>
                   <TableCell align="right">
                     {step.status ? (
                       <StatusChip
                         tone={severityColor(step.severity)}
-                        label={step.status}
+                        label={termLabel(t, 'status', step.status)}
                       />
                     ) : (
                       '—'

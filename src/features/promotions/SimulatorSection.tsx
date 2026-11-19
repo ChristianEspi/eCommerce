@@ -13,9 +13,9 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useState } from 'react'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -78,6 +78,7 @@ function ProductoDeLinea({
 
   return (
     <EntityPicker
+          minChars={0}
       label={t('promotions.simulator.product')}
       placeholder={t('promotions.hint.target')}
       term={term}
@@ -174,7 +175,7 @@ export function SimulatorSection() {
   const customerYaElegido = customer !== null && customer.primary === customerDebounced
   const customers = useCustomerOptions({
     term: customerDebounced,
-    enabled: !customerYaElegido && customerDebounced.trim().length >= 2,
+    enabled: !customerYaElegido,
   })
   const customerOptions: PickerOption[] = (customers.data ?? []).map((fila) => ({
     id: fila.id,
@@ -246,9 +247,10 @@ export function SimulatorSection() {
                   onPick={(productId) => update(index, { productId })}
                 />
               </Box>
-              <TextField
+              <Field
                 size="small"
                 label={t('promotions.simulator.quantity')}
+                rule="decimal"
                 value={line.quantity}
                 onChange={(event) => update(index, { quantity: event.target.value })}
                 sx={{ width: 120 }}
@@ -288,6 +290,7 @@ export function SimulatorSection() {
                 en «Opcional. Hace f…» y la ayuda ocupaba tres líneas. */}
             <Box>
               <EntityPicker
+          minChars={0}
                 label={t('promotions.simulator.customer')}
                 placeholder={t('promotions.hint.simulatorCustomerPlaceholder')}
                 term={customerTerm}
@@ -307,15 +310,16 @@ export function SimulatorSection() {
                 }}
               />
             </Box>
-            <TextField
+            <Field
               size="small"
               label={t('promotions.simulator.coupons')}
+              rule="text"
               value={coupons}
               onChange={(event) => setCoupons(event.target.value)}
               helperText={t('promotions.hint.simulatorCoupons')}
               fullWidth
             />
-            <TextField
+            <Field
               size="small"
               type="datetime-local"
               label={t('promotions.simulator.at')}

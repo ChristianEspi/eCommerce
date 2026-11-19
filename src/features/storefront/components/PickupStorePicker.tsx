@@ -7,12 +7,12 @@ import {
   CircularProgress,
   Radio,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { formatDistance, type LatLng } from '@/shared/lib/geo'
+import { Field } from '@/shared/ui/Field'
 import { MapView } from '@/shared/ui/map/MapView'
 import { StatusChip } from '@/shared/ui/StatusChip'
 import { TS } from '@/theme/tokens'
@@ -67,13 +67,14 @@ export function PickupStorePicker({
 
   return (
     <Stack sx={{ gap: 1.5 }}>
-      <TextField
+      <Field
         label={t('store.pickup.district')}
+        rule="text"
+        maxLength={80}
         value={district}
         onChange={(evento) => onDistrictChange(evento.target.value)}
         helperText={t('store.pickup.districtHint')}
         autoComplete="address-level3"
-        slotProps={{ htmlInput: { maxLength: 80 } }}
       />
       <Box>
         <Button

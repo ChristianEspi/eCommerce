@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildTextSearchFilter } from '@/shared/lib/search'
 import { tryGetSupabaseClient, tryGetStorefrontClient } from '@/shared/lib/supabase'
 import { InventoryError, inventoryErrorFromDb } from './errors'
-import { ADMIN_PRODUCT_MASTERS_VIEW } from '@/shared/lib/db-schema'
+import { ADMIN_PRODUCT_MASTERS_VIEW, BUNDLE_STOCK_ALERTS_VIEW } from '@/shared/lib/db-schema'
 import {
   ADJUST_INVENTORY_RPC,
   AVAILABILITY_PUBLIC_RPC,
@@ -10,6 +10,7 @@ import {
   INVENTORY_ALERTS_VIEW,
   INVENTORY_AVAILABILITY_RPC,
   INVENTORY_LEVELS_TABLE,
+  INVENTORY_TRANSFER_RPC,
   INVENTORY_MOVEMENTS_TABLE,
   INVENTORY_RESERVATIONS_TABLE,
   PRODUCTS_TABLE,
@@ -34,6 +35,8 @@ import {
   type InventoryMovement,
   type LevelRow,
   type MovementFormValues,
+  type StockLevel,
+  type TransferFormValues,
   type PolicyFormValues,
   type Reservation,
   type ReservationResult,
@@ -369,6 +372,45 @@ export async function adjustInventory(values: MovementFormValues): Promise<void>
   if (error) throw inventoryErrorFromDb(error)
 }
 
+/**
+ * El stock de un producto (o variante) en un almacén. Sin fila todavía es cero:
+ * el almacén nunca lo tuvo.
+ */
+export async function fetchStockLevel(
+  warehouseId: string,
+  productId: string,
+  variantId: string | null,
+): Promise<StockLevel> {
+  let query = client()
+    .from(INVENTORY_LEVELS_TABLE)
+    .select('on_hand_qty, reserved_qty, available_qty')
+    .eq('warehouse_id', warehouseId)
+    .eq('product_id', productId)
+  query = variantId ? query.eq('variant_id', variantId) : query.is('variant_id', null)
+  const { data, error } = await query.maybeSingle()
+  if (error) throw inventoryErrorFromDb(error)
+  const row = (data ?? null) as { on_hand_qty?: unknown; reserved_qty?: unknown; available_qty?: unknown } | null
+  return {
+    on_hand: Number(row?.on_hand_qty ?? 0),
+    reserved: Number(row?.reserved_qty ?? 0),
+    available: Number(row?.available_qty ?? 0),
+  }
+}
+
+/** Traslada en una sola operación: sale del origen y entra en el destino, o nada. */
+export async function transferInventory(values: TransferFormValues): Promise<{ reference: string }> {
+  const { data, error } = await client().rpc(INVENTORY_TRANSFER_RPC, {
+    p_from_warehouse_id: values.from_warehouse_id,
+    p_to_warehouse_id: values.to_warehouse_id,
+    p_product_id: values.product_id,
+    p_variant_id: values.variant_id,
+    p_quantity: values.quantity,
+    p_reason: values.reason ? values.reason : null,
+  })
+  if (error) throw inventoryErrorFromDb(error)
+  return { reference: String((data as { reference?: unknown } | null)?.reference ?? '') }
+}
+
 export async function setInventoryPolicy(values: PolicyFormValues): Promise<void> {
   const { error } = await client().rpc(SET_INVENTORY_POLICY_RPC, {
     p_warehouse_id: values.warehouse_id,
@@ -512,5 +554,12 @@ export async function fetchAlerts(storeId: string | null): Promise<InventoryAler
         : query.or(`warehouse_id.in.(${serving.join(',')}),store_id.eq.${storeId}`)
   const { data, error } = await query.limit(200)
   if (error) throw inventoryErrorFromDb(error)
-  return inventoryAlertSchema.array().parse(data ?? [])
+  // 2026-11-17 · Los kits: van por la tienda donde están publicados. Si la
+  // vista no existe todavía en la base, no tumba el resto de avisos.
+  const kits = await client()
+    .from(BUNDLE_STOCK_ALERTS_VIEW)
+    .select(`${ALERT_SELECT}, limiting_component`)
+    .eq('store_id', storeId)
+    .limit(100)
+  return inventoryAlertSchema.array().parse([...(data ?? []), ...(kits.error ? [] : (kits.data ?? []))])
 }

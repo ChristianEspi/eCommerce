@@ -40,6 +40,12 @@ export function mapPaymentsCode(code: string): MessageKey {
     case 'NO_ENCONTRADO':
     case 'PGRST116':
       return 'payments.error.notFound'
+    case 'COBRO_CON_PASARELA':
+      return 'payments.confirm.error.gateway'
+    case 'COBRO_NO_PENDIENTE':
+      return 'payments.confirm.error.notPending'
+    case 'REFERENCIA_NO_VALIDA':
+      return 'payments.confirm.error.reference'
     case 'DEVOLUCION_EXCEDE_COBRO':
       return 'payments.error.refundTooLarge'
     case 'IMPORTE_NO_VALIDO':

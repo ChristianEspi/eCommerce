@@ -3,7 +3,6 @@ import {
   MenuItem,
   Stack,
   Switch,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useMemo, useState } from 'react'
@@ -21,7 +20,8 @@ import {
   useSaveProductAttribute,
 } from './hooks'
 import type { ProductAttributeInput } from './api'
-import type { AttributeValue, ProductAttributeValue } from './types'
+import { SIGNED_FACTOR_FIELD_RULE, type AttributeValue, type ProductAttributeValue } from './types'
+import { Field } from '@/shared/ui/Field'
 import type { PimProduct } from '../types'
 import { SelectField } from '@/shared/ui/SelectField'
 
@@ -197,8 +197,16 @@ export function ProductAttributesPanel({
             const type = attribute.data_type === 'date' ? 'date' : 'text'
 
             return (
-              <TextField
+              <Field
                 key={attribute.id}
+                rule={
+                  attribute.data_type === 'number'
+                    ? SIGNED_FACTOR_FIELD_RULE
+                    : attribute.data_type === 'date'
+                      ? undefined
+                      : 'text'
+                }
+                maxLength={attribute.data_type === 'number' || attribute.data_type === 'date' ? undefined : 500}
                 size="small"
                 fullWidth
                 type={type}

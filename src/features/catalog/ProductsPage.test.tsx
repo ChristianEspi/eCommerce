@@ -765,7 +765,10 @@ describe('ProductsPage — alta y edicion del maestro', () => {
 
     await user.type(within(drawer).getByLabelText('Nombre'), 'Mesa nueva')
     await user.type(within(drawer).getByLabelText('SKU'), 'MES-001')
-    await user.type(within(drawer).getByLabelText('Precio'), '19,90')
+    // La coma ya se convierte en punto al teclear («19,90» es válido): un
+    // importe que termina en separador sigue sin serlo.
+    await user.type(within(drawer).getByLabelText('Precio'), '19,')
+    expect(within(drawer).getByLabelText('Precio')).toHaveValue('19.')
     await user.click(within(drawer).getByRole('button', { name: 'Guardar' }))
 
     expect(await within(drawer).findByText(/importe con hasta 2 decimales/i)).toBeInTheDocument()

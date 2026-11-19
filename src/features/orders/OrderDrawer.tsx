@@ -22,11 +22,11 @@ import {
   TableHead,
   TableRow,
   Tabs,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { Field as InputField } from '@/shared/ui/Field'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { formatDate, formatDateTime, formatMoney, formatTime } from '@/shared/lib/format'
 import { isSafeExternalUrl } from '@/domain/href'
@@ -428,13 +428,14 @@ export function OrderDrawer({
             )}
             {awaitingApproval && canWrite && (
               <>
-                <TextField
+                <InputField
                   size="small"
+                  rule="longText"
+                  maxLength={1000}
                   label={t('orders.approval.reasonField')}
                   helperText={t('orders.approval.reasonHelp')}
                   value={approvalReason}
                   onChange={(event) => setApprovalReason(event.target.value)}
-                  inputProps={{ maxLength: 1000 }}
                 />
                 <Stack direction="row" spacing={1}>
                   <Button
@@ -771,15 +772,16 @@ export function OrderDrawer({
                   <Alert severity="info">{t('orders.status.final')}</Alert>
                 ) : (
                   <>
-                    <TextField
+                    <InputField
                       size="small"
+                      rule="longText"
+                      maxLength={1000}
                       label={t('orders.note')}
                       helperText={t('orders.noteHelp')}
                       value={reason}
                       onChange={(event) => setReason(event.target.value)}
                       multiline
                       minRows={2}
-                      inputProps={{ maxLength: 1000 }}
                     />
                     <Box>
                       <Button
@@ -898,13 +900,14 @@ export function OrderDrawer({
           </Stack>
           {canWrite && (
             <Stack direction="row" spacing={1}>
-              <TextField
+              <InputField
                 size="small"
+                rule="text"
+                maxLength={40}
                 label={t('orders.tags.add')}
                 helperText={t('orders.tags.help')}
                 value={tagInput}
                 onChange={(event) => setTagInput(event.target.value)}
-                inputProps={{ maxLength: 40 }}
                 sx={{ flex: 1 }}
               />
               <Button
@@ -975,14 +978,15 @@ export function OrderDrawer({
           ))}
           {canWrite && (
             <>
-              <TextField
+              <InputField
                 size="small"
+                rule="longText"
+                maxLength={4000}
                 label={t('orders.notes.add')}
                 value={noteBody}
                 onChange={(event) => setNoteBody(event.target.value)}
                 multiline
                 minRows={2}
-                inputProps={{ maxLength: 4000 }}
               />
               <Box>
                 <Button
@@ -1061,26 +1065,32 @@ export function OrderDrawer({
           ))}
           {canWrite && (
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-              <TextField
+              <InputField
                 size="small"
+                rule="lowerCode"
+                maxLength={41}
+                help={t('help.orders.refSystem')}
                 label={t('orders.externalRefs.system')}
                 value={refSystem}
                 onChange={(event) => setRefSystem(event.target.value)}
-                inputProps={{ maxLength: 41 }}
               />
-              <TextField
+              <InputField
                 size="small"
+                rule="lowerCode"
+                maxLength={41}
+                help={t('help.orders.refType')}
                 label={t('orders.externalRefs.type')}
                 value={refType}
                 onChange={(event) => setRefType(event.target.value)}
-                inputProps={{ maxLength: 41 }}
               />
-              <TextField
+              <InputField
                 size="small"
+                rule="text"
+                maxLength={120}
+                help={t('help.orders.refValue')}
                 label={t('orders.externalRefs.value')}
                 value={refValue}
                 onChange={(event) => setRefValue(event.target.value)}
-                inputProps={{ maxLength: 120 }}
                 sx={{ flex: 1 }}
               />
               <Button
@@ -1268,17 +1278,18 @@ export function OrderDrawer({
           <Typography sx={{ fontSize: 13, color: 'var(--muted)', mb: 2 }}>
             {t('orders.cancel.body')}
           </Typography>
-          <TextField
+          <InputField
             autoFocus
             fullWidth
             multiline
             minRows={2}
             size="small"
+            rule="longText"
+            maxLength={1000}
             label={t('orders.cancel.reason')}
             helperText={t('orders.cancel.reasonHelp')}
             value={cancelReason}
             onChange={(event) => setCancelReason(event.target.value)}
-            inputProps={{ maxLength: 1000 }}
           />
         </DialogContent>
         <DialogActions>

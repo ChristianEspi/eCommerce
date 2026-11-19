@@ -87,6 +87,11 @@ export function AlertsSection() {
                     <Stack>
                       <Typography sx={{ fontWeight: 700, fontSize: 13 }}>{alert.sku}</Typography>
                       <Typography sx={{ color: 'var(--muted)', fontSize: 12 }}>{alert.name}</Typography>
+                      {alert.limiting_component && (
+                        <Typography sx={{ color: 'var(--amber)', fontSize: 12 }}>
+                          {t('inventory.alert.bundleLimitedBy').replace('{component}', alert.limiting_component)}
+                        </Typography>
+                      )}
                     </Stack>
                   </TableCell>
                   <TableCell>{alert.warehouse_code ?? '—'}</TableCell>

@@ -19,9 +19,9 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useMemo, useState } from 'react'
 import { CONTENT_PAGE_KINDS, CONTENT_STATUSES } from '@/domain/content'
 import { useTenant } from '@/features/tenant/tenant-context'
@@ -336,8 +336,10 @@ export function PagesSection({
         }
       >
         <Stack spacing={2}>
-          <TextField
+          <Field
             label={t('content.pages.title')}
+            rule="text"
+            maxLength={160}
             value={form.title}
             onChange={(event) => {
               const title = event.target.value
@@ -348,8 +350,10 @@ export function PagesSection({
             }}
             required
           />
-          <TextField
+          <Field
             label={t('content.pages.slug')}
+            rule="slug"
+            maxLength={61}
             value={form.slug}
             onChange={(event) => setForm({ ...form, slug: event.target.value })}
             helperText={t('content.pages.slugHelp')}
@@ -381,14 +385,14 @@ export function PagesSection({
               </MenuItem>
             ))}
           </SelectField>
-          <TextField
+          <Field
             type="datetime-local"
             label={t('content.pages.from')}
             value={form.publish_from}
             onChange={(event) => setForm({ ...form, publish_from: event.target.value })}
             InputLabelProps={{ shrink: true }}
           />
-          <TextField
+          <Field
             type="datetime-local"
             label={t('content.pages.to')}
             value={form.publish_to}
@@ -396,12 +400,14 @@ export function PagesSection({
             InputLabelProps={{ shrink: true }}
             helperText={t('content.pages.toHelp')}
           />
-          <TextField
+          <Field
             type="number"
             label={t('content.pages.priority')}
+            rule="signedInteger"
+            maxLength={3}
             value={form.priority}
             onChange={(event) => setForm({ ...form, priority: Number(event.target.value) })}
-            helperText={t('content.pages.priorityHelp')}
+            help={t('content.pages.priorityHelp')}
           />
           <Stack direction="row" spacing={1} alignItems="center">
             <Switch
@@ -411,13 +417,19 @@ export function PagesSection({
             />
             <Typography sx={{ fontWeight: 700 }}>{t('content.pages.nav')}</Typography>
           </Stack>
-          <TextField
+          <Field
             label={t('content.pages.seoTitle')}
+            rule="text"
+            maxLength={160}
+            help={t('help.content.seoTitle')}
             value={form.seo_title}
             onChange={(event) => setForm({ ...form, seo_title: event.target.value })}
           />
-          <TextField
+          <Field
             label={t('content.pages.seoDescription')}
+            rule="longText"
+            maxLength={320}
+            help={t('help.content.seoDescription')}
             value={form.seo_description}
             onChange={(event) => setForm({ ...form, seo_description: event.target.value })}
             multiline

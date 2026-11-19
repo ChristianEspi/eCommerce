@@ -1,25 +1,26 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import VisibilityOffRoundedIcon from '@mui/icons-material/VisibilityOffRounded'
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded'
-import { Alert, Box, Button, IconButton, InputAdornment, Stack, TextField } from '@mui/material'
+import { Alert, Box, Button, IconButton, InputAdornment, Stack } from '@mui/material'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link as RouterLink, Navigate, useLocation } from 'react-router-dom'
 import { z } from 'zod'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
+import { Field } from '@/shared/ui/Field'
 import { LoadingState } from '@/shared/ui/states'
 import { R } from '@/theme/tokens'
 import { AuthShell, CTA_SX, FieldLabel, ROUNDED_FIELD_SX } from './AuthShell'
 import { AuthActionError, updatePassword } from './authApi'
-import { MIN_PASSWORD_LENGTH } from './passwordPolicy'
+import { MIN_PASSWORD_LENGTH, PASSWORD_MAX_LENGTH } from './passwordPolicy'
 import { returnPathOr } from './returnTo'
 import { useSessionContext } from './session-context'
 
 const schema = z
   .object({
-    password: z.string().min(MIN_PASSWORD_LENGTH, 'auth.reset.tooShort'),
-    confirm: z.string().min(1, 'auth.reset.confirmRequired'),
+    password: z.string().min(MIN_PASSWORD_LENGTH, 'auth.reset.tooShort').max(PASSWORD_MAX_LENGTH, 'sfHelp.auth.error.passwordTooLong'),
+    confirm: z.string().min(1, 'auth.reset.confirmRequired').max(PASSWORD_MAX_LENGTH, 'sfHelp.auth.error.passwordTooLong'),
   })
   .refine((values) => values.password === values.confirm, {
     path: ['confirm'],
@@ -104,8 +105,9 @@ export function ResetPasswordPage() {
           <Stack spacing={2.25}>
             <Box>
               <FieldLabel htmlFor="reset-password">{t('auth.reset.newPassword')}</FieldLabel>
-              <TextField
+              <Field
                 id="reset-password"
+                maxLength={PASSWORD_MAX_LENGTH}
                 type={showPassword ? 'text' : 'password'}
                 fullWidth
                 autoComplete="new-password"
@@ -135,8 +137,9 @@ export function ResetPasswordPage() {
 
             <Box>
               <FieldLabel htmlFor="reset-confirm">{t('auth.reset.confirm')}</FieldLabel>
-              <TextField
+              <Field
                 id="reset-confirm"
+                maxLength={PASSWORD_MAX_LENGTH}
                 type="password"
                 fullWidth
                 autoComplete="new-password"

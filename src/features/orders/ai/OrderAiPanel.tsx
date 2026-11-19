@@ -11,7 +11,6 @@ import {
   Divider,
   Skeleton,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
@@ -20,6 +19,7 @@ import { useCapabilities } from '@/features/capabilities/capabilities-context'
 import { AiFeedbackButtons } from '@/features/ai/AiFeedbackButtons'
 import { useAiFeature } from '@/features/ai/hooks'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { Field } from '@/shared/ui/Field'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { AppIcon } from '@/shared/ui/AppIcon'
 import { T } from '@/theme/tokens'
@@ -368,16 +368,17 @@ export function OrderAiPanel({
             </Stack>
             <Box component="form" onSubmit={onSubmit} noValidate>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'flex-start' } }}>
-                <TextField
+                <Field
                   fullWidth
                   size="small"
+                  rule="longText"
+                  maxLength={MAX_ORDER_QUESTION + 50}
                   label={t('aiOrders.ask.label')}
                   placeholder={t('aiOrders.ask.placeholder')}
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
                   error={tooLong}
                   helperText={tooLong ? t('aiOrders.ask.tooLong') : t('aiOrders.costHint')}
-                  inputProps={{ maxLength: MAX_ORDER_QUESTION + 50 }}
                 />
                 <Button
                   type="submit"

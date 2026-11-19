@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Alert, Box, Button, MenuItem, Stack, TextField } from '@mui/material'
+import { Alert, Box, Button, MenuItem, Stack } from '@mui/material'
 import { useEffect, useMemo, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { useCustomerOptions } from '@/features/customers/hooks'
@@ -13,6 +13,7 @@ import { SalesError } from './errors'
 import { useRoutes, useSalesReps, useSaveVisit } from './hooks'
 import { emptyVisitForm, visitFormSchema, type VisitFormValues } from './types'
 import { SelectField } from '@/shared/ui/SelectField'
+import { Field } from '@/shared/ui/Field'
 
 /**
  * Agendar una visita.
@@ -47,7 +48,7 @@ export function VisitDrawer({
 
   const customers = useCustomerOptions({
     term: customerSearch,
-    enabled: open && customerSearch.trim().length >= 2,
+    enabled: open,
   })
 
   const opcionesCliente = useMemo<PickerOption[]>(
@@ -145,7 +146,7 @@ export function VisitDrawer({
                 </SelectField>
               )}
             />
-            <TextField
+            <Field
               fullWidth
               type="datetime-local"
               label={t('sales.field.plannedAt')}
@@ -185,6 +186,7 @@ export function VisitDrawer({
                 campo más, y el desplegable solo decide cuál se escribe. */}
             <input type="hidden" {...register('customer_id')} />
             <EntityPicker
+          minChars={0}
               label={t('sales.field.customerName')}
               term={customerSearch}
               onTermChange={setCustomerSearch}
@@ -202,12 +204,16 @@ export function VisitDrawer({
             />
           </Box>
 
-          <TextField
+          <Field
             fullWidth
             multiline
             minRows={2}
+            rule="longText"
+            maxLength={500}
             label={t('sales.field.notes')}
             disabled={!canWrite}
+            error={Boolean(errors.notes)}
+            helperText={errors.notes ? t(errors.notes.message as MessageKey) : undefined}
             slotProps={{ inputLabel: { shrink: true } }}
             {...register('notes')}
           />

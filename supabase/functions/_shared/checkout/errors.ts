@@ -79,6 +79,10 @@ const STAGE_CODE_STATUS: Record<string, ErrorStatus> = {
   // que el comprador pueda hacer ahora, falta que quien cobra levante el
   // bloqueo. Por la misma razón NO es reintentable: insistir no lo cambia.
   CREDITO_BLOQUEADO: 403,
+  // 2026-11-17 · La línea no alcanza, no existe, o no hay cuenta empresa.
+  CREDITO_EXCEDIDO: 403,
+  CREDITO_SIN_LINEA: 403,
+  CREDITO_SIN_CUENTA: 403,
   // --- Catálogo y precio ---
   PRODUCTO_NO_DISPONIBLE: 404,
   PRODUCTO_FUERA_DE_CANAL: 409,

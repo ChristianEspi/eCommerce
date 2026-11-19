@@ -7,7 +7,6 @@ import {
   MenuItem,
   Stack,
   Switch,
-  TextField,
 } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
@@ -26,6 +25,7 @@ import {
   type TerritoryFormValues,
 } from './types'
 import { SelectField } from '@/shared/ui/SelectField'
+import { Field } from '@/shared/ui/Field'
 
 /**
  * Alta y edición de un territorio.
@@ -127,7 +127,10 @@ export function TerritoryDrawer({
           <FieldRow>
             {/* El código son unas pocas letras: ancho fijo y sin encoger, para
                 que el nombre se quede con el resto de la fila. */}
-            <TextField
+            <Field
+              rule="code"
+              maxLength={41}
+              help={t('help.sales.territoryCode')}
               label={t('sales.field.code')}
               required
               disabled={!canWrite}
@@ -139,8 +142,10 @@ export function TerritoryDrawer({
               sx={{ width: { xs: '100%', sm: 160 }, flexShrink: 0 }}
               {...register('code')}
             />
-            <TextField
+            <Field
               fullWidth
+              rule="text"
+              maxLength={120}
               label={t('sales.field.name')}
               required
               disabled={!canWrite}

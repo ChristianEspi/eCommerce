@@ -12,11 +12,11 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useState } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { Field } from '@/shared/ui/Field'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState } from '@/shared/ui/states'
@@ -99,18 +99,24 @@ export function ExternalIdsPanel({
         <Stack spacing={1.5}>
           {error && <Alert severity="error">{t(error)}</Alert>}
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-            <TextField
+            <Field
               size="small"
               fullWidth
+              rule="lowerCode"
+              maxLength={41}
+              help={t('help.customers.systemCode')}
               label={t('customers.field.systemCode')}
               value={values.system_code}
               onChange={(event) => set('system_code', event.target.value)}
               helperText={t('customers.field.systemCodeHint')}
               inputProps={{ spellCheck: false }}
             />
-            <TextField
+            <Field
               size="small"
               fullWidth
+              rule="text"
+              maxLength={120}
+              help={t('help.customers.externalId')}
               label={t('customers.field.externalId')}
               value={values.external_id}
               onChange={(event) => set('external_id', event.target.value)}

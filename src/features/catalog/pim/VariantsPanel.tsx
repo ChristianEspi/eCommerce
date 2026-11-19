@@ -18,7 +18,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useEffect, useMemo, useState } from 'react'
@@ -48,6 +47,7 @@ import {
   type ProductVariant,
   type VariantFormValues,
 } from './types'
+import { Field } from '@/shared/ui/Field'
 import type { PimProduct } from '../types'
 import { SelectField } from '@/shared/ui/SelectField'
 
@@ -407,17 +407,21 @@ function VariantForm({
         )}
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-          <TextField
+          <Field
             size="small"
             fullWidth
+            rule="text"
+            maxLength={240}
             label={t('pim.field.name')}
             error={Boolean(errors.name)}
             helperText={fieldError('name')}
             {...register('name', { onChange: () => setTouchedName(true) })}
           />
-          <TextField
+          <Field
             size="small"
             fullWidth
+            rule="sku"
+            help={t('help.catalog.variantSku')}
             label={t('catalog.field.sku')}
             error={Boolean(errors.sku)}
             helperText={fieldError('sku')}
@@ -427,27 +431,32 @@ function VariantForm({
         </Stack>
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-          <TextField
+          <Field
             size="small"
             fullWidth
+            rule="money"
             label={`${t('common.price')} (${currency})`}
             error={Boolean(errors.price)}
             helperText={fieldError('price') ?? t('pim.variants.priceHelp')}
             inputProps={{ inputMode: 'decimal' }}
             {...register('price')}
           />
-          <TextField
+          <Field
             size="small"
             fullWidth
+            rule="integer"
             label={t('catalog.field.stock')}
             error={Boolean(errors.stock)}
             helperText={fieldError('stock')}
             inputProps={{ inputMode: 'numeric' }}
             {...register('stock')}
           />
-          <TextField
+          <Field
             size="small"
             fullWidth
+            rule="code"
+            maxLength={64}
+            help={t('help.catalog.barcode')}
             label={t('pim.field.barcode')}
             error={Boolean(errors.barcode)}
             helperText={fieldError('barcode') ?? t('common.optional')}

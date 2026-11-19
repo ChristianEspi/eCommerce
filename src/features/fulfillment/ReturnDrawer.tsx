@@ -11,12 +11,13 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { eventLabel } from '@/shared/i18n/codeLabels'
+import { DetailHeading, DetailTimeline } from '@/shared/ui/DetailBlocks'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { formatDateTime, formatMoney } from '@/shared/lib/format'
 import { FormDrawer } from '@/shared/ui/FormDrawer'
@@ -37,6 +38,7 @@ import {
   type ReturnRow,
 } from './types'
 import { SelectField } from '@/shared/ui/SelectField'
+import { Field } from '@/shared/ui/Field'
 
 interface LineDraft {
   condition: ReturnCondition
@@ -167,7 +169,7 @@ export function ReturnDrawer({
 
           {/* ---- Líneas --------------------------------------------------- */}
           <Stack spacing={1}>
-            <Typography variant="subtitle2">{t('returns.detail.lines')}</Typography>
+            <DetailHeading>{t('returns.detail.lines')}</DetailHeading>
             <Table size="small">
               <TableHead>
                 <TableRow>
@@ -236,13 +238,13 @@ export function ReturnDrawer({
                         )}
                       </TableCell>
                       <TableCell align="right">
-                        <TextField
+                        <Field
                           size="small"
+                          rule="money"
                           value={draft.refundAmount}
                           disabled={!editable}
                           inputProps={{
                             'aria-label': t('returns.field.refund'),
-                            inputMode: 'decimal',
                           }}
                           onChange={(event) =>
                             setDrafts((current) => ({
@@ -264,13 +266,14 @@ export function ReturnDrawer({
 
           {/* ---- Acciones, solo las que caben en este estado --------------- */}
           <Stack spacing={2}>
-            <Typography variant="subtitle2">{t('fulfillment.detail.actions')}</Typography>
+            <DetailHeading>{t('fulfillment.detail.actions')}</DetailHeading>
             {!canOperate && <Alert severity="info">{t('fulfillment.detail.readOnly')}</Alert>}
 
             {state === 'requested' && (
               <Stack spacing={1}>
-                <TextField
+                <Field
                   size="small"
+                  rule="longText"
                   label={t('returns.field.decisionNote')}
                   value={note}
                   disabled={!canOperate}
@@ -415,20 +418,18 @@ export function ReturnDrawer({
 
           {/* ---- Bitácora -------------------------------------------------- */}
           <Stack spacing={1}>
-            <Typography variant="subtitle2">{t('fulfillment.detail.timeline')}</Typography>
-            {(events.data ?? []).map((event) => (
-              <Stack key={event.id} direction="row" spacing={1} alignItems="baseline">
-                <Typography variant="caption" sx={{ color: 'var(--muted)', minWidth: 132 }}>
-                  {formatDateTime(event.created_at, locale)}
-                </Typography>
-                <Typography variant="body2">
-                  {event.event_type}
-                  {event.to_state ? ` → ${event.to_state}` : ''}
-                  {event.actor_email ? ` · ${event.actor_email}` : ''}
-                  {event.note ? ` · ${event.note}` : ''}
-                </Typography>
-              </Stack>
-            ))}
+            <DetailHeading>{t('fulfillment.detail.timeline')}</DetailHeading>
+            <DetailTimeline
+              empty={t('payments.detail.none')}
+              entries={(events.data ?? []).map((event) => ({
+                id: event.id,
+                title: event.to_state
+                  ? `${eventLabel(t, event.event_type)} → ${t(`returns.state.${event.to_state}` as MessageKey)}`
+                  : eventLabel(t, event.event_type),
+                when: formatDateTime(event.created_at, locale),
+                meta: [event.actor_email, event.note].filter(Boolean).join(' · '),
+              }))}
+            />
           </Stack>
         </Stack>
       )}

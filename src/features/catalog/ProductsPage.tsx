@@ -20,7 +20,6 @@ import {
   TableRow,
   TableSortLabel,
   Tabs,
-  TextField,
   Typography,
   MenuItem,
   LinearProgress,
@@ -55,6 +54,7 @@ import { CatalogImportAction } from './import/CatalogImportAction'
 import { useCategories } from './useCategories'
 import { useBrands } from './pim/hooks'
 import { useDeleteProduct, useProductUsage, useProducts } from './useProducts'
+import { Field } from '@/shared/ui/Field'
 import { SelectField } from '@/shared/ui/SelectField'
 
 const STATUS_LABEL: Record<ProductStatus, MessageKey> = {
@@ -467,9 +467,10 @@ export function ProductsPage() {
               </SelectField>
             )}
 
-            <TextField
+            <Field
               size="small"
               type="number"
+              rule="integer"
               label={t('catalog.products.filter.minStock')}
               value={borrador.minStock}
               onChange={(event) => cambiar('minStock', event.target.value)}

@@ -23,7 +23,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
@@ -38,6 +37,7 @@ import { EntityPicker, type PickerOption } from '@/shared/ui/EntityPicker'
 import { FormDrawer } from '@/shared/ui/FormDrawer'
 import { StatusChip } from '@/shared/ui/StatusChip'
 import { useFeedback } from '@/shared/ui/feedback-context'
+import { Field } from '@/shared/ui/Field'
 import { TradeError } from '../errors'
 import {
   MAX_ASSORTMENT_QUESTION,
@@ -154,7 +154,7 @@ export function QuoteAiDraftDrawer({
   const create = useCreateQuoteFromDraft()
   const suggest = useAssortmentSuggestions(locale)
 
-  const customers = useCustomerOptions({ term: customerSearch, enabled: open && customerSearch.trim().length >= 2 })
+  const customers = useCustomerOptions({ term: customerSearch, enabled: open })
   const customerOptions = useMemo<PickerOption[]>(
     () => (customers.data ?? []).map((c) => ({ id: c.id, primary: c.name, secondary: c.code })),
     [customers.data],
@@ -305,7 +305,7 @@ export function QuoteAiDraftDrawer({
                     />
                   ))}
                 </Stack>
-                <TextField
+                <Field
                   multiline
                   minRows={3}
                   fullWidth
@@ -315,7 +315,8 @@ export function QuoteAiDraftDrawer({
                   onChange={(e) => setInstruction(e.target.value)}
                   error={tooLong}
                   helperText={tooLong ? t('aiQuotes.instruction.tooLong') : t('aiQuotes.costHint')}
-                  inputProps={{ maxLength: MAX_INSTRUCTION + 50 }}
+                  rule="longText"
+                  maxLength={MAX_INSTRUCTION + 50}
                 />
                 <Box>
                   <Button
@@ -416,6 +417,7 @@ export function QuoteAiDraftDrawer({
             </RadioGroup>
           )}
           <EntityPicker
+          minChars={0}
             label={t('aiQuotes.customer.search')}
             term={customerSearch}
             onTermChange={setCustomerSearch}
@@ -507,16 +509,18 @@ export function QuoteAiDraftDrawer({
         {/* 6 · Confirmación humana */}
         <Block id="ai-quote-confirm" title={t('aiQuotes.confirm.title')} help={t('aiQuotes.confirm.help')}>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-            <TextField
+            <Field
               size="small"
               label={t('trade.field.number')}
               value={quoteNumber}
               onChange={(e) => setQuoteNumber(e.target.value)}
-              inputProps={{ maxLength: 60 }}
+              rule="sku"
+              maxLength={60}
+              help={t('help.trade.quoteNumber')}
               required
               fullWidth
             />
-            <TextField
+            <Field
               size="small"
               type="date"
               label={t('trade.field.validUntil')}
@@ -527,14 +531,14 @@ export function QuoteAiDraftDrawer({
               fullWidth
             />
           </Stack>
-          <TextField
+          <Field
             size="small"
             multiline
             minRows={2}
             label={t('trade.field.notes')}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            inputProps={{ maxLength: 2000 }}
+            rule="longText"
             fullWidth
           />
           <FormControlLabel
@@ -640,14 +644,15 @@ function DraftLineEditor({
             )}
           </FormControl>
         )}
-        <TextField
+        <Field
           size="small"
           label={t('trade.field.quantity')}
           value={line.quantity}
           onChange={(e) => onQuantity(e.target.value)}
           error={qtyInvalid || line.quantity.trim() === ''}
           helperText={line.quantity.trim() === '' ? t('aiQuotes.line.quantityMissing') : qtyInvalid ? t('trade.error.quantity') : ' '}
-          inputProps={{ inputMode: 'numeric', maxLength: 6 }}
+          rule="integer"
+          maxLength={6}
           sx={{ maxWidth: 200 }}
         />
       </Stack>
@@ -818,7 +823,7 @@ function AssortmentBlock({
 
       {canAsk && system && system.candidates.length > 0 && (
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'flex-start' } }}>
-          <TextField
+          <Field
             fullWidth
             size="small"
             label={t('aiQuotes.assortment.question')}
@@ -826,7 +831,8 @@ function AssortmentBlock({
             onChange={(e) => onQuestion(e.target.value)}
             error={tooLong}
             helperText={tooLong ? t('aiOrders.ask.tooLong') : t('aiQuotes.costHint')}
-            inputProps={{ maxLength: MAX_ASSORTMENT_QUESTION + 50 }}
+            rule="longText"
+            maxLength={MAX_ASSORTMENT_QUESTION + 50}
           />
           <Button
             variant="contained"

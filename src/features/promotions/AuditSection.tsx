@@ -111,7 +111,9 @@ export function AuditSection() {
                       <StatusChip tone="warning" label={t('promotions.audit.live')} />
                     ) : (
                       <Typography sx={{ color: 'var(--muted)', fontSize: 13 }}>
-                        {event.promotion_status ?? '—'}
+                        {event.promotion_status
+                          ? t(`promotions.status.${event.promotion_status}` as MessageKey)
+                          : '—'}
                       </Typography>
                     )}
                   </TableCell>

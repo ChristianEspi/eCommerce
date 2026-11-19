@@ -36,9 +36,12 @@ import { fetchMyStatement, myStatementKey, type AccountStatement } from '../port
  * compra al contado y la segunda tiene el crédito agotado. Por eso `null` se
  * dice con palabras y no con un cero.
  */
-export function AccountStatementSection() {
+export function AccountStatementSection({ storeSlug }: { storeSlug?: string | null }) {
   const { t } = useI18n()
-  const query = useQuery({ queryKey: myStatementKey(), queryFn: fetchMyStatement })
+  const query = useQuery({
+    queryKey: myStatementKey(storeSlug),
+    queryFn: () => fetchMyStatement(storeSlug),
+  })
 
   if (query.isPending) return <BrandLoader />
   if (query.isError) return <ErrorState error={query.error} onRetry={() => void query.refetch()} />
@@ -71,6 +74,8 @@ function CuentaCard({ cuenta }: { cuenta: AccountStatement }) {
   const limite = cuenta.credit_limit === null ? null : Number(cuenta.credit_limit)
   const disponible = cuenta.credit_available === null ? null : Number(cuenta.credit_available)
   const usado = limite && limite > 0 ? Math.min((deuda / limite) * 100, 100) : 0
+  const pendientes = cuenta.pending_payments ?? []
+  const porConfirmar = Number(cuenta.pending_payments_total ?? 0)
 
   return (
     <Card
@@ -148,6 +153,12 @@ function CuentaCard({ cuenta }: { cuenta: AccountStatement }) {
             etiqueta={t('account.statement.paid12m')}
             valor={formatMoney(Number(cuenta.paid_12m), moneda, locale)}
           />
+          {porConfirmar > 0 && (
+            <Menor
+              etiqueta={t('account.statement.pending')}
+              valor={formatMoney(porConfirmar, moneda, locale)}
+            />
+          )}
         </Stack>
 
         {cuenta.documents.length === 0 ? (
@@ -194,6 +205,62 @@ function CuentaCard({ cuenta }: { cuenta: AccountStatement }) {
                 ))}
               </TableBody>
             </Table>
+          </Box>
+        )}
+
+        {/* Pagado pero sin confirmar: va aparte para que nadie lo lea como deuda. */}
+        {pendientes.length > 0 && (
+          <Box
+            component="section"
+            aria-labelledby={`pendientes-${cuenta.account_id}`}
+            sx={{
+              borderTop: '1px solid var(--sf-line)',
+              pt: 2,
+            }}
+          >
+            <Stack direction="row" sx={{ alignItems: 'baseline', gap: 1, flexWrap: 'wrap' }}>
+              <Typography
+                id={`pendientes-${cuenta.account_id}`}
+                component="h3"
+                sx={{ fontSize: 15, fontWeight: 800 }}
+              >
+                {t('account.statement.pending')}
+              </Typography>
+              <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>
+                {t('account.statement.pendingCount')
+                  .replace('{n}', String(pendientes.length))
+                  .replace('{amount}', formatMoney(porConfirmar, moneda, locale))}
+              </Typography>
+            </Stack>
+            <Typography sx={{ fontSize: TS.body, color: 'var(--muted)', mt: 0.5, mb: 1.5 }}>
+              {t('account.statement.pendingHelp')}
+            </Typography>
+            <Box sx={{ overflowX: 'auto' }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>{t('account.orders.number')}</TableCell>
+                    <TableCell>{t('account.orders.date')}</TableCell>
+                    <TableCell>{t('account.statement.method')}</TableCell>
+                    <TableCell align="right">{t('account.orders.total')}</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {pendientes.map((pago) => (
+                    <TableRow key={pago.order_id} hover>
+                      <TableCell sx={{ fontWeight: 800 }}>{pago.order_number}</TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                        {formatDate(new Date(pago.placed_at), locale)}
+                      </TableCell>
+                      <TableCell>{pago.method ?? '—'}</TableCell>
+                      <TableCell align="right" className="tnum" sx={{ fontWeight: 800 }}>
+                        {formatMoney(Number(pago.total), pago.currency, locale)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Box>
           </Box>
         )}
       </Stack>

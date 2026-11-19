@@ -15,7 +15,6 @@ import {
   TableHead,
   TableRow,
   Tabs,
-  TextField,
   Typography,
 } from '@mui/material'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -25,6 +24,8 @@ import { useAiFeature } from '@/features/ai/hooks'
 import { useCapabilities } from '@/features/capabilities/capabilities-context'
 import { useSegments } from '@/features/pricing/hooks'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { Field } from '@/shared/ui/Field'
+import { DocumentField } from '@/shared/ui/DocumentField'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { formatMoney } from '@/shared/lib/format'
 import { FormDrawer } from '@/shared/ui/FormDrawer'
@@ -38,7 +39,8 @@ import { CustomersError } from './errors'
 import { useAccountForCustomer, useCustomerOrders, useSaveCustomer } from './hooks'
 import {
   CUSTOMER_KINDS,
-  customerFormSchema,
+  customerFormSchemaFor,
+  defaultDocType,
   customerToForm,
   toCustomerCode,
   type Customer,
@@ -104,7 +106,7 @@ export function CustomerDrawer({
     watch,
     formState: { errors, isSubmitting },
   } = useForm<CustomerFormValues>({
-    resolver: zodResolver(customerFormSchema),
+    resolver: zodResolver(customerFormSchemaFor(customer)),
     defaultValues: customerToForm(customer),
   })
   // Persona y empresa no piden lo mismo: cambian etiquetas y la razón social.
@@ -197,6 +199,8 @@ export function CustomerDrawer({
                   // Una persona no tiene razón social: si se escribió como
                   // empresa y luego se cambió, no se guarda a escondidas.
                   if (next === 'person') setValue('legal_name', '')
+                  // Sin número escrito, el tipo propuesto sigue al tipo de cliente.
+                  if (!watch('tax_id')) setValue('tax_id_type', defaultDocType(next))
                 }}
                 helperText={t('customers.field.kindHint')}
               >
@@ -207,8 +211,10 @@ export function CustomerDrawer({
                 ))}
               </SelectField>
 
-              <TextField
+              <Field
                 label={t(isPerson ? 'customers.field.personName' : 'customers.field.name')}
+                rule={isPerson ? 'personName' : 'text'}
+                maxLength={200}
                 fullWidth
                 autoFocus
                 disabled={!canWrite}
@@ -222,8 +228,11 @@ export function CustomerDrawer({
               />
 
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                <TextField
+                <Field
                   label={t('customers.field.code')}
+                  rule="code"
+                  maxLength={41}
+                  help={t('help.customers.code')}
                   fullWidth
                   disabled={!canWrite}
                   error={Boolean(errors.code)}
@@ -231,24 +240,31 @@ export function CustomerDrawer({
                   inputProps={{ spellCheck: false }}
                   {...register('code', { onChange: () => setCodeEdited(true) })}
                 />
-                <TextField
-                  label={t(isPerson ? 'customers.field.personDoc' : 'customers.field.taxId')}
-                  fullWidth
-                  disabled={!canWrite}
-                  error={Boolean(errors.tax_id)}
-                  helperText={
-                    fieldError('tax_id') ??
-                    t(isPerson ? 'customers.field.personDocHint' : 'customers.field.taxIdHint')
-                  }
-                  {...register('tax_id')}
-                />
               </Stack>
+
+              {/* Tipo + número: el número sigue al tipo (RUC 11 dígitos, DNI 8…). */}
+              <DocumentField
+                docType={watch('tax_id_type')}
+                onDocTypeChange={(type) =>
+                  setValue('tax_id_type', type, { shouldValidate: Boolean(watch('tax_id')) })
+                }
+                disabled={!canWrite}
+                typeError={fieldError('tax_id_type')}
+                numberProps={{
+                  label: t(isPerson ? 'customers.field.personDoc' : 'customers.field.taxId'),
+                  error: Boolean(errors.tax_id),
+                  helperText: fieldError('tax_id'),
+                  ...register('tax_id'),
+                }}
+              />
 
               {/* La razón social es de empresa. En una persona el nombre ya es
                   el legal: pedirla duplica el dato y confunde. */}
               {!isPerson && (
-                <TextField
+                <Field
                   label={t('customers.field.legalName')}
+                  rule="text"
+                  maxLength={200}
                   fullWidth
                   disabled={!canWrite}
                   error={Boolean(errors.legal_name)}
@@ -258,17 +274,20 @@ export function CustomerDrawer({
               )}
 
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                <TextField
+                <Field
                   label={t('customers.field.email')}
                   type="email"
+                  rule="email"
+                  maxLength={160}
                   fullWidth
                   disabled={!canWrite}
                   error={Boolean(errors.email)}
                   helperText={fieldError('email')}
                   {...register('email')}
                 />
-                <TextField
+                <Field
                   label={t('customers.field.phone')}
+                  rule="phone"
                   fullWidth
                   disabled={!canWrite}
                   error={Boolean(errors.phone)}
@@ -293,8 +312,9 @@ export function CustomerDrawer({
                 ))}
               </SelectField>
 
-              <TextField
+              <Field
                 label={t('customers.field.notes')}
+                rule="longText"
                 fullWidth
                 multiline
                 minRows={2}

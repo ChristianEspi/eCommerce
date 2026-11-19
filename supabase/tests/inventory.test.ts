@@ -1475,3 +1475,79 @@ describe('cobrado + servido = entregado (20261111140000)', () => {
     expect(o?.s).toBe('fulfilled')
   })
 })
+
+describe('kits casi agotados (2026-11-17)', () => {
+  it('avisa cuando el componente más escaso deja armar 5 o menos, y dice cuál', async () => {
+    // Jabón x2 por kit: 6 en Lima → 3 kits. Camiseta roja x1: 50 → 50 kits.
+    await svc(
+      `insert into public.inventory_levels
+         (organization_id, company_id, warehouse_id, store_id, product_id, variant_id, on_hand_qty)
+       values ($1, $2, $3, $4, $5, null, 6), ($1, $2, $3, $4, $6, $7, 50)`,
+      [TENANT_A.organizationId, TENANT_A.companyId, lima, storeA, jabon, camiseta, camisetaRoja],
+    )
+    const rows = await asRole(db, 'authenticated', claimsFor(TENANT_A), async () =>
+      (await db.query<Row>(`select sku, available_qty::text as kits, limiting_component from public.bundle_stock_alerts`)).rows,
+    )
+    expect(rows).toEqual([{ sku: 'A-KIT', kits: '3', limiting_component: 'Jabón' }])
+
+    // Con existencia de sobra, no avisa.
+    await svc(`update public.inventory_levels set on_hand_qty = 100 where product_id = $1`, [jabon])
+    const despues = await asRole(db, 'authenticated', claimsFor(TENANT_A), async () =>
+      (await db.query<Row>(`select sku from public.bundle_stock_alerts`)).rows,
+    )
+    expect(despues).toEqual([])
+  })
+})
+
+describe('trasladar entre almacenes (2026-11-18)', () => {
+  async function nivel(warehouse: string) {
+    const [row] = (await svc(
+      `select on_hand_qty::float8::text as on_hand from public.inventory_levels
+        where warehouse_id = $1 and product_id = $2 and variant_id is null`,
+      [warehouse, jabon],
+    )) as Array<{ on_hand: string }>
+    return row?.on_hand ?? null
+  }
+  const trasladar = (from: string, to: string, qty: number) =>
+    asRole(db, 'authenticated', claimsFor(TENANT_A), async () =>
+      (
+        await db.query<{ r: Row }>(
+          `select public.inventory_transfer($1, $2, $3, null, $4, 'Reparto') as r`,
+          [from, to, jabon, qty],
+        )
+      ).rows[0]?.r,
+    )
+
+  it('300 en Lima → 150 y 150, con dos asientos de la misma referencia', async () => {
+    await svc(
+      `insert into public.inventory_levels (organization_id, company_id, warehouse_id, store_id, product_id, variant_id, on_hand_qty)
+       values ($1, $2, $3, $4, $5, null, 300)`,
+      [TENANT_A.organizationId, TENANT_A.companyId, lima, storeA, jabon],
+    )
+    const r = await trasladar(lima, arequipa, 150)
+    expect(r).toMatchObject({ from: 'LIMA', to: 'AQP' })
+    expect(Number(r?.from_available)).toBe(150)
+    expect(Number(r?.to_available)).toBe(150)
+    expect(await nivel(lima)).toBe('150')
+    expect(await nivel(arequipa)).toBe('150')
+    const asientos = (await svc(
+      `select kind::text, quantity::text from public.inventory_movements where external_ref = $1 order by quantity`,
+      [r?.reference],
+    )) as Array<{ kind: string; quantity: string }>
+    expect(asientos.map((a) => a.kind)).toEqual(['transfer_out', 'transfer_in'])
+  })
+
+  it('no traslada más de lo disponible, ni al mismo almacén, ni desde uno del sistema de gestión', async () => {
+    await svc(
+      `insert into public.inventory_levels (organization_id, company_id, warehouse_id, store_id, product_id, variant_id, on_hand_qty)
+       values ($1, $2, $3, $4, $5, null, 10)`,
+      [TENANT_A.organizationId, TENANT_A.companyId, lima, storeA, jabon],
+    )
+    expect(await expectFailure(() => trasladar(lima, arequipa, 11))).toMatch(/STOCK_INSUFICIENTE_ORIGEN/)
+    expect(await expectFailure(() => trasladar(lima, lima, 1))).toMatch(/TRASLADO_MISMO_ALMACEN/)
+    await svc(`update public.warehouses set is_active = true where id = $1`, [erp])
+    expect(await expectFailure(() => trasladar(lima, erp, 1))).toMatch(/TRASLADO_ALMACEN_EXTERNO/)
+    // Nada a medias: Lima sigue con sus 10.
+    expect(await nivel(lima)).toBe('10')
+  })
+})

@@ -10,12 +10,13 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useMemo, useState } from 'react'
 import { useOrderItems } from '@/features/orders/useOrders'
 import { useTenant } from '@/features/tenant/tenant-context'
+import { DetailHeading } from '@/shared/ui/DetailBlocks'
+import { eventLabel } from '@/shared/i18n/codeLabels'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { formatDateTime, formatMoney } from '@/shared/lib/format'
@@ -40,6 +41,7 @@ import {
 } from './types'
 import { FulfillmentAiToggle } from './ai/FulfillmentAiSection'
 import { SelectField } from '@/shared/ui/SelectField'
+import { Field } from '@/shared/ui/Field'
 
 /**
  * De la clave de un hecho a su nombre.
@@ -240,7 +242,7 @@ export function FulfillmentDrawer({
 
           {/* ---- Acciones ------------------------------------------------ */}
           <Stack spacing={2}>
-            <Typography variant="subtitle2">{t('fulfillment.detail.actions')}</Typography>
+            <DetailHeading>{t('fulfillment.detail.actions')}</DetailHeading>
 
             {!canOperate && <Alert severity="info">{t('fulfillment.detail.readOnly')}</Alert>}
 
@@ -263,8 +265,10 @@ export function FulfillmentDrawer({
                   ))}
                 </SelectField>
                 {needsReason && (
-                  <TextField
+                  <Field
                     size="small"
+                    rule="longText"
+                    maxLength={1000}
                     label={t('fulfillment.field.reason')}
                     value={reason}
                     onChange={(event) => setReason(event.target.value)}
@@ -324,8 +328,10 @@ export function FulfillmentDrawer({
 
             {fulfillment.strategy === 'ship' && (
               <Stack spacing={1}>
-                <TextField
+                <Field
                   size="small"
+                  rule="text"
+                  maxLength={60}
                   label={t('fulfillment.field.serviceCode')}
                   value={serviceCode}
                   disabled={!canOperate}
@@ -361,7 +367,7 @@ export function FulfillmentDrawer({
 
           {/* ---- Bultos --------------------------------------------------- */}
           <Stack spacing={1}>
-            <Typography variant="subtitle2">{t('fulfillment.detail.shipments')}</Typography>
+            <DetailHeading>{t('fulfillment.detail.shipments')}</DetailHeading>
             {(shipments.data ?? []).length === 0 ? (
               <Typography variant="body2" sx={{ color: 'var(--muted)' }}>
                 {t('fulfillment.detail.noShipments')}
@@ -419,9 +425,11 @@ export function FulfillmentDrawer({
                       </MenuItem>
                     ))}
                   </SelectField>
-                  <TextField
+                  <Field
                     size="small"
                     fullWidth
+                    rule="longText"
+                    maxLength={1000}
                     label={t('fulfillment.field.trackingNote')}
                     value={noteText}
                     disabled={!canOperate}
@@ -455,7 +463,7 @@ export function FulfillmentDrawer({
 
           {/* ---- Qué hay que preparar ------------------------------------- */}
           <Stack spacing={1}>
-            <Typography variant="subtitle2">{t('fulfillment.detail.items')}</Typography>
+            <DetailHeading>{t('fulfillment.detail.items')}</DetailHeading>
             {(items.data ?? []).length === 0 ? (
               <Typography variant="body2" sx={{ color: 'var(--muted)' }}>
                 {t('fulfillment.detail.noItems')}
@@ -484,14 +492,14 @@ export function FulfillmentDrawer({
 
           {/* ---- Línea de tiempo ------------------------------------------ */}
           <Stack spacing={1}>
-            <Typography variant="subtitle2">{t('fulfillment.detail.timeline')}</Typography>
+            <DetailHeading>{t('fulfillment.detail.timeline')}</DetailHeading>
             {(facts.data ?? []).map((fact) => (
               <Stack key={fact.id} direction="row" spacing={1} alignItems="baseline">
                 <Typography variant="caption" sx={{ color: 'var(--muted)', minWidth: 132 }}>
                   {formatDateTime(fact.created_at, locale)}
                 </Typography>
                 <Typography variant="body2">
-                  {HECHO[fact.event_type] ? t(HECHO[fact.event_type]!) : fact.event_type}
+                  {HECHO[fact.event_type] ? t(HECHO[fact.event_type]!) : eventLabel(t, fact.event_type)}
                   {destinoDe(fact) ? ` → ${t(destinoDe(fact)!)}` : ''}
                   {fact.note ? ` · ${fact.note}` : ''}
                 </Typography>

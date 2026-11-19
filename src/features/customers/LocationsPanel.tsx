@@ -16,11 +16,11 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useMemo, useState } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { Field } from '@/shared/ui/Field'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState } from '@/shared/ui/states'
@@ -129,17 +129,22 @@ export function LocationsPanel({
           {error && <Alert severity="error">{t(error)}</Alert>}
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-            <TextField
+            <Field
               size="small"
               fullWidth
+              rule="code"
+              maxLength={41}
+              help={t('help.customers.locationCode')}
               label={t('customers.field.code')}
               value={values.code}
               onChange={(event) => set('code', event.target.value)}
               inputProps={{ spellCheck: false }}
             />
-            <TextField
+            <Field
               size="small"
               fullWidth
+              rule="text"
+              maxLength={160}
               label={t('customers.field.name')}
               value={values.name}
               onChange={(event) => set('name', event.target.value)}

@@ -8,7 +8,6 @@ import {
   Switch,
   Tab,
   Tabs,
-  TextField,
 } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -22,6 +21,7 @@ import { PriceItemsPanel } from './PriceItemsPanel'
 import { PricingError } from './errors'
 import { useSavePriceList } from './hooks'
 import { priceListFormSchema, priceListToForm, type PriceList, type PriceListFormValues } from './types'
+import { Field } from '@/shared/ui/Field'
 
 /**
  * Alta y edición de una lista, por pestañas.
@@ -152,8 +152,10 @@ export function PriceListDrawer({
             <Stack spacing={2.5}>
               {serverError && <Alert severity="error">{t(serverError)}</Alert>}
 
-              <TextField
+              <Field
                 label={t('pricing.field.name')}
+                rule="text"
+                maxLength={120}
                 fullWidth
                 autoFocus
                 disabled={!canWrite}
@@ -162,8 +164,11 @@ export function PriceListDrawer({
                 {...register('name')}
               />
 
-              <TextField
+              <Field
                 label={t('pricing.field.code')}
+                rule="lowerCode"
+                maxLength={41}
+                help={t('help.pricing.code')}
                 fullWidth
                 disabled={!canWrite || Boolean(list)}
                 error={Boolean(errors.code)}
@@ -173,17 +178,21 @@ export function PriceListDrawer({
               />
 
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                <TextField
+                <Field
                   label={t('pricing.field.currency')}
+                  rule="currency"
+                  help={t('help.pricing.currency')}
                   fullWidth
                   disabled={!canWrite}
                   error={Boolean(errors.currency)}
                   helperText={fieldError('currency') ?? t('pricing.field.currencyHint')}
-                  inputProps={{ maxLength: 3, style: { textTransform: 'uppercase' } }}
                   {...register('currency')}
                 />
-                <TextField
+                <Field
                   label={t('pricing.field.priority')}
+                  rule="integer"
+                  maxLength={4}
+                  help={t('help.pricing.priority')}
                   fullWidth
                   type="number"
                   disabled={!canWrite}
@@ -195,8 +204,9 @@ export function PriceListDrawer({
               </Stack>
 
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                <TextField
+                <Field
                   label={t('pricing.field.validFrom')}
+                  help={t('help.pricing.validFrom')}
                   fullWidth
                   type="datetime-local"
                   disabled={!canWrite}
@@ -205,8 +215,9 @@ export function PriceListDrawer({
                   helperText={fieldError('valid_from')}
                   {...register('valid_from')}
                 />
-                <TextField
+                <Field
                   label={t('pricing.field.validTo')}
+                  help={t('help.pricing.validTo')}
                   fullWidth
                   type="datetime-local"
                   disabled={!canWrite}
@@ -217,8 +228,10 @@ export function PriceListDrawer({
                 />
               </Stack>
 
-              <TextField
+              <Field
                 label={t('pricing.field.notes')}
+                rule="longText"
+                maxLength={1000}
                 fullWidth
                 multiline
                 minRows={2}

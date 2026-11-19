@@ -5,6 +5,7 @@ import {
   INTEGRATION_PROVIDERS_TABLE,
   PAYMENTS_TABLE,
   PAYMENT_ATTEMPTS_TABLE,
+  PAYMENT_CONFIRM_OFFLINE_RPC,
   PAYMENT_EVENTS_TABLE,
   PAYMENT_METHODS_TABLE,
   PAYMENT_METHOD_SET_SECRET_RPC,
@@ -272,6 +273,41 @@ export async function requestRefund(input: RefundRequestInput): Promise<void> {
     p_reason: input.reason.trim() === '' ? null : input.reason.trim(),
   })
   if (error) throw paymentsErrorFromDb(error)
+}
+
+export interface ConfirmOfflineInput {
+  intentId: string
+  reference: string
+  note: string
+}
+
+/**
+ * 2026-11-17 · Confirmar que el dinero de un medio SIN pasarela llegó. La base
+ * escribe el cobro, pone el pedido en pagado y deja quién lo confirmó; una
+ * segunda pulsación no cobra dos veces.
+ */
+export async function confirmOfflinePayment(input: ConfirmOfflineInput): Promise<void> {
+  const reference = input.reference.trim()
+  const note = input.note.trim()
+  const { error } = await client().rpc(PAYMENT_CONFIRM_OFFLINE_RPC, {
+    p_intent_id: input.intentId,
+    p_reference: reference === '' ? null : reference,
+    p_note: note === '' ? null : note,
+  })
+  if (error) throw paymentsErrorFromDb(error)
+}
+
+/** Lo que una persona puede confirmar: sin pasarela y sin cobrar todavía. */
+export function canConfirmOffline(intent: {
+  provider_code: string | null
+  capture_mode: string
+  status: string
+}): boolean {
+  return (
+    intent.provider_code === null &&
+    intent.capture_mode === 'manual' &&
+    ['open', 'processing', 'requires_action', 'authorized'].includes(intent.status)
+  )
 }
 
 // ---------------------------------------------------------------------------

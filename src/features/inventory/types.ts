@@ -21,6 +21,7 @@ export {
   INVENTORY_MOVEMENTS_TABLE,
   INVENTORY_RESERVATIONS_TABLE,
   INVENTORY_ALERTS_VIEW,
+  INVENTORY_TRANSFER_RPC,
   PRODUCTS_TABLE,
   PRODUCT_VARIANTS_TABLE,
   INVENTORY_AVAILABILITY_RPC,
@@ -191,7 +192,7 @@ export const reservationSchema = z.object({
 })
 export type Reservation = z.infer<typeof reservationSchema>
 
-export const ALERT_KINDS = ['below_reorder', 'negative', 'stale', 'unmapped'] as const
+export const ALERT_KINDS = ['below_reorder', 'negative', 'stale', 'unmapped', 'bundle_low'] as const
 export type AlertKind = (typeof ALERT_KINDS)[number]
 
 export const inventoryAlertSchema = z.object({
@@ -206,6 +207,8 @@ export const inventoryAlertSchema = z.object({
   available_qty: quantityText.nullable().default(null),
   reorder_point: quantityText.nullable().default(null),
   synced_at: z.string().nullable().default(null),
+  /** Solo en `bundle_low`: el componente que deja armar pocos kits. */
+  limiting_component: z.string().nullable().default(null),
 })
 export type InventoryAlert = z.infer<typeof inventoryAlertSchema>
 
@@ -219,6 +222,7 @@ export const ALERT_SEVERITY: Record<AlertKind, number> = {
   negative: 40,
   unmapped: 30,
   stale: 20,
+  bundle_low: 15,
   below_reorder: 10,
 }
 
@@ -278,6 +282,9 @@ export type ReservationResult = z.infer<typeof reservationResultSchema>
 // Formularios
 // ---------------------------------------------------------------------------
 
+/** Tope de una cantidad de inventario: `numeric(18,6)` admite 12 cifras enteras. */
+const MAX_QUANTITY = 1e12
+
 export const warehouseFormSchema = z
   .object({
     code: z
@@ -323,7 +330,9 @@ export const movementFormSchema = z
     kind: z.enum(MANUAL_MOVEMENT_KINDS),
     quantity: z
       .number({ invalid_type_error: 'inventory.error.quantity' })
-      .refine((value) => value !== 0, 'inventory.error.quantity'),
+      .refine((value) => value !== 0, 'inventory.error.quantity')
+      // `numeric(18,6)`: hasta 12 enteros, con o sin signo.
+      .refine((value) => Math.abs(value) < MAX_QUANTITY, 'inventory.error.quantity'),
     reason: z.string().trim().max(500).optional().default(''),
   })
   // «Traslado enviado: 5» quiere decir que salen cinco. Pedir que se escriba
@@ -339,12 +348,41 @@ export const movementFormSchema = z
   })
 export type MovementFormValues = z.infer<typeof movementFormSchema>
 
+/**
+ * 2026-11-18 · Trasladar entre almacenes. La cantidad es siempre positiva: la
+ * dirección la dicen el origen y el destino, no el signo.
+ */
+export const transferFormSchema = z
+  .object({
+    from_warehouse_id: z.string().uuid('inventory.error.warehouse'),
+    to_warehouse_id: z.string().uuid('inventory.error.transferTo'),
+    product_id: z.string().uuid('inventory.error.product'),
+    variant_id: z.string().uuid().nullable().default(null),
+    quantity: z
+      .number({ invalid_type_error: 'inventory.error.quantity' })
+      .positive('inventory.error.transferQuantity')
+      .lt(MAX_QUANTITY, 'inventory.error.quantity'),
+    reason: z.string().trim().max(500).optional().default(''),
+  })
+  .refine((v) => v.from_warehouse_id !== v.to_warehouse_id, {
+    path: ['to_warehouse_id'],
+    message: 'inventory.error.transferSame',
+  })
+export type TransferFormValues = z.infer<typeof transferFormSchema>
+
+/** El stock de UN producto en UN almacén, para enseñarlo mientras se escribe. */
+export interface StockLevel {
+  on_hand: number
+  reserved: number
+  available: number
+}
+
 export const policyFormSchema = z.object({
   warehouse_id: z.string().uuid('inventory.error.warehouse'),
   product_id: z.string().uuid('inventory.error.product'),
   variant_id: z.string().uuid().nullable().default(null),
-  safety_stock: z.number().min(0, 'inventory.error.quantity'),
-  reorder_point: z.number().min(0, 'inventory.error.quantity'),
+  safety_stock: z.number().min(0, 'inventory.error.quantity').lt(MAX_QUANTITY, 'inventory.error.quantity'),
+  reorder_point: z.number().min(0, 'inventory.error.quantity').lt(MAX_QUANTITY, 'inventory.error.quantity'),
 })
 export type PolicyFormValues = z.infer<typeof policyFormSchema>
 

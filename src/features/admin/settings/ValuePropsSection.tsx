@@ -10,9 +10,9 @@ import {
   MenuItem,
   Stack,
   Switch,
-  TextField,
   Typography,
 } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import type { UseFormReturn } from 'react-hook-form'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { R, TS } from '@/theme/tokens'
@@ -196,7 +196,8 @@ export function ValuePropsSection({
               </SelectField>
 
               <Stack spacing={1.25} sx={{ minWidth: 0 }}>
-                <TextField
+                <Field
+                  rule="text" maxLength={VALUE_PROPS_LIMITS.titleMax}
                   fullWidth
                   size="small"
                   label={t('settings.valueProps.itemTitle')}
@@ -210,7 +211,8 @@ export function ValuePropsSection({
                     'aria-label': `${t('settings.valueProps.itemTitle')}: ${nombre}`,
                   }}
                 />
-                <TextField
+                <Field
+                  rule="text" maxLength={VALUE_PROPS_LIMITS.bodyMax}
                   fullWidth
                   size="small"
                   label={t('settings.valueProps.itemBody')}

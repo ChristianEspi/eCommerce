@@ -27,7 +27,6 @@ import {
   Link as MuiLink,
   Stack,
   Switch,
-  TextField,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
@@ -83,6 +82,7 @@ import {
   useStoreSettings,
 } from './settings/useStoreSettings'
 import { SelectField } from '@/shared/ui/SelectField'
+import { Field } from '@/shared/ui/Field'
 
 function errorKeyOf(error: unknown): MessageKey {
   return error instanceof SettingsError ? error.key : 'settings.error.generic'
@@ -349,7 +349,8 @@ export function SettingsPage() {
                     >
                       <Grid container spacing={2}>
                         <Grid item xs={12} md={5}>
-                          <TextField
+                          <Field
+                            rule="text"
                             fullWidth
                             slotProps={SHRINK}
                             label={t('settings.name')}
@@ -376,7 +377,8 @@ export function SettingsPage() {
                             campaña, y el kicker es la línea que permite que el
                             hero deje de repetir el nombre de la tienda. */}
                         <Grid item xs={12} md={7}>
-                          <TextField
+                          <Field
+                            rule="longText" maxLength={360}
                             fullWidth
                             slotProps={SHRINK}
                             label={t('settings.storeDescription')}
@@ -394,7 +396,8 @@ export function SettingsPage() {
                         </Grid>
                         {/* Resumen v2 · El titular de la portada, por fin editable. */}
                         <Grid item xs={12} md={8}>
-                          <TextField
+                          <Field
+                            rule="text" maxLength={120}
                             fullWidth
                             slotProps={SHRINK}
                             label={t('settings.heroTitle')}
@@ -410,7 +413,8 @@ export function SettingsPage() {
                           />
                         </Grid>
                         <Grid item xs={12} md={4}>
-                          <TextField
+                          <Field
+                            rule="text" maxLength={80}
                             fullWidth
                             slotProps={SHRINK}
                             label={t('settings.heroKicker')}
@@ -425,7 +429,8 @@ export function SettingsPage() {
                           />
                         </Grid>
                         <Grid item xs={12} md={8}>
-                          <TextField
+                          <Field
+                            rule="longText" maxLength={240}
                             fullWidth
                             slotProps={SHRINK}
                             label={t('settings.heroSubtitle')}
@@ -455,7 +460,8 @@ export function SettingsPage() {
                           y darle el mismo hace pensar que cabe algo más. */}
                       <Grid container spacing={2}>
                         <Grid item xs={12} md={4}>
-                          <TextField
+                          <Field
+                            rule="email" maxLength={320}
                             fullWidth
                             slotProps={SHRINK}
                             label={t('settings.contactEmail')}
@@ -468,7 +474,8 @@ export function SettingsPage() {
                           />
                         </Grid>
                         <Grid item xs={12} md={3}>
-                          <TextField
+                          <Field
+                            rule="phone" maxLength={40} help={t('field.help.phone')}
                             fullWidth
                             slotProps={SHRINK}
                             label={t('settings.contactPhone')}
@@ -480,7 +487,8 @@ export function SettingsPage() {
                           />
                         </Grid>
                         <Grid item xs={12} md={5}>
-                          <TextField
+                          <Field
+                            rule="text" maxLength={240}
                             fullWidth
                             slotProps={SHRINK}
                             label={t('settings.contactAddress')}
@@ -583,6 +591,7 @@ export function SettingsPage() {
                       icon={<SupportAgentRoundedIcon />}
                       title={t('settings.help.title')}
                       subtitle={t('settings.help.subtitle')}
+                      padded
                     >
                       <HelpContactSection storeId={storeId} canManage={canManage} />
                     </SectionCard>
@@ -591,6 +600,7 @@ export function SettingsPage() {
                       icon={<CreditCardRoundedIcon />}
                       title={t('settings.installments.title')}
                       subtitle={t('settings.installments.subtitle')}
+                      padded
                     >
                       <InstallmentsSection storeId={storeId} canManage={canManage} />
                     </SectionCard>
@@ -637,7 +647,8 @@ export function SettingsPage() {
                                     cursor: 'pointer',
                                   }}
                                 />
-                                <TextField
+                                <Field
+                                  rule="hexColor" help={t('help.admin.settings.accentHex')}
                                   fullWidth
                                   size="small"
                                   value={field.value}
@@ -857,7 +868,8 @@ export function SettingsPage() {
                     >
                       <Grid container spacing={2}>
                         <Grid item xs={12} md={4}>
-                          <TextField
+                          <Field
+                            rule="text" maxLength={200}
                             fullWidth
                             slotProps={SHRINK}
                             label={t('settings.businessName')}
@@ -871,7 +883,8 @@ export function SettingsPage() {
                             tipografía. */}
                         <CapabilityFeature capability="content.white_label">
                           <Grid item xs={12} md={4}>
-                            <TextField
+                            <Field
+                              rule="text" maxLength={120}
                               fullWidth
                               slotProps={SHRINK}
                               label={t('settings.emailFromName')}
@@ -881,7 +894,8 @@ export function SettingsPage() {
                             />
                           </Grid>
                           <Grid item xs={12} md={4}>
-                            <TextField
+                            <Field
+                              rule="email" maxLength={320} help={t('help.admin.settings.emailReplyTo')}
                               fullWidth
                               slotProps={SHRINK}
                               label={t('settings.emailReplyTo')}

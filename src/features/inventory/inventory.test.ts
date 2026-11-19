@@ -168,6 +168,7 @@ describe('los avisos se ordenan por lo que de verdad urge', () => {
       available_qty: null,
       reorder_point: null,
       synced_at: null,
+      limiting_component: null,
     }
   }
 

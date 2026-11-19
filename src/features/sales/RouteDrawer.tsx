@@ -13,7 +13,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useEffect, useMemo, useState } from 'react'
@@ -44,6 +43,7 @@ import {
   type RouteFormValues,
 } from './types'
 import { SelectField } from '@/shared/ui/SelectField'
+import { Field } from '@/shared/ui/Field'
 
 /**
  * La ruta: cabecera y paradas en orden.
@@ -88,7 +88,7 @@ export function RouteDrawer({
 
   const customers = useCustomerOptions({
     term: customerSearch,
-    enabled: open && customerSearch.trim().length >= 2,
+    enabled: open,
   })
 
   const opcionesCliente = useMemo<PickerOption[]>(
@@ -197,7 +197,10 @@ export function RouteDrawer({
           <FieldRow>
             {/* El código son unas pocas letras: ancho fijo y sin encoger, para
                 que el nombre se quede con el resto de la fila. */}
-            <TextField
+            <Field
+              rule="code"
+              maxLength={41}
+              help={t('help.sales.routeCode')}
               label={t('sales.field.code')}
               required
               disabled={!canWrite}
@@ -209,8 +212,10 @@ export function RouteDrawer({
               sx={{ width: { xs: '100%', sm: 160 }, flexShrink: 0 }}
               {...register('code')}
             />
-            <TextField
+            <Field
               fullWidth
+              rule="text"
+              maxLength={120}
               label={t('sales.field.name')}
               required
               disabled={!canWrite}
@@ -389,6 +394,7 @@ export function RouteDrawer({
               {canWrite && (
                 <Stack spacing={1.5} sx={{ mt: 2 }}>
                   <EntityPicker
+          minChars={0}
                     label={t('sales.field.customerName')}
                     placeholder={t('sales.routes.searchCustomer')}
                     term={customerSearch}

@@ -16,9 +16,10 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
+import { FIELD_RULES, ruleFor } from '@/shared/lib/fieldRules'
 import { useMemo, useState } from 'react'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -39,6 +40,17 @@ import {
 } from './hooks'
 import { normalizeCouponCode } from './types'
 import { SelectField } from '@/shared/ui/SelectField'
+
+/**
+ * El código del cupón: el de `code` (sin espacios) hasta los 64 caracteres
+ * que admite `coupons_code_len`, y en mayúsculas, que es como lo guarda
+ * `code_normalized`.
+ */
+const COUPON_CODE_RULE = ruleFor('code', {
+  maxLength: 64,
+  uppercase: true,
+  sanitize: (value) => (FIELD_RULES.code.sanitize?.(value) ?? value).toUpperCase(),
+})
 
 /**
  * Los cupones: el código que el comprador teclea.
@@ -295,8 +307,10 @@ export function CouponsSection() {
             ))}
           </SelectField>
 
-          <TextField
+          <Field
             label={t('promotions.field.code')}
+            rule={COUPON_CODE_RULE}
+            help={t('help.promotions.couponCode')}
             value={code}
             onChange={(event) => setCode(event.target.value)}
             error={duplicate}
@@ -312,7 +326,7 @@ export function CouponsSection() {
           />
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <TextField
+            <Field
               type="datetime-local"
               label={t('promotions.field.validFrom')}
               value={validFrom}
@@ -321,7 +335,7 @@ export function CouponsSection() {
               size="small"
               fullWidth
             />
-            <TextField
+            <Field
               type="datetime-local"
               label={t('promotions.field.validTo')}
               value={validTo}
@@ -334,15 +348,19 @@ export function CouponsSection() {
           </Stack>
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <TextField
+            <Field
               label={t('promotions.field.usageLimit')}
+              rule="integer"
+              help={t('help.promotions.couponUsageLimit')}
               value={usageLimit}
               onChange={(event) => setUsageLimit(event.target.value)}
               size="small"
               fullWidth
             />
-            <TextField
+            <Field
               label={t('promotions.field.usageLimitPerCustomer')}
+              rule="integer"
+              help={t('help.promotions.couponUsageLimitPerCustomer')}
               value={perCustomer}
               onChange={(event) => setPerCustomer(event.target.value)}
               size="small"
@@ -350,8 +368,10 @@ export function CouponsSection() {
             />
           </Stack>
 
-          <TextField
+          <Field
             label={t('promotions.field.notes')}
+            rule="longText"
+            maxLength={1000}
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
             multiline

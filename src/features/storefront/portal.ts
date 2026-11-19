@@ -58,6 +58,16 @@ export interface StatementDocument {
   payment_status: string
 }
 
+/** Un pedido pagado con un medio que el vendedor confirma a mano (transferencia, Yape…). */
+export interface StatementPendingPayment {
+  order_id: string
+  order_number: string
+  placed_at: string
+  total: string
+  currency: string
+  method: string | null
+}
+
 export interface AccountStatement {
   account_id: string
   account_name: string
@@ -70,6 +80,9 @@ export interface AccountStatement {
   documents: StatementDocument[]
   purchased_12m: string
   paid_12m: string
+  /** 2026-11-18 · Ausentes contra una base anterior: se leen como vacío. */
+  pending_payments?: StatementPendingPayment[]
+  pending_payments_total?: string
   currency: string | null
 }
 
@@ -146,8 +159,12 @@ export async function fetchMyOrders(limit = 50): Promise<MyOrder[]> {
   return rpc<MyOrder[]>(MY_ORDERS_RPC, { p_only_pending: false, p_limit: limit })
 }
 
-export async function fetchMyStatement(): Promise<AccountStatement[]> {
-  return rpc<AccountStatement[]>(MY_STATEMENT_RPC)
+/**
+ * 2026-11-18 · Con `storeSlug`, solo las cuentas con el vendedor de esa tienda:
+ * el cliente de otra tienda no tiene por qué aparecer aquí.
+ */
+export async function fetchMyStatement(storeSlug?: string | null): Promise<AccountStatement[]> {
+  return rpc<AccountStatement[]>(MY_STATEMENT_RPC, storeSlug ? { p_store_slug: storeSlug } : {})
 }
 
 export async function fetchMyCoupons(storeId: string): Promise<MyCoupon[]> {
@@ -164,7 +181,7 @@ export async function fetchMyOrderDetail(orderId: string): Promise<MyOrderDetail
 // recargar los tres cuando solo cambia uno.
 // ---------------------------------------------------------------------------
 export const myOrdersKey = () => ['storefront', 'my-orders'] as const
-export const myStatementKey = () => ['storefront', 'my-statement'] as const
+export const myStatementKey = (storeSlug?: string | null) => ['storefront', 'my-statement', storeSlug ?? null] as const
 export const myCouponsKey = (storeId: string) => ['storefront', 'my-coupons', storeId] as const
 export const myOrderDetailKey = (orderId: string) =>
   ['storefront', 'my-order', orderId] as const

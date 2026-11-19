@@ -1,7 +1,8 @@
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded'
-import { InputAdornment, ListSubheader, TextField, Typography, type TextFieldProps } from '@mui/material'
+import { InputAdornment, ListSubheader, TextField, Typography } from '@mui/material'
 import { Children, cloneElement, forwardRef, isValidElement, useState, type ReactNode } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { Field, type FieldProps } from './Field'
 
 /**
  * Desplegable con buscador (2026-11-12).
@@ -26,7 +27,8 @@ import { useI18n } from '@/shared/i18n/i18n-context'
  */
 export const SEARCH_FROM_OPTIONS = 7
 
-export type SelectFieldProps = Omit<TextFieldProps, 'select'>
+/** `help` pone el icono «i» con la explicación, como en `Field`. */
+export type SelectFieldProps = Omit<FieldProps, 'select' | 'rule' | 'maxLength'>
 
 function textOf(node: ReactNode): string {
   if (node == null || typeof node === 'boolean') return ''
@@ -53,9 +55,9 @@ export const SelectField = forwardRef<HTMLDivElement, SelectFieldProps>(function
 
   if (!searchable) {
     return (
-      <TextField ref={ref} select SelectProps={SelectProps} {...props}>
+      <Field ref={ref} select SelectProps={SelectProps} {...props}>
         {children}
-      </TextField>
+      </Field>
     )
   }
 
@@ -73,7 +75,7 @@ export const SelectField = forwardRef<HTMLDivElement, SelectFieldProps>(function
   const stop = (event: React.SyntheticEvent) => event.stopPropagation()
 
   return (
-    <TextField
+    <Field
       ref={ref}
       select
       {...props}
@@ -120,6 +122,6 @@ export const SelectField = forwardRef<HTMLDivElement, SelectFieldProps>(function
         )}
       </ListSubheader>
       {shown}
-    </TextField>
+    </Field>
   )
 })

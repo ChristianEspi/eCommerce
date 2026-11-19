@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { matchesRule } from '@/shared/lib/fieldRules'
 import { moneyText } from '@/shared/lib/money'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { PRODUCT_KINDS as PIM_PRODUCT_KINDS, type ProductKind } from './pim/types'
@@ -241,7 +242,8 @@ export const productFormSchema = z
       .string()
       .trim()
       .min(1, errorKey('catalog.error.sku'))
-      .max(64, errorKey('catalog.error.sku')),
+      .max(64, errorKey('catalog.error.sku'))
+      .refine((value) => !value || matchesRule('sku', value), errorKey('help.catalog.error.sku')),
     description: z.string().trim().max(8000, errorKey('catalog.error.description')),
     stock: z
       .string()

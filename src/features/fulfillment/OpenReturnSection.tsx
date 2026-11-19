@@ -1,4 +1,4 @@
-import { Alert, Box, Button, Checkbox, FormControlLabel, MenuItem, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, Checkbox, FormControlLabel, MenuItem, Stack, Typography } from '@mui/material'
 import { useState } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
@@ -6,6 +6,7 @@ import { useFeedback } from '@/shared/ui/feedback-context'
 import { FulfillmentError } from './errors'
 import { useOpenReturn, useReturnReasons } from './hooks'
 import { SelectField } from '@/shared/ui/SelectField'
+import { Field } from '@/shared/ui/Field'
 
 export interface ReturnableLine {
   id: string
@@ -121,7 +122,7 @@ export function OpenReturnSection({
             </MenuItem>
           ))}
         </SelectField>
-        <TextField label={t('returns.open.note')} multiline minRows={2} value={note} onChange={(event) => setNote(event.target.value)} />
+        <Field rule="longText" label={t('returns.open.note')} multiline minRows={2} value={note} onChange={(event) => setNote(event.target.value)} />
         <Stack direction="row" sx={{ gap: 1, justifyContent: 'flex-end' }}>
           <Button onClick={() => setAbierto(false)} disabled={open.isPending}>
             {t('common.cancel')}

@@ -24,9 +24,9 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useEffect, useMemo, useState, Suspense } from 'react'
 import { lazyPage } from '@/app/lazyPage'
 import {
@@ -538,9 +538,11 @@ export function BlocksSection({ pageId }: { pageId: string | null }) {
               imágenes. Las colecciones tienen su propio campo más abajo, con la
               regla de su tipo. */}
           {blockUsesMediaItems(form.block_type) && form.layout === 'grid' && (
-            <TextField
+            <Field
               type="number"
               label={t('content.blocks.columns')}
+              rule="integer"
+              maxLength={1}
               helperText={t('content.blocks.columnsHelp')}
               value={form.columns}
               onChange={(event) => setForm({ ...form, columns: Number(event.target.value) })}
@@ -568,8 +570,10 @@ export function BlocksSection({ pageId }: { pageId: string | null }) {
             onApply={(field, value) => setForm((prev) => ({ ...prev, [field]: value }))}
           />
 
-          <TextField
+          <Field
             label={t('content.blocks.title')}
+            rule="text"
+            maxLength={160}
             required={rules.title === 'required'}
             value={form.title}
             error={Boolean(issueOf('title'))}
@@ -583,8 +587,10 @@ export function BlocksSection({ pageId }: { pageId: string | null }) {
             onChange={(event) => setForm({ ...form, title: event.target.value })}
           />
           {rules.subtitle !== 'unused' && (
-            <TextField
+            <Field
               label={t('content.blocks.subtitle')}
+              rule="longText"
+              maxLength={320}
               value={form.subtitle}
               onChange={(event) => setForm({ ...form, subtitle: event.target.value })}
             />
@@ -628,13 +634,16 @@ export function BlocksSection({ pageId }: { pageId: string | null }) {
           )}
           {rules.cta !== 'unused' && (
             <>
-              <TextField
+              <Field
                 label={t('content.blocks.ctaLabel')}
+                rule="text"
+                maxLength={60}
                 value={form.cta_label}
                 onChange={(event) => setForm({ ...form, cta_label: event.target.value })}
               />
-              <TextField
+              <Field
                 label={t('content.blocks.ctaHref')}
+                rule="url"
                 value={form.cta_href}
                 error={Boolean(issueOf('cta_href'))}
                 onChange={(event) => setForm({ ...form, cta_href: event.target.value })}
@@ -667,8 +676,9 @@ export function BlocksSection({ pageId }: { pageId: string | null }) {
                 onChange={(next) => setForm({ ...form, media_url: next })}
               />
 
-              <TextField
+              <Field
                 label={t('content.blocks.mediaAlt')}
+                rule="text"
                 value={form.media_alt}
                 onChange={(event) => setForm({ ...form, media_alt: event.target.value })}
                 helperText={t('content.blocks.mediaAltHelp')}
@@ -690,29 +700,35 @@ export function BlocksSection({ pageId }: { pageId: string | null }) {
           )}
 
           {rules.columns !== 'unused' && (
-            <TextField
+            <Field
               type="number"
               label={t('content.blocks.columns')}
+              rule="integer"
+              maxLength={1}
+              help={t('content.blocks.columnsHelp')}
               value={form.columns}
               onChange={(event) => setForm({ ...form, columns: Number(event.target.value) })}
             />
           )}
           {rules.itemLimit !== 'unused' && (
-            <TextField
+            <Field
               type="number"
               label={t('content.blocks.itemLimit')}
+              rule="integer"
+              maxLength={2}
+              help={t('help.content.itemLimit')}
               value={form.item_limit}
               onChange={(event) => setForm({ ...form, item_limit: Number(event.target.value) })}
             />
           )}
-          <TextField
+          <Field
             type="datetime-local"
             label={t('content.pages.from')}
             value={form.publish_from}
             onChange={(event) => setForm({ ...form, publish_from: event.target.value })}
             InputLabelProps={{ shrink: true }}
           />
-          <TextField
+          <Field
             type="datetime-local"
             label={t('content.pages.to')}
             value={form.publish_to}
@@ -802,8 +818,10 @@ function PositionField({
   }
 
   return (
-    <TextField
+    <Field
       type="number"
+      rule="integer"
+      maxLength={3}
       size="small"
       value={draft}
       disabled={busy}
@@ -1170,16 +1188,18 @@ function SlidesDrawer({ block, onClose }: { block: ContentBlockRow; onClose: () 
           />
         )}
 
-        <TextField
+        <Field
           label={t('content.slides.alt')}
+          rule="text"
           helperText={t('content.slides.altHelp')}
           value={alt}
           onChange={(event) => setAlt(event.target.value)}
           slotProps={SHRINK}
           fullWidth
         />
-        <TextField
+        <Field
           label={t('content.slides.href')}
+          rule="url"
           helperText={hrefValido ? t('content.slides.hrefHelp') : t('content.slides.badHref')}
           error={!hrefValido}
           value={href}

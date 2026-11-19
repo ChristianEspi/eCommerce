@@ -409,6 +409,20 @@ export const trackedOrderSchema = z.object({
    */
   payment_status: z.string().default('pending'),
   /**
+   * 2026-11-17 · Con qué se paga (el intento de cobro más reciente). Es lo que
+   * permite decir «pagas al recibir» en un contra entrega. `null` sin intento
+   * o en una respuesta anterior al despliegue.
+   */
+  payment_method: z
+    .object({
+      code: z.string(),
+      kind: z.string(),
+      display_name: z.string(),
+      instructions: z.string().nullable().default(null),
+    })
+    .nullable()
+    .default(null),
+  /**
    * Resumen v2 · Los otros dos ejes del pedido, para la línea de tiempo.
    * `order_by_token` los devuelve y el esquema los tiraba. `null` en una
    * respuesta anterior al despliegue: la línea de tiempo lo trata como «sin

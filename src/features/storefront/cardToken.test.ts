@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { TokenizacionError, tokenizarTarjeta } from './cardToken'
+import { TokenizacionError, estiloCulqi, pagarConCulqiCheckout, textoSobre, tokenizarTarjeta } from './cardToken'
 
 /**
  * La tarjeta se cambia por un token contra la API de Culqi (2026-11-15), con
@@ -52,5 +52,61 @@ describe('tokenizar la tarjeta con Culqi', () => {
     vi.stubGlobal('fetch', fetchMock)
     await expect(tokenizarTarjeta(TARJETA, null)).resolves.toMatch(/^sim_.*1$/)
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * 2026-11-18 · La ventana de Culqi con la marca de la tienda: su logo y su
+ * acento, y un texto de botón que se lea sobre ese acento.
+ */
+describe('la ventana de Culqi con la marca de la tienda', () => {
+  it('el texto del botón contrasta con el acento', () => {
+    expect(textoSobre('#8f2d37')).toBe('#FFFFFF')
+    expect(textoSobre('#f5d547')).toBe('#111111')
+  })
+
+  it('logo https y acento van al estilo; lo que no es válido no se manda', () => {
+    expect(estiloCulqi('https://cdn.test/logo.png', '#8f2d37')).toMatchObject({
+      logo: 'https://cdn.test/logo.png',
+      bannerColor: '#8f2d37',
+      buttonBackground: '#8f2d37',
+      buttonTextColor: '#FFFFFF',
+    })
+    expect(estiloCulqi('http://inseguro/logo.png', 'rojo')).toEqual({})
+    expect(estiloCulqi(null, null)).toEqual({})
+  })
+
+  it('abre Culqi con la marca de la tienda en `options.style`', async () => {
+    const options = vi.fn()
+    const culqi = {
+      settings: vi.fn(),
+      options,
+      open: vi.fn(),
+      close: vi.fn(),
+      isOpen: true,
+      token: null as { id: string } | null,
+      error: null,
+    }
+    const ventana = window as unknown as { Culqi?: unknown; culqi?: () => void }
+    ventana.Culqi = culqi
+    try {
+      const promesa = pagarConCulqiCheckout({
+        llavePublica: 'pk_test_x',
+        montoCentimos: 1000,
+        moneda: 'PEN',
+        titulo: 'Química Suiza',
+        logoUrl: 'https://cdn.test/logo.png',
+        colorAcento: '#8f2d37',
+      })
+      await vi.waitFor(() => expect(culqi.open).toHaveBeenCalled())
+      expect(options.mock.calls[0]?.[0]).toMatchObject({
+        style: { logo: 'https://cdn.test/logo.png', bannerColor: '#8f2d37' },
+      })
+      culqi.token = { id: 'tkn_test_1' }
+      ventana.culqi?.()
+      await expect(promesa).resolves.toBe('tkn_test_1')
+    } finally {
+      delete ventana.Culqi
+    }
   })
 })

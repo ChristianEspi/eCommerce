@@ -21,6 +21,28 @@ export function mapCreditCode(code: string): MessageKey {
   switch (code) {
     case 'COBRO_EXCEDE_DEUDA':
       return 'credit.error.overpay'
+    case 'APLICADO_EXCEDE_COBRO':
+      return 'credit.error.overApplied'
+    case 'DOCUMENTO_ANULADO':
+      return 'credit.error.voided'
+    case 'DOCUMENTO_DE_OTRO_CLIENTE':
+      return 'credit.error.otherCustomer'
+    case 'MONEDAS_DISTINTAS':
+      return 'credit.error.currencies'
+    case 'SIN_DOCUMENTOS':
+      return 'credit.error.noDocuments'
+    case 'FECHA_FUTURA':
+      return 'credit.error.futureDate'
+    case 'IMPORTE_NO_VALIDO':
+      return 'credit.error.amount'
+    case 'CLIENTE_NO_ENCONTRADO':
+      return 'credit.error.notFound'
+    case 'PEDIDO_NO_ENCONTRADO':
+      return 'credit.error.orderNotFound'
+    case 'PEDIDO_CANCELADO':
+      return 'credit.error.orderCancelled'
+    case 'COMPROBANTE_YA_EXISTE':
+      return 'credit.error.invoiceExists'
     case 'COMPROBANTE_EMITIDO':
       return 'credit.error.issued'
     case 'COMPROBANTE_ACEPTADO':

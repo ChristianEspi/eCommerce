@@ -9,8 +9,8 @@ import {
   MenuItem,
   Stack,
   Switch,
-  TextField,
 } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useState } from 'react'
 import { useWarehouses } from '@/features/inventory/hooks'
 import { usePriceLists } from '@/features/pricing/hooks'
@@ -105,11 +105,11 @@ export function FeedDialog({
             ))}
           </SelectField>
 
-          <TextField
+          <Field
+            rule="apiPath" help={t('integrations.sources.feed.pathHelp')}
             label={t('integrations.sources.feed.path')}
             value={draft.path}
             onChange={(event) => set('path', event.target.value.trim())}
-            helperText={t('integrations.sources.feed.pathHelp')}
             error={touched && problem === 'integrations.sources.validation.path'}
           />
 
@@ -164,7 +164,8 @@ export function FeedDialog({
             ))}
           </SelectField>
 
-          <TextField
+          <Field
+            rule="integer" maxLength={4} help={t('help.integrations.sources.pageSize')}
             type="number"
             label={t('integrations.sources.feed.pageSize')}
             value={draft.pageSize}

@@ -1,6 +1,7 @@
 import AddPhotoAlternateRoundedIcon from '@mui/icons-material/AddPhotoAlternateRounded'
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
-import { Alert, Box, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Box, Stack, Typography } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useRef, useState } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { GhostButton } from '@/shared/ui/buttons'
@@ -191,15 +192,16 @@ export function CategoryImageField({
 
       {/* El alt solo existe si hay foto que describir. */}
       {imageUrl && (
-        <TextField
+        <Field
           fullWidth
           size="small"
+          rule="text"
+          maxLength={160}
           label={t('catalog.categories.image.alt')}
           helperText={t('catalog.categories.image.altHelp')}
           disabled={ocupado}
           value={imageAlt}
           onChange={(event) => onChangeAlt(event.target.value)}
-          inputProps={{ maxLength: 160 }}
         />
       )}
 

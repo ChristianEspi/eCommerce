@@ -29,12 +29,12 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useState } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
+import { Field } from '@/shared/ui/Field'
 import {
   rateToPercent,
   useCreateTaxCategory,
@@ -167,8 +167,9 @@ export function TaxesSection({ organizationId, companyId, canManage }: Props) {
                 </TableCell>
                 <TableCell sx={{ color: 'var(--muted)' }}>{row.code}</TableCell>
                 <TableCell align="right">
-                  <TextField
+                  <Field
                     size="small"
+                    rule="percent"
                     value={draftFor(row)}
                     disabled={!canManage || busy}
                     inputProps={{
@@ -216,13 +217,17 @@ export function TaxesSection({ organizationId, companyId, canManage }: Props) {
         <DialogTitle>{t('taxes.new')}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ pt: 1 }}>
-            <TextField
+            <Field
+              rule="text"
+              maxLength={120}
               label={t('taxes.name')}
               value={form.name}
-              inputProps={{ maxLength: 120 }}
               onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
             />
-            <TextField
+            <Field
+              rule="lowerCode"
+              maxLength={41}
+              help={t('help.admin.taxes.code')}
               label={t('taxes.code')}
               value={form.code}
               helperText={t('taxes.codeHelp')}
@@ -231,7 +236,9 @@ export function TaxesSection({ organizationId, companyId, canManage }: Props) {
                 setForm((prev) => ({ ...prev, code: event.target.value.toLowerCase() }))
               }
             />
-            <TextField
+            <Field
+              rule="percent"
+              help={t('help.admin.taxes.rate')}
               label={t('taxes.rate')}
               value={form.rate}
               inputProps={{ inputMode: 'decimal' }}

@@ -553,6 +553,26 @@ describe('checkout', () => {
     expect(fake.state.invocations[0]?.body.idempotency_key).toMatch(/^[a-f0-9]{64}$/)
   })
 
+  it('el cupón y la tarjeta de regalo están en el resumen desde el primer paso', async () => {
+    const user = userEvent.setup()
+    const fake = backend()
+    sembrarCarrito([LINEA_SILLA])
+    renderStorefront(fake, '/s/casa-nordica/checkout')
+
+    // Primer paso: el campo ya está, dentro del bloque del resumen.
+    const cupon = await screen.findByLabelText(/Cupón de descuento/, { selector: 'input' })
+    expect(cupon.closest('[data-checkout-codes]')).not.toBeNull()
+    expect(screen.getByLabelText(/Tarjeta de regalo/, { selector: 'input' }).closest('[data-checkout-codes]')).not.toBeNull()
+
+    await rellenarContacto(user)
+    await irAPagar(user)
+    // En el último paso, un Enter en el cupón no registra el pedido.
+    await user.type(screen.getByLabelText(/Cupón de descuento/, { selector: 'input' }), 'verano-25{Enter}')
+    // El envío es asíncrono: se le da tiempo a ocurrir antes de afirmar que no.
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    expect(fake.state.invocations).toHaveLength(0)
+  })
+
   it('el cupón viaja como TEXTO y sin un solo importe (P10)', async () => {
     const user = userEvent.setup()
     const fake = backend()
@@ -561,8 +581,8 @@ describe('checkout', () => {
 
     await rellenarContacto(user)
     await irAPagar(user)
-    // Resumen v2 · el cupón vive en el paso de pago, junto al total.
-    await user.type(screen.getByLabelText(/Cupón de descuento/), 'verano-25')
+    // 2026-11-17 · el cupón vive en el resumen, debajo del total.
+    await user.type(screen.getByLabelText(/Cupón de descuento/, { selector: 'input' }), 'verano-25')
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
 
     await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
@@ -1005,7 +1025,7 @@ async function irAPagar(user: ReturnType<typeof userEvent.setup>) {
   const confirmar = await screen.findByRole('button', { name: 'Confirmar pedido' })
   // 2026-11-15 · La boleta lleva SIEMPRE documento y nombre: se completa el DNI
   // (el nombre se propone con el del contacto) salvo que la prueba ya lo hiciera.
-  const documento = screen.queryByLabelText(/Número de documento/)
+  const documento = screen.queryByLabelText(/Número de documento/, { selector: 'input' })
   if (documento && (documento as HTMLInputElement).value === '') await user.type(documento, DNI_PRUEBA)
   const nombre = screen.queryByLabelText(/Nombre completo/)
   if (nombre && (nombre as HTMLInputElement).value === '') await user.type(nombre, 'Ana Pérez')
@@ -1817,7 +1837,7 @@ describe('checkout con sesión: datos y direcciones propuestos (H04)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Jr. Lampa 55, Lima, PE' }))
     expect(screen.getByLabelText(/Dirección de entrega/)).toHaveValue('Jr. Lampa 55')
-    expect(screen.getByLabelText(/País/)).toHaveValue('PE')
+    expect(screen.getByLabelText(/País/, { selector: 'input' })).toHaveValue('PE')
 
     await user.click(await irAPagar(user))
     await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
@@ -1952,7 +1972,7 @@ describe('país por defecto del checkout (H08)', () => {
     renderStorefront(fake, '/s/casa-nordica/checkout')
 
     await rellenarContacto(user)
-    expect(screen.getByLabelText(/País/)).toHaveValue('PE')
+    expect(screen.getByLabelText(/País/, { selector: 'input' })).toHaveValue('PE')
 
     await user.click(await irAPagar(user))
     await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
@@ -1965,7 +1985,7 @@ describe('país por defecto del checkout (H08)', () => {
     renderStorefront(backend({ store: { default_country: 'CO' } }), '/s/casa-nordica/checkout')
 
     await rellenarContacto(user)
-    expect(screen.getByLabelText(/País/)).toHaveValue('CO')
+    expect(screen.getByLabelText(/País/, { selector: 'input' })).toHaveValue('CO')
   })
 
   it('sin país configurado el campo sigue vacío, como antes', async () => {
@@ -1974,7 +1994,7 @@ describe('país por defecto del checkout (H08)', () => {
     renderStorefront(backend(), '/s/casa-nordica/checkout')
 
     await rellenarContacto(user)
-    expect(screen.getByLabelText(/País/)).toHaveValue('')
+    expect(screen.getByLabelText(/País/, { selector: 'input' })).toHaveValue('')
   })
 
   it('un valor raro en la vista no rompe la tienda ni se propone', async () => {
@@ -1983,7 +2003,7 @@ describe('país por defecto del checkout (H08)', () => {
     renderStorefront(backend({ store: { default_country: 'peru' } }), '/s/casa-nordica/checkout')
 
     await rellenarContacto(user)
-    expect(screen.getByLabelText(/País/)).toHaveValue('')
+    expect(screen.getByLabelText(/País/, { selector: 'input' })).toHaveValue('')
   })
 })
 
@@ -2120,14 +2140,14 @@ describe('orden de compra (N05)', () => {
     expect(fake.state.invocations).toHaveLength(0)
 
     // 2026-11-15 · Un RUC sin su dígito verificador correcto tampoco.
-    await user.type(screen.getByLabelText(/RUC/), '20601234567')
+    await user.type(screen.getByLabelText(/RUC/, { selector: 'input' }), '20601234567')
     await user.type(screen.getByLabelText(/Dirección fiscal/), 'Av. Javier Prado Este 4200, Surco')
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
     expect(await screen.findByText('El RUC no es válido: revisa los 11 dígitos.')).toBeInTheDocument()
     expect(fake.state.invocations).toHaveLength(0)
 
-    await user.clear(screen.getByLabelText(/RUC/))
-    await user.type(screen.getByLabelText(/RUC/), '20131312955')
+    await user.clear(screen.getByLabelText(/RUC/, { selector: 'input' }))
+    await user.type(screen.getByLabelText(/RUC/, { selector: 'input' }), '20131312955')
     await user.type(screen.getByLabelText(/Centro de costo/), 'CC-0412')
     await user.click(screen.getByRole('button', { name: 'Confirmar pedido' }))
     await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
@@ -2152,14 +2172,14 @@ describe('orden de compra (N05)', () => {
 
     expect(await screen.findByRole('button', { name: 'Boleta' })).toHaveAttribute('aria-pressed', 'true')
     // Sin documento no se confirma, y el aviso dice qué falta.
-    await user.clear(screen.getByLabelText(/Número de documento/))
-    await user.type(screen.getByLabelText(/Número de documento/), '1234')
+    await user.clear(screen.getByLabelText(/Número de documento/, { selector: 'input' }))
+    await user.type(screen.getByLabelText(/Número de documento/, { selector: 'input' }), '1234')
     await user.click(confirmar)
     expect(await screen.findByText('Revisa el número de documento: un DNI tiene 8 dígitos.')).toBeInTheDocument()
     expect(fake.state.invocations).toHaveLength(0)
 
-    await user.clear(screen.getByLabelText(/Número de documento/))
-    await user.type(screen.getByLabelText(/Número de documento/), '45781236')
+    await user.clear(screen.getByLabelText(/Número de documento/, { selector: 'input' }))
+    await user.type(screen.getByLabelText(/Número de documento/, { selector: 'input' }), '45781236')
     await user.click(confirmar)
     await waitFor(() => expect(fake.state.invocations).toHaveLength(1))
     const billing = fake.state.invocations[0]!.body.billing_address as Record<string, unknown>
@@ -2269,6 +2289,58 @@ describe('la confirmación sigue el estado real del pedido', () => {
     )
     expect(document.querySelector('[data-step="payment"]')).toHaveAttribute('data-state', 'done')
     expect(consultas).toBeGreaterThan(0)
+  })
+})
+
+/**
+ * 2026-11-17 · Contra entrega: la confirmación no dice «pendiente de pago».
+ */
+describe('confirmación de un pedido para recoger en tienda', () => {
+  it('pagado: dice dónde se recoge y no habla de envío', async () => {
+    const fake = backend()
+    fake.state.rpc.order_by_token = () => ({
+      order_number: 'EC-3', status: 'paid', payment_status: 'paid', approval_status: 'not_required',
+      fulfillment_status: 'unfulfilled', currency: 'PEN', placed_at: '2026-11-17T10:00:00Z', customer_name: 'Ana',
+      subtotal: '100.00', tax_total: '0.00', discount_total: '0.00', shipping_total: '0.00', grand_total: '100.00',
+      shipping_address: {}, items: [{ sku: 'SILLA', name: 'Silla de roble', unit_price: '100.00', quantity: 1 }],
+      payment_method: { code: 'tarjeta', kind: 'card', display_name: 'Tarjeta', instructions: null },
+      deliveries: [{
+        sequence: 1, method_name: 'Recojo en botica', strategy: 'pickup', state: 'pending',
+        promised_from: '2026-11-17', promised_to: '2026-11-18',
+        pickup_point: { name: 'Botica Miraflores', address: { address: 'Av. Larco 1200', district: 'Miraflores' } },
+        tracking_number: null, tracking_url: null,
+      }],
+    })
+    renderStorefront(fake, `/s/casa-nordica/order/EC-3?t=${'c'.repeat(64)}`)
+
+    expect(
+      await screen.findByText(/listo para recoger en Botica Miraflores \(Av\. Larco 1200, Miraflores\)/),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/coordinar la entrega/)).not.toBeInTheDocument()
+    expect(document.querySelector('[data-step="shipping"]')).toBeNull()
+    expect(document.querySelector('[data-step="preparing"]')).toHaveAttribute('data-state', 'current')
+    expect(document.querySelector('[data-step="readyForPickup"]')).toHaveAttribute('data-state', 'pending')
+  })
+})
+
+describe('confirmación de un pedido contra entrega', () => {
+  it('dice cuánto se paga al recibir y pone el pago al final de la línea', async () => {
+    const fake = backend()
+    fake.state.rpc.order_by_token = () => ({
+      order_number: 'EC-2', status: 'pending', payment_status: 'pending', approval_status: 'not_required',
+      fulfillment_status: 'unfulfilled', currency: 'PEN', placed_at: '2026-11-17T10:00:00Z', customer_name: 'Ana',
+      subtotal: '100.00', tax_total: '0.00', discount_total: '0.00', shipping_total: '0.00', grand_total: '100.00',
+      shipping_address: {}, deliveries: [], items: [{ sku: 'SILLA', name: 'Silla de roble', unit_price: '100.00', quantity: 1 }],
+      payment_method: { code: 'efectivo', kind: 'cash', display_name: 'Pago en efectivo', instructions: null },
+    })
+    renderStorefront(fake, `/s/casa-nordica/order/EC-2?t=${'b'.repeat(64)}`)
+
+    expect(await screen.findByText(/en efectivo al recibir tu pedido/)).toBeInTheDocument()
+    expect(screen.getByText('Pagas al recibir')).toBeInTheDocument()
+    expect(screen.queryByText('Pendiente de pago')).not.toBeInTheDocument()
+    expect(screen.getByText('Pago en efectivo')).toBeInTheDocument()
+    expect(document.querySelector('[data-step="payment"]')).toBeNull()
+    expect(document.querySelector('[data-step="paymentOnDelivery"]')).toHaveAttribute('data-state', 'pending')
   })
 })
 

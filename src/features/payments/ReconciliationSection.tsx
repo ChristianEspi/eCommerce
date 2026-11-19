@@ -14,12 +14,12 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useRef, useState, type ChangeEvent } from 'react'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { Field } from '@/shared/ui/Field'
 import type { MessageKey } from '@/shared/i18n/messages'
 import {
   IMPORT_ACCEPT,
@@ -199,8 +199,9 @@ export function ReconciliationSection() {
                 onChange={(event) => void onFile(event)}
               />
             </Stack>
-            <TextField
+            <Field
               label={t('payments.reconciliation.paste')}
+              help={t('help.payments.reconciliationPaste')}
               value={csv}
               onChange={(event) => setCsv(event.target.value)}
               multiline

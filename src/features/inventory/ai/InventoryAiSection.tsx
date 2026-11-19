@@ -11,7 +11,6 @@ import {
   Divider,
   Skeleton,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useState, type FormEvent } from 'react'
@@ -23,6 +22,7 @@ import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { AppIcon } from '@/shared/ui/AppIcon'
+import { Field } from '@/shared/ui/Field'
 import { T } from '@/theme/tokens'
 import {
   MAX_INVENTORY_QUESTION,
@@ -299,16 +299,17 @@ export function InventoryAiSection() {
             </Stack>
             <Box component="form" onSubmit={onSubmit} noValidate>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'flex-start' } }}>
-                <TextField
+                <Field
                   fullWidth
                   size="small"
+                  rule="text"
+                  maxLength={MAX_INVENTORY_QUESTION + 50}
                   label={t('aiInventory.ask.label')}
                   placeholder={t('aiInventory.ask.placeholder')}
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
                   error={tooLong}
                   helperText={tooLong ? t('aiOrders.ask.tooLong') : t('aiInventory.costHint')}
-                  inputProps={{ maxLength: MAX_INVENTORY_QUESTION + 50 }}
                 />
                 <Button
                   type="submit"

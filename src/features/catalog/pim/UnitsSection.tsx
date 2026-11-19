@@ -19,7 +19,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
@@ -35,6 +34,7 @@ import { EmptyState, ErrorState } from '@/shared/ui/states'
 import { CatalogError } from '../api/errors'
 import { useSaveUnit, useUnits } from './hooks'
 import { unitFormSchema, unitToForm, type UnitFormValues, type UnitOfMeasure } from './types'
+import { Field } from '@/shared/ui/Field'
 
 /**
  * Unidades de medida de la sociedad.
@@ -253,9 +253,12 @@ function UnitDrawer({
         <Stack spacing={2.5}>
           {serverError && <Alert severity="error">{t(serverError)}</Alert>}
 
-          <TextField
+          <Field
             label={t('pim.field.code')}
             fullWidth
+            rule="code"
+            maxLength={16}
+            help={t('help.catalog.uomCode')}
             autoFocus
             disabled={!canWrite}
             error={Boolean(errors.code)}
@@ -264,18 +267,23 @@ function UnitDrawer({
             {...register('code')}
           />
 
-          <TextField
+          <Field
             label={t('pim.field.name')}
             fullWidth
+            rule="text"
+            maxLength={80}
             disabled={!canWrite}
             error={Boolean(errors.name)}
             helperText={fieldError('name')}
             {...register('name')}
           />
 
-          <TextField
+          <Field
             label={t('pim.field.symbol')}
             fullWidth
+            rule="text"
+            maxLength={12}
+            help={t('help.catalog.uomSymbol')}
             disabled={!canWrite}
             error={Boolean(errors.symbol)}
             helperText={fieldError('symbol') ?? t('common.optional')}

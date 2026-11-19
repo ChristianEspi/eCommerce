@@ -6,6 +6,10 @@ import { TradeError, tradeErrorFromDb } from './errors'
 import {
   ASSORTMENTS_TABLE,
   ASSORTMENT_ITEMS_TABLE,
+  ASSORTMENT_ASSIGNMENTS_TABLE,
+  assortmentAssignmentSchema,
+  type AssortmentAssignment,
+  type AssortmentScope,
   QUOTES_TABLE,
   QUOTE_ITEMS_TABLE,
   assortmentItemSchema,
@@ -349,5 +353,69 @@ export async function addAssortmentItem(input: {
 
 export async function removeAssortmentItem(id: string): Promise<void> {
   const { error } = await client().from(ASSORTMENT_ITEMS_TABLE).delete().eq('id', id)
+  if (error) throw tradeErrorFromDb(error)
+}
+
+// ---------------------------------------------------------------------------
+// A quién se aplica el surtido (2026-11-16)
+// ---------------------------------------------------------------------------
+
+const ASSIGNMENT_SELECT =
+  'id, assortment_id, scope, channel_id, territory_id, segment_id, customer_id, is_active, customers(name)'
+
+function asignaciones(data: unknown[] | null): AssortmentAssignment[] {
+  const filas = (data ?? []).map((row) => {
+    const { customers, ...resto } = row as Record<string, unknown> & {
+      customers?: { name?: string }[] | { name?: string } | null
+    }
+    const cliente = Array.isArray(customers) ? customers[0] : customers
+    return { ...resto, customer_name: cliente?.name ?? null }
+  })
+  return assortmentAssignmentSchema.array().parse(filas)
+}
+
+/** Las de un surtido, o (sin id) todas las de la sociedad, para la tabla. */
+export async function fetchAssortmentAssignments(assortmentId: string | null): Promise<AssortmentAssignment[]> {
+  let consulta = client().from(ASSORTMENT_ASSIGNMENTS_TABLE).select(ASSIGNMENT_SELECT)
+  if (assortmentId) consulta = consulta.eq('assortment_id', assortmentId)
+  const { data, error } = await consulta.order('scope')
+  if (error) throw tradeErrorFromDb(error)
+  return asignaciones(data)
+}
+
+export async function addAssortmentAssignment(input: {
+  scope: TradeScope
+  assortmentId: string
+  assignmentScope: AssortmentScope
+  targetId: string
+}): Promise<void> {
+  const s = input.assignmentScope
+  const { error } = await client()
+    .from(ASSORTMENT_ASSIGNMENTS_TABLE)
+    .insert({
+      organization_id: input.scope.organizationId,
+      company_id: input.scope.companyId,
+      store_id: input.scope.storeId,
+      assortment_id: input.assortmentId,
+      scope: s,
+      channel_id: s === 'channel' ? input.targetId : null,
+      territory_id: s === 'territory' ? input.targetId : null,
+      segment_id: s === 'segment' ? input.targetId : null,
+      customer_id: s === 'customer' ? input.targetId : null,
+      is_active: true,
+    })
+  if (error) throw tradeErrorFromDb(error)
+}
+
+export async function setAssortmentAssignmentActive(input: { id: string; isActive: boolean }): Promise<void> {
+  const { error } = await client()
+    .from(ASSORTMENT_ASSIGNMENTS_TABLE)
+    .update({ is_active: input.isActive })
+    .eq('id', input.id)
+  if (error) throw tradeErrorFromDb(error)
+}
+
+export async function deleteAssortmentAssignment(id: string): Promise<void> {
+  const { error } = await client().from(ASSORTMENT_ASSIGNMENTS_TABLE).delete().eq('id', id)
   if (error) throw tradeErrorFromDb(error)
 }

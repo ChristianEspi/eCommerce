@@ -13,6 +13,7 @@ import { BuyerTermsNotice } from './commerce/BuyerTermsNotice'
 import { RequestQuoteButton } from './cart/RequestQuoteButton'
 import { ScheduleCartButton } from './cart/ScheduleCartButton'
 import { useCart } from './cart/cart-context'
+import { useAssortmentBlocked } from './commerce/assortment'
 import { useQuotedCart } from './cart/useQuotedCart'
 import { useStorefront } from './hooks'
 import { privateMeta } from './seo'
@@ -33,6 +34,8 @@ export function StoreCartPage() {
   const { t, locale } = useI18n()
   const { store, storeSlug } = useStorefront()
   const { cart, count, subtotal, currency } = useCart()
+  // 2026-11-16 · Con líneas fuera del surtido de la empresa no se pasa a pagar.
+  const fueraDeSurtido = useAssortmentBlocked(storeSlug, cart.lines.map((l) => l.product_id)).size > 0
 
   // Carrito, checkout, cuenta y seguimiento NO se indexan (P15-SaaS). No es
   // pudor: son estado de una sesión, no contenido, y el seguimiento además
@@ -171,9 +174,22 @@ export function StoreCartPage() {
             />
           </Box>
 
+          {fueraDeSurtido && (
+            <Alert severity="warning" sx={{ mt: 1.5 }} data-cart-assortment-blocked>
+              {t('store.assortment.cartBlocked')}
+            </Alert>
+          )}
+
           <Divider sx={{ my: 2 }} />
           <Stack sx={{ gap: 1 }}>
-            <Button component={Link} to={`/s/${storeSlug}/checkout`} variant="contained" fullWidth className="sf-cart-checkout">
+            <Button
+              component={Link}
+              to={`/s/${storeSlug}/checkout`}
+              variant="contained"
+              fullWidth
+              className="sf-cart-checkout"
+              disabled={fueraDeSurtido}
+            >
               {t('store.cart.checkout')}
             </Button>
             {/* Cierre A3: solo se pinta para quien compra para una empresa. */}

@@ -10,7 +10,6 @@ import {
   Divider,
   Skeleton,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useState, type FormEvent, type ReactNode } from 'react'
@@ -18,6 +17,7 @@ import { AiFeedbackButtons } from '@/features/ai/AiFeedbackButtons'
 import { useAiFeature } from '@/features/ai/hooks'
 import { MarkerText, MotivoNotice, SeverityIcon } from '@/features/orders/ai/parts'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { Field } from '@/shared/ui/Field'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { CustomerSystemBlock } from './CustomerSystemBlock'
 import { MAX_CUSTOMER_QUESTION, type CustomerAiContext, type CustomerInsight } from './customersAi'
@@ -240,16 +240,17 @@ export function CustomerAiPanel({ customerId }: { customerId: string }) {
             </Stack>
             <Box component="form" onSubmit={onSubmit} noValidate>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'flex-start' } }}>
-                <TextField
+                <Field
                   fullWidth
                   size="small"
+                  rule="longText"
+                  maxLength={MAX_CUSTOMER_QUESTION + 50}
                   label={t('aiCustomers.ask.label')}
                   placeholder={t('aiCustomers.ask.placeholder')}
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
                   error={tooLong}
                   helperText={tooLong ? t('aiOrders.ask.tooLong') : t('aiCustomers.costHint')}
-                  inputProps={{ maxLength: MAX_CUSTOMER_QUESTION + 50 }}
                 />
                 <Button
                   type="submit"

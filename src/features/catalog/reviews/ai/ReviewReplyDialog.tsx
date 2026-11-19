@@ -10,7 +10,6 @@ import {
   MenuItem,
   Skeleton,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -21,6 +20,7 @@ import { ContentMotivoNotice, CopyTextButton } from '@/features/ai/content/conte
 import { aiEntitlementKey, useAiFeature } from '@/features/ai/hooks'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
+import { Field } from '@/shared/ui/Field'
 import { MAX_REPLY_NOTES, REPLY_TONES, requestReviewReply, type ReplyTone, type ReviewReply } from './reviewsAi'
 import { SelectField } from '@/shared/ui/SelectField'
 
@@ -79,15 +79,16 @@ export function ReviewReplyDialog({
                   </MenuItem>
                 ))}
               </SelectField>
-              <TextField
+              <Field
                 size="small"
+                rule="longText"
+                maxLength={MAX_REPLY_NOTES}
                 multiline
                 minRows={2}
                 label={t('aiReviews.reply.notes')}
                 helperText={t('aiReviews.reply.notesHelp')}
                 value={notes}
                 onChange={(event) => setNotes(event.target.value.slice(0, MAX_REPLY_NOTES))}
-                inputProps={{ maxLength: MAX_REPLY_NOTES }}
               />
               <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
                 <Button
@@ -136,7 +137,7 @@ function ReplyEditor({ draft, interactionId }: { draft: ReviewReply; interaction
   const [body, setBody] = useState(() => plainAnalystText(draft.body, draft, locale, { days }))
   return (
     <Stack spacing={1.25}>
-      <TextField fullWidth multiline minRows={5} label={t('aiReviews.reply.body')} value={body} onChange={(e) => setBody(e.target.value)} />
+      <Field fullWidth rule="longText" multiline minRows={5} label={t('aiReviews.reply.body')} value={body} onChange={(e) => setBody(e.target.value)} />
       {draft.points.length > 0 && (
         <Box>
           <Typography sx={{ fontWeight: 700, fontSize: 13, mb: 0.5 }}>{t('aiReviews.reply.points')}</Typography>

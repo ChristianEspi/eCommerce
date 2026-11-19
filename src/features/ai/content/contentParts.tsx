@@ -1,7 +1,8 @@
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded'
-import { Alert, Box, Button, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, Stack, Typography } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useState } from 'react'
 import { canRetryMotivo } from '@/features/admin/dashboard/aiAnalyst'
 import type { AiErrorKind } from '@/features/ai/result'
@@ -102,9 +103,10 @@ export function SuggestionRow({
           {current.trim() ? current : t('aiContent.empty')}
         </Typography>
       )}
-      <TextField
+      <Field
         fullWidth
         size="small"
+        rule={multiline ? 'longText' : 'text'}
         multiline={multiline}
         minRows={multiline ? 3 : undefined}
         label={t('aiContent.suggestion')}

@@ -1,7 +1,8 @@
-import { Alert, Box, Button, FormControlLabel, Grid, Stack, Switch, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, FormControlLabel, Grid, Stack, Switch, Typography } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
+import { Field } from '@/shared/ui/Field'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { LoadingState } from '@/shared/ui/states'
 import {
@@ -90,9 +91,11 @@ export function CartRecoverySection({ storeId }: { storeId: string | null }) {
 
       <Grid container spacing={2}>
         <Grid item xs={12} sm={6}>
-          <TextField
+          <Field
             fullWidth
             type="number"
+            rule="integer"
+            maxLength={2}
             label={t('cartRecovery.delay')}
             value={delay}
             onChange={(event) => setDelay(event.target.value)}
@@ -101,9 +104,11 @@ export function CartRecoverySection({ storeId }: { storeId: string | null }) {
           />
         </Grid>
         <Grid item xs={12} sm={6}>
-          <TextField
+          <Field
             fullWidth
             type="number"
+            rule="integer"
+            maxLength={2}
             label={t('cartRecovery.maxAge')}
             value={maxAge}
             onChange={(event) => setMaxAge(event.target.value)}

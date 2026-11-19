@@ -185,8 +185,8 @@ describe('la traza en Diagnóstico', () => {
     holder.opinar = opinar
     renderWithProviders(<AiSection />)
 
-    // Anclada al principio: «No sirvió: assistant» contiene «Sirvió: assistant».
-    await userEvent.click(screen.getByRole('button', { name: /^Sirvió: assistant$/ }))
+    // Anclada al principio: «No sirvió: Asistente» contiene «Sirvió: Asistente».
+    await userEvent.click(screen.getByRole('button', { name: /^Sirvió: Asistente$/ }))
 
     expect(opinar.mutate).toHaveBeenCalledWith({
       id: '99999999-9999-4999-8999-999999999999',

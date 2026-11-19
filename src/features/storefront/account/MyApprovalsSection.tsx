@@ -8,7 +8,6 @@ import {
   DialogContent,
   DialogTitle,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useRef, useState } from 'react'
@@ -16,6 +15,7 @@ import { useI18n } from '@/shared/i18n/i18n-context'
 import { isUiError } from '@/shared/lib/appError'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import { BrandLoader } from '@/shared/ui/BrandLoader'
+import { Field } from '@/shared/ui/Field'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState, ErrorState } from '@/shared/ui/states'
 import { TS } from '@/theme/tokens'
@@ -183,7 +183,7 @@ export function MyApprovalsSection({ storeSlug, storeId = null }: { storeSlug: s
           <Typography sx={{ fontSize: TS.label, color: 'var(--muted)', mb: 1.5 }}>
             {t('account.approvals.rejectBody')}
           </Typography>
-          <TextField
+          <Field
             autoFocus
             fullWidth
             multiline
@@ -193,7 +193,8 @@ export function MyApprovalsSection({ storeSlug, storeId = null }: { storeSlug: s
             helperText={motivoVacio ? t('account.approvals.reasonRequired') : ' '}
             value={motivo}
             onChange={(event) => setMotivo(event.target.value)}
-            slotProps={{ htmlInput: { maxLength: 1000 } }}
+            rule="longText"
+            maxLength={1000}
           />
         </DialogContent>
         <DialogActions>

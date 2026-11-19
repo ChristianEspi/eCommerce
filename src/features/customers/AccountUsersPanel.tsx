@@ -18,11 +18,11 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useState } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { Field } from '@/shared/ui/Field'
 import type { MessageKey } from '@/shared/i18n/messages'
 import {
   mapCreateAccountCode,
@@ -216,9 +216,12 @@ export function AccountUsersPanel({
           )}
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-            <TextField
+            <Field
               size="small"
               fullWidth
+              type="email"
+              rule="email"
+              maxLength={160}
               label={t('customers.field.email')}
               value={values.email}
               onChange={(event) => set('email', event.target.value)}
@@ -246,14 +249,14 @@ export function AccountUsersPanel({
               ))}
             </SelectField>
 
-            <TextField
+            <Field
               size="small"
               fullWidth
+              rule="money"
               label={t('customers.field.spendingLimit')}
               value={values.spending_limit}
               onChange={(event) => set('spending_limit', event.target.value)}
               helperText={t('customers.field.spendingLimitHint')}
-              inputProps={{ inputMode: 'decimal' }}
             />
 
             <SelectField

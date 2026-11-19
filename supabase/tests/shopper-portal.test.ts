@@ -9,13 +9,15 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
-import { TENANT_A, asRole, createTestDatabase, expectFailure } from './harness.ts'
+import { TENANT_A, TENANT_B, asRole, createTestDatabase, expectFailure } from './harness.ts'
 
 type Row = Record<string, unknown>
 
 /** Dos compradores de dos empresas distintas del MISMO tenant. */
 const COMPRADOR_A = '0d000000-0000-4000-8000-00000000a001'
 const COMPRADOR_B = '0d000000-0000-4000-8000-00000000b001'
+/** Compra para sí: sin empresa (2026-11-18). */
+const CONSUMIDOR = '0d000000-0000-4000-8000-00000000c001'
 
 let db: PGlite
 let storeId = ''
@@ -48,6 +50,16 @@ async function statement(sub: string): Promise<Array<Record<string, unknown>>> {
   return asShopper(sub, async () => {
     const result = await db.query<{ s: Array<Record<string, unknown>> }>(
       'select public.my_account_statement() as s',
+    )
+    return result.rows[0]!.s
+  })
+}
+
+async function statementIn(sub: string, storeSlug: string): Promise<Array<Record<string, unknown>>> {
+  return asShopper(sub, async () => {
+    const result = await db.query<{ s: Array<Record<string, unknown>> }>(
+      'select public.my_account_statement($1) as s',
+      [storeSlug],
     )
     return result.rows[0]!.s
   })
@@ -143,6 +155,12 @@ beforeAll(async () => {
              $4, 'B-0001', 'pending', 'pending', 'PEN', 'sur@empresa.test', 999, 0, 0, 0, 999, now())`,
     [TENANT_A.organizationId, TENANT_A.companyId, storeId, cuentaB],
   )
+  // 2026-11-17 · La deuda del estado de cuenta es la deuda A CRÉDITO: los dos
+  // pedidos pendientes se vendieron a crédito y tienen su documento por cobrar,
+  // como los deja el checkout al atar el cobro.
+  await db.query(
+    `select ebim.ar_document_for_order(o.id) from public.orders o where o.order_number in ('A-0001', 'B-0001')`,
+  )
 
   // Dos cupones: uno abierto a la tienda y otro dirigido SOLO a la cuenta B.
   const [promoAbierta] = await svc<{ id: string }>(
@@ -227,6 +245,86 @@ describe('estado de cuenta', () => {
     )
     expect(message).toMatch(/permission denied|denegado/i)
   })
+
+  it('desde una tienda solo salen las cuentas con SU vendedor', async () => {
+    // El comprador A también es cliente de OTRO vendedor (tenant B).
+    await svc(`select public.bootstrap_tenant($1, $2, $3, $4, $5, $6, $7, $8, 'PEN')`, [
+      TENANT_B.organizationId,
+      TENANT_B.companyId,
+      TENANT_B.slug,
+      `Cuenta ${TENANT_B.slug}`,
+      TENANT_B.adminEmail,
+      TENANT_B.ownerId,
+      TENANT_B.storeSlug,
+      `Tienda ${TENANT_B.slug}`,
+    ])
+    const [cliente] = await svc<{ id: string }>(
+      `insert into public.customers (organization_id, company_id, kind, code, name, legal_name)
+       values ($1, $2, 'company', 'norte-en-b', 'Botica Norte (B)', 'Botica Norte (B)') returning id`,
+      [TENANT_B.organizationId, TENANT_B.companyId],
+    )
+    const [cuenta] = await svc<{ id: string }>(
+      `insert into public.business_accounts
+         (organization_id, company_id, customer_id, customer_kind, code, name, is_active)
+       values ($1, $2, $3, 'company', 'norte-en-b', 'Botica Norte en B', true) returning id`,
+      [TENANT_B.organizationId, TENANT_B.companyId, cliente!.id],
+    )
+    await svc(
+      `insert into public.business_account_users
+         (organization_id, company_id, business_account_id, user_id, email, role, status)
+       values ($1, $2, $3, $4, $5, 'admin', 'active')`,
+      [TENANT_B.organizationId, TENANT_B.companyId, cuenta!.id, COMPRADOR_A, `${COMPRADOR_A}@empresa.test`],
+    )
+
+    // Sin tienda, las dos; en cada tienda, la suya.
+    expect((await statement(COMPRADOR_A)).map((r) => r.account_name).sort()).toEqual([
+      'Botica Norte',
+      'Botica Norte en B',
+    ])
+    expect((await statementIn(COMPRADOR_A, TENANT_A.storeSlug)).map((r) => r.account_name)).toEqual([
+      'Botica Norte',
+    ])
+    expect((await statementIn(COMPRADOR_A, TENANT_B.storeSlug)).map((r) => r.account_name)).toEqual([
+      'Botica Norte en B',
+    ])
+    // Una tienda que no existe no devuelve nada.
+    expect(await statementIn(COMPRADOR_A, 'no-existe')).toEqual([])
+    // Y el comprador B, que no es cliente de B, no ve nada allí.
+    expect(await statementIn(COMPRADOR_B, TENANT_B.storeSlug)).toEqual([])
+  })
+
+  it('lo pagado sin confirmar va aparte: ni es deuda ni usa la linea', async () => {
+    // A-0003: pagado por transferencia, la tienda aun no lo confirma (sin
+    // documento a credito). A-0004: igual pero cancelado, no cuenta.
+    await svc(
+      `insert into public.orders
+         (organization_id, company_id, store_id, channel_id, business_account_id, order_number,
+          status, payment_status, currency, customer_email, subtotal, tax_total, shipping_total,
+          discount_total, grand_total, placed_at)
+       values
+         ($1, $2, $3, (select c.id from public.channels c where c.store_id = $3 and c.is_default),
+          $4, 'A-0003', 'pending', 'pending', 'PEN', 'norte@empresa.test', 250, 0, 0, 0, 250,
+          now() - interval '2 days'),
+         ($1, $2, $3, (select c.id from public.channels c where c.store_id = $3 and c.is_default),
+          $4, 'A-0004', 'cancelled', 'pending', 'PEN', 'norte@empresa.test', 70, 0, 0, 0, 70,
+          now() - interval '1 days')`,
+      [TENANT_A.organizationId, TENANT_A.companyId, storeId, cuentaA],
+    )
+
+    const [cuenta] = await statement(COMPRADOR_A)
+    const pendientes = cuenta?.pending_payments as Array<Record<string, unknown>>
+
+    expect(pendientes.map((p) => p.order_number)).toEqual(['A-0003'])
+    expect(Number(cuenta?.pending_payments_total)).toBe(250)
+    // La deuda a credito (A-0001) no se repite aqui ni cambia.
+    expect(Number(cuenta?.balance_due)).toBe(800)
+    expect(Number(cuenta?.credit_available)).toBe(4200)
+
+    // Y B no ve lo pendiente de A.
+    const [deB] = await statement(COMPRADOR_B)
+    expect(deB?.pending_payments).toEqual([])
+    expect(Number(deB?.pending_payments_total)).toBe(0)
+  })
 })
 
 describe('cupones', () => {
@@ -249,6 +347,33 @@ describe('cupones', () => {
     await svc(`update public.coupons set valid_to = now() + interval '30 days' where id = $1`, [
       cuponDirigido,
     ])
+  })
+
+  // 2026-11-18 · «Mis cupones» del consumidor.
+  it('el consumidor ve los cupones abiertos, nunca los dirigidos a una empresa', async () => {
+    const suyos = (await coupons(CONSUMIDOR)).map((row) => row.code)
+    expect(suyos).toContain('ABIERTO10')
+    expect(suyos).not.toContain('SOLOSUR20')
+  })
+
+  it('al consumidor los usos que le quedan se le cuentan por su correo', async () => {
+    const [cupon] = await svc<{ id: string; promotion_id: string }>(
+      `update public.coupons set usage_limit_per_customer = 2 where code = 'ABIERTO10' returning id, promotion_id`,
+    )
+    const [pedido] = await svc<{ id: string }>(`select id from public.orders limit 1`)
+    await svc(
+      `insert into public.promotion_redemptions
+         (organization_id, company_id, store_id, promotion_id, coupon_id, order_id, customer_email, discount_amount, currency)
+       values ($1, $2, $3, $4, $5, $6, $7, 1, 'PEN')`,
+      [TENANT_A.organizationId, TENANT_A.companyId, storeId, cupon!.promotion_id, cupon!.id, pedido!.id, `${CONSUMIDOR}@comprador.test`],
+    )
+    try {
+      const abierto = (await coupons(CONSUMIDOR)).find((row) => row.code === 'ABIERTO10')
+      expect(abierto?.remaining_uses).toBe(1)
+    } finally {
+      await svc(`delete from public.promotion_redemptions where coupon_id = $1`, [cupon!.id])
+      await svc(`update public.coupons set usage_limit_per_customer = null where id = $1`, [cupon!.id])
+    }
   })
 
   it('sin sesion no hay cupones: un cupon es una llave', async () => {

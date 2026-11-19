@@ -136,7 +136,12 @@ describe('CategoriesPage — CRUD minimo', () => {
 
     await user.type(within(drawer).getByLabelText('Nombre'), 'Ok')
     await user.clear(within(drawer).getByLabelText('Dirección del producto'))
+    // El campo ya no deja teclear espacios (los vuelve guion): «a b» quedaría
+    // en «a-b», que es válido. Uno de dos letras sigue siendo corto.
     await user.type(within(drawer).getByLabelText('Dirección del producto'), 'a b')
+    expect(within(drawer).getByLabelText('Dirección del producto')).toHaveValue('a-b')
+    await user.clear(within(drawer).getByLabelText('Dirección del producto'))
+    await user.type(within(drawer).getByLabelText('Dirección del producto'), 'ab')
     await user.click(within(drawer).getByRole('button', { name: 'Guardar' }))
 
     expect(await within(drawer).findByText(/minúsculas, números y guiones/i)).toBeInTheDocument()

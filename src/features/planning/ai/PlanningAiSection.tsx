@@ -10,7 +10,6 @@ import {
   Divider,
   Skeleton,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useState, type FormEvent, type ReactNode } from 'react'
@@ -22,6 +21,7 @@ import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { AppIcon } from '@/shared/ui/AppIcon'
+import { Field } from '@/shared/ui/Field'
 import { T } from '@/theme/tokens'
 import {
   MAX_PLANNING_QUESTION,
@@ -328,16 +328,17 @@ export function PlanningAiSection() {
             </Stack>
             <Box component="form" onSubmit={onSubmit} noValidate>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'flex-start' } }}>
-                <TextField
+                <Field
                   fullWidth
                   size="small"
+                  rule="text"
+                  maxLength={MAX_PLANNING_QUESTION + 50}
                   label={t('aiPlanning.ask.label')}
                   placeholder={t('aiPlanning.ask.placeholder')}
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
                   error={tooLong}
                   helperText={tooLong ? t('aiOrders.ask.tooLong') : t('aiPlanning.costHint')}
-                  inputProps={{ maxLength: MAX_PLANNING_QUESTION + 50 }}
                 />
                 <Button
                   type="submit"

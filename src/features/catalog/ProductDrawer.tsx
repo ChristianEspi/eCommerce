@@ -11,7 +11,6 @@ import {
   Stack,
   Tab,
   Tabs,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
@@ -55,6 +54,7 @@ import {
   type ProductStatus,
 } from './types'
 import { useProductCandidates, useProductPublications, useSaveProduct } from './useProducts'
+import { Field } from '@/shared/ui/Field'
 import { SelectField } from '@/shared/ui/SelectField'
 
 const STATUS_LABEL: Record<ProductStatus, MessageKey> = {
@@ -363,9 +363,11 @@ export function ProductDrawer({
           {!canWrite && <Alert severity="info">{t('catalog.products.unauthorized')}</Alert>}
           {serverError && <Alert severity="error">{t(serverError)}</Alert>}
 
-          <TextField
+          <Field
             label={t('catalog.field.name')}
             fullWidth
+            rule="text"
+            maxLength={240}
             disabled={!canWrite}
             error={Boolean(errors.name)}
             helperText={fieldError('name')}
@@ -376,9 +378,11 @@ export function ProductDrawer({
             })}
           />
 
-          <TextField
+          <Field
             label={t('catalog.field.sku')}
             fullWidth
+            rule="sku"
+            help={t('help.catalog.sku')}
             disabled={!canWrite}
             error={Boolean(errors.sku)}
             helperText={fieldError('sku') ?? t('catalog.master.skuHelp')}
@@ -387,9 +391,11 @@ export function ProductDrawer({
           />
 
           <Stack sx={{ gap: 0.75 }}>
-            <TextField
+            <Field
               label={t('catalog.field.description')}
               fullWidth
+              rule="longText"
+              maxLength={8000}
               multiline
               minRows={3}
               disabled={!canWrite}
@@ -480,9 +486,10 @@ export function ProductDrawer({
           )}
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <TextField
+            <Field
               label={t('catalog.field.stock')}
               fullWidth
+              rule="integer"
               // Un maestro de variantes y un kit no llevan existencia propia:
               // el campo se bloquea en vez de aceptar un número que no decide
               // nada y que el operario del almacén leería como verdad.
@@ -590,9 +597,12 @@ export function ProductDrawer({
 
                 {publish ? (
                   <>
-                    <TextField
+                    <Field
                       label={t('catalog.field.slug')}
                       fullWidth
+                      rule="slug"
+                      maxLength={62}
+                      help={t('help.catalog.slug')}
                       disabled={!canWrite}
                       error={Boolean(errors.slug)}
                       helperText={fieldError('slug') ?? t('catalog.field.slug.help')}
@@ -614,9 +624,10 @@ export function ProductDrawer({
                     />
 
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                      <TextField
+                      <Field
                         label={t('catalog.field.price')}
                         fullWidth
+                        rule="money"
                         disabled={!canWrite}
                         error={Boolean(errors.price)}
                         helperText={fieldError('price')}

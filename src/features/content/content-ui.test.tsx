@@ -438,7 +438,7 @@ describe('los bloques', () => {
     expect(campo).toHaveValue(0)
   })
 
-  it('un número fuera del rango del CHECK no se envía', async () => {
+  it('un número fuera del rango del CHECK no se puede teclear', async () => {
     const user = userEvent.setup()
     const fake = backend()
     renderContent(fake)
@@ -449,9 +449,11 @@ describe('los bloques', () => {
     await user.type(campo, '1500')
     await user.tab()
 
-    // `content_blocks_position_range` es 0..999. Pararlo aquí convierte un 400
-    // genérico en un campo que vuelve solo.
-    expect(posiciones(fake)['Rebajas de verano']).toBe(0)
+    // `content_blocks_position_range` es 0..999. Desde 2026-11-18 el campo
+    // (regla `integer` con tope de 3 cifras) no deja escribir la cuarta: el
+    // 1500 se queda en 150, que sí cabe, en vez de llegar a la base y volver.
+    expect(campo).toHaveValue(150)
+    expect(posiciones(fake)['Rebajas de verano']).toBe(150)
   })
 
   it('el editor de texto explica la sintaxis y NO admite etiquetas', async () => {

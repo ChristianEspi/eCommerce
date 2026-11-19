@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { matchesRule, ruleFor, sanitizeDecimal } from '@/shared/lib/fieldRules'
 import { moneyText } from '@/shared/lib/money'
 import type { MessageKey } from '@/shared/i18n/messages'
 
@@ -219,6 +220,21 @@ export const UOM_CODE_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,15}$/
 export const FACTOR_RE = /^\d{1,12}(\.\d{1,6})?$/
 export const MONEY_RE = /^\d{1,12}(\.\d{1,2})?$/
 
+/**
+ * Lo que se deja teclear en un factor o una cantidad de componente: el mismo
+ * `numeric(18,6)` de FACTOR_RE (12 enteros y 6 decimales). La regla `decimal`
+ * de la suite corta en 4 decimales y aquí se perderían los dos últimos.
+ */
+export const FACTOR_FIELD_RULE = ruleFor('decimal', {
+  maxLength: 19,
+  sanitize: (value) => sanitizeDecimal(value, 6),
+})
+/** Igual que FACTOR_FIELD_RULE, con signo: el valor numérico de un atributo. */
+export const SIGNED_FACTOR_FIELD_RULE = ruleFor('signedDecimal', {
+  maxLength: 20,
+  sanitize: (value) => sanitizeDecimal(value, 6, true),
+})
+
 const errorKey = (key: MessageKey) => key
 
 export const catalogEntryFormSchema = z.object({
@@ -280,12 +296,21 @@ export const attributeValueFormSchema = z.object({
 export type AttributeValueFormValues = z.infer<typeof attributeValueFormSchema>
 
 export const variantFormSchema = z.object({
-  sku: z.string().trim().min(1, errorKey('catalog.error.sku')).max(64, errorKey('catalog.error.sku')),
+  sku: z
+    .string()
+    .trim()
+    .min(1, errorKey('catalog.error.sku'))
+    .max(64, errorKey('catalog.error.sku'))
+    .refine((v) => !v || matchesRule('sku', v), errorKey('help.catalog.error.sku')),
   name: z.string().trim().min(1, errorKey('pim.error.name')).max(240, errorKey('pim.error.name')),
   /** Vacío = hereda el precio del maestro. No es lo mismo que cero. */
   price: z.string().trim().refine((v) => v === '' || MONEY_RE.test(v), errorKey('catalog.error.price')),
   stock: z.string().trim().regex(/^\d{1,9}$/, errorKey('catalog.error.stock')),
-  barcode: z.string().trim().refine((v) => v === '' || (v.length >= 4 && v.length <= 64), errorKey('pim.error.barcode')),
+  barcode: z
+    .string()
+    .trim()
+    .refine((v) => v === '' || (v.length >= 4 && v.length <= 64), errorKey('pim.error.barcode'))
+    .refine((v) => v === '' || matchesRule('code', v), errorKey('help.catalog.error.barcode')),
   is_active: z.boolean(),
   is_default: z.boolean(),
 })

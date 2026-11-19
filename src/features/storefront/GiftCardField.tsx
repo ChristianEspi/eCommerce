@@ -1,9 +1,10 @@
-import { Alert, Button, Stack, TextField } from '@mui/material'
+import { Alert, Button, Stack } from '@mui/material'
 import { useMutation } from '@tanstack/react-query'
 import type { UseFormRegisterReturn } from 'react-hook-form'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { formatMoney } from '@/shared/lib/format'
+import { Field } from '@/shared/ui/Field'
 import { fetchGiftCardBalance, giftCardProblem } from './giftCards'
 
 /**
@@ -19,11 +20,14 @@ export function GiftCardField({
   registration,
   readCode,
   errorKey,
+  size = 'medium',
 }: {
   storeSlug: string
   registration: UseFormRegisterReturn
   readCode: () => string
   errorKey: MessageKey | null
+  /** `small` en el resumen del checkout, donde la columna es estrecha. */
+  size?: 'small' | 'medium'
 }) {
   const { t, locale } = useI18n()
   const check = useMutation({ mutationFn: (code: string) => fetchGiftCardBalance(storeSlug, code) })
@@ -34,18 +38,29 @@ export function GiftCardField({
   return (
     <Stack sx={{ gap: 1 }}>
       <Stack direction="row" sx={{ gap: 1, alignItems: 'stretch' }}>
-        <TextField
+        <Field
           fullWidth
+          size={size}
           label={t('store.checkout.giftCard')}
           placeholder={t('store.checkout.giftCardPlaceholder')}
           error={Boolean(errorKey)}
           {...(errorKey ? { helperText: t(errorKey) } : {})}
           autoComplete="off"
-          slotProps={{ htmlInput: { style: { textTransform: 'uppercase' }, maxLength: 40 } }}
+          rule="code"
+          maxLength={40}
+          help={t('sfHelp.checkout.giftCard')}
+          slotProps={{ htmlInput: { style: { textTransform: 'uppercase' } } }}
           {...registration}
           onChange={(event) => {
             check.reset()
             void registration.onChange(event)
+          }}
+          // Enter consulta el saldo, como el botón de al lado.
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter') return
+            event.preventDefault()
+            const code = readCode().trim()
+            if (code !== '') check.mutate(code)
           }}
         />
         <Button
@@ -56,7 +71,7 @@ export function GiftCardField({
             const code = readCode().trim()
             if (code !== '') check.mutate(code)
           }}
-          sx={{ fontWeight: 800, flexShrink: 0, px: 2.5 }}
+          sx={{ fontWeight: 800, flexShrink: 0, px: size === 'small' ? 2 : 2.5 }}
         >
           {t('store.checkout.giftCardCheck')}
         </Button>

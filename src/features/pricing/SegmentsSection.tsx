@@ -19,7 +19,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
@@ -35,6 +34,7 @@ import { EmptyState, ErrorState } from '@/shared/ui/states'
 import { PricingError } from './errors'
 import { useSaveSegment, useSegments } from './hooks'
 import { segmentFormSchema, type CustomerSegment, type SegmentFormValues } from './types'
+import { Field } from '@/shared/ui/Field'
 
 /**
  * Segmentos comerciales.
@@ -260,8 +260,10 @@ function SegmentDrawer({
         <Stack spacing={2.5}>
           {serverError && <Alert severity="error">{t(serverError)}</Alert>}
 
-          <TextField
+          <Field
             label={t('pricing.field.name')}
+            rule="text"
+            maxLength={120}
             fullWidth
             autoFocus
             disabled={!canWrite}
@@ -285,8 +287,11 @@ function SegmentDrawer({
             })}
           />
 
-          <TextField
+          <Field
             label={t('pricing.field.code')}
+            rule="lowerCode"
+            maxLength={41}
+            help={t('help.pricing.segmentCode')}
             fullWidth
             disabled={!canWrite}
             error={Boolean(errors.code)}

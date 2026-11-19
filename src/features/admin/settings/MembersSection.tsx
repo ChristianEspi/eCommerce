@@ -15,9 +15,10 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
+import { matchesRule } from '@/shared/lib/fieldRules'
 import { useState } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
@@ -122,7 +123,7 @@ export function MembersSection({
 
   async function agregar() {
     if (!organizationId || !companyId) return
-    if (!email.includes('@')) return setError(t('settings.members.error.email'))
+    if (!matchesRule('email', email)) return setError(t('settings.members.error.email'))
 
     setError(null)
     setFaltaCuenta(false)
@@ -334,7 +335,8 @@ export function MembersSection({
               </Alert>
             )}
 
-            <TextField
+            <Field
+              rule="email" help={t('help.admin.members.email')}
               label={t('settings.members.email')}
               type="email"
               fullWidth

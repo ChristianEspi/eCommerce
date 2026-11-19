@@ -802,9 +802,9 @@ describe('ficha de producto', () => {
       'href',
       '/s/casa-nordica?c=sillas',
     )
-    // Tres: las migas, la ficha de datos junto a la descripción (lámina 31) y
-    // la pestaña «Datos del producto».
-    expect(within(contenido).getAllByText('Sillas')).toHaveLength(3)
+    // Dos: las migas y la pestaña «Datos del producto». La descripción ya NO
+    // lleva al lado una copia de la ficha (2026-11-16): cada dato, un sitio.
+    expect(within(contenido).getAllByText('Sillas')).toHaveLength(2)
     expect(screen.getAllByText('Disponible').length).toBeGreaterThan(0)
 
     // Bucket privado: la imagen llega por URL firmada, no por URL pública.

@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '@/test/render'
@@ -241,7 +241,7 @@ describe('alta y edición', () => {
     await screen.findByText('Mayorista')
 
     await user.click(screen.getByRole('button', { name: 'Nuevo canal' }))
-    await user.type(await screen.findByLabelText(/Código/), 'distribuidores')
+    await user.type(await screen.findByRole('textbox', { name: /Código/ }), 'distribuidores')
     await user.type(screen.getByLabelText(/Nombre/), 'Distribuidores')
     await user.click(screen.getByRole('button', { name: 'Guardar' }))
 
@@ -283,14 +283,16 @@ describe('alta y edición', () => {
     await screen.findByText('Mayorista')
 
     await user.click(screen.getByRole('button', { name: 'Nuevo canal' }))
-    await user.type(await screen.findByLabelText(/Código/), 'Mal Código')
+    // 2026-11-18 · El campo corrige mientras se escribe: minúsculas y sin
+    // espacios ni tildes. Lo que llega a la base ya es un código válido.
+    const codigo = await screen.findByRole('textbox', { name: /Código/ })
+    await user.type(codigo, 'Mal Código')
+    expect(codigo).toHaveValue('malcdigo')
     await user.type(screen.getByLabelText(/Nombre/), 'X')
     await user.click(screen.getByRole('button', { name: 'Guardar' }))
 
-    expect(
-      await screen.findByText('Usa minúsculas, números, guion o guion bajo (hasta 41 caracteres).'),
-    ).toBeInTheDocument()
-    expect(fake.state.tables.channels).toHaveLength(4)
+    await waitFor(() => expect(fake.state.tables.channels).toHaveLength(5))
+    expect((fake.state.tables.channels ?? []).map((c) => (c as { code: string }).code)).toContain('malcdigo')
   })
 
   it('en el canal por defecto, activo está bloqueado y se explica', async () => {

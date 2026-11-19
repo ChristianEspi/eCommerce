@@ -20,7 +20,6 @@ import {
   TableHead,
   TableRow,
   Tabs,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useMemo, useState } from 'react'
@@ -46,6 +45,7 @@ import { useModerateReview, useReviewQueue } from './hooks'
 import { useAiFeature } from '@/features/ai/hooks'
 import { ReviewReplyDialog } from './ai/ReviewReplyDialog'
 import { ReviewsAiPanel } from './ai/ReviewsAiPanel'
+import { Field } from '@/shared/ui/Field'
 
 const TABS: Array<{ value: ReviewStatus; label: MessageKey }> = [
   { value: 'pending', label: 'admin.reviews.tab.pending' },
@@ -308,8 +308,10 @@ export function ReviewsPage() {
         <DialogContent>
           <Stack sx={{ gap: 2, pt: 1 }}>
             {dialogError && <Alert severity="error">{t(dialogError)}</Alert>}
-            <TextField
+            <Field
               autoFocus
+              rule="longText"
+              maxLength={REASON_MAX}
               multiline
               minRows={3}
               label={t('admin.reviews.reason')}
@@ -319,7 +321,6 @@ export function ReviewsPage() {
                 setReason(event.target.value)
                 setDialogError(null)
               }}
-              inputProps={{ maxLength: REASON_MAX }}
               required
             />
           </Stack>

@@ -15,6 +15,7 @@ import {
 } from '@mui/material'
 import { useState } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { entityLabel, eventLabel, roleLabel, termLabel } from '@/shared/i18n/codeLabels'
 import { formatDateTime } from '@/shared/lib/format'
 import { useDebouncedValue } from '@/shared/lib/useDebouncedValue'
 import { SearchField } from '@/shared/ui/SearchField'
@@ -92,9 +93,9 @@ export function AuditSection() {
                   <TableCell>
                     <Typography sx={{ fontSize: 13 }}>{row.actor_email ?? '—'}</Typography>
                     <Stack direction="row" sx={{ gap: 0.5, mt: 0.5 }}>
-                      <StatusChip label={row.actor_kind} />
+                      <StatusChip label={termLabel(t, 'actor', row.actor_kind)} />
                       {row.actor_role && (
-                        <StatusChip label={row.actor_role} />
+                        <StatusChip label={roleLabel(t, row.actor_role)} />
                       )}
                       {row.cross_tenant && (
                         <StatusChip tone="error" label={t('ops.audit.crossTenant')} />
@@ -102,10 +103,10 @@ export function AuditSection() {
                     </Stack>
                   </TableCell>
                   <TableCell>
-                    <Typography sx={{ fontSize: 13, fontWeight: 700 }}>{row.action}</Typography>
+                    <Typography sx={{ fontSize: 13, fontWeight: 700 }}>{eventLabel(t, row.action)}</Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography sx={{ fontSize: 13 }}>{row.entity_label ?? row.entity_type}</Typography>
+                    <Typography sx={{ fontSize: 13 }}>{row.entity_label ?? entityLabel(t, row.entity_type)}</Typography>
                     {row.correlation_id && (
                       <Typography sx={{ fontSize: 11, color: 'var(--muted)' }}>
                         {row.correlation_id}

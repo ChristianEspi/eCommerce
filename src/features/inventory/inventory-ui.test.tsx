@@ -202,6 +202,7 @@ function backend(options: { entitlements?: string[]; links?: boolean } = {}): Fa
     },
     rpc: {
       effective_capabilities: () => makePlatformContext({ entitlements, source: 'hub' }),
+      inventory_transfer: () => ({ reference: 'TRF-1', quantity: '5', from: 'LIMA', to: 'ERP-AQP' }),
     },
   })
 }
@@ -323,6 +324,63 @@ describe('Inventario — la pantalla', () => {
     await user.click(within(drawer).getByRole('combobox', { name: 'Almacén' }))
     await user.click(await screen.findByRole('option', { name: 'ERP-AQP · Arequipa (ERP)' }))
     expect(await within(drawer).findByText(aviso)).toBeInTheDocument()
+  })
+
+  it('al elegir almacén y producto enseña su stock y cómo quedará', async () => {
+    const user = userEvent.setup()
+    renderInventory(backend())
+    await screen.findByText('CD Lima')
+    await user.click(screen.getByRole('tab', { name: 'Existencias' }))
+    await user.click(await screen.findByRole('button', { name: 'Registrar movimiento' }))
+    const drawer = await screen.findByRole('dialog')
+
+    await user.click(within(drawer).getByRole('combobox', { name: 'Almacén' }))
+    await user.click(await screen.findByRole('option', { name: 'LIMA · CD Lima' }))
+    await user.type(within(drawer).getByRole('combobox', { name: 'Producto' }), 'jab')
+    await user.click(await screen.findByRole('option', { name: /Jabón/ }))
+
+    const panel = await within(drawer).findByText('Stock actual en LIMA')
+    const caja = panel.parentElement as HTMLElement
+    expect(within(caja).getByText('10')).toBeInTheDocument()
+    expect(within(caja).getByText('4')).toBeInTheDocument()
+    expect(within(caja).getByText('6')).toBeInTheDocument()
+    // Entrada de 1 por defecto: 10 + 1.
+    expect(within(caja).getByText('Después del movimiento: 11')).toBeInTheDocument()
+  })
+
+  it('«Traslado entre almacenes» manda las dos partes en UNA llamada', async () => {
+    const user = userEvent.setup()
+    const fake = backend()
+    renderInventory(fake)
+    await screen.findByText('CD Lima')
+    await user.click(screen.getByRole('tab', { name: 'Existencias' }))
+    await user.click(await screen.findByRole('button', { name: 'Registrar movimiento' }))
+    const drawer = await screen.findByRole('dialog')
+
+    await user.click(within(drawer).getByRole('button', { name: 'Traslado entre almacenes' }))
+    await user.click(within(drawer).getByRole('combobox', { name: 'Almacén de origen' }))
+    await user.click(await screen.findByRole('option', { name: 'LIMA · CD Lima' }))
+    await user.type(within(drawer).getByRole('combobox', { name: 'Producto' }), 'jab')
+    await user.click(await screen.findByRole('option', { name: /Jabón/ }))
+    await user.click(within(drawer).getByRole('combobox', { name: 'Almacén de destino' }))
+    // El origen no se ofrece como destino.
+    expect(screen.queryByRole('option', { name: 'LIMA · CD Lima' })).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('option', { name: 'ERP-AQP · Arequipa (ERP)' }))
+    const cantidad = within(drawer).getByRole('spinbutton', { name: 'Cantidad' })
+    await user.clear(cantidad)
+    await user.type(cantidad, '5')
+    await user.click(within(drawer).getByRole('button', { name: 'Trasladar' }))
+
+    await vi.waitFor(() =>
+      expect(fake.state.rpcCalls.filter((c) => c.name === 'inventory_transfer')).toHaveLength(1),
+    )
+    expect(fake.state.rpcCalls.find((c) => c.name === 'inventory_transfer')?.args).toMatchObject({
+      p_from_warehouse_id: LIMA,
+      p_to_warehouse_id: AQP,
+      p_product_id: PRODUCT,
+      p_quantity: 5,
+    })
+    expect(fake.state.rpcCalls.some((c) => c.name === 'adjust_inventory')).toBe(false)
   })
 
   it('el libro mayor enseña el motivo y el saldo que dejó cada asiento', async () => {

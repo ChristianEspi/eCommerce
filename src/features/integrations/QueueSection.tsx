@@ -20,6 +20,7 @@ import {
 } from '@mui/material'
 import { useState } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { eventLabel, termLabel } from '@/shared/i18n/codeLabels'
 import { formatDateTime } from '@/shared/lib/format'
 import { SearchField } from '@/shared/ui/SearchField'
 import { EmptyState, ErrorState, UnauthorizedState } from '@/shared/ui/states'
@@ -74,8 +75,8 @@ function DetailDialog({ outboxId, onClose }: { outboxId: string | null; onClose:
               {t('integrations.queue.sanitized')}
             </Typography>
             <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap' }}>
-              <StatusChip label={`${detail.data.provider_code} · ${detail.data.operation}`} />
-              <StatusChip label={detail.data.status} />
+              <StatusChip label={`${detail.data.provider_code} · ${eventLabel(t, detail.data.operation)}`} />
+              <StatusChip label={termLabel(t, 'status', detail.data.status)} />
               <StatusChip
                 label={`${detail.data.attempts}/${detail.data.max_attempts}`}
               />
@@ -218,7 +219,7 @@ export function QueueSection() {
               {(queue.data ?? []).map((row) => (
                 <TableRow key={row.id}>
                   <TableCell>
-                    <Typography sx={{ fontSize: 13, fontWeight: 700 }}>{row.operation}</Typography>
+                    <Typography sx={{ fontSize: 13, fontWeight: 700 }}>{eventLabel(t, row.operation)}</Typography>
                     <Typography sx={{ fontSize: 12, color: 'var(--muted)' }}>
                       {row.provider_name}
                     </Typography>
@@ -226,11 +227,11 @@ export function QueueSection() {
                   <TableCell>
                     <Typography sx={{ fontSize: 13 }}>{row.target_label}</Typography>
                     {row.circuit_state !== 'closed' && (
-                      <StatusChip tone="error" label={row.circuit_state} />
+                      <StatusChip tone="error" label={termLabel(t, 'status', row.circuit_state)} />
                     )}
                   </TableCell>
                   <TableCell>
-                    <StatusChip tone={statusColor(row)} label={row.status} />
+                    <StatusChip tone={statusColor(row)} label={termLabel(t, 'status', row.status)} />
                     <Typography sx={{ fontSize: 12, color: 'var(--muted)' }}>
                       {t('integrations.queue.attempt')} {row.attempts}/{row.max_attempts}
                     </Typography>

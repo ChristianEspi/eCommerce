@@ -56,6 +56,14 @@ export function mapInventoryCode(code: string): MessageKey {
     case 'VARIANTE_NO_DISPONIBLE':
     case 'PRODUCTO_NO_DISPONIBLE':
       return 'inventory.error.product'
+    case 'STOCK_INSUFICIENTE_ORIGEN':
+      return 'inventory.error.transferStock'
+    case 'TRASLADO_MISMO_ALMACEN':
+      return 'inventory.error.transferSame'
+    case 'TRASLADO_ALMACEN_EXTERNO':
+      return 'inventory.error.transferExternal'
+    case 'TRASLADO_OTRA_SOCIEDAD':
+      return 'inventory.error.transferCompany'
     case 'SIGNO_INCOHERENTE':
       return 'inventory.error.sign'
     case 'MOVIMIENTO_NO_PERMITIDO':

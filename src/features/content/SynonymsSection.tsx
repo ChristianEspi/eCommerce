@@ -17,9 +17,9 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
+import { Field } from '@/shared/ui/Field'
 import { useMemo, useState } from 'react'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -254,14 +254,19 @@ export function SynonymsSection() {
         }
       >
         <Stack spacing={2}>
-          <TextField
+          <Field
             label={t('content.synonyms.term')}
+            rule="text"
+            maxLength={60}
+            help={t('help.content.synonymTerm')}
             value={form.term}
             onChange={(event) => setForm({ ...form, term: event.target.value })}
             required
           />
-          <TextField
+          <Field
             label={t('content.synonyms.expansions')}
+            rule="longText"
+            maxLength={750}
             value={form.expansions}
             onChange={(event) => setForm({ ...form, expansions: event.target.value })}
             helperText={t('content.synonyms.expansionsHelp')}

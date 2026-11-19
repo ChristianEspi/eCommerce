@@ -20,6 +20,7 @@ import {
 import { useMemo, useState, type ReactNode } from 'react'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { termLabel } from '@/shared/i18n/codeLabels'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { FilterBar } from '@/shared/ui/FilterBar'
 import { RowActions, type RowActionTone } from '@/shared/ui/RowActions'
@@ -183,7 +184,7 @@ export function SuggestionsSection() {
                   <TableCell>{row.generated_at.slice(0, 10)}</TableCell>
                   {/* El modelo a la vista: sin él, la cifra no tiene procedencia. */}
                   <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>
-                    {row.model_code}
+                    <span title={row.model_code}>{termLabel(t, 'model', row.model_code)}</span>
                   </TableCell>
                   <TableCell>
                     <StatusChip

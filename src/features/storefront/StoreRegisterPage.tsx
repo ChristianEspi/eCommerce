@@ -1,32 +1,39 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import PersonAddAlt1RoundedIcon from '@mui/icons-material/PersonAddAlt1Rounded'
-import { Alert, Box, Button, Card, CardContent, Link as MuiLink, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, Card, CardContent, Link as MuiLink, Stack, Typography } from '@mui/material'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, Navigate, useLocation } from 'react-router-dom'
 import { z } from 'zod'
 import { AuthActionError, signUpConsumer } from '@/features/auth/authApi'
-import { MIN_PASSWORD_LENGTH } from '@/features/auth/passwordPolicy'
+import { MIN_PASSWORD_LENGTH, PASSWORD_MAX_LENGTH } from '@/features/auth/passwordPolicy'
 import { returnPathFrom, storefrontSlugOf } from '@/features/auth/returnTo'
 import { useSessionContext } from '@/features/auth/session-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { useDocumentMeta } from '@/shared/seo/useDocumentMeta'
+import { matchesRule } from '@/shared/lib/fieldRules'
+import { Field } from '@/shared/ui/Field'
 import { LoadingState } from '@/shared/ui/states'
 import { useStorefront } from './hooks'
 import { privateMeta } from './seo'
 
 const schema = z
   .object({
-    fullName: z.string().trim().min(2, 'store.register.nameRequired').max(120, 'account.consumer.profile.nameTooLong'),
-    email: z.string().trim().min(1, 'store.register.emailRequired').email('auth.invalid.email'),
+    fullName: z
+      .string()
+      .trim()
+      .min(2, 'store.register.nameRequired')
+      .max(120, 'account.consumer.profile.nameTooLong')
+      .refine((value) => matchesRule('personName', value), 'field.error.personName'),
+    email: z.string().trim().min(1, 'store.register.emailRequired').max(254, 'auth.invalid.email').email('auth.invalid.email'),
     phone: z
       .string()
       .trim()
       .max(40, 'account.consumer.profile.phoneInvalid')
       .refine((value) => value === '' || /^[+\d][\d\s()-]{5,39}$/.test(value), 'account.consumer.profile.phoneInvalid'),
-    password: z.string().min(MIN_PASSWORD_LENGTH, 'auth.reset.tooShort'),
-    confirm: z.string().min(1, 'auth.reset.confirmRequired'),
+    password: z.string().min(MIN_PASSWORD_LENGTH, 'auth.reset.tooShort').max(PASSWORD_MAX_LENGTH, 'sfHelp.auth.error.passwordTooLong'),
+    confirm: z.string().min(1, 'auth.reset.confirmRequired').max(PASSWORD_MAX_LENGTH, 'sfHelp.auth.error.passwordTooLong'),
   })
   .refine((values) => values.password === values.confirm, { path: ['confirm'], message: 'auth.reset.mismatch' })
 
@@ -144,53 +151,60 @@ export function StoreRegisterPage() {
                       {t(serverError)}
                     </Alert>
                   )}
-                  <TextField
+                  <Field
                     id="register-name"
                     label={t('account.consumer.profile.name')}
                     autoComplete="name"
+                    rule="personName"
+                    maxLength={120}
                     required
                     error={Boolean(errors.fullName)}
                     helperText={message(errors.fullName?.message)}
                     fullWidth
                     {...register('fullName')}
                   />
-                  <TextField
+                  <Field
                     id="register-email"
                     label={t('account.consumer.profile.email')}
                     type="email"
                     autoComplete="email"
+                    rule="email"
                     required
                     error={Boolean(errors.email)}
                     helperText={message(errors.email?.message)}
                     fullWidth
                     {...register('email')}
                   />
-                  <TextField
+                  <Field
                     id="register-phone"
                     label={t('account.consumer.profile.phone')}
                     type="tel"
                     autoComplete="tel"
+                    rule="phone"
+                    maxLength={40}
                     error={Boolean(errors.phone)}
                     helperText={message(errors.phone?.message) ?? t('account.consumer.profile.phoneHint')}
                     fullWidth
                     {...register('phone')}
                   />
-                  <TextField
+                  <Field
                     id="register-password"
                     label={t('auth.password')}
                     type="password"
                     autoComplete="new-password"
+                    maxLength={PASSWORD_MAX_LENGTH}
                     required
                     error={Boolean(errors.password)}
                     helperText={message(errors.password?.message) ?? t('auth.reset.tooShort')}
                     fullWidth
                     {...register('password')}
                   />
-                  <TextField
+                  <Field
                     id="register-confirm"
                     label={t('auth.reset.confirm')}
                     type="password"
                     autoComplete="new-password"
+                    maxLength={PASSWORD_MAX_LENGTH}
                     required
                     error={Boolean(errors.confirm)}
                     helperText={message(errors.confirm?.message)}

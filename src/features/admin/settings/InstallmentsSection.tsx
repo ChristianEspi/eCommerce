@@ -1,9 +1,10 @@
-import { Button, FormControlLabel, Grid, Stack, Switch, TextField, Typography } from '@mui/material'
+import { Button, FormControlLabel, Stack, Switch, Typography } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { installmentFor, type StoreInstallments } from '@/features/storefront/productDetail'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { formatMoney } from '@/shared/lib/format'
 import { useFeedback } from '@/shared/ui/feedback-context'
+import { Field } from '@/shared/ui/Field'
 import { useSaveStoreInstallments, useStoreInstallments } from './installments'
 
 /**
@@ -70,11 +71,13 @@ export function InstallmentsSection({ storeId, canManage }: { storeId: string | 
         label={t('settings.installments.enabled')}
       />
       {enabled ? (
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={3}>
-            <TextField
+        <Stack sx={{ gap: 2, maxWidth: 640 }}>
+            <Field
               fullWidth
               type="number"
+              rule="integer"
+              maxLength={2}
+              help={t('help.admin.installments.count')}
               label={t('settings.installments.count')}
               value={count}
               disabled={busy}
@@ -82,10 +85,11 @@ export function InstallmentsSection({ storeId, canManage }: { storeId: string | 
               error={!(Number.isInteger(cuotas) && cuotas >= 2 && cuotas <= 36)}
               onChange={(event) => setCount(event.target.value)}
             />
-          </Grid>
-          <Grid item xs={12} sm={5}>
-            <TextField
+            <Field
               fullWidth
+              rule="text"
+              maxLength={60}
+              help={t('help.admin.installments.provider')}
               label={t('settings.installments.provider')}
               placeholder={t('settings.installments.providerPlaceholder')}
               value={provider}
@@ -93,11 +97,11 @@ export function InstallmentsSection({ storeId, canManage }: { storeId: string | 
               inputProps={{ maxLength: 60 }}
               onChange={(event) => setProvider(event.target.value)}
             />
-          </Grid>
-          <Grid item xs={12} sm={4}>
-            <TextField
+            <Field
               fullWidth
               type="number"
+              rule="money"
+              help={t('help.admin.installments.min')}
               label={t('settings.installments.min')}
               helperText={t('common.optional')}
               value={minAmount}
@@ -105,8 +109,7 @@ export function InstallmentsSection({ storeId, canManage }: { storeId: string | 
               inputProps={{ min: 0, step: '0.01' }}
               onChange={(event) => setMinAmount(event.target.value)}
             />
-          </Grid>
-        </Grid>
+        </Stack>
       ) : null}
       {ejemplo ? (
         <Typography sx={{ fontSize: 13, color: 'var(--muted)' }}>

@@ -1780,11 +1780,6 @@
   background: transparent;
   color: var(--text);
 }
-.sf-scope[data-store-theme='retail'] [data-pdp-sheet-aside] {
-  border-radius: 0;
-  background: var(--sf-soft);
-  border-color: transparent;
-}
 /* ---- Bolsa ---------------------------------------------------------------- */
 .sf-scope[data-store-theme='retail'] .sf-cart-head h1 {
   font-family: var(--sf-display);
@@ -1875,9 +1870,6 @@
   font-weight: 700;
   text-transform: none;
   letter-spacing: 0;
-}
-.sf-scope[data-store-theme='retail'] .sf-pdp-details :has(> [data-pdp-sheet-aside]) {
-  grid-template-columns: minmax(0, 1fr);
 }
 .sf-scope[data-store-theme='retail'] .sf-pdp-details p {
   font-size: 14px;

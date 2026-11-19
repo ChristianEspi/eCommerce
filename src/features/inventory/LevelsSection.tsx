@@ -10,13 +10,15 @@ import {
   Button,
   Card,
   MenuItem,
+  Skeleton,
   Stack,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
-  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from '@mui/material'
 import { useEffect, useMemo, useState } from 'react'
@@ -34,6 +36,8 @@ import { EmptyState, ErrorState } from '@/shared/ui/states'
 import { InventoryError } from './errors'
 import {
   useAdjustInventory,
+  useStockLevel,
+  useTransferInventory,
   useLevels,
   useSetInventoryPolicy,
   useStockProductSearch,
@@ -45,12 +49,15 @@ import {
   MANUAL_MOVEMENT_KINDS,
   formatQuantity,
   movementFormSchema,
+  transferFormSchema,
+  type TransferFormValues,
   policyFormSchema,
   requiredSign,
   type LevelRow,
   type MovementFormValues,
   type PolicyFormValues,
 } from './types'
+import { Field } from '@/shared/ui/Field'
 import { SelectField } from '@/shared/ui/SelectField'
 
 /**
@@ -82,6 +89,8 @@ export function LevelsSection() {
   const warehouses = useWarehouses()
   const query = useLevels(activeStore?.id ?? null, warehouseId || null, term)
   const adjust = useAdjustInventory()
+  const transfer = useTransferInventory()
+  const warehousesForToast = useWarehouses(movementOpen)
   const policy = useSetInventoryPolicy()
 
   const isEmpty = !query.isPending && !query.isError && (query.data ?? []).length === 0
@@ -212,6 +221,17 @@ export function LevelsSection() {
           notify(t('inventory.toast.moved'))
           setMovementOpen(false)
         }}
+        onTransfer={async (values) => {
+          await transfer.mutateAsync(values)
+          const code = (id: string) => (warehousesForToast.data ?? []).find((w) => w.id === id)?.code ?? ''
+          notify(
+            t('inventory.transfer.done')
+              .replace('{qty}', formatQuantity(values.quantity))
+              .replace('{from}', code(values.from_warehouse_id))
+              .replace('{to}', code(values.to_warehouse_id)),
+          )
+          setMovementOpen(false)
+        }}
       />
 
       <PolicyDrawer
@@ -233,16 +253,21 @@ function MovementDrawer({
   canWrite,
   onClose,
   onSubmit,
+  onTransfer,
 }: {
   open: boolean
   canWrite: boolean
   onClose: () => void
   onSubmit: (values: MovementFormValues) => Promise<void>
+  onTransfer: (values: TransferFormValues) => Promise<void>
 }) {
   const { t } = useI18n()
   const { activeStore } = useTenant()
   const [serverError, setServerError] = useState<MessageKey | null>(null)
   const [productTerm, setProductTerm] = useState('')
+  // 2026-11-18 · Dos modos en el mismo cajón: un movimiento suelto, o un
+  // traslado que sale de un almacén y entra en otro en una sola operación.
+  const [modo, setModo] = useState<'movement' | 'transfer'>('movement')
 
   const warehouses = useWarehouses(open)
   const links = useStoreWarehouses(open ? (activeStore?.id ?? null) : null)
@@ -268,7 +293,21 @@ function MovementDrawer({
     },
   })
 
+  const traslado = useForm<TransferFormValues>({
+    resolver: zodResolver(transferFormSchema),
+    defaultValues: {
+      from_warehouse_id: '',
+      to_warehouse_id: '',
+      product_id: '',
+      variant_id: null,
+      quantity: 1,
+      reason: '',
+    },
+  })
+
+  // El producto y la variante son los mismos en los dos modos.
   const productId = watch('product_id')
+  const variantId = watch('variant_id')
   const kind = watch('kind')
   const variants = useStockVariants(productId || null)
   /**
@@ -288,79 +327,194 @@ function MovementDrawer({
     [products.data],
   )
 
+  const origen = modo === 'movement' ? watch('warehouse_id') : traslado.watch('from_warehouse_id')
+  const destino = traslado.watch('to_warehouse_id')
+  // Si el producto tiene variantes, el stock es el de la variante elegida.
+  const listoParaStock = Boolean(productId) && (picked?.kind !== 'variant' || Boolean(variantId))
+  const stockOrigen = useStockLevel(listoParaStock ? origen || null : null, productId || null, variantId ?? null)
+  const stockDestino = useStockLevel(
+    listoParaStock && modo === 'transfer' ? destino || null : null,
+    productId || null,
+    variantId ?? null,
+  )
+
+  const codigo = (id: string) => (warehouses.data ?? []).find((w) => w.id === id)?.code ?? ''
+  const cantidadMovimiento = Number(watch('quantity'))
+  const cantidadTraslado = Number(traslado.watch('quantity'))
+
   useEffect(() => {
     if (!open) return
     setServerError(null)
     setProductTerm('')
     setPicked(null)
-    reset({
-      warehouse_id: '',
+    setModo('movement')
+    reset({ warehouse_id: '', product_id: '', variant_id: null, kind: 'receipt', quantity: 1, reason: '' })
+    traslado.reset({
+      from_warehouse_id: '',
+      to_warehouse_id: '',
       product_id: '',
       variant_id: null,
-      kind: 'receipt',
       quantity: 1,
       reason: '',
     })
+    // `traslado` es estable; solo se reinicia al abrir.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, reset])
+
+  function elegirProducto(id: string, variant: string | null) {
+    setValue('product_id', id, { shouldValidate: Boolean(id) })
+    setValue('variant_id', variant)
+    traslado.setValue('product_id', id, { shouldValidate: Boolean(id) })
+    traslado.setValue('variant_id', variant)
+  }
+
+  /** Lo que habrá después del movimiento, con el signo que pone el motivo. */
+  function despues(): number | null {
+    if (!stockOrigen.data || !Number.isFinite(cantidadMovimiento) || cantidadMovimiento === 0) return null
+    const signo = requiredSign(kind) === 'negative' ? -Math.abs(cantidadMovimiento) : cantidadMovimiento
+    return stockOrigen.data.on_hand + signo
+  }
+
+  const guardar = async () => {
+    setServerError(null)
+    try {
+      if (modo === 'movement') {
+        await handleSubmit(async (values) => onSubmit(values))()
+      } else {
+        await traslado.handleSubmit(async (values) => onTransfer(values))()
+      }
+    } catch (error) {
+      setServerError(error instanceof InventoryError ? error.key : 'inventory.error.generic')
+    }
+  }
+
+  const ocupado = isSubmitting || traslado.formState.isSubmitting
+  const fmt = (n: number) => formatQuantity(n)
+
+  function StockPanel({ id, after }: { id: string; after?: number | null }) {
+    const query = id === origen ? stockOrigen : stockDestino
+    if (!id || !listoParaStock) return null
+    if (query.isPending) return <Skeleton variant="rounded" height={58} />
+    if (!query.data) return null
+    const vacio = query.data.on_hand === 0 && query.data.reserved === 0
+    return (
+      <Box
+        data-stock-panel={codigo(id)}
+        sx={{ border: '1px solid var(--border)', borderRadius: 2, p: 1.5, bgcolor: 'var(--bg)' }}
+      >
+        <Typography sx={{ fontSize: 12, fontWeight: 800, color: 'var(--muted)', mb: 0.5 }}>
+          {t('inventory.stock.title').replace('{warehouse}', codigo(id))}
+        </Typography>
+        {vacio ? (
+          <Typography sx={{ fontSize: 13 }}>{t('inventory.stock.none')}</Typography>
+        ) : (
+          <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap', rowGap: 0.5 }}>
+            <Typography sx={{ fontSize: 13 }}>
+              {t('inventory.stock.onHand')}: <b className="tnum">{fmt(query.data.on_hand)}</b>
+            </Typography>
+            <Typography sx={{ fontSize: 13 }}>
+              {t('inventory.stock.reserved')}: <b className="tnum">{fmt(query.data.reserved)}</b>
+            </Typography>
+            <Typography sx={{ fontSize: 13 }}>
+              {t('inventory.stock.available')}: <b className="tnum">{fmt(query.data.available)}</b>
+            </Typography>
+          </Stack>
+        )}
+        {after !== undefined && after !== null && (
+          <Typography sx={{ fontSize: 12.5, mt: 0.5, color: after < 0 ? 'var(--red)' : 'var(--accent-deep)', fontWeight: 700 }}>
+            {t('inventory.stock.after').replace('{qty}', fmt(after))}
+          </Typography>
+        )}
+      </Box>
+    )
+  }
+
+  const almacenes = (warehouses.data ?? []).map((warehouse) => (
+    <MenuItem key={warehouse.id} value={warehouse.id}>
+      {warehouse.code} · {warehouse.name}
+    </MenuItem>
+  ))
+
+  const avisoNoAbastece = (chosen: string) => {
+    const rows = links.data ?? []
+    if (!chosen || rows.length === 0) return null
+    const serves = rows.some((link) => link.warehouse_id === chosen && link.is_active)
+    return serves ? null : <Alert severity="warning">{t('inventory.movement.notServing')}</Alert>
+  }
 
   return (
     <FormDrawer
       open={open}
       title={t('inventory.levels.newMovement')}
-      subtitle={t('inventory.levels.movementHelp')}
+      subtitle={modo === 'movement' ? t('inventory.levels.movementHelp') : t('inventory.transfer.help')}
       onClose={onClose}
-      busy={isSubmitting}
+      busy={ocupado}
       actions={
         <>
-          <Button onClick={onClose} disabled={isSubmitting}>
+          <Button onClick={onClose} disabled={ocupado}>
             {t('common.cancel')}
           </Button>
-          <Button
-            variant="contained"
-            disabled={!canWrite || isSubmitting}
-            onClick={handleSubmit(async (values) => {
-              try {
-                await onSubmit(values)
-              } catch (error) {
-                setServerError(error instanceof InventoryError ? error.key : 'inventory.error.generic')
-              }
-            })}
-          >
-            {t('common.save')}
+          <Button variant="contained" disabled={!canWrite || ocupado} onClick={() => void guardar()}>
+            {modo === 'movement' ? t('common.save') : t('inventory.transfer.save')}
           </Button>
         </>
       }
     >
       <Stack spacing={2}>
+        <ToggleButtonGroup
+          exclusive
+          fullWidth
+          size="small"
+          color="primary"
+          value={modo}
+          onChange={(_, next: 'movement' | 'transfer' | null) => {
+            if (!next) return
+            setServerError(null)
+            setModo(next)
+            // El almacén elegido pasa de un modo al otro como origen.
+            if (next === 'transfer' && watch('warehouse_id')) {
+              traslado.setValue('from_warehouse_id', watch('warehouse_id'))
+            }
+            if (next === 'movement' && traslado.watch('from_warehouse_id')) {
+              setValue('warehouse_id', traslado.watch('from_warehouse_id'))
+            }
+          }}
+        >
+          <ToggleButton value="movement">{t('inventory.mode.movement')}</ToggleButton>
+          <ToggleButton value="transfer">{t('inventory.mode.transfer')}</ToggleButton>
+        </ToggleButtonGroup>
+
         {serverError && <Alert severity="error">{t(serverError)}</Alert>}
 
-        <SelectField
-          label={t('inventory.field.warehouse')}
-          value={watch('warehouse_id')}
-          onChange={(event) => setValue('warehouse_id', event.target.value)}
-          error={Boolean(errors.warehouse_id)}
-          helperText={errors.warehouse_id ? t(errors.warehouse_id.message as MessageKey) : undefined}
-          fullWidth
-        >
-          {(warehouses.data ?? []).map((warehouse) => (
-            <MenuItem key={warehouse.id} value={warehouse.id}>
-              {warehouse.code} · {warehouse.name}
-            </MenuItem>
-          ))}
-        </SelectField>
+        {modo === 'movement' ? (
+          <SelectField
+            label={t('inventory.field.warehouse')}
+            value={watch('warehouse_id')}
+            onChange={(event) => setValue('warehouse_id', event.target.value)}
+            error={Boolean(errors.warehouse_id)}
+            helperText={errors.warehouse_id ? t(errors.warehouse_id.message as MessageKey) : undefined}
+            fullWidth
+          >
+            {almacenes}
+          </SelectField>
+        ) : (
+          <SelectField
+            label={t('inventory.transfer.from')}
+            value={traslado.watch('from_warehouse_id')}
+            onChange={(event) => traslado.setValue('from_warehouse_id', event.target.value)}
+            error={Boolean(traslado.formState.errors.from_warehouse_id)}
+            helperText={
+              traslado.formState.errors.from_warehouse_id
+                ? t(traslado.formState.errors.from_warehouse_id.message as MessageKey)
+                : undefined
+            }
+            fullWidth
+          >
+            {almacenes}
+          </SelectField>
+        )}
 
-        {/* Existencias (y la vitrina) solo cuentan los almacenes que abastecen a
-            la tienda. Sin este aviso, una entrada en un almacén sin vincular
-            «desaparecía»: quedaba guardada pero no se veía en ningún sitio. */}
-        {(() => {
-          const chosen = watch('warehouse_id')
-          const rows = links.data ?? []
-          if (!chosen || rows.length === 0) return null
-          const serves = rows.some((link) => link.warehouse_id === chosen && link.is_active)
-          return serves ? null : (
-            <Alert severity="warning">{t('inventory.movement.notServing')}</Alert>
-          )
-        })()}
+        {modo === 'movement' && avisoNoAbastece(watch('warehouse_id'))}
 
         {/* Un solo campo: se escribe SKU o nombre y se elige de la lista. Abre
             con los primeros por SKU, sin tener que escribir nada. */}
@@ -373,17 +527,21 @@ function MovementDrawer({
           value={picked}
           onPick={(option) => {
             setPicked(productOptions.find((p) => p.id === option.id) ?? null)
-            setValue('product_id', option.id, { shouldValidate: true })
-            setValue('variant_id', null)
+            elegirProducto(option.id, null)
           }}
           onClear={() => {
             setPicked(null)
-            setValue('product_id', '')
-            setValue('variant_id', null)
+            elegirProducto('', null)
           }}
           loading={products.isFetching}
-          error={Boolean(errors.product_id)}
-          helperText={errors.product_id ? t(errors.product_id.message as MessageKey) : undefined}
+          error={Boolean(errors.product_id) || Boolean(traslado.formState.errors.product_id)}
+          helperText={
+            errors.product_id
+              ? t(errors.product_id.message as MessageKey)
+              : traslado.formState.errors.product_id
+                ? t(traslado.formState.errors.product_id.message as MessageKey)
+                : undefined
+          }
           minChars={0}
           limit={30}
         />
@@ -391,8 +549,8 @@ function MovementDrawer({
         {picked?.kind === 'variant' && (
           <SelectField
             label={t('inventory.field.variant')}
-            value={watch('variant_id') ?? ''}
-            onChange={(event) => setValue('variant_id', event.target.value || null)}
+            value={variantId ?? ''}
+            onChange={(event) => elegirProducto(productId, event.target.value || null)}
             fullWidth
           >
             {(variants.data ?? []).map((variant) => (
@@ -403,46 +561,116 @@ function MovementDrawer({
           </SelectField>
         )}
 
-        <SelectField
-          label={t('inventory.field.movementKind')}
-          value={kind}
-          onChange={(event) =>
-            setValue('kind', event.target.value as MovementFormValues['kind'])
-          }
-          helperText={t('inventory.field.movementKindHelp')}
-          fullWidth
-        >
-          {MANUAL_MOVEMENT_KINDS.map((value) => (
-            <MenuItem key={value} value={value}>
-              {t(`inventory.movement.${value}` as MessageKey)}
-            </MenuItem>
-          ))}
-        </SelectField>
+        {modo === 'movement' ? (
+          <>
+            <StockPanel id={watch('warehouse_id')} after={despues()} />
 
-        <TextField
-          label={t('inventory.field.quantity')}
-          type="number"
-          {...register('quantity', { valueAsNumber: true })}
-          error={Boolean(errors.quantity)}
-          helperText={
-            errors.quantity
-              ? t(errors.quantity.message as MessageKey)
-              : requiredSign(kind) === 'negative'
-                ? t('inventory.field.quantityNegative')
-                : requiredSign(kind) === 'positive'
-                  ? t('inventory.field.quantityPositive')
-                  : t('inventory.field.quantityAny')
-          }
-          fullWidth
-        />
+            <SelectField
+              label={t('inventory.field.movementKind')}
+              value={kind}
+              onChange={(event) => setValue('kind', event.target.value as MovementFormValues['kind'])}
+              helperText={
+                kind === 'transfer_in' || kind === 'transfer_out'
+                  ? t('inventory.transfer.useTransfer')
+                  : t('inventory.field.movementKindHelp')
+              }
+              fullWidth
+            >
+              {MANUAL_MOVEMENT_KINDS.map((value) => (
+                <MenuItem key={value} value={value}>
+                  {t(`inventory.movement.${value}` as MessageKey)}
+                </MenuItem>
+              ))}
+            </SelectField>
 
-        <TextField
-          label={t('inventory.field.reason')}
-          {...register('reason')}
-          multiline
-          minRows={2}
-          fullWidth
-        />
+            <Field
+              label={t('inventory.field.quantity')}
+              type="number"
+              rule="signedDecimal"
+              {...register('quantity', { valueAsNumber: true })}
+              error={Boolean(errors.quantity)}
+              helperText={
+                errors.quantity
+                  ? t(errors.quantity.message as MessageKey)
+                  : requiredSign(kind) === 'negative'
+                    ? t('inventory.field.quantityNegative')
+                    : requiredSign(kind) === 'positive'
+                      ? t('inventory.field.quantityPositive')
+                      : t('inventory.field.quantityAny')
+              }
+              fullWidth
+            />
+
+            <Field
+              label={t('inventory.field.reason')}
+              rule="longText"
+              maxLength={500}
+              {...register('reason')}
+              multiline
+              minRows={2}
+              fullWidth
+            />
+          </>
+        ) : (
+          <>
+            <StockPanel id={traslado.watch('from_warehouse_id')} />
+
+            <SelectField
+              label={t('inventory.transfer.to')}
+              value={destino}
+              onChange={(event) => traslado.setValue('to_warehouse_id', event.target.value, { shouldValidate: true })}
+              error={Boolean(traslado.formState.errors.to_warehouse_id)}
+              helperText={
+                traslado.formState.errors.to_warehouse_id
+                  ? t(traslado.formState.errors.to_warehouse_id.message as MessageKey)
+                  : undefined
+              }
+              fullWidth
+            >
+              {(warehouses.data ?? [])
+                .filter((w) => w.id !== traslado.watch('from_warehouse_id'))
+                .map((warehouse) => (
+                  <MenuItem key={warehouse.id} value={warehouse.id}>
+                    {warehouse.code} · {warehouse.name}
+                  </MenuItem>
+                ))}
+            </SelectField>
+
+            {avisoNoAbastece(destino)}
+            <StockPanel id={destino} />
+
+            <Field
+              label={t('inventory.field.quantity')}
+              type="number"
+              rule="decimal"
+              inputProps={{ min: 0 }}
+              {...traslado.register('quantity', { valueAsNumber: true })}
+              error={Boolean(traslado.formState.errors.quantity)}
+              helperText={
+                traslado.formState.errors.quantity
+                  ? t(traslado.formState.errors.quantity.message as MessageKey)
+                  : stockOrigen.data && stockDestino.data && cantidadTraslado > 0
+                    ? t('inventory.transfer.after')
+                        .replace('{from}', codigo(traslado.watch('from_warehouse_id')))
+                        .replace('{fromQty}', fmt(stockOrigen.data.on_hand - cantidadTraslado))
+                        .replace('{to}', codigo(destino))
+                        .replace('{toQty}', fmt(stockDestino.data.on_hand + cantidadTraslado))
+                    : undefined
+              }
+              fullWidth
+            />
+
+            <Field
+              label={t('inventory.field.reason')}
+              rule="longText"
+              maxLength={500}
+              {...traslado.register('reason')}
+              multiline
+              minRows={2}
+              fullWidth
+            />
+          </>
+        )}
       </Stack>
     </FormDrawer>
   )
@@ -520,9 +748,11 @@ function PolicyDrawer({
     >
       <Stack spacing={2}>
         {serverError && <Alert severity="error">{t(serverError)}</Alert>}
-        <TextField
+        <Field
           label={t('inventory.field.safety')}
           type="number"
+          rule="decimal"
+          help={t('help.inventory.safetyStock')}
           {...register('safety_stock', { valueAsNumber: true })}
           error={Boolean(errors.safety_stock)}
           helperText={
@@ -532,9 +762,11 @@ function PolicyDrawer({
           }
           fullWidth
         />
-        <TextField
+        <Field
           label={t('inventory.field.reorder')}
           type="number"
+          rule="decimal"
+          help={t('help.inventory.reorderPoint')}
           {...register('reorder_point', { valueAsNumber: true })}
           error={Boolean(errors.reorder_point)}
           helperText={

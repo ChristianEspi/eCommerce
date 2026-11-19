@@ -14,6 +14,7 @@ import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { usePagedRows } from '@/shared/ui/usePagedRows'
 import { EmptyState, ErrorState } from '@/shared/ui/states'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { termLabel } from '@/shared/i18n/codeLabels'
 import { useForecasts } from './hooks'
 
 /**
@@ -77,7 +78,7 @@ export function ForecastsSection() {
                       : `${(Number(row.confidence) * 100).toFixed(0)} %`}
                   </TableCell>
                   <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>
-                    {row.model_code}
+                    <span title={row.model_code}>{termLabel(t, 'model', row.model_code)}</span>
                   </TableCell>
                 </TableRow>
               ))}

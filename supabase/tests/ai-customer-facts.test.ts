@@ -182,8 +182,9 @@ beforeAll(async () => {
   )
   CUENTA = (
     await svc<{ id: string }>(
-      `insert into public.business_accounts (organization_id, company_id, customer_id, code, name, credit_status, credit_limit)
-       values ($1, $2, $3, 'CTA-1', 'Cuenta CLI-1', 'watch', 5000) returning id`,
+      `insert into public.business_accounts (organization_id, company_id, customer_id, code, name, credit_status, credit_limit,
+         credit_watch_after_days, credit_block_after_days)
+       values ($1, $2, $3, 'CTA-1', 'Cuenta CLI-1', 'watch', 5000, null, null) returning id`,
       [TENANT_A.organizationId, TENANT_A.companyId, CLIENTE],
     )
   )[0]!.id

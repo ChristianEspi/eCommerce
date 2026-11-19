@@ -20,6 +20,7 @@ import {
 import { visuallyHidden } from '@mui/utils'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { Field } from '@/shared/ui/Field'
 import { TS } from '@/theme/tokens'
 
 export interface FacetOption {
@@ -533,8 +534,9 @@ function PriceRange({
         }}
         sx={{ gap: 0.75, alignItems: 'center' }}
       >
-        <TextField
+        <Field
           size="small"
+          rule="money"
           value={desde}
           onChange={(event) => setDesde(event.target.value)}
           onBlur={() => aplicar()}
@@ -544,8 +546,9 @@ function PriceRange({
             input: { startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment> },
           }}
         />
-        <TextField
+        <Field
           size="small"
+          rule="money"
           value={hasta}
           onChange={(event) => setHasta(event.target.value)}
           onBlur={() => aplicar()}

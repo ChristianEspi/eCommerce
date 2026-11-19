@@ -17,6 +17,7 @@ import type { PriceQuote } from '@/domain'
 import { esAcuerdoDelComprador } from './agreement'
 import { MAX_LINE_QUANTITY, lineKey, type Cart, type CartLine } from './cart'
 import { useCart } from './cart-context'
+import { useAssortmentBlocked } from '../commerce/assortment'
 
 /**
  * Líneas del carrito. Se usa igual en el panel lateral y en la página del
@@ -56,6 +57,11 @@ export function CartLineList({
     storeSlug,
     cart.lines.map((line) => line.product_id),
   )
+  // 2026-11-16 · Lo que ya estaba en el carrito y quedó fuera del surtido.
+  const fueraDeSurtido = useAssortmentBlocked(
+    storeSlug,
+    cart.lines.map((line) => line.product_id),
+  )
 
   return (
     <Stack component="ul" sx={{ listStyle: 'none', m: 0, p: 0, gap: compact ? 1.5 : 2 }}>
@@ -71,6 +77,7 @@ export function CartLineList({
           favorite={favorites.isFavorite(line.product_id)}
           onToggleFavorite={() => void favorites.toggle(line.product_id)}
           components={bundles.data?.[line.product_id] ?? null}
+          outOfAssortment={fueraDeSurtido.has(line.product_id)}
         />
       ))}
     </Stack>
@@ -121,6 +128,7 @@ function CartLineRow({
   favorite,
   onToggleFavorite,
   components,
+  outOfAssortment = false,
 }: {
   line: CartLine
   storeSlug: string
@@ -132,6 +140,8 @@ function CartLineRow({
   onToggleFavorite: () => void
   /** Lo que trae el kit; `null` si la línea no es un kit. */
   components: BundleComponent[] | null
+  /** Fuera del surtido de la empresa: hay que quitarla para pagar. */
+  outOfAssortment?: boolean
 }) {
   const { t, locale } = useI18n()
   const { setQuantity, remove } = useCart()
@@ -189,6 +199,11 @@ function CartLineRow({
             </Typography>
           )}
         </Box>
+        {outOfAssortment && (
+          <Typography role="note" data-cart-out-of-assortment sx={{ fontSize: TS.label, fontWeight: 700, color: 'var(--danger, #b42318)' }}>
+            {t('store.assortment.lineBlocked')}
+          </Typography>
+        )}
         {/* El precio de antes se TACHA al lado del de ahora: la oferta o el
             convenio no pueden perderse al entrar al carrito. */}
         <Stack direction="row" sx={{ alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>

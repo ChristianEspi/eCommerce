@@ -19,15 +19,16 @@ import {
   TableHead,
   TableRow,
   Tabs,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useState } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
+import { codeLabel, termLabel } from '@/shared/i18n/codeLabels'
 import { formatDateTime } from '@/shared/lib/format'
 import { SearchField } from '@/shared/ui/SearchField'
 import { EmptyState, ErrorState, UnauthorizedState } from '@/shared/ui/states'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
+import { Field } from '@/shared/ui/Field'
 import { useDebouncedValue } from '@/shared/lib/useDebouncedValue'
 import { isForbidden } from './errors'
 import { useIncidents, useResolveIncident } from './hooks'
@@ -125,7 +126,7 @@ export function IncidentsSection({ onTrace }: { onTrace: (correlationId: string)
                 <TableRow key={row.id}>
                   <TableCell>{formatDateTime(row.occurred_at, locale)}</TableCell>
                   <TableCell>
-                    <StatusChip tone={severityColor(row.severity)} label={row.kind} />
+                    <StatusChip tone={severityColor(row.severity)} label={termLabel(t, 'kind', row.kind)} />
                     {row.repeats > 1 && (
                       <Chip
                         size="small"
@@ -136,7 +137,7 @@ export function IncidentsSection({ onTrace }: { onTrace: (correlationId: string)
                     )}
                   </TableCell>
                   <TableCell>
-                    <Typography sx={{ fontSize: 13, fontWeight: 700 }}>{row.code}</Typography>
+                    <Typography sx={{ fontSize: 13, fontWeight: 700 }}>{codeLabel(t, row.code)}</Typography>
                     {row.message && (
                       <Typography sx={{ fontSize: 12, color: 'var(--muted)' }}>
                         {row.message}
@@ -194,11 +195,13 @@ export function IncidentsSection({ onTrace }: { onTrace: (correlationId: string)
           <Typography sx={{ color: 'var(--muted)', mb: 2 }}>
             {t('ops.incidents.resolveBody')}
           </Typography>
-          <TextField
+          <Field
             autoFocus
             fullWidth
             multiline
             minRows={2}
+            rule="longText"
+            maxLength={1000}
             label={t('ops.incidents.note')}
             value={note}
             onChange={(event) => setNote(event.target.value)}

@@ -19,7 +19,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from 'react'
@@ -46,6 +45,7 @@ import {
   type CatalogEntryFormValues,
   type ProductFamily,
 } from './types'
+import { Field } from '@/shared/ui/Field'
 
 /**
  * Marcas y familias: dos catálogos de la sociedad con casi la misma forma y la
@@ -387,9 +387,11 @@ function BrandDrawer({
         <Stack spacing={2.5}>
           {serverError && <Alert severity="error">{t(serverError)}</Alert>}
 
-          <TextField
+          <Field
             label={t('pim.field.name')}
             fullWidth
+            rule="text"
+            maxLength={160}
             autoFocus
             disabled={!canWrite}
             error={Boolean(errors.name)}
@@ -401,9 +403,12 @@ function BrandDrawer({
             })}
           />
 
-          <TextField
+          <Field
             label={t('pim.field.code')}
             fullWidth
+            rule="lowerCode"
+            maxLength={41}
+            help={t('help.catalog.entryCode')}
             disabled={!canWrite}
             error={Boolean(errors.code)}
             helperText={fieldError('code')}
@@ -518,9 +523,11 @@ function CatalogEntryDrawer({
         <Stack spacing={2.5}>
           {serverError && <Alert severity="error">{t(serverError)}</Alert>}
 
-          <TextField
+          <Field
             label={t('pim.field.name')}
             fullWidth
+            rule="text"
+            maxLength={160}
             autoFocus
             disabled={!canWrite}
             error={Boolean(errors.name)}
@@ -532,9 +539,12 @@ function CatalogEntryDrawer({
             })}
           />
 
-          <TextField
+          <Field
             label={t('pim.field.code')}
             fullWidth
+            rule="lowerCode"
+            maxLength={41}
+            help={t('help.catalog.entryCode')}
             disabled={!canWrite}
             error={Boolean(errors.code)}
             helperText={fieldError('code')}

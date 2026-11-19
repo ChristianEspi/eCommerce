@@ -135,6 +135,44 @@ describe('con el token correcto se recupera el pedido', () => {
   })
 })
 
+describe('el medio de pago, para que la confirmación sepa qué decir', () => {
+  it('sin intento de cobro, payment_method es null', async () => {
+    const order = await lookup(String(pedidoDos.order_number), String(pedidoDos.access_token))
+    expect(order.payment_method).toBeNull()
+  })
+
+  it('devuelve familia, nombre e instrucciones del ÚLTIMO intento, y nada del proveedor', async () => {
+    const [pedido] = await svc(`select id from public.orders where order_number = $1`, [pedidoUno.order_number])
+    const medio = async (codigo: string, familia: string, nombre: string, minutos: number) => {
+      const [metodo] = await svc(
+        `insert into public.payment_methods
+           (organization_id, company_id, store_id, code, kind, display_name, instructions, capture_mode, is_active)
+         values ($1, $2, $3, $4, $5::public.payment_method_kind, $6, 'Ten el monto exacto.', 'manual', true)
+         returning id`,
+        [TENANT_A.organizationId, TENANT_A.companyId, storeA, codigo, familia, nombre],
+      )
+      await svc(
+        `insert into public.payment_intents
+           (organization_id, company_id, store_id, order_id, payment_method_id,
+            currency, amount, idempotency_key, created_at)
+         values ($1, $2, $3, $4, $5, 'PEN', '10.00', $6, now() + make_interval(mins => $7))`,
+        [TENANT_A.organizationId, TENANT_A.companyId, storeA, pedido?.id, metodo?.id, `int-${codigo}`, minutos],
+      )
+    }
+    await medio('yape-test', 'wallet', 'Yape', 0)
+    // El comprador cambió de idea: manda el más reciente.
+    await medio('efectivo-test', 'cash', 'Pago en efectivo', 1)
+
+    const order = await lookup(String(pedidoUno.order_number), String(pedidoUno.access_token))
+    expect(order.payment_method).toEqual({
+      code: 'efectivo-test',
+      kind: 'cash',
+      display_name: 'Pago en efectivo',
+      instructions: 'Ten el monto exacto.',
+    })
+  })
+})
+
 describe('sin el token no hay pedido', () => {
   it('el número correcto sin token no revela ni que existe', async () => {
     const message = await expectFailure(() =>

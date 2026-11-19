@@ -24,7 +24,7 @@ import { StatusChip } from '@/shared/ui/StatusChip'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { EmptyState, ErrorState } from '@/shared/ui/states'
 import { AssortmentDrawer } from './AssortmentDrawer'
-import { useAssortments } from './hooks'
+import { useAssortmentAssignments, useAssortments } from './hooks'
 import type { Assortment } from './types'
 
 /**
@@ -54,6 +54,20 @@ export function AssortmentsPage() {
   const [creando, setCreando] = useState(false)
 
   const query = useAssortments()
+  // Todas las asignaciones de la sociedad, para decir en la tabla a quién se
+  // aplica cada surtido: uno sin asignar no actúa sobre nadie (2026-11-16).
+  const asignaciones = useAssortmentAssignments(null)
+  const resumenAsignaciones = useMemo(() => {
+    const porSurtido = new Map<string, { activas: number; nombres: string[] }>()
+    for (const a of asignaciones.data ?? []) {
+      if (!a.is_active) continue
+      const r = porSurtido.get(a.assortment_id) ?? { activas: 0, nombres: [] }
+      r.activas += 1
+      if (a.customer_name) r.nombres.push(a.customer_name)
+      porSurtido.set(a.assortment_id, r)
+    }
+    return porSurtido
+  }, [asignaciones.data])
 
   const surtidos = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -157,6 +171,7 @@ export function AssortmentsPage() {
                   <TableCell>{t('trade.field.code')}</TableCell>
                   <TableCell>{t('trade.field.name')}</TableCell>
                   <TableCell>{t('trade.field.listKind')}</TableCell>
+                  <TableCell>{t('trade.assignments.column')}</TableCell>
                   <TableCell>{t('common.status')}</TableCell>
                   <TableCell align="right">{t('common.actions')}</TableCell>
                 </TableRow>
@@ -175,6 +190,17 @@ export function AssortmentsPage() {
                           row.is_allow_list ? t('trade.list.allow') : t('trade.list.block')
                         }
                       />
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const r = resumenAsignaciones.get(row.id)
+                        if (!r) return <StatusChip tone="warning" label={t('trade.assignments.none')} />
+                        // Un solo cliente se nombra; si hay más, se cuentan.
+                        if (r.activas === 1 && r.nombres.length === 1) return r.nombres[0]
+                        return r.activas === 1
+                          ? t('trade.assignments.countOne')
+                          : t('trade.assignments.count').replace('{n}', String(r.activas))
+                      })()}
                     </TableCell>
                     <TableCell>
                       <StatusChip

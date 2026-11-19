@@ -2,8 +2,14 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { tryGetSupabaseClient } from '@/shared/lib/supabase'
 import { CreditError, creditErrorFromDb } from './errors'
 import {
-  AR_APPLICATIONS_TABLE,
   AR_DOCUMENTS_TABLE,
+  AR_REGISTER_RECEIPT_RPC,
+  CREDIT_LINES_RPC,
+  INVOICE_CREATE_FOR_ORDER_RPC,
+  creditLineSchema,
+  receiptResultSchema,
+  type CreditLine,
+  type ReceiptResult,
   AR_RECEIPTS_TABLE,
   CUSTOMER_AGING_RPC,
   INVOICES_TABLE,
@@ -71,7 +77,7 @@ function conCliente(row: unknown) {
 
 const DOC_SELECT =
   'id, customer_id, order_id, kind, document_number, currency, issued_at, due_at, ' +
-  'amount::text, balance::text, customers(code, name)'
+  'amount::text, balance::text, business_account_id, voided_at, void_reason, customers(code, name)'
 
 export async function fetchArDocuments(options: { onlyOpen: boolean }): Promise<ArDocument[]> {
   let query = client().from(AR_DOCUMENTS_TABLE).select(DOC_SELECT).order('due_at')
@@ -120,44 +126,42 @@ export async function fetchArReceipts(): Promise<ArReceipt[]> {
  * sobre lo que se debe.
  */
 export async function registerReceipt(input: {
-  scope: CreditScope
   customerId: string
-  currency: string
   values: ReceiptFormValues
   applications: { documentId: string; amount: string }[]
-}): Promise<void> {
-  const supabase = client()
-
-  const { data, error } = await supabase
-    .from(AR_RECEIPTS_TABLE)
-    .insert({
-      organization_id: input.scope.organizationId,
-      company_id: input.scope.companyId,
-      customer_id: input.customerId,
-      receipt_number: input.values.receipt_number.trim(),
-      currency: input.currency,
-      received_at: input.values.received_at,
-      amount: input.values.amount,
-      method: nullable(input.values.method),
-      reference: nullable(input.values.reference),
-    })
-    .select('id')
-    .single()
-
-  if (error) throw creditErrorFromDb(error)
-  if (input.applications.length === 0) return
-
-  const { error: applyError } = await supabase.from(AR_APPLICATIONS_TABLE).insert(
-    input.applications.map((app) => ({
-      organization_id: input.scope.organizationId,
-      company_id: input.scope.companyId,
-      receipt_id: (data as { id: string }).id,
+}): Promise<ReceiptResult> {
+  // 2026-11-17 · Una sola llamada: recibo y aplicaciones en la MISMA
+  // transacción (`ar_register_receipt`). Si una aplicación no cabe, no queda
+  // ni el recibo. El tenant sale del cliente, no de aquí.
+  const { data, error } = await client().rpc(AR_REGISTER_RECEIPT_RPC, {
+    p_customer_id: input.customerId,
+    p_receipt_number: nullable(input.values.receipt_number),
+    p_received_at: input.values.received_at,
+    p_amount: input.values.amount,
+    p_method: nullable(input.values.method),
+    p_reference: nullable(input.values.reference),
+    p_applications: input.applications.map((app) => ({
       document_id: app.documentId,
       amount: app.amount,
     })),
-  )
+  })
+  if (error) throw creditErrorFromDb(error)
+  return receiptResultSchema.parse(data)
+}
 
-  if (applyError) throw creditErrorFromDb(applyError)
+/** Las líneas de crédito de las cuentas empresa (límite, usado, disponible, vencido). */
+export async function fetchCreditLines(): Promise<CreditLine[]> {
+  const { data, error } = await client().rpc(CREDIT_LINES_RPC)
+  if (error) throw creditErrorFromDb(error)
+  return creditLineSchema.array().parse(data ?? [])
+}
+
+/** Arma un comprobante pendiente desde un pedido, con sus líneas. */
+export async function createInvoiceForOrder(orderNumber: string): Promise<void> {
+  const { error } = await client().rpc(INVOICE_CREATE_FOR_ORDER_RPC, {
+    p_order_number: orderNumber.trim().toUpperCase(),
+  })
+  if (error) throw creditErrorFromDb(error)
 }
 
 // ---------------------------------------------------------------------------
@@ -166,7 +170,8 @@ export async function registerReceipt(input: {
 
 const INVOICE_SELECT =
   'id, order_id, series, number, status, currency, issued_at, customer_name, ' +
-  'customer_tax_id, net_total::text, tax_total::text, gross_total::text, reject_reason'
+  'customer_tax_id, net_total::text, tax_total::text, gross_total::text, reject_reason, ' +
+  'invoice_items(count)'
 
 export async function fetchInvoices(): Promise<Invoice[]> {
   const { data, error } = await client()
@@ -175,7 +180,15 @@ export async function fetchInvoices(): Promise<Invoice[]> {
     .order('issued_at', { ascending: false })
 
   if (error) throw creditErrorFromDb(error)
-  return invoiceSchema.array().parse(data ?? [])
+  // `invoice_items(count)` llega como `[{ count: n }]`.
+  return invoiceSchema.array().parse(
+    (data ?? []).map((row) => {
+      const { invoice_items, ...rest } = (row as unknown) as Record<string, unknown> & {
+        invoice_items?: { count?: number }[]
+      }
+      return { ...rest, item_count: invoice_items?.[0]?.count ?? 0 }
+    }),
+  )
 }
 
 /** Estado de emisión de cada comprobante visible. La RLS pone el tenant. */

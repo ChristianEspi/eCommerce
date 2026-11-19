@@ -18,7 +18,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useEffect, useState } from 'react'
@@ -53,6 +52,7 @@ import {
   type ZoneFormValues,
 } from './types'
 import { SelectField } from '@/shared/ui/SelectField'
+import { Field } from '@/shared/ui/Field'
 import { PickupPointsSection } from './PickupPointsSection'
 
 const EMPTY_ZONE: ZoneFormValues = {
@@ -576,14 +576,19 @@ export function NetworkSection() {
         }
       >
         <Stack spacing={2}>
-          <TextField
+          <Field
+            rule="lowerCode"
+            maxLength={41}
+            help={t('help.fulfillment.methodCode')}
             label={t('fulfillment.field.code')}
             value={methodValues.code}
             disabled={Boolean(methodValues.id)}
             onChange={(event) => setMethodValues((v) => ({ ...v, code: event.target.value }))}
             helperText={t('fulfillment.field.codeHelp')}
           />
-          <TextField
+          <Field
+            rule="text"
+            maxLength={120}
             label={t('fulfillment.field.methodName')}
             value={methodValues.displayName}
             onChange={(event) =>
@@ -643,7 +648,10 @@ export function NetworkSection() {
             ))}
           </SelectField>
           <Stack direction="row" spacing={2}>
-            <TextField
+            <Field
+              rule="integer"
+              maxLength={3}
+              help={t('help.fulfillment.leadDays')}
               label={t('fulfillment.field.leadMin')}
               type="number"
               value={methodValues.leadTimeMinDays}
@@ -651,7 +659,10 @@ export function NetworkSection() {
                 setMethodValues((v) => ({ ...v, leadTimeMinDays: Number(event.target.value) || 0 }))
               }
             />
-            <TextField
+            <Field
+              rule="integer"
+              maxLength={3}
+              help={t('help.fulfillment.leadDays')}
               label={t('fulfillment.field.leadMax')}
               type="number"
               value={methodValues.leadTimeMaxDays}
@@ -660,7 +671,8 @@ export function NetworkSection() {
               }
             />
           </Stack>
-          <TextField
+          <Field
+            rule="longText"
             label={t('fulfillment.field.instructions')}
             value={methodValues.instructions}
             multiline
@@ -713,30 +725,38 @@ export function NetworkSection() {
         }
       >
         <Stack spacing={2}>
-          <TextField
+          <Field
+            rule="lowerCode"
+            maxLength={41}
+            help={t('help.fulfillment.zoneCode')}
             label={t('fulfillment.field.code')}
             value={zoneValues.code}
             disabled={Boolean(zoneValues.id)}
             onChange={(event) => setZoneValues((v) => ({ ...v, code: event.target.value }))}
           />
-          <TextField
+          <Field
+            rule="text"
+            maxLength={120}
             label={t('fulfillment.field.zoneName')}
             value={zoneValues.name}
             onChange={(event) => setZoneValues((v) => ({ ...v, name: event.target.value }))}
           />
-          <TextField
+          <Field
+            rule="country"
             label={t('fulfillment.field.country')}
             value={zoneValues.country}
             onChange={(event) => setZoneValues((v) => ({ ...v, country: event.target.value }))}
             helperText={t('fulfillment.field.countryHelp')}
           />
-          <TextField
+          <Field
+            rule="longText"
             label={t('fulfillment.field.regions')}
             value={zoneValues.regions}
             onChange={(event) => setZoneValues((v) => ({ ...v, regions: event.target.value }))}
             helperText={t('fulfillment.field.regionsHelp')}
           />
-          <TextField
+          <Field
+            rule="longText"
             label={t('fulfillment.field.postalPrefixes')}
             value={zoneValues.postalPrefixes}
             onChange={(event) =>
@@ -744,7 +764,9 @@ export function NetworkSection() {
             }
             helperText={t('fulfillment.field.postalPrefixesHelp')}
           />
-          <TextField
+          <Field
+            rule="integer"
+            maxLength={4}
             label={t('fulfillment.field.priority')}
             type="number"
             value={zoneValues.priority}
@@ -823,39 +845,44 @@ export function NetworkSection() {
               </MenuItem>
             ))}
           </SelectField>
-          <TextField
+          <Field
+            rule="money"
+            help={t('help.fulfillment.baseAmount')}
             label={t('fulfillment.field.base')}
             value={rateValues.baseAmount}
-            inputProps={{ inputMode: 'decimal' }}
             onChange={(event) => setRateValues((v) => ({ ...v, baseAmount: event.target.value }))}
           />
-          <TextField
+          <Field
+            rule="money"
+            help={t('help.fulfillment.perItemAmount')}
             label={t('fulfillment.field.perItem')}
             value={rateValues.perItemAmount}
-            inputProps={{ inputMode: 'decimal' }}
             onChange={(event) =>
               setRateValues((v) => ({ ...v, perItemAmount: event.target.value }))
             }
           />
-          <TextField
+          <Field
+            rule="money"
             label={t('fulfillment.field.perWeight')}
             value={rateValues.perWeightAmount}
-            inputProps={{ inputMode: 'decimal' }}
             onChange={(event) =>
               setRateValues((v) => ({ ...v, perWeightAmount: event.target.value }))
             }
             helperText={t('fulfillment.field.perWeightHelp')}
           />
-          <TextField
+          <Field
+            rule="money"
             label={t('fulfillment.field.freeOver')}
             value={rateValues.freeOverSubtotal}
-            inputProps={{ inputMode: 'decimal' }}
             onChange={(event) =>
               setRateValues((v) => ({ ...v, freeOverSubtotal: event.target.value }))
             }
             helperText={t('fulfillment.field.freeOverHelp')}
           />
-          <TextField
+          <Field
+            rule="integer"
+            maxLength={4}
+            help={t('help.fulfillment.ratePriority')}
             label={t('fulfillment.field.priority')}
             type="number"
             value={rateValues.priority}

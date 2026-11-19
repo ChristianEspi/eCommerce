@@ -1,18 +1,19 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Alert, Box, Button, Stack, TextField } from '@mui/material'
+import { Alert, Box, Button, Stack } from '@mui/material'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link as RouterLink, useLocation } from 'react-router-dom'
 import { z } from 'zod'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
+import { Field } from '@/shared/ui/Field'
 import { R } from '@/theme/tokens'
 import { AuthShell, CTA_SX, FieldLabel, ROUNDED_FIELD_SX } from './AuthShell'
 import { AuthActionError, requestPasswordReset } from './authApi'
 import { returnPathFrom } from './returnTo'
 
 const schema = z.object({
-  email: z.string().min(1, 'auth.required.email').email('auth.invalid.email'),
+  email: z.string().min(1, 'auth.required.email').max(254, 'auth.invalid.email').email('auth.invalid.email'),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -80,9 +81,10 @@ export function ForgotPasswordPage() {
         <Stack spacing={2.25}>
           <Box>
             <FieldLabel htmlFor="forgot-email">{t('auth.email')}</FieldLabel>
-            <TextField
+            <Field
               id="forgot-email"
               type="email"
+              rule="email"
               fullWidth
               autoComplete="email"
               error={Boolean(errors.email)}

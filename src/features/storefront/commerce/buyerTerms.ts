@@ -38,8 +38,8 @@ export function useBuyerCredit(storeSlug: string): BuyerCredit | null {
   const { context } = useCommerceContext(storeSlug, status === 'authenticated')
   const enabled = Boolean(context?.has_credit_terms)
   const statement = useQuery({
-    queryKey: myStatementKey(),
-    queryFn: fetchMyStatement,
+    queryKey: myStatementKey(storeSlug),
+    queryFn: () => fetchMyStatement(storeSlug),
     enabled,
     retry: false,
     staleTime: 60_000,

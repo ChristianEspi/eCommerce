@@ -12,8 +12,12 @@ import {
   saveQuote,
   searchTradeProducts,
   setQuoteStatus,
+  addAssortmentAssignment,
+  deleteAssortmentAssignment,
+  fetchAssortmentAssignments,
+  setAssortmentAssignmentActive,
 } from './api'
-import type { Assortment, AssortmentItem, Quote, QuoteItem } from './types'
+import type { Assortment, AssortmentAssignment, AssortmentItem, Quote, QuoteItem } from './types'
 
 /**
  * Estado comercial en el cliente.
@@ -103,4 +107,28 @@ export function useAddAssortmentItem() {
 
 export function useRemoveAssortmentItem() {
   return useTradeMutation(removeAssortmentItem)
+}
+
+export const assortmentAssignmentsKey = (assortmentId: string | null) =>
+  [...TRADE_KEY, 'assortment-assignments', assortmentId] as const
+
+/** Con id: las de ese surtido. Con `null`: todas, para la columna «Se aplica a». */
+export function useAssortmentAssignments(assortmentId: string | null): UseQueryResult<AssortmentAssignment[]> {
+  return useQuery({
+    queryKey: assortmentAssignmentsKey(assortmentId),
+    queryFn: () => fetchAssortmentAssignments(assortmentId),
+    retry: false,
+  })
+}
+
+export function useAddAssortmentAssignment() {
+  return useTradeMutation(addAssortmentAssignment)
+}
+
+export function useToggleAssortmentAssignment() {
+  return useTradeMutation(setAssortmentAssignmentActive)
+}
+
+export function useDeleteAssortmentAssignment() {
+  return useTradeMutation(deleteAssortmentAssignment)
 }

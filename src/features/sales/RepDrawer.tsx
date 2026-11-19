@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Alert, Box, Button, MenuItem, Stack, Tab, Tabs, TextField } from '@mui/material'
+import { Alert, Box, Button, MenuItem, Stack, Tab, Tabs } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -20,6 +20,7 @@ import {
   type SalesRepFormValues,
 } from './types'
 import { SelectField } from '@/shared/ui/SelectField'
+import { Field } from '@/shared/ui/Field'
 
 /**
  * Alta y edición de un vendedor, con su cartera.
@@ -146,7 +147,10 @@ export function RepDrawer({
               <FieldRow>
                 {/* El código es un puñado de caracteres: ancho fijo y sin
                     encoger, para que el nombre se quede con lo que sobra. */}
-                <TextField
+                <Field
+                  rule="code"
+                  maxLength={40}
+                  help={t('help.sales.repCode')}
                   label={t('sales.field.code')}
                   required
                   disabled={!canWrite}
@@ -156,8 +160,10 @@ export function RepDrawer({
                   sx={{ width: { xs: '100%', sm: 160 }, flexShrink: 0 }}
                   {...register('employee_code')}
                 />
-                <TextField
+                <Field
                   fullWidth
+                  rule="personName"
+                  maxLength={160}
                   label={t('sales.field.name')}
                   required
                   disabled={!canWrite}
@@ -169,9 +175,11 @@ export function RepDrawer({
               </FieldRow>
 
               <FieldRow>
-                <TextField
+                <Field
                   fullWidth
                   type="email"
+                  rule="email"
+                  maxLength={320}
                   label={t('sales.field.email')}
                   disabled={!canWrite}
                   error={Boolean(errors.email)}
@@ -179,8 +187,9 @@ export function RepDrawer({
                   slotProps={{ inputLabel: { shrink: true } }}
                   {...register('email')}
                 />
-                <TextField
+                <Field
                   fullWidth
+                  rule="phone"
                   label={t('sales.field.phone')}
                   disabled={!canWrite}
                   error={Boolean(errors.phone)}
@@ -226,7 +235,7 @@ export function RepDrawer({
                     </MenuItem>
                   ))}
                 </SelectField>
-                <TextField
+                <Field
                   fullWidth
                   type="date"
                   label={t('sales.field.hiredAt')}
@@ -236,10 +245,12 @@ export function RepDrawer({
                 />
               </FieldRow>
 
-              <TextField
+              <Field
                 fullWidth
                 multiline
                 minRows={2}
+                rule="longText"
+                maxLength={500}
                 label={t('sales.field.notes')}
                 disabled={!canWrite}
                 error={Boolean(errors.notes)}

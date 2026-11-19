@@ -7,6 +7,7 @@ import ShoppingCartRoundedIcon from '@mui/icons-material/ShoppingCartRounded'
 import FavoriteBorderRoundedIcon from '@mui/icons-material/FavoriteBorderRounded'
 import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded'
 import {
+  Alert,
   Box,
   Button,
   Card,
@@ -32,6 +33,7 @@ import { ProductPageSkeleton } from './components/ProductPageSkeleton'
 import { notFoundMeta, productMeta } from './seo'
 import { track } from './analytics'
 import { useAddToCart } from './cart/useAddToCart'
+import { useAssortmentBlocked } from './commerce/assortment'
 import { PriceTiers } from './components/PriceTiers'
 import {
   DeliveryAside,
@@ -413,45 +415,27 @@ export function StoreProductPage() {
                   id: 'description',
                   title: t('store.product.description'),
                   /**
-                   * Lámina 31 · El texto y, AL LADO, la ficha de datos en una
-                   * tarjeta. Solo el texto dejaba dos líneas en 1300 px de
-                   * ancho; en el teléfono la ficha baja debajo del texto.
+                   * SOLO el texto. Antes llevaba al lado la ficha de datos
+                   * entera, y la pestaña «Datos del producto» repetía la misma
+                   * tabla: dos pestañas para leer lo mismo (visto 2026-11-16).
+                   * Cada dato vive en un sitio. El texto va en una columna de
+                   * lectura centrada bajo las pestañas, también centradas.
                    */
                   content: (
-                    <Box
+                    <Typography
+                      data-pdp-description
                       sx={{
-                        display: 'grid',
-                        gap: { xs: 2.5, md: 5 },
-                        gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) minmax(280px, 400px)' },
-                        alignItems: 'start',
+                        fontSize: { xs: 15, md: 17 },
+                        color: 'var(--text)',
+                        whiteSpace: 'pre-line',
+                        lineHeight: 1.7,
+                        // Una línea de lectura cómoda, no a lo ancho de la página.
+                        maxWidth: '72ch',
+                        mx: 'auto',
                       }}
                     >
-                      <Typography
-                        sx={{
-                          fontSize: { xs: 15, md: 17 },
-                          color: 'var(--text)',
-                          whiteSpace: 'pre-line',
-                          lineHeight: 1.7,
-                          // Texto corrido a lo ancho de la página se lee peor que
-                          // en una línea larga pero acotada.
-                          maxWidth: '68ch',
-                        }}
-                      >
-                        {item.description.trim()}
-                      </Typography>
-                      <Box
-                        data-pdp-sheet-aside
-                        sx={{
-                          px: 2.5,
-                          py: 0.5,
-                          border: '1px solid var(--sf-line)',
-                          borderRadius: 'var(--sf-radius-sm)',
-                          bgcolor: 'var(--card)',
-                        }}
-                      >
-                        {fichaDeDatos}
-                      </Box>
-                    </Box>
+                      {item.description.trim()}
+                    </Typography>
                   ),
                 },
               ]
@@ -459,8 +443,9 @@ export function StoreProductPage() {
           {
             id: 'sheet',
             title: t('store.product.sheet'),
-            // Universal: la tabla a lo ancho, en filas alternas (lámina).
-            content: <Box sx={{ maxWidth: universal ? 'none' : '60ch' }}>{fichaDeDatos}</Box>,
+            // En la misma columna centrada que la descripción: al cambiar de
+            // pestaña el contenido no salta de sitio.
+            content: <Box sx={{ maxWidth: 760, mx: 'auto' }}>{fichaDeDatos}</Box>,
           },
         ]}
       />
@@ -967,7 +952,10 @@ function AddToCart({
 
   const hasVariants = product.kind === 'variant'
   const { selected, select } = choice
-  const canBuy = available && (!hasVariants || (selected !== null && selected.in_stock !== false))
+  // 2026-11-16 · Fuera del surtido de la empresa: se ve, pero no se compra.
+  const fueraDeSurtido = useAssortmentBlocked(storeSlug, [product.product_id]).has(product.product_id)
+  const canBuy =
+    !fueraDeSurtido && available && (!hasVariants || (selected !== null && selected.in_stock !== false))
 
   /**
    * El grupo de compra, para poder volver a él desde la barra del teléfono.
@@ -1055,6 +1043,12 @@ function AddToCart({
 
       <PriceTiers tiers={tiers} currency={product.currency} quantity={quantity} onChoose={setQuantity} />
 
+      {fueraDeSurtido && (
+        <Alert severity="info" data-pdp-out-of-assortment>
+          {t('store.assortment.productBlocked')}
+        </Alert>
+      )}
+
       <Stack direction="row" sx={{ gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
         <QuantityStepper value={quantity} onChange={setQuantity} />
 
@@ -1115,7 +1109,7 @@ function AddToCart({
       * falta elegir variante, porque ahí tiene algo que hacer: llevar a
       * elegirla.
       */}
-    {available ? (
+    {available && !fueraDeSurtido ? (
       <StoreProductPurchaseBar
         priceLabel={
           selected ? formatMoney(Number(selected.price), selected.currency, locale) : priceLabel

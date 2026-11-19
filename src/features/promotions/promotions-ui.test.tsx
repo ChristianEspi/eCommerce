@@ -53,6 +53,7 @@ const COUPON_ID = '88888888-8888-4888-8888-888888888803'
 const CARD_ID = '88888888-8888-4888-8888-888888888804'
 const EVENT_ID = '88888888-8888-4888-8888-888888888805'
 const PRODUCT_ID = '88888888-8888-4888-8888-888888888806'
+const CHANNEL_ID = '88888888-8888-4888-8888-888888888807'
 
 const PROMOS = ['ecommerce.promotions']
 
@@ -141,6 +142,22 @@ function backend(options: { entitlements?: string[]; role?: string } = {}): Fake
       promotion_scopes: [],
       promotion_tiers: [],
       promotion_audiences: [],
+      channels: [
+        {
+          id: CHANNEL_ID,
+          organization_id: ORG,
+          company_id: COMPANY_A,
+          store_id: STORE_A,
+          code: 'b2c',
+          name: 'Tienda online',
+          kind: 'b2c',
+          is_default: true,
+          requires_auth: false,
+          is_active: true,
+        },
+      ],
+      customer_segments: [],
+      business_accounts: [],
       coupons: [
         {
           id: COUPON_ID,
@@ -446,6 +463,39 @@ describe('Campañas — el alta', () => {
     expect(panel.queryByLabelText('Porcentaje (%)')).not.toBeInTheDocument()
     expect(panel.getByLabelText('Llevando')).toBeInTheDocument()
     expect(panel.getByLabelText('Salen gratis')).toBeInTheDocument()
+  })
+})
+
+/**
+ * 2026-11-18 · «Dirigida a». Sin destinatarios la campaña vale para todos, y
+ * la pantalla lo dice; añadir uno guarda SOLO el destinatario elegido.
+ */
+describe('Campañas — dirigida a', () => {
+  it('dice que vale para todos y guarda el canal elegido como destinatario', async () => {
+    const fake = backend()
+    renderPromotions(fake)
+    await screen.findByText('Rebajas de verano')
+
+    const usuario = userEvent.setup()
+    await usuario.click(screen.getByText('Rebajas de verano'))
+    await screen.findByRole('dialog')
+    const seccion = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>('[data-promotion-audiences]')
+      if (!el) throw new Error('sin sección')
+      return el
+    })
+    const zona = within(seccion)
+    expect(zona.getByText(/vale para todos los compradores/)).toBeInTheDocument()
+
+    await usuario.click(zona.getByRole('combobox', { name: 'Canal' }))
+    await usuario.click(await screen.findByRole('option', { name: 'b2c · Tienda online' }))
+    await usuario.click(zona.getByRole('button', { name: 'Añadir destinatario' }))
+
+    await waitFor(() => expect(fake.state.tables.promotion_audiences).toHaveLength(1))
+    const fila = fake.state.tables.promotion_audiences![0] as Record<string, unknown>
+    expect(fila).toMatchObject({ promotion_id: PROMO_ID, audience_kind: 'channel', channel_id: CHANNEL_ID })
+    expect(fila.customer_id ?? null).toBeNull()
+    expect(fila.business_account_id ?? null).toBeNull()
   })
 })
 

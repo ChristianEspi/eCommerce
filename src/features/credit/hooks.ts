@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import {
+  createInvoiceForOrder,
+  fetchCreditLines,
   fetchAging,
   fetchArDocuments,
   fetchArReceipts,
@@ -8,7 +10,7 @@ import {
   registerReceipt,
   requestInvoiceIssue,
 } from './api'
-import type { Aging, ArDocument, ArReceipt, Invoice, InvoiceIssueStatus } from './types'
+import type { Aging, ArDocument, ArReceipt, CreditLine, Invoice, InvoiceIssueStatus } from './types'
 
 /**
  * Estado de crédito en el cliente.
@@ -74,6 +76,24 @@ export function useRegisterReceipt() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: registerReceipt,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: CREDIT_KEY }),
+    // Saldar una deuda pone su pedido en pagado: Pedidos también se refresca.
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: CREDIT_KEY })
+      await queryClient.invalidateQueries({ queryKey: ['orders'] })
+    },
+  })
+}
+
+export const creditLinesKey = () => [...CREDIT_KEY, 'lines'] as const
+
+export function useCreditLines(): UseQueryResult<CreditLine[]> {
+  return useQuery({ queryKey: creditLinesKey(), queryFn: fetchCreditLines, retry: false })
+}
+
+export function useCreateInvoiceForOrder() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: createInvoiceForOrder,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: invoicesKey() }),
   })
 }

@@ -21,7 +21,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
@@ -52,6 +51,7 @@ import {
   type AttributeValue,
   type AttributeValueFormValues,
 } from './types'
+import { Field } from '@/shared/ui/Field'
 import { SelectField } from '@/shared/ui/SelectField'
 
 const DATA_TYPE_LABEL: Record<AttributeDataType, MessageKey> = {
@@ -324,9 +324,11 @@ function AttributeDrawer({
         <Stack spacing={2.5}>
           {serverError && <Alert severity="error">{t(serverError)}</Alert>}
 
-          <TextField
+          <Field
             label={t('pim.field.name')}
             fullWidth
+            rule="text"
+            maxLength={120}
             autoFocus
             disabled={!canWrite}
             error={Boolean(errors.name)}
@@ -334,9 +336,12 @@ function AttributeDrawer({
             {...register('name')}
           />
 
-          <TextField
+          <Field
             label={t('pim.field.code')}
             fullWidth
+            rule="lowerCode"
+            maxLength={41}
+            help={t('help.catalog.attributeCode')}
             disabled={!canWrite}
             error={Boolean(errors.code)}
             helperText={fieldError('code')}
@@ -360,9 +365,12 @@ function AttributeDrawer({
             ))}
           </SelectField>
 
-          <TextField
+          <Field
             label={t('pim.field.unit')}
             fullWidth
+            rule="text"
+            maxLength={16}
+            help={t('help.catalog.attributeUnit')}
             disabled={!canWrite}
             error={Boolean(errors.unit)}
             helperText={fieldError('unit') ?? t('common.optional')}
@@ -509,16 +517,21 @@ function AttributeValuesPanel({
       {canWrite && (
         <Box component="form" onSubmit={handleSubmit(submit)} noValidate aria-label={t('pim.values.new')}>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-            <TextField
+            <Field
               size="small"
+              rule="text"
+              maxLength={120}
               label={t('pim.field.label')}
               fullWidth
               error={Boolean(errors.label)}
               helperText={errors.label ? t(errors.label.message as MessageKey) : undefined}
               {...register('label')}
             />
-            <TextField
+            <Field
               size="small"
+              rule="lowerCode"
+              maxLength={41}
+              help={t('help.catalog.entryCode')}
               label={t('pim.field.code')}
               fullWidth
               error={Boolean(errors.code)}

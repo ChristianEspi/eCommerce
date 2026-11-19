@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Alert, Box, Button, MenuItem, Stack, TextField } from '@mui/material'
+import { Alert, Box, Button, MenuItem, Stack } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -16,6 +16,7 @@ import {
   type PodFormValues,
 } from './routing-types'
 import { SelectField } from '@/shared/ui/SelectField'
+import { Field } from '@/shared/ui/Field'
 
 /**
  * Firmar una entrega.
@@ -142,19 +143,30 @@ export function PodDrawer({
           />
 
           <FieldRow>
-            <TextField
+            <Field
               fullWidth
+              rule="personName"
+              maxLength={160}
               label={t('fulfillment.field.receivedBy')}
               disabled={!canWrite}
-              helperText={t('fulfillment.field.receivedByHint')}
+              error={Boolean(errors.received_by)}
+              helperText={
+                errors.received_by
+                  ? t(errors.received_by.message as MessageKey)
+                  : t('fulfillment.field.receivedByHint')
+              }
               slotProps={{ inputLabel: { shrink: true } }}
               {...register('received_by')}
             />
             {/* Un DNI son ocho digitos: no necesita mas, y asi el nombre de
                 quien firma se queda con el ancho que si le hace falta. */}
-            <TextField
+            <Field
+              rule="document"
+              help={t('help.fulfillment.documentId')}
               label={t('fulfillment.field.documentId')}
               disabled={!canWrite}
+              error={Boolean(errors.document_id)}
+              helperText={errors.document_id ? t(errors.document_id.message as MessageKey) : undefined}
               slotProps={{ inputLabel: { shrink: true } }}
               sx={{ width: { xs: '100%', sm: 160 }, flexShrink: 0 }}
               {...register('document_id')}
@@ -164,11 +176,13 @@ export function PodDrawer({
           {/* El motivo solo cuando NO se entregó: en una entrega correcta
               sería una casilla que invita a rellenar ruido. */}
           {outcome !== 'delivered' && (
-            <TextField
+            <Field
               fullWidth
               multiline
               minRows={2}
               required
+              rule="longText"
+              maxLength={400}
               label={t('fulfillment.field.reason')}
               disabled={!canWrite}
               error={Boolean(errors.reason)}
