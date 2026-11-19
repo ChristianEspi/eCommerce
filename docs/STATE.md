@@ -13,8 +13,16 @@ el recorrido SaaS P00–P17 queda cerrado)
 
 ## IA diferenciadora — 8 frentes (2026-11-19, a pedido del operador: «haz todo»)
 
-Commits locales en `dev` (`111d0e1`…`fdf9286`). **No desplegado**: 4 migraciones, 2 Edge Functions
-modificadas y 1 nueva pendientes de la promoción a QAS.
+Commits locales en `dev` (`111d0e1`…`ae9ec8a`).
+
+**Base y funciones en QAS (2026-11-19, a pedido del operador):** las 4 migraciones
+`20261119120000`…`20261119180000` aplicadas con `scripts/aplicar-migracion.mjs` (API de gestión,
+como las anteriores: NO quedan en `supabase_migrations`, igual que las 34 previas sin registrar y
+la versión duplicada `20261118120000`; `db push` no sirve hasta reconciliar el historial).
+Verificado: `intake` en el registro, 3 tablas con RLS forzada + policy + guardián, 8 funciones,
+cron `ecommerce-ai-digest` (`5 * * * *`). Funciones `order-intake` (nueva), `shopping-assistant` y
+`catalog-copy` desplegadas (`--use-api`); humo: sin credenciales 401, búsqueda por intención responde
+`match: intent` con IA real. **Frontend NO promovido** (Amplify sigue en `qas` `6907701`).
 
 | Frente | Qué | Dónde |
 |---|---|---|
