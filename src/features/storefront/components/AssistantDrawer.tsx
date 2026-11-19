@@ -163,7 +163,13 @@ export function AssistantDrawer({
                   en uno útil, porque lo primero que aprende quien pregunta es
                   que la tienda no tiene eso. Sin el marco, un catálogo sin
                   pañales contesta con óvulos vaginales y parece roto. */}
-              {asistente.data.match === 'fuzzy' ? (
+              {/* Búsqueda por intención: se dice POR QUÉ salen estos productos,
+                  que no llevan las palabras de la pregunta. */}
+              {asistente.data.match === 'intent' && asistente.data.intent_terms.length > 0 ? (
+                <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>
+                  {t('store.assistant.intent').replace('{terms}', asistente.data.intent_terms.join(', '))}
+                </Typography>
+              ) : asistente.data.match === 'fuzzy' ? (
                 <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>
                   {t('store.assistant.fuzzy').replace('{term}', asistente.data.query)}
                 </Typography>

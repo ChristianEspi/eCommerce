@@ -3731,6 +3731,7 @@ export const es = {
     'store.assistant.searchMode': 'Resultados del buscador del catálogo.',
     'store.assistant.fuzzy':
       'No encontré «{term}» en esta tienda. Esto es lo más parecido que hay:',
+    'store.assistant.intent': 'No encontramos esas palabras, así que buscamos por lo que necesitas: {terms}.',
     'store.assistant.example.1': 'Protector solar por menos de S/ 100',
     'store.assistant.example.2': 'Crema para la piel',
     'store.assistant.example.3': 'Vitaminas con stock',

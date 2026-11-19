@@ -65,6 +65,14 @@ import { hayProveedorIA, pedirJson } from '../_runtime/anthropic.ts'
 import { medidorDeTienda } from '../_runtime/aiMeter.ts'
 import { delimitarDatos, sistemaConFrontera } from '../_shared/aiCore.ts'
 import { ejecutarIA } from '../_shared/aiPipeline.ts'
+import {
+  ESQUEMA_INTENCION,
+  SISTEMA_INTENCION,
+  fusionarResultados,
+  hayQueReescribir,
+  revisarIntencion,
+  type RespuestaModeloIntencion,
+} from '../_shared/aiIntent.ts'
 
 const FEATURE = 'assistant'
 
@@ -213,6 +221,41 @@ async function recomendar(
   return { reply: resultado.data.reply, ids: resultado.data.ids, status: 'ai' }
 }
 
+/**
+ * La necesidad, en términos de catálogo (2026-11-19). Mismas reglas que
+ * `recomendar`: cuota de la tienda ANTES de llamar, consulta saneada, y ante
+ * cualquier duda lista vacía —el asistente sigue con lo que tenía—. El modelo
+ * no ve el catálogo aquí: solo propone qué buscar.
+ */
+async function reescribir(storeSlug: string, mensaje: string, query: string, trace: Trace): Promise<string[]> {
+  const medidor = medidorDeTienda(serviceClient(trace), storeSlug)
+  const resultado = await ejecutarIA<RespuestaModeloIntencion, string[]>(
+    {
+      feature: FEATURE,
+      prompt: `intención · ${mensaje}`,
+      revisar: (data) => {
+        const revision = revisarIntencion(data, query)
+        if (!revision.ok) return { ok: false, motivo: revision.motivo }
+        return { ok: true, value: revision.value, reply: revision.value.join(', ') }
+      },
+    },
+    {
+      hayProveedor: hayProveedorIA,
+      consumir: medidor.consumir,
+      registrar: medidor.registrar,
+      llamar: () =>
+        pedirJson<RespuestaModeloIntencion>({
+          feature: FEATURE,
+          system: sistemaConFrontera(SISTEMA_INTENCION),
+          user: delimitarDatos('consulta_comprador', sanitizeTextForModel(mensaje, MAX_MENSAJE) ?? ''),
+          schema: ESQUEMA_INTENCION,
+          timeoutMs: TIMEOUT_MS,
+        }),
+    },
+  )
+  return resultado.data ?? []
+}
+
 const handler = serveJson(
   {
     allowedOrigins: parseAllowedOrigins(Deno.env.get('EBIM_STOREFRONT_ORIGINS')),
@@ -287,6 +330,37 @@ const handler = serveJson(
       const principal = palabras.sort((a, b) => b.length - a.length)[0]
       if (principal && principal !== query) items = await buscar(principal)
     }
+
+    /**
+     * 2026-11-19 · Búsqueda por intención.
+     *
+     * Si con las palabras no hubo coincidencia real, el modelo traduce la
+     * NECESIDAD a términos de catálogo y el mismo buscador los resuelve. Solo
+     * se aceptan coincidencias de texto (`fts`): un parecido por letras de un
+     * término reescrito es dos saltos de distancia de lo que se pidió.
+     */
+    let terminosIntencion: string[] = []
+    if (hayQueReescribir(match, items.length)) {
+      terminosIntencion = await reescribir(storeSlug, mensaje, query, trace)
+      if (terminosIntencion.length > 0) {
+        const listas: Candidato[][] = []
+        for (const termino of terminosIntencion) {
+          const encontrados = await buscar(termino)
+          if (match === 'fts') listas.push(encontrados)
+        }
+        const fusion = fusionarResultados(listas, CANDIDATOS)
+        if (fusion.length > 0) {
+          items = fusion
+          match = 'intent'
+        } else {
+          terminosIntencion = []
+          // `buscar` dejó el modo del último término; el resultado que se
+          // devuelve es el de antes, así que su modo también.
+          match = items.length > 0 ? 'fuzzy' : 'empty'
+        }
+      }
+    }
+
     const candidatos = items.map((item) => ({
       product_id: item.product_id,
       name: item.name,
@@ -306,8 +380,12 @@ const handler = serveJson(
           // `search` no es un error: es el modo en el que esto funciona sin
           // proveedor de IA, y la vitrina lo pinta igual de bien.
           mode: sugerido ? 'ai' : 'search',
-          /** Cómo se encontró: `fts` es coincidencia real, `fuzzy` es parecido. */
+          /**
+           * Cómo se encontró: `fts` es coincidencia real, `fuzzy` es parecido e
+           * `intent` es que se buscó por los términos de `intent_terms`.
+           */
           match,
+          intent_terms: terminosIntencion,
           /** Lo que de verdad se buscó, ya limpio. La pantalla lo cita. */
           query,
           reply: sugerido?.reply ?? null,

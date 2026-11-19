@@ -52,6 +52,12 @@ export const assistantAnswerSchema = z.object({
   match: z.string().default('fts'),
   /** Lo que de verdad se buscó, ya limpio de muletillas. La pantalla lo cita. */
   query: z.string().default(''),
+  /**
+   * 2026-11-19 · Con `match: 'intent'`, los términos de catálogo en los que la
+   * IA tradujo la necesidad. La pantalla los cita: explican por qué salen
+   * productos que no llevan las palabras de la pregunta.
+   */
+  intent_terms: z.array(z.string().max(60)).max(4).default([]),
   reply: z.string().nullable().default(null),
   product_ids: z.array(z.string().uuid()).default([]),
 })

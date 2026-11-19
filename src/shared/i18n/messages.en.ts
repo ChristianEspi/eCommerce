@@ -4837,6 +4837,7 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.assistant.searchMode': 'Catalogue search results.',
     'store.assistant.fuzzy':
       'I could not find “{term}” in this shop. This is the closest match:',
+    'store.assistant.intent': 'We could not find those words, so we searched for what you need: {terms}.',
     'store.assistant.example.1': 'Sunscreen under S/ 100',
     'store.assistant.example.2': 'Skin cream',
     'store.assistant.example.3': 'Vitamins in stock',
