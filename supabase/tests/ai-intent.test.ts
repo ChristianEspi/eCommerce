@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { validarEsquema } from '../functions/_shared/aiCore.ts'
+import { respuestaVitrinaSinSalud } from '../functions/_shared/ai.ts'
 import {
   ESQUEMA_INTENCION,
   fusionarResultados,
@@ -54,6 +55,39 @@ describe('fusión de resultados', () => {
     const b = [{ product_id: '2' }, { product_id: '4' }]
     expect(fusionarResultados([a, b], 8).map((x) => x.product_id)).toEqual(['1', '2', '4', '3'])
     expect(fusionarResultados([a, b], 2).map((x) => x.product_id)).toEqual(['1', '2'])
+  })
+})
+
+describe('candado sanitario de la respuesta pública', () => {
+  it('bloquea la respuesta real vista en QAS (efecto, niño y comparar precio)', () => {
+    expect(
+      respuestaVitrinaSinSalud(
+        'Tenemos varias opciones para la tos de tu hijo. Te recomiendo el Codipront Expectorante que ayuda a expulsar flemas, o el Sulfaquilab Balsámico si buscas algo más económico.',
+      ),
+    ).toBe(false)
+  })
+
+  it.each([
+    'Este jarabe sirve para la gripe.',
+    'Alivia el dolor de cabeza en minutos.',
+    'Toma 5 ml cada 8 horas.',
+    'Está indicado para adultos.',
+    'Es el más barato de la lista.',
+  ])('bloquea: %s', (frase) => {
+    expect(respuestaVitrinaSinSalud(frase)).toBe(false)
+  })
+
+  it.each([
+    'Encontré estos jarabes y expectorantes de la tienda; confírmalo con el farmacéutico.',
+    'Tenemos protector solar en crema y en spray de dos marcas.',
+    'Hay tres presentaciones del Donecil: 5 mg y 10 mg en caja de 30.',
+  ])('deja pasar: %s', (frase) => {
+    expect(respuestaVitrinaSinSalud(frase)).toBe(true)
+  })
+
+  it('el asistente lo aplica a su respuesta', () => {
+    const src = readFileSync(join(process.cwd(), 'supabase', 'functions', 'shopping-assistant', 'index.ts'), 'utf8')
+    expect(src).toMatch(/respuestaVitrinaSinSalud\(reply\)/)
   })
 })
 

@@ -55,6 +55,7 @@ import {
   listarCandidatos,
   recortarRespuesta,
   respuestaVitrinaSegura,
+  respuestaVitrinaSinSalud,
   type AiStatus,
   type CandidatoIA,
 } from '../_shared/ai.ts'
@@ -192,6 +193,9 @@ async function recomendar(
         // cifra que no sale de los candidatos ⇒ se descarta y se degrada al
         // buscador (la cuota ya se gastó; la traza lo dice como `bloqueada`).
         if (!respuestaVitrinaSegura(reply, candidatos)) return { ok: false, motivo: 'bloqueada' }
+        // 2026-11-19 · Candado sanitario: «para qué sirve», efectos, dosis o
+        // comparar precios ⇒ fuera la frase; los productos se enseñan igual.
+        if (!respuestaVitrinaSinSalud(reply)) return { ok: false, motivo: 'bloqueada' }
         return { ok: true, value: { reply, ids }, reply }
       },
     },
