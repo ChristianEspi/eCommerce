@@ -257,6 +257,62 @@ describe('el precio del acuerdo en la ficha', () => {
     expect(screen.queryByText('Precio acordado con tu empresa')).not.toBeInTheDocument()
     expect(screen.queryByText('S/ 92.00')).not.toBeInTheDocument()
   })
+  /**
+   * Visto en QAS (2026-11-18): un producto con sabores enseñaba «Desde S/ 9.07»
+   * en la ficha y S/ 8.16 · −10 % en el carrito. Con variantes la ficha no
+   * preguntaba el convenio nunca. Ahora cotiza la ELEGIDA y tacha SU precio.
+   */
+  it('con variantes, cotiza la elegida y enseña su precio acordado con el −%', async () => {
+    const P_SUERO = 'cccc2222-1111-4111-8111-111111111111'
+    const V_UVA = 'eeee1111-1111-4111-8111-111111111111'
+    const sesion = makeSession()
+    const llamadas: Array<Record<string, unknown>> = []
+    holder.client = null
+    render(
+      createFakeSupabase({
+        session: sesion,
+        tables: {
+          public_stores: [store()],
+          public_categories: [],
+          public_products: [
+            {
+              ...producto(),
+              product_id: P_SUERO,
+              slug: 'suero',
+              name: 'Suero oral',
+              kind: 'variant',
+              variant_count: 2,
+              price_from: '100.00',
+            },
+          ],
+          public_product_images: [],
+          public_product_variants: [
+            { variant_id: V_UVA, product_id: P_SUERO, store_id: STORE, name: 'Uva', position: 0,
+              is_default: true, in_stock: true, price: '100.00', compare_at_price: null, currency: 'PEN' },
+            { variant_id: 'eeee2222-1111-4111-8111-111111111111', product_id: P_SUERO, store_id: STORE,
+              name: 'Fresa', position: 1, is_default: false, in_stock: true, price: '100.00',
+              compare_at_price: null, currency: 'PEN' },
+          ],
+        },
+        rpc: {
+          [PROMOTION_QUOTE_PUBLIC_RPC]: (args: Record<string, unknown>) => {
+            llamadas.push(args)
+            const base = cotizacion(1)
+            return { ...base, lines: base.lines.map((l) => ({ ...l, product_id: P_SUERO, variant_id: V_UVA })) }
+          },
+        },
+      }),
+      '/s/casa-nordica/product/suero',
+      sesion,
+    )
+
+    expect(await screen.findByText('Precio especial −8 %')).toBeInTheDocument()
+    expect(screen.getAllByText('S/ 92.00').length).toBeGreaterThan(0)
+    expect(screen.getByText('S/ 100.00', { selector: 's' })).toBeInTheDocument()
+    // Elegida la variante, ya no es un «desde».
+    expect(screen.queryByText('Desde')).not.toBeInTheDocument()
+    expect(JSON.stringify(llamadas)).toContain(V_UVA)
+  })
 })
 
 /**

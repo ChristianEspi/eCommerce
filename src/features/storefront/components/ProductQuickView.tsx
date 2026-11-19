@@ -98,9 +98,13 @@ export function ProductQuickView({
    * rápida del MISMO producto salía S/ 61.42, el público: dos precios para una
    * misma cosa, que es exactamente lo que hace desconfiar de la tienda. Misma
    * regla que la tarjeta y la ficha (cotización del servidor, cantidad 1, solo
-   * si viene de una lista y mejora el público); con variantes no se pregunta.
+   * si viene de una lista y mejora el público); con variantes, sobre la elegida.
    */
-  const conAcuerdo = useAgreementPrice(storeSlug, item && !hasVariants ? item : null)
+  const conAcuerdo = useAgreementPrice(
+    storeSlug,
+    item && (!hasVariants || selected) ? item : null,
+    hasVariants ? selected : null,
+  )
   // Con acuerdo, el tachado es el precio público: el −% de la oferta abierta a
   // todos no es el ahorro de este comprador.
   const shown = item && hasVariants && selected ? { ...item, price: selected.price, compare_at_price: selected.compare_at_price } : item
@@ -282,12 +286,20 @@ export function ProductQuickView({
 
                   <Stack sx={{ gap: 0, mt: 0.5 }}>
                     {conAcuerdo ? (
-                      <Typography
-                        component="s"
-                        sx={{ fontSize: TS.body, color: 'var(--muted)', fontWeight: 600 }}
-                      >
-                        {formatMoney(Number(item.price), item.currency, locale)}
-                      </Typography>
+                      <Stack direction="row" sx={{ gap: 0.75, alignItems: 'baseline' }}>
+                        <Typography
+                          component="s"
+                          sx={{ fontSize: TS.body, color: 'var(--muted)', fontWeight: 600 }}
+                        >
+                          {formatMoney(conAcuerdo.reference, item.currency, locale)}
+                        </Typography>
+                        <Typography
+                          component="span"
+                          sx={{ fontSize: TS.label, color: 'var(--accent-deep)', fontWeight: 800 }}
+                        >
+                          {`−${conAcuerdo.percent} %`}
+                        </Typography>
+                      </Stack>
                     ) : (
                       discount !== null &&
                       shown?.compare_at_price && (
