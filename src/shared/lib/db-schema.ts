@@ -561,6 +561,10 @@ export const AI_ACTION_DECIDE_RPC = 'ai_action_decide'
 export const SALES_DUE_CUSTOMERS_RPC = 'sales_due_customers'
 export const AI_DIGEST_SETTINGS_TABLE = 'ai_digest_settings'
 export const AI_DIGEST_CONFIGURE_RPC = 'ai_digest_configure'
+/** 2026-11-19 · Medir resultados (migración 20261119180000). Sin `satisfies` hasta regenerar tipos. */
+export const AI_ATTRIBUTION_MARK_RPC = 'ai_attribution_mark'
+export const AI_VALUE_SUMMARY_RPC = 'ai_value_summary'
+export const PROMOTION_IMPACT_RPC = 'promotion_impact'
 export const SELECT_STORE_BUSINESS_ACCOUNT_RPC = 'select_store_business_account' satisfies FunctionName
 
 // --- Cierre A3 · cotizaciones del comprador (migración 20260914101000) -------

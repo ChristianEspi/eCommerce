@@ -232,7 +232,7 @@ export const routes: RouteObject[] = [
           // todo, cada comando de la base.
           { path: 'stores', element: <StoresPage /> },
           // Sin módulo propio: quien la ve lo decide la RLS por rol y tipo de acción.
-          { path: 'ai-actions', element: <AiActionsPage /> },
+          { path: 'ai-actions', element: gated('ai.insights', <AiActionsPage />) },
           // Llevar existencia por almacen es el modulo vendible; la existencia
           // del catalogo (`products.stock`) sigue viniendo con el producto, y
           // por eso un tenant sin este addon vende igual que antes de P06.

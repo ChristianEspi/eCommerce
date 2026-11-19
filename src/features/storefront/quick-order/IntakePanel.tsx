@@ -25,6 +25,7 @@ import type { MessageKey } from '@/shared/i18n/messages'
 import { Field } from '@/shared/ui/Field'
 import { SelectField } from '@/shared/ui/SelectField'
 import { TS } from '@/theme/tokens'
+import { markAiAttribution } from '../aiAttribution'
 import {
   INTAKE_ACCEPT,
   INTAKE_MAX_TEXT,
@@ -128,6 +129,18 @@ export function IntakePanel({
     )
 
   const canRead = !read.isPending && (Boolean(file) || text.trim().length >= 3)
+
+  /** Pasa lo marcado al pedido y anota sus productos para medir el valor de la IA. */
+  function acceptAll() {
+    const productIds = choices.flatMap((choice, index) => {
+      const line = lines[index]
+      if (!choice.checked || !choice.sku || !line) return []
+      const match = [line.coincidencia, ...line.alternativas].find((p) => p?.sku === choice.sku)
+      return match ? [match.product_id] : []
+    })
+    markAiAttribution(storeSlug, productIds, 'intake')
+    onAccept(ready.map(({ sku, quantity }) => ({ sku, quantity })))
+  }
 
   return (
     <Stack spacing={2}>
@@ -295,7 +308,7 @@ export function IntakePanel({
 
             <Button
               variant="contained"
-              onClick={() => onAccept(ready.map(({ sku, quantity }) => ({ sku, quantity })))}
+              onClick={acceptAll}
               disabled={ready.length === 0}
               sx={{ alignSelf: { xs: 'stretch', sm: 'flex-end' } }}
             >

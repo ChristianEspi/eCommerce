@@ -14,6 +14,8 @@ import {
 import { useState } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { TS } from '@/theme/tokens'
+import { useSessionContext } from '@/features/auth/session-context'
+import { markAiAttribution } from '../aiAttribution'
 import { useAssistant } from '../assistant'
 import { useSignedThumbnails } from '../hooks'
 import { ProductCard } from './ProductCard'
@@ -68,6 +70,7 @@ export function AssistantDrawer({
   const { t } = useI18n()
   const [texto, setTexto] = useState('')
   const asistente = useAssistant()
+  const { status } = useSessionContext()
 
   const productos = asistente.data?.products ?? []
   const miniaturas = useSignedThumbnails(productos.map((producto) => producto.primary_image_path))
@@ -76,7 +79,18 @@ export function AssistantDrawer({
     const limpio = mensaje.trim()
     if (limpio.length < 2 || asistente.isPending) return
     setTexto(limpio)
-    asistente.mutate({ storeSlug, storeId, message: limpio })
+    asistente.mutate(
+      { storeSlug, storeId, message: limpio },
+      {
+        // 2026-11-19 · Solo lo que la IA ELIGIÓ (modo `ai`) y con sesión: es lo
+        // que luego se mide como «lo que la IA propuso y se compró».
+        onSuccess: (respuesta) => {
+          if (respuesta.mode === 'ai' && status === 'authenticated') {
+            markAiAttribution(storeSlug, respuesta.product_ids, 'assistant')
+          }
+        },
+      },
+    )
   }
 
   return (

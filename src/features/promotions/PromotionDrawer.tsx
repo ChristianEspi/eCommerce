@@ -39,6 +39,7 @@ import {
 import { PromotionAudiencePanel } from './PromotionAudiencePanel'
 import type { PromotionScopeIds } from './api'
 import { PromotionAiAssistant } from './ai/PromotionAiAssistant'
+import { PromotionImpact } from './PromotionImpact'
 import {
   PROMOTION_KINDS,
   PROMOTION_STATUSES,
@@ -440,6 +441,8 @@ export function PromotionDrawer({
         {/* Fase 09: redactar con IA sobre la promoción GUARDADA (las reglas
             salen de la base). Aplicar escribe en el formulario; se guarda con
             «Guardar». Sin promoción guardada no hay reglas que citar. */}
+        {/* 2026-11-19 · ¿Funcionó? Solo para una campaña guardada. */}
+        {promotion && <PromotionImpact promotionId={promotion.id} currency={currency} />}
         {promotion && (
           <PromotionAiAssistant
             key={promotion.id}

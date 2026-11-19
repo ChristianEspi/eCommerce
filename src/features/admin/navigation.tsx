@@ -262,6 +262,8 @@ export const NAV_ITEMS: NavItem[] = [
     to: '/app/ai-actions',
     label: 'nav.aiActions',
     icon: <AutoAwesomeRoundedIcon fontSize="small" />,
+    // Sin IA contratada no hay quien proponga: la entrada no se enseña.
+    capability: 'ai.insights',
     permission: 'catalog.write',
     group: 'system',
   },

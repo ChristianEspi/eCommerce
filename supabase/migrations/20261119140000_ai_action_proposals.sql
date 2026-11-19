@@ -211,7 +211,10 @@ begin
     if v_ids is null or cardinality(v_ids) not between 1 and 50 then
       raise exception 'PRODUCTOS_INVALIDOS: entre 1 y 50 productos' using errcode = '22023';
     end if;
-    if (select count(*) from public.products p where p.id = any (v_ids) and p.store_id = p_store_id)
+    -- Publicados en ESTA tienda (`store_products`, maestro desde 20260917):
+    -- es la misma llave que exige `promotion_scopes_product_fk`.
+    if (select count(*) from public.store_products sp
+         where sp.product_id = any (v_ids) and sp.store_id = p_store_id)
        <> cardinality(v_ids) then
       raise exception 'PRODUCTO_AJENO: algun producto no es de esta tienda' using errcode = '22023';
     end if;
