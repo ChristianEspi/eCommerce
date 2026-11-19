@@ -82,15 +82,26 @@ function securityHeadersPlugin(env: Record<string, string>): Plugin {
    * tienda con llave). `VITE_PAYMENTS_DISABLE_CULQI=true` los cierra para un
    * despliegue que no la ofrezca: vuelve a `script-src 'self'` y `frame-src 'none'`.
    *
-   * Son tres cosas y cada una tiene su motivo: `checkout.culqi.com` sirve el
-   * script y el iframe donde se teclea la tarjeta —ese aislamiento es lo que
-   * mantiene el numero fuera de esta aplicacion— y `api.culqi.com` es a donde
-   * el propio script envia los datos para devolver el token.
+   * Cada uno tiene su motivo: `checkout.culqi.com` sirve el script (`/js/v4`);
+   * `checkoutview.culqi.com` es el IFRAME donde se teclea la tarjeta —ese
+   * aislamiento es lo que mantiene el numero fuera de esta aplicacion—;
+   * `secure.culqi.com` y `api.culqi.com` reciben los datos y devuelven el
+   * token, y `3ds.culqi.com` es la verificacion 3-D Secure del banco.
+   *
+   * 2026-11-19 · Sin `checkoutview` en `frame-src` la ventana de Culqi salia
+   * como «Este contenido esta bloqueado» al pagar con tarjeta en QAS: el
+   * script v4 abre su iframe en ese origen (`_culqiCheckoutUrl`).
    */
   const paymentGatewayOrigins =
     env.VITE_PAYMENTS_DISABLE_CULQI === 'true'
       ? []
-      : ['https://secure.culqi.com', 'https://checkout.culqi.com', 'https://api.culqi.com', 'https://3ds.culqi.com']
+      : [
+          'https://secure.culqi.com',
+          'https://checkout.culqi.com',
+          'https://checkoutview.culqi.com',
+          'https://api.culqi.com',
+          'https://3ds.culqi.com',
+        ]
   const inlineScriptHashes: string[] = []
   let outDir = 'dist'
 
