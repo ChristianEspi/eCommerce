@@ -4764,6 +4764,7 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.pickup.near.city': 'In your city',
     'store.pickup.near.region': 'In your region',
     'store.pickup.stock.available': 'Ready for pickup',
+    'store.pickup.stock.unknown': 'Prepared from our central warehouse',
     'store.pickup.stock.unavailable': 'Out of stock: {items}',
     'store.pickup.phone': 'Phone',
     'store.pickup.addressPrefix': 'Store pickup',

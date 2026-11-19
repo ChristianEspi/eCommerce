@@ -3666,6 +3666,7 @@ export const es = {
     'store.pickup.near.city': 'En tu ciudad',
     'store.pickup.near.region': 'En tu departamento',
     'store.pickup.stock.available': 'Disponible para recoger',
+    'store.pickup.stock.unknown': 'Se prepara desde el almacén central',
     'store.pickup.stock.unavailable': 'Sin stock: {items}',
     'store.pickup.phone': 'Teléfono',
     'store.pickup.addressPrefix': 'Recojo en tienda',

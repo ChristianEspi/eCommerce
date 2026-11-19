@@ -189,6 +189,12 @@ export function PickupStorePicker({
                 {point.stock?.state === 'available' && (
                   <Box><StatusChip tone="success" label={t('store.pickup.stock.available')} /></Box>
                 )}
+                {/* 2026-11-19 · Sin almacén propio el stock no se puede mirar: se dice de
+                    dónde sale el pedido en vez de callar, que dejaba al comprador sin
+                    saber si lo encontraría listo. */}
+                {point.stock?.state === 'unknown' && (
+                  <Box><StatusChip tone="info" label={t('store.pickup.stock.unknown')} /></Box>
+                )}
                 {sinStock && (
                   <Box>
                     <StatusChip
