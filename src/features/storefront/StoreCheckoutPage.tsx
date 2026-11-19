@@ -52,6 +52,7 @@ import {
   clavePublicaCulqi,
   pagarConCulqiCheckout,
   pareceTarjeta,
+  puedeOfrecerYape,
   tokenizarTarjeta,
   type DatosTarjeta,
 } from './cardToken'
@@ -775,9 +776,13 @@ export function StoreCheckoutPage() {
 
   const pistasDePago = useMemo(() => {
     const pistas: Record<string, string> = {}
-    if (!credito) return pistas
     for (const metodo of paymentMethods) {
-      if (metodo.kind !== 'credit') continue
+      // 2026-11-19 · La ventana de Culqi también cobra Yape: que se sepa antes de abrirla.
+      if (metodo.kind === 'card' && metodo.accepts_yape && clavePublicaCulqi(metodo.checkout_public_key)) {
+        pistas[metodo.code] = t('store.payment.yapeHint')
+        continue
+      }
+      if (metodo.kind !== 'credit' || !credito) continue
       pistas[metodo.code] = t('store.payment.creditHint')
         .replace('{days}', String(credito.termsDays))
         .replace('{amount}', formatMoney(credito.available, credito.currency ?? currency, locale))
@@ -804,6 +809,11 @@ export function StoreCheckoutPage() {
               titulo: store.name,
               logoUrl: store.logo_url,
               colorAcento: store.accent_color,
+              aceptaYape: puedeOfrecerYape(
+                medioElegido?.accepts_yape,
+                currency,
+                Math.round((totalAPagar ?? Number(subtotal)) * 100),
+              ),
             })
           : await tokenizarTarjeta({ ...tarjeta, email: input.values.customerEmail }, null)
 
@@ -877,7 +887,9 @@ export function StoreCheckoutPage() {
       const errorTarjeta: MessageKey | null =
         error instanceof TokenizacionError
           ? error.message === 'TARJETA_RECHAZADA'
-            ? 'store.card.rejected'
+            ? llaveCulqi && medioElegido?.accepts_yape
+              ? 'store.card.rejectedYape'
+              : 'store.card.rejected'
             : error.message === 'CANCELADO'
               ? 'store.card.cancelled'
               : 'store.card.gatewayDown'
@@ -1380,6 +1392,7 @@ export function StoreCheckoutPage() {
                   onSelect={(code) => setValue('paymentMethodCode', code)}
                   error={null}
                   hints={pistasDePago}
+                  onRetry={() => void payment.refetch()}
                 />
 
                 {/* Los datos de la tarjeta solo cuando se ha elegido una: pedir

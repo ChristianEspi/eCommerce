@@ -62,7 +62,7 @@ function client(): SupabaseClient {
 // ---------------------------------------------------------------------------
 
 const METHOD_SELECT =
-  'id, store_id, code, kind, display_name, provider_code, capture_mode, is_active, position, instructions, checkout_public_key, has_secret, secret_hint, secret_set_at'
+  'id, store_id, code, kind, display_name, provider_code, capture_mode, is_active, position, instructions, checkout_public_key, accepts_yape, has_secret, secret_hint, secret_set_at'
 
 /** Pasarelas que piden llaves de la tienda en este formulario. */
 export const PROVIDERS_WITH_KEYS = new Set(['culqi'])
@@ -116,6 +116,8 @@ export async function savePaymentMethod(
     checkout_public_key: PROVIDERS_WITH_KEYS.has(values.providerCode)
       ? values.publicKey.trim() || null
       : null,
+    // Yape por Culqi solo en un medio de tarjeta cobrado por Culqi (CHECK en la base).
+    accepts_yape: values.providerCode === 'culqi' && values.kind === 'card' && values.acceptsYape,
   }
 
   let id = values.id ?? null

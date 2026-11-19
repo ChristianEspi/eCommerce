@@ -6993,6 +6993,7 @@ export type Database = {
       }
       payment_methods: {
         Row: {
+          accepts_yape: boolean
           capture_mode: Database["public"]["Enums"]["payment_capture_mode"]
           checkout_public_key: string | null
           code: string
@@ -7015,6 +7016,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          accepts_yape?: boolean
           capture_mode?: Database["public"]["Enums"]["payment_capture_mode"]
           checkout_public_key?: string | null
           code: string
@@ -7037,6 +7039,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          accepts_yape?: boolean
           capture_mode?: Database["public"]["Enums"]["payment_capture_mode"]
           checkout_public_key?: string | null
           code?: string
@@ -12827,6 +12830,7 @@ export type Database = {
       }
       public_payment_methods: {
         Row: {
+          accepts_yape: boolean | null
           checkout_public_key: string | null
           code: string | null
           display_name: string | null
@@ -12837,6 +12841,7 @@ export type Database = {
           store_id: string | null
         }
         Insert: {
+          accepts_yape?: boolean | null
           checkout_public_key?: string | null
           code?: string | null
           display_name?: string | null
@@ -12847,6 +12852,7 @@ export type Database = {
           store_id?: string | null
         }
         Update: {
+          accepts_yape?: boolean | null
           checkout_public_key?: string | null
           code?: string | null
           display_name?: string | null

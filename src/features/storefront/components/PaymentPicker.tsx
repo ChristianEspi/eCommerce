@@ -6,6 +6,7 @@ import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import {
   Alert,
   Box,
+  Button,
   FormControl,
   FormLabel,
   Radio,
@@ -64,6 +65,7 @@ export function PaymentPicker({
   onSelect,
   error,
   hints = {},
+  onRetry,
 }: {
   methods: readonly StorePaymentMethod[]
   loading: boolean
@@ -77,6 +79,8 @@ export function PaymentPicker({
    * crédito de su cuenta). Sin ella, la de su familia.
    */
   hints?: Readonly<Record<string, string>>
+  /** Volver a pedir los medios cuando la consulta falló. */
+  onRetry?: () => void
 }) {
   const { t } = useI18n()
   const selected = methods.find((method) => method.code === selectedCode) ?? null
@@ -89,7 +93,28 @@ export function PaymentPicker({
     )
   }
 
-  if (failed || methods.length === 0) {
+  // 2026-11-19 · Que no carguen los medios es un ERROR, no una decisión del
+  // comercio: decir «acuerda el pago por separado» mandaba al comprador a
+  // esperar un contacto que nadie iba a hacer.
+  if (failed) {
+    return (
+      <Alert
+        severity="error"
+        data-payment-load-error
+        action={
+          onRetry ? (
+            <Button color="inherit" size="small" onClick={onRetry}>
+              {t('common.retry')}
+            </Button>
+          ) : undefined
+        }
+      >
+        {t('store.payment.loadError')}
+      </Alert>
+    )
+  }
+
+  if (methods.length === 0) {
     return (
       <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>
         {t('store.payment.none')}

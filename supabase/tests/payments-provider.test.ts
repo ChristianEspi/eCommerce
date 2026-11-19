@@ -12,7 +12,8 @@
  * aislamiento entre tenants, que se comprueba contra Postgres en
  * `payments.test.ts` porque es ahi donde vive la garantia.
  */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { createCulqiProvider } from '../functions/_shared/payments/culqi.ts'
 import { createPaymentGateway } from '../functions/_shared/payments/gateway.ts'
 import {
   PaymentCapabilityError,
@@ -669,5 +670,41 @@ describe('la entrada de un aviso de pasarela', () => {
     expect(Object.keys(args)).not.toContain('p_organization_id')
     expect(Object.keys(args)).not.toContain('p_company_id')
     expect(args.p_intent_id).toBe(INTENT)
+  })
+})
+
+/**
+ * 2026-11-19 · Yape por Culqi. La ventana devuelve un token `ype_…` y Culqi lo
+ * cobra en el mismo `POST /v2/charges` que una tarjeta (`source_id`). El
+ * conector no distingue: lo que se prueba es que no lo hace.
+ */
+describe('Culqi cobra el token de Yape como el de una tarjeta', () => {
+  it('manda el ype_ como source_id, en céntimos y en soles, y queda capturado', async () => {
+    const fetchFalso = vi.fn(async () =>
+      new Response(JSON.stringify({ id: 'chr_test_yape1' }), { status: 201, headers: { 'content-type': 'application/json' } }),
+    )
+    vi.stubGlobal('fetch', fetchFalso)
+    try {
+      const culqi = createCulqiProvider({ secret: 'sk_test_x' })
+      const resultado = await culqi.authorize!({
+        intentId: 'intento-yape',
+        providerToken: 'ype_test_abc123',
+        amount: '150.50',
+        currency: 'PEN',
+        idempotencyKey: 'k-yape',
+        customerEmail: 'comprador@test.pe',
+      })
+      expect(resultado).toMatchObject({ status: 'captured', providerReference: 'chr_test_yape1' })
+      const [url, init] = fetchFalso.mock.calls[0] as unknown as [string, RequestInit]
+      expect(url).toBe('https://api.culqi.com/v2/charges')
+      expect(JSON.parse(String(init.body))).toMatchObject({
+        source_id: 'ype_test_abc123',
+        amount: 15050,
+        currency_code: 'PEN',
+        email: 'comprador@test.pe',
+      })
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })

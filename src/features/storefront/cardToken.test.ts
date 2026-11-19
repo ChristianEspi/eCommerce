@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { TokenizacionError, estiloCulqi, pagarConCulqiCheckout, textoSobre, tokenizarTarjeta } from './cardToken'
+import {
+  TokenizacionError,
+  estiloCulqi,
+  pagarConCulqiCheckout,
+  puedeOfrecerYape,
+  textoSobre,
+  tokenizarTarjeta,
+} from './cardToken'
 
 /**
  * La tarjeta se cambia por un token contra la API de Culqi (2026-11-15), con
@@ -105,6 +112,52 @@ describe('la ventana de Culqi con la marca de la tienda', () => {
       culqi.token = { id: 'tkn_test_1' }
       ventana.culqi?.()
       await expect(promesa).resolves.toBe('tkn_test_1')
+    } finally {
+      delete ventana.Culqi
+    }
+  })
+})
+
+/** 2026-11-19 · Yape por Culqi: solo si el comercio lo encendió, en soles y hasta S/ 2000. */
+describe('Yape en la ventana de Culqi', () => {
+  it('se ofrece solo con el interruptor, en soles y sin pasar el máximo de Culqi', () => {
+    expect(puedeOfrecerYape(true, 'PEN', 200_000)).toBe(true)
+    expect(puedeOfrecerYape(true, 'pen', 1_000)).toBe(true)
+    expect(puedeOfrecerYape(true, 'PEN', 200_001)).toBe(false)
+    expect(puedeOfrecerYape(true, 'USD', 1_000)).toBe(false)
+    expect(puedeOfrecerYape(false, 'PEN', 1_000)).toBe(false)
+    expect(puedeOfrecerYape(null, 'PEN', 1_000)).toBe(false)
+  })
+
+  it('con Yape abre la ventana con Yape y devuelve el token ype_ tal cual', async () => {
+    const options = vi.fn()
+    const culqi = { settings: vi.fn(), options, open: vi.fn(), close: vi.fn(), isOpen: true, token: null as { id: string } | null, error: null }
+    const ventana = window as unknown as { Culqi?: unknown; culqi?: () => void }
+    ventana.Culqi = culqi
+    try {
+      const promesa = pagarConCulqiCheckout({ llavePublica: 'pk_test_x', montoCentimos: 5000, moneda: 'PEN', titulo: 'MiQuímica', aceptaYape: true })
+      await vi.waitFor(() => expect(culqi.open).toHaveBeenCalled())
+      expect(options.mock.calls[0]?.[0]).toMatchObject({ paymentMethods: { tarjeta: true, yape: true, bancaMovil: false } })
+      culqi.token = { id: 'ype_test_abc123' }
+      ventana.culqi?.()
+      await expect(promesa).resolves.toBe('ype_test_abc123')
+    } finally {
+      delete ventana.Culqi
+    }
+  })
+
+  it('sin Yape la ventana sigue siendo solo de tarjeta', async () => {
+    const options = vi.fn()
+    const culqi = { settings: vi.fn(), options, open: vi.fn(), close: vi.fn(), isOpen: true, token: null as { id: string } | null, error: null }
+    const ventana = window as unknown as { Culqi?: unknown; culqi?: () => void }
+    ventana.Culqi = culqi
+    try {
+      const promesa = pagarConCulqiCheckout({ llavePublica: 'pk_test_x', montoCentimos: 5000, moneda: 'PEN', titulo: 'MiQuímica' })
+      await vi.waitFor(() => expect(culqi.open).toHaveBeenCalled())
+      expect(options.mock.calls[0]?.[0]).toMatchObject({ paymentMethods: { tarjeta: true, yape: false } })
+      culqi.token = { id: 'tkn_test_2' }
+      ventana.culqi?.()
+      await promesa
     } finally {
       delete ventana.Culqi
     }

@@ -68,6 +68,8 @@ export const paymentMethodSchema = z.object({
   instructions: z.string().nullable(),
   /** Llave PÚBLICA de la pasarela (Culqi `pk_…`). La secreta nunca se lee. */
   checkout_public_key: z.string().nullable().default(null),
+  /** 2026-11-19 · La ventana de Culqi ofrece también Yape. */
+  accepts_yape: z.boolean().default(false),
   /** Hay llave secreta en Vault. Solo se sabe que existe y su pista. */
   has_secret: z.boolean().default(false),
   secret_hint: z.string().nullable().default(null),
@@ -191,6 +193,8 @@ export interface PaymentMethodFormValues {
   instructions: string
   /** Llave pública de Culqi. Vacía = sin llave. */
   publicKey: string
+  /** Yape por Culqi: la ventana de Culqi ofrece también Yape. */
+  acceptsYape: boolean
   /**
    * Llave secreta NUEVA tecleada en este guardado. Vacía = no se toca la que
    * hubiera. Nunca se rellena desde la base: la secreta no se lee.

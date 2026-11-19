@@ -18,6 +18,7 @@ const holder = vi.hoisted(() => ({
 
 const SIN_LLAVES = {
   checkout_public_key: null,
+  accepts_yape: false,
   has_secret: false,
   secret_hint: null,
   secret_set_at: null,
@@ -62,6 +63,7 @@ const METODOS: PaymentMethod[] = [
     position: 5,
     instructions: null,
     checkout_public_key: 'pk_test_abcdefgh1234',
+    accepts_yape: false,
     has_secret: true,
     secret_hint: 'sk_test_…ab12',
     secret_set_at: '2026-11-13T10:00:00Z',
@@ -178,6 +180,28 @@ describe('llaves de Culqi en el medio de tarjeta', () => {
         secretKey: 'sk_test_nuevanueva5678',
         clearSecret: false,
       }),
+    )
+  })
+})
+
+/** 2026-11-19 · Yape por Culqi: interruptor del medio de tarjeta con Culqi. */
+describe('Yape por Culqi', () => {
+  it('un medio sin pasarela no ofrece el interruptor', async () => {
+    renderWithProviders(<MethodsSection />)
+    await userEvent.click(screen.getByRole('button', { name: 'Editar: Yape' }))
+    expect(screen.queryByLabelText('Aceptar también Yape en la ventana de Culqi')).not.toBeInTheDocument()
+  })
+
+  it('encenderlo en el medio Culqi viaja al guardar', async () => {
+    renderWithProviders(<MethodsSection />)
+    await userEvent.click(screen.getByRole('button', { name: 'Editar: Tarjeta' }))
+    const interruptor = screen.getByLabelText('Aceptar también Yape en la ventana de Culqi')
+    expect(interruptor).not.toBeChecked()
+    await userEvent.click(interruptor)
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+
+    expect(holder.save.mutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'm-tarjeta', providerCode: 'culqi', acceptsYape: true }),
     )
   })
 })

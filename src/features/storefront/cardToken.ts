@@ -159,8 +159,11 @@ export async function tokenizarTarjeta(
  *   TARJETA_RECHAZADA  Culqi no aceptó la tarjeta;
  *   CULQI_NO_CARGA / CULQI_SIN_API  la librería no está disponible.
  *
- * Se piden SOLO tarjetas: Yape, banca móvil o agentes dentro de Culqi crean
- * una «orden» que se paga después y necesita otro circuito en el servidor.
+ * Tarjeta siempre; Yape solo si el comercio lo encendió (2026-11-19) y la
+ * compra cabe en sus reglas (`puedeOfrecerYape`). Yape devuelve un token
+ * `ype_…` que el servidor cobra igual que el de una tarjeta. Banca móvil,
+ * agentes y billeteras crean una «orden» que se paga después y necesitan otro
+ * circuito en el servidor: siguen apagados.
  */
 export interface CulqiCheckoutInput {
   readonly llavePublica: string
@@ -175,6 +178,21 @@ export interface CulqiCheckoutInput {
    */
   readonly logoUrl?: string | null
   readonly colorAcento?: string | null
+  /** Ofrecer Yape en la ventana. Se decide con `puedeOfrecerYape`. */
+  readonly aceptaYape?: boolean
+}
+
+/** Culqi: «Los pagos con Yape tienen un monto máximo de S/ 2000» y solo en soles. */
+export const YAPE_MAXIMO_CENTIMOS = 200_000
+
+/**
+ * Si la ventana de Culqi puede ofrecer Yape para ESTA compra: el comercio lo
+ * encendió, la moneda es soles y el importe no pasa del máximo de Culqi.
+ * Fuera de eso se abre solo con tarjeta: ofrecer Yape y que Culqi lo rechace
+ * después de que el comprador escribió su código es peor que no ofrecerlo.
+ */
+export function puedeOfrecerYape(aceptaYape: boolean | null | undefined, moneda: string, montoCentimos: number): boolean {
+  return Boolean(aceptaYape) && moneda.trim().toUpperCase() === 'PEN' && montoCentimos > 0 && montoCentimos <= YAPE_MAXIMO_CENTIMOS
 }
 
 /** Negro o blanco, el que se lea mejor sobre el acento (contraste WCAG). */
@@ -258,7 +276,7 @@ export async function pagarConCulqiCheckout(input: CulqiCheckoutInput): Promise<
   culqi.options?.({
     lang: 'auto',
     installments: false,
-    paymentMethods: { tarjeta: true, yape: false, bancaMovil: false, agente: false, billetera: false, cuotealo: false },
+    paymentMethods: { tarjeta: true, yape: Boolean(input.aceptaYape), bancaMovil: false, agente: false, billetera: false, cuotealo: false },
     ...(Object.keys(estilo).length > 0 ? { style: estilo } : {}),
   })
 

@@ -1389,9 +1389,11 @@ describe('RLS: quien ve y quien escribe', () => {
     for (const fila of filas) {
       // `checkout_public_key` (2026-11-13): la llave PÚBLICA de la pasarela de
       // la tienda (Culqi pk_…), publicable por diseño. Nada del proveedor, la
-      // captura, la config ni la secreta.
+      // captura, la config ni la secreta. `accepts_yape` (2026-11-19): si la
+      // ventana de Culqi ofrece también Yape.
       expect(Object.keys(fila).sort()).toEqual(
         [
+          'accepts_yape',
           'checkout_public_key',
           'code',
           'display_name',
