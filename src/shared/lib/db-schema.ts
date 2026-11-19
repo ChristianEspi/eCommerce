@@ -550,6 +550,13 @@ export const MY_PURCHASED_PRODUCTS_RPC = 'my_purchased_products_for_slug' satisf
 export const MY_STORE_BUSINESS_ACCOUNTS_RPC = 'my_store_business_accounts' satisfies FunctionName
 /** 2026-11-16 · Qué productos NO puede comprar la cuenta B2B de la sesión por su surtido. */
 export const MY_ASSORTMENT_BLOCKED_RPC = 'my_assortment_blocked'
+/**
+ * 2026-11-19 · Acciones propuestas por la IA con aprobación (migración
+ * 20261119140000). Sin `satisfies` hasta regenerar los tipos al aplicarla.
+ */
+export const AI_ACTION_PROPOSALS_TABLE = 'ai_action_proposals'
+export const AI_ACTION_PROPOSE_RPC = 'ai_action_propose'
+export const AI_ACTION_DECIDE_RPC = 'ai_action_decide'
 export const SELECT_STORE_BUSINESS_ACCOUNT_RPC = 'select_store_business_account' satisfies FunctionName
 
 // --- Cierre A3 · cotizaciones del comprador (migración 20260914101000) -------

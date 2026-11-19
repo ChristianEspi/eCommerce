@@ -11,6 +11,9 @@ import { AiFeedbackButtons } from '@/features/ai/AiFeedbackButtons'
 import { ContentMotivoNotice } from '@/features/ai/content/contentParts'
 import { aiEntitlementKey, useAiFeature } from '@/features/ai/hooks'
 import { MarkerText, SeverityIcon } from '@/features/orders/ai/parts'
+import { proposeAction } from '@/features/ai/actions/api'
+import { AI_ACTIONS_QUERY_KEY } from '@/features/ai/actions/keys'
+import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import {
@@ -231,6 +234,55 @@ function SystemBlock({ system }: { system: ReviewsSystem }) {
   )
 }
 
+/**
+ * 2026-11-19 · Motivos que justifican RECHAZAR una reseña. Lo demás (queja del
+ * producto, de la entrega…) se responde, no se esconde.
+ */
+const MODERATION_REASONS: ReadonlySet<string> = new Set(['personal_data', 'offensive_language', 'possible_spam', 'off_topic'])
+
+/**
+ * Deja armado el rechazo para que alguien con rol de catálogo lo apruebe en
+ * «Acciones de la IA». La base comprueba que la reseña es de esta sociedad y
+ * sigue pendiente; aprobar usa la moderación de siempre.
+ */
+function ProposeRejectButton({
+  reviewId,
+  label,
+  reason,
+  interactionId,
+}: {
+  reviewId: string
+  label: string
+  reason: string
+  interactionId: string | null
+}) {
+  const { t } = useI18n()
+  const { can } = useTenant()
+  const queryClient = useQueryClient()
+  const propose = useMutation({
+    mutationFn: () =>
+      proposeAction({
+        kind: 'review.moderate',
+        storeId: null,
+        title: t('aiActions.review.title').replace('{label}', label).slice(0, 160),
+        rationale: reason,
+        sourceFeature: 'reviews',
+        interactionId,
+        payload: { review_id: reviewId, decision: 'reject', reason },
+      }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: AI_ACTIONS_QUERY_KEY }),
+  })
+  if (!can('catalog.write')) return null
+  if (propose.isSuccess) {
+    return <Chip size="small" color="success" variant="outlined" label={t('aiActions.review.proposed')} />
+  }
+  return (
+    <Button size="small" color="inherit" onClick={() => propose.mutate()} disabled={propose.isPending} sx={{ whiteSpace: 'nowrap' }}>
+      {propose.isError ? t('aiActions.review.retry') : t('aiActions.review.propose')}
+    </Button>
+  )
+}
+
 function InsightView({
   insight,
   onReply,
@@ -318,6 +370,14 @@ function InsightView({
                 >
                   {t('aiReviews.reply.open')}
                 </Button>
+                {MODERATION_REASONS.has(a.reason) && (
+                  <ProposeRejectButton
+                    reviewId={a.review_id}
+                    label={insight.entities[a.ref]?.label ?? a.ref}
+                    reason={t(`aiReviews.reason.${a.reason}` as MessageKey)}
+                    interactionId={interactionId}
+                  />
+                )}
               </Stack>
             ))}
           </Stack>

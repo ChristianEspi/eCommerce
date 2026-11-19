@@ -18,6 +18,7 @@ import { formatMetric } from '@/features/admin/dashboard/aiAnalyst'
 import { AiFeedbackButtons } from '@/features/ai/AiFeedbackButtons'
 import { useAiFeature } from '@/features/ai/hooks'
 import { MarkerText, MotivoNotice, SeverityIcon } from '@/features/orders/ai/parts'
+import { ProposePromotionDialog } from '@/features/ai/actions/ProposePromotionDialog'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
@@ -83,6 +84,42 @@ function SignalChips({ signals }: { signals: readonly InventoryAiSignal[] }) {
         <Chip key={s} size="small" variant="outlined" label={t(`aiInventory.signal.${s}` as MessageKey)} />
       ))}
     </Stack>
+  )
+}
+
+/**
+ * 2026-11-19 · De la señal a la acción: lo que tiene EXCESO o no rota se puede
+ * dejar armado como campaña de liquidación para que alguien la apruebe en
+ * «Acciones de la IA». Los productos los eligió el sistema, no el modelo; la
+ * base vuelve a comprobar que son de esta tienda y quién puede proponer.
+ */
+function LiquidationProposal({ storeId, items }: { storeId: string; items: InventorySystem['items'] }) {
+  const { t } = useI18n()
+  const { can } = useTenant()
+  const [open, setOpen] = useState(false)
+  const candidatos = [
+    ...new Map(
+      items
+        .filter((i) => i.signals.includes('excess') || i.signals.includes('stagnant'))
+        .map((i) => [i.product_id, { productId: i.product_id, name: i.name }]),
+    ).values(),
+  ]
+  if (candidatos.length === 0 || !can('store.manage')) return null
+  return (
+    <>
+      <Button size="small" variant="outlined" sx={{ alignSelf: 'flex-start', mt: 1.5 }} onClick={() => setOpen(true)}>
+        {t('aiActions.propose.fromInventory').replace('{count}', String(Math.min(candidatos.length, 50)))}
+      </Button>
+      {open && (
+        <ProposePromotionDialog
+          open
+          storeId={storeId}
+          candidates={candidatos}
+          rationale={t('aiActions.propose.inventoryRationale')}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
   )
 }
 
@@ -266,6 +303,9 @@ export function InventoryAiSection() {
               </Alert>
             )}
             {signals.isSuccess && signals.data && <SystemBlock system={signals.data} />}
+            {signals.isSuccess && signals.data && (
+              <LiquidationProposal storeId={storeId} items={signals.data.items} />
+            )}
             {signals.isSuccess && !signals.data && <Alert severity="warning">{t('aiInventory.system.error')}</Alert>}
           </Box>
         </CardContent>
