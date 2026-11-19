@@ -22,7 +22,7 @@
  * petición ni se arregla reintentando: se arregla reactivando la cuenta.
  */
 export type ErrorStatus =
-  | 400 | 401 | 402 | 403 | 404 | 405 | 409 | 422 | 423 | 429 | 500 | 502 | 503
+  | 400 | 401 | 402 | 403 | 404 | 405 | 409 | 413 | 422 | 423 | 429 | 500 | 502 | 503
 
 export class AppError extends Error {
   readonly code: string

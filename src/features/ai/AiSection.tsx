@@ -19,6 +19,7 @@ import { RowActions } from '@/shared/ui/RowActions'
 import { StatusChip } from '@/shared/ui/StatusChip'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
 import { AiMeter } from './AiMeter'
+import { AiValueCard } from './AiValueCard'
 import { useAiEntitlement, useAiFeedback, useAiInteractions } from './hooks'
 import type { AiInteraction, AiInteractionStatus } from './types'
 
@@ -46,6 +47,7 @@ export function AiSection() {
   return (
     <Stack spacing={2}>
       <AiMeter />
+      {contratada && <AiValueCard />}
 
       {/* Sin contratar no se enseña una tabla vacía: se enseña qué falta. El
           medidar ya lo dijo arriba, así que aquí no se repite. */}

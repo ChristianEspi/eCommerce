@@ -1,3 +1,4 @@
+import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded'
 import CreditCardRoundedIcon from '@mui/icons-material/CreditCardRounded'
 import SupportAgentRoundedIcon from '@mui/icons-material/SupportAgentRounded'
 import HourglassTopRoundedIcon from '@mui/icons-material/HourglassTopRounded'
@@ -49,6 +50,7 @@ import { useSessionContext } from '@/features/auth/session-context'
 import { MembersSection } from './settings/MembersSection'
 import { MailSettingsSection } from '@/features/notifications/MailSettingsSection'
 import { CartRecoverySection } from '@/features/notifications/CartRecoverySection'
+import { AiDigestSection } from '@/features/notifications/AiDigestSection'
 import RemoveShoppingCartRoundedIcon from '@mui/icons-material/RemoveShoppingCartRounded'
 import { StorefrontDesignSection } from './settings/StorefrontDesignSection'
 import { TaxesSection } from './settings/TaxesSection'
@@ -1017,6 +1019,20 @@ export function SettingsPage() {
                       padded
                     >
                       <CartRecoverySection storeId={storeId} />
+                    </SectionCard>
+                  </CardContent>
+                </Card>
+                {/* 2026-11-19 · Resumen diario: también es correo y sale por la
+                    misma cola. Cifras de la base, nunca de un modelo. */}
+                <Card sx={{ mt: 2.5 }}>
+                  <CardContent>
+                    <SectionCard
+                      icon={<AutoAwesomeRoundedIcon />}
+                      title={t('aiDigest.title')}
+                      subtitle={t('aiDigest.subtitle')}
+                      padded
+                    >
+                      <AiDigestSection storeId={storeId} />
                     </SectionCard>
                   </CardContent>
                 </Card>

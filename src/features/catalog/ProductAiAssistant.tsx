@@ -18,10 +18,14 @@ import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { Field } from '@/shared/ui/Field'
 import { useFeedback } from '@/shared/ui/feedback-context'
+import { fileToBase64 } from '@/shared/lib/fileToBase64'
 import {
+  FICHA_PROVEEDOR_ACCEPT,
   aEntradaDeAtributo,
   claveDeMotivoPim,
   pedirSugerenciasDeFicha,
+  pedirSugerenciasDesdeDocumento,
+  problemaDeFichaProveedor,
   type AsistenciaDeFicha,
   type ValorAtributoPropuesto,
 } from './api/copy'
@@ -98,6 +102,33 @@ export function ProductAiAssistant({
     setEdiciones({})
     try {
       setResultado(await pedirSugerenciasDeFicha({ productId, storeId, locale }))
+    } catch (error) {
+      setResultado(null)
+      setErrorRed(error instanceof CatalogError ? error.key : 'catalog.error.generic')
+    } finally {
+      setPidiendo(false)
+    }
+  }
+
+  /**
+   * 2026-11-19 · Desde la ficha del proveedor: el documento se transcribe y la
+   * transcripción es la fuente de las propuestas (mismos candados).
+   */
+  async function pedirDesdeDocumento(file: File) {
+    const problema = problemaDeFichaProveedor(file)
+    if (problema) {
+      setErrorRed(problema)
+      return
+    }
+    setPidiendo(true)
+    setErrorRed(null)
+    setDecisiones({})
+    setEdiciones({})
+    try {
+      const data = await fileToBase64(file)
+      setResultado(
+        await pedirSugerenciasDesdeDocumento({ productId, storeId, locale, file: { mediaType: file.type, data } }),
+      )
     } catch (error) {
       setResultado(null)
       setErrorRed(error instanceof CatalogError ? error.key : 'catalog.error.generic')
@@ -199,7 +230,41 @@ export function ProductAiAssistant({
           >
             {pidiendo ? t('aiPim.generating') : resultado ? t('aiPim.regenerate') : t('aiPim.generate')}
           </Button>
+          <Button
+            size="small"
+            variant="text"
+            component="label"
+            disabled={pidiendo || disabled || bloqueado}
+            sx={{ textTransform: 'none', fontWeight: 700 }}
+          >
+            {t('aiPim.document.button')}
+            <input
+              type="file"
+              hidden
+              accept={FICHA_PROVEEDOR_ACCEPT}
+              aria-label={t('aiPim.document.button')}
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                event.target.value = ''
+                if (file) void pedirDesdeDocumento(file)
+              }}
+            />
+          </Button>
         </Stack>
+
+        {resultado?.documento && (
+          <Box component="details" sx={{ fontSize: 12.5 }}>
+            <Box component="summary" sx={{ cursor: 'pointer', fontWeight: 700 }}>
+              {t('aiPim.document.read')}
+            </Box>
+            <Typography
+              component="pre"
+              sx={{ fontSize: 12.5, whiteSpace: 'pre-wrap', fontFamily: 'inherit', color: 'var(--muted)', m: 0, mt: 0.75 }}
+            >
+              {resultado.documento}
+            </Typography>
+          </Box>
+        )}
 
         <Typography sx={{ fontSize: 12.5, color: 'var(--muted)' }}>{t('aiPim.notice')}</Typography>
 

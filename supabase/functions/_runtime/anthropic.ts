@@ -30,6 +30,7 @@
  */
 import Anthropic from 'npm:@anthropic-ai/sdk@0.124.0'
 import { AI_DEFAULT_MODEL, AI_DEFAULT_TIMEOUT_MS, AI_USAGE_CERO, normalizarUso, type AiUsage } from '../_shared/ai.ts'
+import { bloquesDeContenido, type AdjuntoIA } from '../_shared/aiAttachments.ts'
 import {
   aceptaEsfuerzo,
   clasificarFallo,
@@ -68,6 +69,12 @@ export interface PeticionIA {
   timeoutMs?: number
   /** Reintentos del SDK (solo 408/409/429/5xx/conexión). Por defecto 1. */
   maxRetries?: number
+  /**
+   * Fotos o PDF que el modelo tiene que LEER (2026-11-19). Ya validados con
+   * `validarAdjunto` (tipo, firma de bytes, tamaño). Son datos, igual que lo
+   * delimitado en `user`: el sistema declara que su contenido no da órdenes.
+   */
+  adjuntos?: readonly AdjuntoIA[]
 }
 
 const leerEntorno = (clave: string) => Deno.env.get(clave)
@@ -123,7 +130,15 @@ export async function pedirJson<T>(peticion: PeticionIA): Promise<RespuestaIA<T>
       model,
       max_tokens: peticion.maxTokens ?? spec?.maxTokens ?? 512,
       system: peticion.system,
-      messages: [{ role: 'user', content: peticion.user }],
+      messages: [
+        {
+          role: 'user',
+          content:
+            peticion.adjuntos && peticion.adjuntos.length > 0
+              ? (bloquesDeContenido(peticion.adjuntos, peticion.user) as unknown as Anthropic.ContentBlockParam[])
+              : peticion.user,
+        },
+      ],
       // Esto es lo que sustituye al recorte entre llaves: la API devuelve algo
       // que YA cumple el esquema, o falla de forma visible. `effort: low` en la
       // familia 5 (Haiku 4.5 lo rechaza): tareas acotadas, coste contenido.

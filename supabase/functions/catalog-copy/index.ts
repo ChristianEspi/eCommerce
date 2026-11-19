@@ -41,7 +41,14 @@
  */
 import { assertNotSuiteOperator, requireTenantContext } from '../_shared/auth.ts'
 import { parseAllowedOrigins } from '../_shared/cors.ts'
-import { badRequest, fromDatabaseError, notFound } from '../_shared/errors.ts'
+import { AppError, badRequest, fromDatabaseError, notFound } from '../_shared/errors.ts'
+import { resumenAdjuntos, validarAdjunto } from '../_shared/aiAttachments.ts'
+import {
+  ESQUEMA_TRANSCRIPCION,
+  SISTEMA_TRANSCRIPCION,
+  revisarTranscripcion,
+  type RespuestaModeloTranscripcion,
+} from '../_shared/aiPimDocument.ts'
 import { serveJson } from '../_shared/http.ts'
 import { optionalUuid, rejectUnknownFields, requireEnum, requireUuid } from '../_shared/validation.ts'
 import { userClient } from '../_runtime/clients.ts'
@@ -75,8 +82,16 @@ import {
 } from '../_shared/aiCopy.ts'
 
 const FEATURE = 'catalog.copy'
-const ALLOWED_FIELDS = ['product_id', 'mode', 'tasks', 'store_id', 'locale'] as const
-const MODES = ['draft', 'assist'] as const
+const ALLOWED_FIELDS = ['product_id', 'mode', 'tasks', 'store_id', 'locale', 'file'] as const
+/**
+ * `extract` (2026-11-19): `assist` con la ficha técnica del proveedor como
+ * fuente. Primero se transcribe el documento y después se proponen mejoras con
+ * los MISMOS candados de `assist` (números de los datos, sin indicaciones).
+ */
+const MODES = ['draft', 'assist', 'extract'] as const
+
+/** Un PDF de 6 MB en base64 son ~8 MB; con el resto del JSON, este techo. */
+const MAX_BODY_BYTES = 9_500_000
 const LOCALES = ['es', 'en'] as const
 
 type Cliente = ReturnType<typeof userClient>
@@ -122,6 +137,10 @@ const handler = serveJson(
       throw badRequest('CAMPO_NO_PERMITIDO', 'El modo `draft` solo admite `product_id`')
     }
 
+    if (mode !== 'extract' && body.file !== undefined) {
+      throw badRequest('CAMPO_NO_PERMITIDO', 'Solo el modo `extract` admite `file`')
+    }
+
     const client = userClient(request, trace)
 
     if (mode === 'assist') {
@@ -130,7 +149,80 @@ const handler = serveJson(
         storeId: optionalUuid(body, 'store_id'),
         tareas: leerTareas(body),
         locale: body.locale === undefined ? 'es' : requireEnum(body, 'locale', LOCALES),
+        documento: null,
       })
+    }
+
+    if (mode === 'extract') {
+      if (Number(request.headers.get('content-length') ?? '0') > MAX_BODY_BYTES) {
+        throw new AppError('ARCHIVO_DEMASIADO_GRANDE', 'El archivo supera el tamaño admitido', 413)
+      }
+      const file = body.file as Record<string, unknown> | undefined
+      if (!file || typeof file !== 'object' || Array.isArray(file)) {
+        throw badRequest('ARCHIVO_REQUERIDO', 'Sube la ficha técnica en PDF o una foto')
+      }
+      const extra = Object.keys(file).filter((k) => k !== 'media_type' && k !== 'data')
+      if (extra.length > 0) throw badRequest('CAMPO_NO_PERMITIDO', `Campo no permitido: ${extra[0]}`)
+      const validado = validarAdjunto(file.media_type, file.data)
+      if (!validado.ok) {
+        throw new AppError(
+          validado.motivo,
+          'El archivo no se puede leer',
+          validado.motivo === 'ARCHIVO_DEMASIADO_GRANDE' ? 413 : 400,
+        )
+      }
+
+      // El producto antes que el modelo: si no es de esta sociedad (RLS), 404
+      // sin gastar cuota en transcribir un documento para nada.
+      const { data: existe, error: errorExiste } = await client
+        .from('admin_product_masters')
+        .select('id')
+        .eq('id', productId)
+        .maybeSingle()
+      if (errorExiste) throw fromDatabaseError(errorExiste)
+      if (!existe) throw notFound('PRODUCTO_NO_ENCONTRADO', 'El producto no existe o no es de esta sociedad')
+
+      const medidor = medidorDeUsuario(client)
+      const transcripcion = await ejecutarIA<RespuestaModeloTranscripcion, string>(
+        {
+          feature: FEATURE,
+          prompt: `ficha proveedor · ${resumenAdjuntos([validado.adjunto])}`,
+          revisar: (data) => {
+            const revision = revisarTranscripcion(data)
+            if (!revision.ok) return { ok: false, motivo: revision.motivo }
+            return { ok: true, value: revision.value, reply: `${revision.value.length} caracteres` }
+          },
+        },
+        {
+          hayProveedor: hayProveedorIA,
+          consumir: medidor.consumir,
+          registrar: medidor.registrar,
+          llamar: () =>
+            pedirJson<RespuestaModeloTranscripcion>({
+              feature: FEATURE,
+              system: sistemaConFrontera(SISTEMA_TRANSCRIPCION),
+              user: 'Transcribe la ficha del producto del documento adjunto.',
+              schema: ESQUEMA_TRANSCRIPCION,
+              adjuntos: [validado.adjunto],
+              // Leer un documento pide más que redactar una frase.
+              maxTokens: 2048,
+              timeoutMs: 25000,
+            }),
+        },
+      )
+      if (!transcripcion.data) {
+        return { status: 200, body: { data: { ...cuerpoIA(transcripcion), documento: null } } }
+      }
+
+      const respuesta = await asistirFicha(client, {
+        productId,
+        storeId: optionalUuid(body, 'store_id'),
+        tareas: leerTareas(body),
+        locale: body.locale === undefined ? 'es' : requireEnum(body, 'locale', LOCALES),
+        documento: transcripcion.data,
+      })
+      const datos = (respuesta.body as { data: Record<string, unknown> }).data
+      return { status: respuesta.status, body: { data: { ...datos, documento: transcripcion.data } } }
     }
 
     // La RLS decide. Si el producto es de otro tenant, esto no devuelve fila y
@@ -200,7 +292,14 @@ const handler = serveJson(
  */
 async function asistirFicha(
   client: Cliente,
-  peticion: { productId: string; storeId: string | null; tareas: PimTask[]; locale: 'es' | 'en' },
+  peticion: {
+    productId: string
+    storeId: string | null
+    tareas: PimTask[]
+    locale: 'es' | 'en'
+    /** Transcripción de la ficha del proveedor (`extract`), o `null`. */
+    documento: string | null
+  },
 ) {
   const { data: producto, error } = await client
     .from('admin_product_masters')
@@ -275,6 +374,7 @@ async function asistirFicha(
     opciones,
     valores,
     similares,
+    documento: peticion.documento,
   })
   const tareas = tareasEfectivas(peticion.tareas, contexto)
   const system = sistemaParaFront(contexto, tareas)

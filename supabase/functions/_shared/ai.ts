@@ -184,6 +184,39 @@ export function respuestaVitrinaSegura(reply: string, candidatos: readonly Candi
   return true
 }
 
+/**
+ * Candado SANITARIO de la respuesta pública (2026-11-19).
+ *
+ * La vitrina puede ser una botica, y el asistente le habla a un comprador
+ * anónimo. Con la búsqueda por intención («algo para la tos de mi hijo») el
+ * modelo empezó a contestar «te recomiendo X, que ayuda a expulsar flemas, o Y
+ * si buscas algo más económico»: decir para qué sirve un medicamento y
+ * recomendarlo para un niño es exactamente lo que una tienda no puede hacer
+ * por escrito, y comparar precios es inventarlos.
+ *
+ * Reúne las frases del candado de fichas (`aiCopy.ts`) con las que aparecen en
+ * una RECOMENDACIÓN: «ayuda a…», «sirve para…», «para la tos/fiebre/…», un
+ * efecto sobre el cuerpo, dosis por día y comparaciones de precio. Si salta, el
+ * texto no sale y la vitrina enseña los productos encontrados sin frase: la
+ * búsqueda se conserva, la afirmación no.
+ */
+const SALUD_VITRINA: readonly RegExp[] = [
+  /\bindicad[oa]s?\s+(?:para|en)\b/i,
+  /\bindicaci(?:on|ón|ones)\b|\bcontraindicaci/i,
+  /\b(?:ayudan?|sirven?|funcionan?)\s+(?:a|para)\b/i,
+  /\b(?:trata|alivia|cura|previene|combate|elimina|reduce|calma|controla|expulsa|descongestiona|desinflama|baja)n?\s+(?:el|la|los|las|un|una|tu|su)\b/i,
+  /\bpara\s+(?:el|la|los|las|tu|su|tus|sus)?\s*(?:tratamiento|alivio|control|manejo|tos|fiebre|dolor\w*|gripe|resfr\w*|alergi\w*|flema\w*|congesti\w*|diarrea|infecci\w*|presi[oó]n|diabet\w*|ansiedad|insomnio|acn[eé]|herida\w*|quemadura\w*|garganta|est[oó]mago|cabeza|colesterol)\b/i,
+  /\b(?:dosis|posolog(?:ia|ía)|modo\s+de\s+(?:empleo|uso)|cada\s+\d+\s+horas|veces\s+al\s+d[ií]a)\b/i,
+  /\b(?:eficaz|efectivo|seguro)\s+(?:para|contra|en)\b/i,
+  /\brecomendad[oa]\s+(?:para|en)\b/i,
+  /\bs(?:i|í)ntomas?\b/i,
+  /\b(?:m[aá]s|menos)\s+(?:econ[oó]mic|barat|car|accesible)\w*/i,
+]
+
+export function respuestaVitrinaSinSalud(reply: string): boolean {
+  return !SALUD_VITRINA.some((patron) => patron.test(reply))
+}
+
 export function listarCandidatos(candidatos: readonly CandidatoIA[]): string {
   return candidatos
     .map(
@@ -209,5 +242,7 @@ export const SISTEMA_ASISTENTE = [
   'Eres el asistente de compra de una tienda. Respondes en español, en dos frases como máximo.',
   'Elige entre 1 y 4 productos EXCLUSIVAMENTE de la lista que se te da.',
   'No inventes productos, precios, stock ni envíos. No prometas plazos ni descuentos.',
+  'Nombra los productos encontrados y en qué se parecen a lo pedido (tipo, presentación, marca); no compares precios.',
+  'Nunca digas para qué sirve un producto de salud, qué efecto tiene en el cuerpo, ni para quién es adecuado (niños, embarazo); sin dosis ni síntomas. Si la consulta es de salud, añade que lo confirme con el farmacéutico o su médico.',
   'Si nada encaja, dilo y deja la lista de identificadores vacía.',
 ].join(' ')

@@ -550,6 +550,21 @@ export const MY_PURCHASED_PRODUCTS_RPC = 'my_purchased_products_for_slug' satisf
 export const MY_STORE_BUSINESS_ACCOUNTS_RPC = 'my_store_business_accounts' satisfies FunctionName
 /** 2026-11-16 · Qué productos NO puede comprar la cuenta B2B de la sesión por su surtido. */
 export const MY_ASSORTMENT_BLOCKED_RPC = 'my_assortment_blocked'
+/**
+ * 2026-11-19 · Acciones propuestas por la IA con aprobación (migración
+ * 20261119140000). Sin `satisfies` hasta regenerar los tipos al aplicarla.
+ */
+export const AI_ACTION_PROPOSALS_TABLE = 'ai_action_proposals'
+export const AI_ACTION_PROPOSE_RPC = 'ai_action_propose'
+export const AI_ACTION_DECIDE_RPC = 'ai_action_decide'
+/** 2026-11-19 · IA proactiva (migración 20261119160000). Sin `satisfies` hasta regenerar tipos. */
+export const SALES_DUE_CUSTOMERS_RPC = 'sales_due_customers'
+export const AI_DIGEST_SETTINGS_TABLE = 'ai_digest_settings'
+export const AI_DIGEST_CONFIGURE_RPC = 'ai_digest_configure'
+/** 2026-11-19 · Medir resultados (migración 20261119180000). Sin `satisfies` hasta regenerar tipos. */
+export const AI_ATTRIBUTION_MARK_RPC = 'ai_attribution_mark'
+export const AI_VALUE_SUMMARY_RPC = 'ai_value_summary'
+export const PROMOTION_IMPACT_RPC = 'promotion_impact'
 export const SELECT_STORE_BUSINESS_ACCOUNT_RPC = 'select_store_business_account' satisfies FunctionName
 
 // --- Cierre A3 · cotizaciones del comprador (migración 20260914101000) -------
@@ -779,6 +794,8 @@ export const CHECKOUT_FUNCTION = 'checkout'
  * precio, el stock y la foto los resuelve la vitrina contra el catálogo.
  */
 export const SHOPPING_ASSISTANT_FUNCTION = 'shopping-assistant'
+/** Pedido desde foto, PDF o texto libre (2026-11-19). Exige sesión del comprador. */
+export const ORDER_INTAKE_FUNCTION = 'order-intake'
 /** Redacta el borrador de la ficha de un producto (addon `ai.catalog.copy`). */
 export const CATALOG_COPY_FUNCTION = 'catalog-copy'
 /** Analista IA del dashboard (addon `ai.insights`, fase 02). Solo lee; nunca ejecuta. */

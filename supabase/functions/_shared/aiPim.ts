@@ -190,6 +190,13 @@ export interface FilasPim {
   readonly opciones: readonly Fila[]
   readonly valores: readonly Fila[]
   readonly similares: readonly Fila[]
+  /**
+   * 2026-11-19 · Transcripción de la ficha técnica del proveedor (PDF o foto),
+   * ya saneada. Es una FUENTE más: sus números cuentan como «dichos por los
+   * datos». Las prohibiciones (precio, stock, indicaciones, dosis…) no cambian
+   * aunque el documento las traiga.
+   */
+  readonly documento?: string | null
 }
 
 export interface CategoriaCandidata {
@@ -238,6 +245,8 @@ export interface ContextoPim {
   readonly candidatos: readonly CandidatoDuplicado[]
   /** Números que ya dicen los datos: lo único que un texto puede repetir. */
   readonly numerosFuente: ReadonlySet<string>
+  /** La ficha técnica del proveedor transcrita, si se subió una. */
+  readonly documento: string | null
 }
 
 const TIPOS_PROPONIBLES: readonly TipoAtributo[] = ['option', 'text', 'number', 'boolean']
@@ -410,10 +419,12 @@ export function construirContexto(filas: FilasPim): ContextoPim {
     producto.familyName ?? '',
     categoriaActual?.path ?? '',
     ...atributos.map((a) => a.current ?? ''),
+    filas.documento ?? '',
   ]
   for (const f of fuentes) for (const n of numerosDe(f)) numerosFuente.add(n)
 
-  return { producto, categoriaActual, categorias, atributos, candidatos, numerosFuente }
+  const documento = typeof filas.documento === 'string' && filas.documento.trim() ? filas.documento : null
+  return { producto, categoriaActual, categorias, atributos, candidatos, numerosFuente, documento }
 }
 
 /** Atributos sin valor: determinista, lo calcula el sistema. */
@@ -512,6 +523,8 @@ export function datosParaPim(
           opciones: a.dataType === 'option' ? a.options.map((o) => o.label) : undefined,
         }))
       : undefined,
+    // La ficha del proveedor, cuando se subió: dato, no instrucciones.
+    ficha_tecnica_del_proveedor: contexto.documento ?? undefined,
     candidatos_duplicado: quiere('duplicates')
       ? contexto.candidatos.map((c) => ({ ref: c.ref, nombre: c.name, marca: c.brandName ?? undefined }))
       : undefined,

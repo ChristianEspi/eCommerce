@@ -59,6 +59,10 @@ const PimPage = lazyPage(() =>
 const ReviewsPage = lazyPage(() =>
   import('@/features/catalog/reviews/ReviewsPage').then((m) => ({ default: m.ReviewsPage })),
 )
+// 2026-11-19 · Acciones propuestas por la IA, con aprobación.
+const AiActionsPage = lazyPage(() =>
+  import('@/features/ai/actions/AiActionsPage').then((m) => ({ default: m.AiActionsPage })),
+)
 // --- fin reseñas ---
 const PricingPage = lazyPage(() =>
   import('@/features/pricing/PricingPage').then((m) => ({ default: m.PricingPage })),
@@ -227,6 +231,8 @@ export const routes: RouteObject[] = [
           // vendible. El permiso `store.manage` lo exige la pantalla y, sobre
           // todo, cada comando de la base.
           { path: 'stores', element: <StoresPage /> },
+          // Sin módulo propio: quien la ve lo decide la RLS por rol y tipo de acción.
+          { path: 'ai-actions', element: gated('ai.insights', <AiActionsPage />) },
           // Llevar existencia por almacen es el modulo vendible; la existencia
           // del catalogo (`products.stock`) sigue viniendo con el producto, y
           // por eso un tenant sin este addon vende igual que antes de P06.

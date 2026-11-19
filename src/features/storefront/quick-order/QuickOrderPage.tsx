@@ -35,6 +35,7 @@ import { useStorefront } from '../hooks'
 import { privateMeta } from '../seo'
 import { resolveOrderLines } from './api'
 import { importIntoCart, type CartImportResult } from './importToCart'
+import { IntakePanel, type IntakeAcceptedLine } from './IntakePanel'
 import {
   QUICK_ORDER_MAX_ROWS,
   buildReport,
@@ -204,6 +205,24 @@ export function QuickOrderView({ storeId, storeSlug }: { storeId: string; storeS
     }))
     setRows([...filled, ...incoming])
     setPasted('')
+  }
+
+  /**
+   * Lo que se aceptó en «Con IA» entra al editor como filas tecleadas y se
+   * valida en el acto: una sola lista que revisar, con el mismo informe y los
+   * mismos motivos de rechazo que el resto (surtido, SKU no publicado…).
+   */
+  function acceptIntake(lines: readonly IntakeAcceptedLine[]) {
+    const filled = rows.filter((row) => row.sku.trim() || row.quantity.trim())
+    resetOutcome()
+    if (filled.length + lines.length > QUICK_ORDER_MAX_ROWS) {
+      setIssue('LIMITE_FILAS')
+      return
+    }
+    const incoming = lines.map((line) => ({ id: nextId.current++, sku: line.sku, quantity: String(line.quantity) }))
+    const next = [...filled, ...incoming]
+    setRows(next)
+    run(draftsFromEditor(next))
   }
 
   async function onFile(event: ChangeEvent<HTMLInputElement>) {
@@ -388,6 +407,11 @@ export function QuickOrderView({ storeId, storeSlug }: { storeId: string; storeS
         items={[
           { id: 'lineas', label: t('store.quickOrder.tab.lines'), content: linesTab },
           { id: 'csv', label: t('store.quickOrder.tab.csv'), content: csvTab },
+          {
+            id: 'ia',
+            label: t('store.quickOrder.tab.intake'),
+            content: <IntakePanel storeSlug={storeSlug} onAccept={acceptIntake} />,
+          },
         ]}
       />
 

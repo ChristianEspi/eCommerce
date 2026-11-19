@@ -9,6 +9,7 @@ import { SectionTabs } from '@/shared/ui/SectionTabs'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { EmptyState } from '@/shared/ui/states'
 import { CapabilityGate } from '@/features/capabilities/CapabilityGate'
+import { DueCustomersSection } from './DueCustomersSection'
 import { PerformanceSection } from './PerformanceSection'
 import { RepsSection } from './RepsSection'
 import { RoutesSection } from './RoutesSection'
@@ -36,6 +37,8 @@ export function SalesPage() {
   const items = useMemo(
     () => [
       { id: 'vendedores', label: t('sales.tab.reps'), content: <RepsSection /> },
+      // 2026-11-19 · A quién llamar hoy: clientes atrasados según su ritmo.
+      { id: 'agenda', label: t('sales.tab.due'), content: <DueCustomersSection /> },
       {
         id: 'territorios',
         label: t('sales.tab.territories'),

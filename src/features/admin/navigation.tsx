@@ -1,3 +1,4 @@
+import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded'
 import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded'
 import AccountBalanceRoundedIcon from '@mui/icons-material/AccountBalanceRounded'
 import AltRouteRoundedIcon from '@mui/icons-material/AltRouteRounded'
@@ -254,6 +255,17 @@ export const NAV_ITEMS: NavItem[] = [
     icon: <InsightsRoundedIcon fontSize="small" />,
     capability: 'analytics.basic',
     group: 'store',
+  },
+  {
+    // 2026-11-19 · Lo que la IA dejó armado y espera aprobación. Catálogo ve las
+    // de reseñas; dueño y administración, todas (lo filtra la RLS).
+    to: '/app/ai-actions',
+    label: 'nav.aiActions',
+    icon: <AutoAwesomeRoundedIcon fontSize="small" />,
+    // Sin IA contratada no hay quien proponga: la entrada no se enseña.
+    capability: 'ai.insights',
+    permission: 'catalog.write',
+    group: 'system',
   },
   {
     // Stores + Product Master, fase 02. En SISTEMA, junto a Configuración y no
