@@ -186,7 +186,13 @@ describe('contrato con el servidor', () => {
   })
 
   it('basura ⇒ esquema sin romper', () => {
-    expect(interpretarAsistencia('nada')).toEqual({ suggestions: null, motivo: 'esquema', interactionId: null, system: null })
+    expect(interpretarAsistencia('nada')).toEqual({
+      suggestions: null,
+      motivo: 'esquema',
+      interactionId: null,
+      system: null,
+      documento: null,
+    })
   })
 
   it('motivo tipado sin datos', () => {

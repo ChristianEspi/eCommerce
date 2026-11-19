@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { CATALOG_COPY_FUNCTION } from '@/shared/lib/db-schema'
+import type { MessageKey } from '@/shared/i18n/messages'
 import { AI_ERROR_KINDS, parseAiResult, type AiErrorKind } from '@/features/ai/result'
 import type { ProductAttributeInput } from '../pim/api'
 import { catalogClient } from './client'
@@ -161,6 +162,11 @@ export interface AsistenciaDeFicha {
   readonly motivo: AiErrorKind | null
   readonly interactionId: string | null
   readonly system: SistemaPim | null
+  /**
+   * 2026-11-19 · Lo que se leyó de la ficha del proveedor (modo `extract`). Se
+   * enseña tal cual: es la fuente de los datos que se proponen.
+   */
+  readonly documento?: string | null
 }
 
 /**
@@ -173,12 +179,56 @@ export function interpretarAsistencia(raw: unknown): AsistenciaDeFicha {
   const envoltorio = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
   const sistema = sistemaPimSchema.safeParse(envoltorio.system)
   const resultado = parseAiResult(sugerenciasPimSchema, raw)
+  const documento = z.string().max(4500).nullable().safeParse(envoltorio.documento ?? null)
   return {
     suggestions: resultado.data,
     motivo: resultado.motivo,
     interactionId: resultado.interactionId,
     system: sistema.success ? sistema.data : null,
+    documento: documento.success ? documento.data : null,
   }
+}
+
+/** Tipos y techos que admite la lectura de fichas del proveedor. */
+export const FICHA_PROVEEDOR_ACCEPT = 'application/pdf,image/jpeg,image/png,image/webp'
+export const FICHA_PROVEEDOR_MAX_BYTES = { image: 4 * 1024 * 1024, pdf: 6 * 1024 * 1024 } as const
+
+/** `null` si el archivo se puede mandar; si no, la clave i18n del problema. */
+export function problemaDeFichaProveedor(file: { type: string; size: number }): MessageKey | null {
+  const esPdf = file.type === 'application/pdf'
+  const esImagen = ['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
+  if (!esPdf && !esImagen) return 'aiPim.document.badType'
+  if (file.size === 0) return 'aiPim.document.badType'
+  return file.size > (esPdf ? FICHA_PROVEEDOR_MAX_BYTES.pdf : FICHA_PROVEEDOR_MAX_BYTES.image)
+    ? 'aiPim.document.tooLarge'
+    : null
+}
+
+/**
+ * Sugerencias de ficha A PARTIR del documento del proveedor (modo `extract`).
+ * Mismos candados que `pedirSugerenciasDeFicha`; además devuelve la
+ * transcripción para que la persona vea de dónde sale cada dato.
+ */
+export async function pedirSugerenciasDesdeDocumento(input: {
+  productId: string
+  storeId: string | null
+  locale: 'es' | 'en'
+  file: { mediaType: string; data: string }
+}): Promise<AsistenciaDeFicha> {
+  const { data, error } = await catalogClient().functions.invoke<{ data: unknown }>(
+    CATALOG_COPY_FUNCTION,
+    {
+      body: {
+        product_id: input.productId,
+        mode: 'extract',
+        locale: input.locale,
+        file: { media_type: input.file.mediaType, data: input.file.data },
+        ...(input.storeId ? { store_id: input.storeId } : {}),
+      },
+    },
+  )
+  if (error) throw await catalogErrorFromInvoke(error)
+  return interpretarAsistencia(data?.data)
 }
 
 /**

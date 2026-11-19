@@ -81,17 +81,7 @@ export function checkIntakeFile(file: { type: string; size: number }): IntakeFil
 }
 
 /** El archivo en base64, sin el prefijo `data:`. */
-export function fileToBase64(file: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(new IntakeError('ARCHIVO_ILEGIBLE'))
-    reader.onload = () => {
-      const result = typeof reader.result === 'string' ? reader.result : ''
-      resolve(result.replace(/^data:[^;,]+;base64,/, ''))
-    }
-    reader.readAsDataURL(file)
-  })
-}
+export { fileToBase64 } from '@/shared/lib/fileToBase64'
 
 export async function readIntake(input: {
   storeSlug: string
