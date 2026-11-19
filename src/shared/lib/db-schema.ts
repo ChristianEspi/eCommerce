@@ -557,6 +557,10 @@ export const MY_ASSORTMENT_BLOCKED_RPC = 'my_assortment_blocked'
 export const AI_ACTION_PROPOSALS_TABLE = 'ai_action_proposals'
 export const AI_ACTION_PROPOSE_RPC = 'ai_action_propose'
 export const AI_ACTION_DECIDE_RPC = 'ai_action_decide'
+/** 2026-11-19 · IA proactiva (migración 20261119160000). Sin `satisfies` hasta regenerar tipos. */
+export const SALES_DUE_CUSTOMERS_RPC = 'sales_due_customers'
+export const AI_DIGEST_SETTINGS_TABLE = 'ai_digest_settings'
+export const AI_DIGEST_CONFIGURE_RPC = 'ai_digest_configure'
 export const SELECT_STORE_BUSINESS_ACCOUNT_RPC = 'select_store_business_account' satisfies FunctionName
 
 // --- Cierre A3 · cotizaciones del comprador (migración 20260914101000) -------

@@ -288,6 +288,37 @@ const COPY: Record<string, Record<Locale, CopyBuilder>> = {
       note: 'You are receiving this reminder because you have an account with this store.',
     }),
   },
+  /**
+   * 2026-11-19 · Resumen diario para dueño y administración. Cada cifra sale de
+   * la base (`ebim.ai_digest_facts`); ninguna la escribe un modelo. Sin ventas en
+   * una sola moneda no se suma: se dice el número de pedidos.
+   */
+  'ai.daily_digest': {
+    es: (p, _l, e) => ({
+      subject: text(p, 'store_name') ? `Tu resumen de hoy en ${text(p, 'store_name')}` : 'Tu resumen de hoy',
+      title: 'Tu resumen de hoy',
+      body: [
+        `Ayer: <strong>${e('orders_yesterday')}</strong> pedidos${text(p, 'sales_yesterday') && text(p, 'currency') ? ` por <strong>${e('sales_yesterday')} ${e('currency')}</strong>` : ''}.`,
+        `Pedidos esperando aprobación: <strong>${e('pending_approval')}</strong>.`,
+        `Acciones de la IA por aprobar: <strong>${e('pending_ai_actions')}</strong>.`,
+        `Clientes que por su ritmo ya deberían haber pedido: <strong>${e('due_customers')}</strong>.`,
+      ].join('<br />'),
+      action: 'Abrir el panel',
+      note: 'Lo recibes porque el resumen diario está activo en Configuración de esta tienda.',
+    }),
+    en: (p, _l, e) => ({
+      subject: text(p, 'store_name') ? `Your summary for today at ${text(p, 'store_name')}` : 'Your summary for today',
+      title: 'Your summary for today',
+      body: [
+        `Yesterday: <strong>${e('orders_yesterday')}</strong> orders${text(p, 'sales_yesterday') && text(p, 'currency') ? ` for <strong>${e('sales_yesterday')} ${e('currency')}</strong>` : ''}.`,
+        `Orders awaiting approval: <strong>${e('pending_approval')}</strong>.`,
+        `AI actions awaiting approval: <strong>${e('pending_ai_actions')}</strong>.`,
+        `Customers who, by their usual pace, should already have ordered: <strong>${e('due_customers')}</strong>.`,
+      ].join('<br />'),
+      action: 'Open the dashboard',
+      note: 'You receive this because the daily summary is on in this store’s Settings.',
+    }),
+  },
   'mail.test': {
     es: () => ({
       subject: 'Prueba de correo de eCommerce',
