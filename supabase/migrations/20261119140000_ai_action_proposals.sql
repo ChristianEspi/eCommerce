@@ -111,10 +111,16 @@ grant all on public.ai_action_proposals to service_role;
 drop policy if exists ai_action_proposals_select on public.ai_action_proposals;
 create policy ai_action_proposals_select on public.ai_action_proposals
   for select to authenticated
+  -- Membresía resuelta UNA vez por consulta (`has_role_companies` en un
+  -- `select`), no fila a fila: es la forma de todas las policies del repo.
   using (
-    organization_id = ebim.org_id()
-    and company_id = any (ebim.companies())
-    and ebim.has_role(organization_id, company_id, ebim.ai_action_roles(kind))
+    organization_id = (select ebim.org_id())
+    and (
+      (kind = 'promotion.create_draft'
+        and company_id = any ((select ebim.has_role_companies(array['owner','admin']::public.app_role[]))::uuid[]))
+      or (kind = 'review.moderate'
+        and company_id = any ((select ebim.has_role_companies(array['owner','admin','catalog']::public.app_role[]))::uuid[]))
+    )
   );
 
 -- ---------------------------------------------------------------------------

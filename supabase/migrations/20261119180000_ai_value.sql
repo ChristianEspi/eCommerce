@@ -135,9 +135,20 @@ create index if not exists ai_cart_attributions_tenant_idx
 
 alter table public.ai_cart_attributions enable row level security;
 alter table public.ai_cart_attributions force  row level security;
--- Ni lectura ni escritura directa: se anota por comando y se lee agregado.
+-- Sin escritura directa: se anota por comando (`ai_attribution_mark`). Lectura
+-- solo para dueño y administración de SU sociedad: el correo del comprador ya
+-- lo ven en sus pedidos, y esto no añade nada que no vieran.
 revoke all on public.ai_cart_attributions from public, anon, authenticated;
+grant select on public.ai_cart_attributions to authenticated;
 grant all on public.ai_cart_attributions to service_role;
+
+drop policy if exists ai_cart_attributions_select on public.ai_cart_attributions;
+create policy ai_cart_attributions_select on public.ai_cart_attributions
+  for select to authenticated
+  using (
+    organization_id = (select ebim.org_id())
+    and company_id = any ((select ebim.has_role_companies(array['owner','admin']::public.app_role[]))::uuid[])
+  );
 
 create or replace function public.ai_attribution_mark(
   p_store_slug  text,

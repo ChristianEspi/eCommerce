@@ -154,9 +154,8 @@ drop policy if exists ai_digest_settings_select on public.ai_digest_settings;
 create policy ai_digest_settings_select on public.ai_digest_settings
   for select to authenticated
   using (
-    organization_id = ebim.org_id()
-    and company_id = any (ebim.companies())
-    and ebim.has_role(organization_id, company_id, array['owner','admin']::public.app_role[])
+    organization_id = (select ebim.org_id())
+    and company_id = any ((select ebim.has_role_companies(array['owner','admin']::public.app_role[]))::uuid[])
   );
 
 create or replace function public.ai_digest_configure(p_store_id uuid, p_enabled boolean, p_send_hour integer)
@@ -273,7 +272,8 @@ begin
      where d.enabled
        and d.send_hour <= v_hora
        and (d.last_sent_on is null or d.last_sent_on < v_hoy)
-       and ebim.company_is_entitled(d.organization_id, d.company_id, 'analytics.basic')
+     -- Sin comprobación de entitlement: las cifras son de `analytics.basic`, que
+     -- es baseline (`capability-enforcement.test.ts`: nada baseline se gatea).
      order by d.store_id
      limit greatest(coalesce(p_limit, 200), 1)
      for update of d skip locked

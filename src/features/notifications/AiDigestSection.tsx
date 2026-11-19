@@ -1,14 +1,10 @@
 import { Alert, Button, FormControlLabel, MenuItem, Stack, Switch, Typography } from '@mui/material'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { z } from 'zod'
 import { useI18n } from '@/shared/i18n/i18n-context'
-import { codeFromDbError } from '@/shared/lib/appError'
-import { AI_DIGEST_CONFIGURE_RPC, AI_DIGEST_SETTINGS_TABLE } from '@/shared/lib/db-schema'
-import { tryGetSupabaseClient } from '@/shared/lib/supabase'
 import { SelectField } from '@/shared/ui/SelectField'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { LoadingState } from '@/shared/ui/states'
+import { useConfigureDigest, useDigestSettings } from './aiDigest'
 
 /**
  * Resumen diario por correo (2026-11-19): ventas de ayer, pedidos por aprobar,
@@ -16,33 +12,11 @@ import { LoadingState } from '@/shared/ui/states'
  * administración. Cada cifra sale de la base; sale una vez al día a la hora
  * elegida (Lima) por la misma cola que el resto del correo.
  */
-const settingsSchema = z.object({ enabled: z.boolean(), send_hour: z.number().int().min(0).max(23) })
-
-function client() {
-  const c = tryGetSupabaseClient()
-  if (!c) throw new Error('CONFIG_INCOMPLETA')
-  return c
-}
-
 export function AiDigestSection({ storeId }: { storeId: string | null }) {
   const { t } = useI18n()
   const { notify } = useFeedback()
-  const queryClient = useQueryClient()
-  const key = ['ai', 'digest-settings', storeId] as const
-
-  const settings = useQuery({
-    queryKey: key,
-    enabled: Boolean(storeId),
-    queryFn: async () => {
-      const { data, error } = await client()
-        .from(AI_DIGEST_SETTINGS_TABLE)
-        .select('enabled, send_hour')
-        .eq('store_id', storeId)
-        .maybeSingle()
-      if (error) throw new Error(codeFromDbError(error))
-      return data ? settingsSchema.parse(data) : { enabled: false, send_hour: 8 }
-    },
-  })
+  const settings = useDigestSettings(storeId)
+  const configure = useConfigureDigest(storeId)
 
   const [enabled, setEnabled] = useState(false)
   const [hour, setHour] = useState(8)
@@ -52,20 +26,12 @@ export function AiDigestSection({ storeId }: { storeId: string | null }) {
     setHour(settings.data.send_hour)
   }, [settings.data])
 
-  const save = useMutation({
-    mutationFn: async () => {
-      const { error } = await client().rpc(AI_DIGEST_CONFIGURE_RPC, {
-        p_store_id: storeId,
-        p_enabled: enabled,
-        p_send_hour: hour,
-      })
-      if (error) throw new Error(codeFromDbError(error))
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: key })
-      notify(t('aiDigest.saved'))
-    },
-  })
+  const save = {
+    mutate: () =>
+      configure.mutate({ enabled, send_hour: hour }, { onSuccess: () => notify(t('aiDigest.saved')) }),
+    isPending: configure.isPending,
+    isError: configure.isError,
+  }
 
   if (!storeId) return null
   if (settings.isPending) return <LoadingState />

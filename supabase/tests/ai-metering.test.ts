@@ -451,9 +451,16 @@ describe('la puerta que PostgREST ve', () => {
     )
 
     expect(filas.map((f) => f.proname)).toEqual([
+      // 2026-11-19 · Acciones propuestas con aprobación: comandos DEFINER con
+      // rol por tipo de acción y sociedad del JWT; la tabla no se escribe directo.
+      'ai_action_decide',
+      'ai_action_propose',
       // Fase 07: candidatos de surtido (reposición, venta cruzada,
       // complemento) calculados en SQL. INVOKER, roles de `quotes`, cartera.
       'ai_assortment_facts',
+      // 2026-11-19 · Anotar lo que llegó al carrito con ayuda de la IA. Exige
+      // sesión; tienda por slug activo; solo productos publicados en ella.
+      'ai_attribution_mark',
       // Fase 08: cobranza (cartera o cliente). INVOKER, roles de `credit` +
       // `credit.management`; solo lectura.
       'ai_collections_facts',
@@ -473,10 +480,15 @@ describe('la puerta que PostgREST ve', () => {
       // Fase 02: el dataset reducido del analista del dashboard. SECURITY
       // INVOKER (RLS de quien llama) y solo owner/admin; no toca cuota.
       'ai_dashboard_facts',
+      // 2026-11-19 · Resumen diario: configurar por tienda (owner/admin).
+      'ai_digest_configure',
       'ai_entitlement',
       'ai_feedback',
       // Fase 08: entregas (tienda o una entrega) sin dirección, contacto ni guía.
       'ai_fulfillment_facts',
+      // 2026-11-19 · Freno por comprador del pedido desde foto/PDF. Exige
+      // sesión; no consume cuota (eso lo hace `ai_consume_for_store`).
+      'ai_intake_check',
       // Fase 10: integraciones (proveedores, errores agrupables, disyuntores,
       // webhooks, API) o un mensaje; sin payloads, URL ni secretos. INVOKER.
       'ai_integrations_facts',
@@ -510,6 +522,8 @@ describe('la puerta que PostgREST ve', () => {
       // El desglose por modulo: con UN presupuesto compartido, es lo que
       // responde en que se esta yendo.
       'ai_usage_by_feature',
+      // 2026-11-19 · Valor de la IA agregado (owner/admin de la tienda).
+      'ai_value_summary',
       'ai_visit_facts',
     ])
   })

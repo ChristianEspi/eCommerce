@@ -1,29 +1,14 @@
 import { Card, CardContent, Skeleton, Stack, Typography } from '@mui/material'
-import { useQuery } from '@tanstack/react-query'
 import { useContext } from 'react'
-import { z } from 'zod'
 import { TenantCtx } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
-import { codeFromDbError } from '@/shared/lib/appError'
-import { AI_VALUE_SUMMARY_RPC } from '@/shared/lib/db-schema'
-import { tryGetSupabaseClient } from '@/shared/lib/supabase'
+import { useAiValue } from './aiValue'
 
 /**
  * «Lo que aportó la IA» (2026-11-19): lo que se pidió de productos que
  * llegaron al carrito con ayuda de la IA (mismo comprador, 7 días) y las
  * acciones de la IA ejecutadas. Lo calcula la base (`ai_value_summary`).
  */
-const valueSchema = z.object({
-  days: z.coerce.number(),
-  currency: z.string().nullable(),
-  attributed_revenue: z.coerce.number().nullable(),
-  attributed_orders: z.coerce.number(),
-  by_source: z.object({ intake: z.coerce.number(), assistant: z.coerce.number() }),
-  marked_lines: z.coerce.number(),
-  actions_executed: z.coerce.number(),
-  actions_pending: z.coerce.number(),
-})
-
 export function AiValueCard() {
   const { t, locale } = useI18n()
   // Opcional: fuera de una sociedad (p. ej. una pantalla de prueba aislada) la
@@ -31,17 +16,7 @@ export function AiValueCard() {
   const tenant = useContext(TenantCtx)
   const storeId = tenant?.activeStore?.id ?? null
   const canSee = Boolean(tenant?.can('tenant.manage'))
-  const query = useQuery({
-    queryKey: ['ai', 'value', storeId],
-    enabled: Boolean(storeId) && canSee,
-    queryFn: async () => {
-      const client = tryGetSupabaseClient()
-      if (!client) throw new Error('CONFIG_INCOMPLETA')
-      const { data, error } = await client.rpc(AI_VALUE_SUMMARY_RPC, { p_store_id: storeId, p_days: 30 })
-      if (error) throw new Error(codeFromDbError(error))
-      return valueSchema.parse(data)
-    },
-  })
+  const query = useAiValue(storeId, canSee)
 
   if (!storeId || !canSee || query.isError) return null
   const money = (n: number | null, currency: string | null) =>

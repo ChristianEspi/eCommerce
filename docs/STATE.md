@@ -3,13 +3,40 @@
 GUIDELINES_STATUS: VERIFIED (**por lectura directa** en la 2ª pasada de P00-SaaS: contrato v1.15,
 `PROTOCOLO.md`, `BANDEJA.md` y `EBIM-CREW-ROSTER.md`). La unidad montada es `G:`, no `H:`.
 Fuentes: ver `docs/EBIM_GUIDELINES_TRACE.md`.
-Última actualización: 2026-09-26 (Resumen v2 · vitrina B2B). Antes: 2026-08-30 (**P17-SaaS terminada — quality gate final y línea base releaseable**;
+Última actualización: 2026-11-19 (IA diferenciadora, 8 frentes). Antes: 2026-09-26 (Resumen v2 · vitrina B2B). Antes: 2026-08-30 (**P17-SaaS terminada — quality gate final y línea base releaseable**;
 el recorrido SaaS P00–P17 queda cerrado)
 
 > **Dos numeraciones de fase.** Lo que sigue como «P00…P12» es el trabajo histórico de este repo. A
 > partir del 2026-08-27 arranca un segundo recorrido, **P00–P17 de productización SaaS**
 > (`claude-saas-opus/config/phases.json`), que se identifica siempre como «P0x-SaaS». No son la misma
 > serie: el P12 histórico es el framework de integraciones; el P12-SaaS es fulfillment y devoluciones.
+
+## IA diferenciadora — 8 frentes (2026-11-19, a pedido del operador: «haz todo»)
+
+Commits locales en `dev` (`111d0e1`…`fdf9286`). **No desplegado**: 4 migraciones, 2 Edge Functions
+modificadas y 1 nueva pendientes de la promoción a QAS.
+
+| Frente | Qué | Dónde |
+|---|---|---|
+| Base multimodal | `pedirJson` acepta imagen/PDF validados (tipo, firma de bytes, tamaño); funcionalidad `intake` en el registro (TS/SQL/front) | `_shared/aiAttachments.ts`, `20261119120000_ai_intake.sql` |
+| Pedido desde foto/PDF/texto | Edge Function `order-intake` (sesión + freno 30/h por comprador); la IA solo lee, el catálogo decide el producto; pestaña «Con IA» del pedido rápido | `order-intake`, `_shared/aiIntake.ts`, `quick-order/IntakePanel.tsx` |
+| Búsqueda por intención | Si la búsqueda por palabras falla, la IA traduce la necesidad a ≤4 términos y el mismo buscador los resuelve (sin embeddings) | `shopping-assistant`, `_shared/aiIntent.ts` |
+| Ficha desde documento del proveedor | Modo `extract` de `catalog-copy`: transcribe PDF/foto y la transcripción es FUENTE del asistente de ficha (mismos candados) | `_shared/aiPimDocument.ts`, `ProductAiAssistant.tsx` |
+| Acciones con aprobación | Bandeja `/app/ai-actions`; `promotion.create_draft` (siempre borrador) y `review.moderate`; orígenes: inventario (exceso/sin rotación) y reseñas | `20261119140000_ai_action_proposals.sql`, `features/ai/actions` |
+| Proactividad | Agenda del vendedor (ritmo propio del cliente) y resumen diario por correo con `pg_cron` (cifras de la base) | `20261119160000_ai_proactive.sql`, `sales/DueCustomersSection.tsx`, `AiDigestSection.tsx` |
+| Medir resultados | `promotion_impact` (vigencia vs mismo tramo anterior) y valor de la IA (atribución acotada: producto + correo + 7 días) | `20261119180000_ai_value.sql`, `PromotionImpact.tsx`, `AiValueCard.tsx` |
+| Conversacional + MCP | Núcleo de comercio agnóstico de canal (3 herramientas de solo lectura) **sin conectar**; propuestas al buzón | `_shared/commerceAgent*.ts`, `docs/propuestas/2026-11-19-*.md` |
+
+Pendiente de operador / plataforma:
+- Aplicar las 4 migraciones en QAS y desplegar `order-intake` (nueva, `verify_jwt = true`),
+  `shopping-assistant` y `catalog-copy`. Regenerar `database.types.ts` y poner `satisfies` a las
+  constantes nuevas de `db-schema.ts` (hoy sin él, como manda el precedente).
+- Alta en el hub de `ecommerce.ai.content` sigue pendiente (no cambia aquí).
+- Enviar al buzón las dos propuestas de `docs/propuestas/2026-11-19-*` (la carpeta de plataforma no
+  estaba montada en esta sesión) y esperar respuesta antes de conectar WhatsApp o publicar MCP.
+- Generación de imágenes de producto: fuera por decisión del operador (sin proveedor).
+- El resumen diario no lleva frase de IA: es 100 % determinista. Añadir una frase sin cifras exige
+  un trabajador Edge (como `watch-assistant`) y queda como mejora.
 
 ## Inventario y vínculo con EBIM MasterAdmin — `tenant-inventory.v1` (2026-11-16)
 

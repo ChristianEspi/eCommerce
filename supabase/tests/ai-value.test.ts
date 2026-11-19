@@ -141,10 +141,14 @@ describe('valor de la IA', () => {
     expect(Number(v.marked_lines)).toBe(2)
   })
 
-  it('solo administración ve el valor, y nadie lee las anotaciones crudas', async () => {
+  it('solo administración ve el valor; las anotaciones, solo las de su sociedad y sin escribirlas', async () => {
     await expect(as(claimsFor(TENANT_B), `select public.ai_value_summary($1::uuid, 30)`, [store])).rejects.toThrow(
       /TIENDA_NO_DISPONIBLE/,
     )
-    await expect(as(owner, `select * from public.ai_cart_attributions`)).rejects.toThrow(/permission denied/i)
+    expect((await as(owner, `select id from public.ai_cart_attributions`)).length).toBe(2)
+    expect(await as(claimsFor(TENANT_B), `select id from public.ai_cart_attributions`)).toEqual([])
+    await expect(
+      as(owner, `delete from public.ai_cart_attributions`),
+    ).rejects.toThrow(/permission denied/i)
   })
 })

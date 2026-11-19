@@ -1,39 +1,16 @@
 import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded'
 import { Box, Skeleton, Stack, Typography } from '@mui/material'
-import { useQuery } from '@tanstack/react-query'
-import { z } from 'zod'
 import { useI18n } from '@/shared/i18n/i18n-context'
-import { codeFromDbError } from '@/shared/lib/appError'
-import { PROMOTION_IMPACT_RPC } from '@/shared/lib/db-schema'
-import { tryGetSupabaseClient } from '@/shared/lib/supabase'
+import { usePromotionImpact } from './impact'
 
 /**
  * ¿Funcionó la campaña? (2026-11-19). Ventas de SUS productos durante la
  * vigencia frente al mismo número de días justo antes, más canjes y descuento
  * dado. Lo calcula la base (`promotion_impact`); aquí solo se pinta.
  */
-const tramo = z.object({ units: z.coerce.number(), revenue: z.coerce.number(), orders: z.coerce.number() })
-const impactSchema = z.object({
-  started: z.boolean(),
-  days: z.coerce.number().optional(),
-  partial_scope: z.boolean().optional(),
-  during: tramo.optional(),
-  before: tramo.optional(),
-  redemptions: z.object({ count: z.coerce.number(), discount: z.coerce.number() }).optional(),
-  units_change_pct: z.coerce.number().nullable().optional(),
-})
-
-async function fetchImpact(promotionId: string) {
-  const client = tryGetSupabaseClient()
-  if (!client) throw new Error('CONFIG_INCOMPLETA')
-  const { data, error } = await client.rpc(PROMOTION_IMPACT_RPC, { p_promotion_id: promotionId })
-  if (error) throw new Error(codeFromDbError(error))
-  return impactSchema.parse(data)
-}
-
 export function PromotionImpact({ promotionId, currency }: { promotionId: string; currency: string }) {
   const { t, locale } = useI18n()
-  const query = useQuery({ queryKey: ['promotions', 'impact', promotionId], queryFn: () => fetchImpact(promotionId) })
+  const query = usePromotionImpact(promotionId)
 
   // Sin permiso o sin datos todavía, el bloque no se pinta: no es un error de la campaña.
   if (query.isError) return null
