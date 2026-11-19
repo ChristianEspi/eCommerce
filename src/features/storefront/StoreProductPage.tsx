@@ -19,7 +19,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material'
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAgreementPrice } from '@/features/pricing/useAgreementPrice'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -62,7 +62,7 @@ import { useStorefrontTheme } from './theme/useStorefrontTheme'
  * (`docs/performance-budget.md`). El primer pintado —foto, precio, comprar— no
  * espera por ellas.
  */
-const ProductReviews = lazy(() =>
+const ProductReviews = lazyPage(() =>
   import('./reviews/ProductReviews').then((module) => ({ default: module.ProductReviews })),
 )
 import {
@@ -81,6 +81,7 @@ import {
   type PublicProduct,
   type PublicVariant,
 } from './types'
+import { lazyPage } from '@/app/lazyPage'
 
 /**
  * Ficha de producto: galería, precio, disponibilidad, descripción, cantidad,

@@ -6,15 +6,16 @@ import {
   InputBase,
   Stack,
 } from '@mui/material'
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { SearchQuery } from '@/domain'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { useDebouncedValue } from '@/shared/lib/useDebouncedValue'
 import { useCatalogSearch, useSignedThumbnails } from '../hooks'
+import { lazyPage } from '@/app/lazyPage'
 
 /** El panel de sugerencias, que no hace falta hasta que se teclea. */
-const QuickSearchPanel = lazy(() =>
+const QuickSearchPanel = lazyPage(() =>
   import('./StoreQuickSearchPanel').then((modulo) => ({ default: modulo.QuickSearchPanel })),
 )
 

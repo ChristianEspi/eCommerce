@@ -2,7 +2,7 @@ import LocalOfferRoundedIcon from '@mui/icons-material/LocalOfferRounded'
 import BoltRoundedIcon from '@mui/icons-material/BoltRounded'
 import { Box, Breadcrumbs, Button, Card, FormControlLabel, Link as MuiLink, Skeleton, Stack, Switch, Typography } from '@mui/material'
 import { visuallyHidden } from '@mui/utils'
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { useSessionContext } from '@/features/auth/session-context'
 import { useCommerceContext } from './commerce/context'
@@ -36,7 +36,7 @@ import { useStorefrontTheme } from './theme/useStorefrontTheme'
  * es la minoría de las visitas. Cargarla siempre era pagar en el primer pintado
  * de la portada —donde ni siquiera puede aparecer— por una sección de rescate.
  */
-const ExploreMore = lazy(() =>
+const ExploreMore = lazyPage(() =>
   import('./components/ExploreMore').then((modulo) => ({ default: modulo.ExploreMore })),
 )
 import {
@@ -87,13 +87,13 @@ const ProductQuickView = lazyPage(() =>
  * quedado a 0,1 kB del techo, y esto es lo que lo devuelve a un margen con el
  * que se puede seguir trabajando (396,0 kB de 405).
  */
-const StoreCatalogToolbar = lazy(() =>
+const StoreCatalogToolbar = lazyPage(() =>
   import('./components/StoreCatalogToolbar').then((m) => ({ default: m.StoreCatalogToolbar })),
 )
-const StoreFilterPanel = lazy(() =>
+const StoreFilterPanel = lazyPage(() =>
   import('./components/StoreFilterPanel').then((m) => ({ default: m.StoreFilterPanel })),
 )
-const StoreSortMenu = lazy(() =>
+const StoreSortMenu = lazyPage(() =>
   import('./components/StoreSortMenu').then((m) => ({ default: m.StoreSortMenu })),
 )
 
@@ -105,7 +105,7 @@ const StoreSortMenu = lazy(() =>
  * del catálogo sería pagar un diálogo por adelantado por cada visita que no lo
  * abre.
  */
-const StoreFilterDrawer = lazy(() =>
+const StoreFilterDrawer = lazyPage(() =>
   import('./components/StoreFilterDrawer').then((m) => ({ default: m.StoreFilterDrawer })),
 )
 

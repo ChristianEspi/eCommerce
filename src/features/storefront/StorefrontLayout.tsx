@@ -24,7 +24,7 @@ import {
   Typography,
   useMediaQuery,
 } from '@mui/material'
-import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
+import { Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ErrorBoundary } from '@/app/ErrorBoundary'
 import { useSessionContext } from '@/features/auth/session-context'
@@ -67,6 +67,7 @@ import { useStorefrontTheme } from './theme/useStorefrontTheme'
 import { themeCssVars, themeDataAttributes } from './theme/theme-context'
 import type { PublicStore } from './types'
 import { LoaderMarkContext } from '@/shared/ui/loaderMark'
+import { lazyPage } from '@/app/lazyPage'
 // La tipografia de la VITRINA, auto-alojada. Se importa aqui —y no en el
 // arranque de la app— para que viaje en el chunk del storefront: quien entra al
 // backoffice no baja ni un byte de ella.
@@ -90,12 +91,12 @@ import './storefront.css'
  * vez abierto, el cajón se queda montado y se cierra como siempre. Desmontarlo
  * al cerrar lo haría desaparecer de golpe.
  */
-const AssistantDrawer = lazy(() =>
+const AssistantDrawer = lazyPage(() =>
   import('./components/AssistantDrawer').then((modulo) => ({ default: modulo.AssistantDrawer })),
 )
 
 /** Solo se descarga con sesión: ver el comentario donde se monta. */
-const CommerceContextBar = lazy(() =>
+const CommerceContextBar = lazyPage(() =>
   import('./commerce/CommerceContextBar').then((m) => ({ default: m.CommerceContextBar })),
 )
 

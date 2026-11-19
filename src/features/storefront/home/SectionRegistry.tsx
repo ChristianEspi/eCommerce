@@ -1,4 +1,4 @@
-import { Suspense, lazy } from 'react'
+import { Suspense } from 'react'
 /**
  * El muro de logotipos viene ESTÁTICO, y es a propósito (V3 · P07).
  *
@@ -36,6 +36,7 @@ import { campanaQueTerminaAntes, mayorDescuento } from '../feria'
 import type { ResolvedPresentation } from '../theme/presentation'
 import type { HomeSectionData, HomeSectionRegistry } from './types'
 import { sanitizeHomeVideos } from '../homeVideos'
+import { lazyPage } from '@/app/lazyPage'
 
 /**
  * El contenido del CMS llega por `lazy` (Storefront V2 · P14).
@@ -64,16 +65,16 @@ import { sanitizeHomeVideos } from '../homeVideos'
  * cobrársela a las tiendas que no la usan, que hoy son todas las que no la
  * tocaron.
  */
-const CategoryDoorGrid = lazy(() =>
+const CategoryDoorGrid = lazyPage(() =>
   import('../components/CategoryDoors').then((modulo) => ({ default: modulo.CategoryDoorGrid })),
 )
-const CategoryPills = lazy(() =>
+const CategoryPills = lazyPage(() =>
   import('../components/CategoryDoors').then((modulo) => ({ default: modulo.CategoryPills })),
 )
-const CategoryCircles = lazy(() =>
+const CategoryCircles = lazyPage(() =>
   import('../components/CategoryDoors').then((modulo) => ({ default: modulo.CategoryCircles })),
 )
-const CategoryIconCards = lazy(() =>
+const CategoryIconCards = lazyPage(() =>
   import('../components/CategoryDoors').then((modulo) => ({ default: modulo.CategoryIconCards })),
 )
 /**
@@ -81,16 +82,16 @@ const CategoryIconCards = lazy(() =>
  * otras dos: la sección viene apagada en los cuatro temas, y su módulo no tiene
  * por qué pesar en la portada de quien no la enciende.
  */
-const CategoryMosaic = lazy(() =>
+const CategoryMosaic = lazyPage(() =>
   import('../components/CategoryMosaic').then((modulo) => ({ default: modulo.CategoryMosaic })),
 )
 
 /** 2026-10-04 · Apagada por defecto: no pesa en la portada de quien no la usa. */
-const VideoCarousel = lazy(() =>
+const VideoCarousel = lazyPage(() =>
   import('../components/VideoCarousel').then((modulo) => ({ default: modulo.VideoCarousel })),
 )
 
-const ContentBlocks = lazy(() =>
+const ContentBlocks = lazyPage(() =>
   import('../components/ContentBlocks').then((modulo) => ({ default: modulo.ContentBlocks })),
 )
 
