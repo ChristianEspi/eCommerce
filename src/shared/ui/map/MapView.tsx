@@ -1,6 +1,7 @@
 import { Skeleton } from '@mui/material'
-import { Suspense, lazy } from 'react'
+import { Suspense } from 'react'
 import type { LatLng } from '@/shared/lib/geo'
+import { lazyPage } from '@/app/lazyPage'
 
 export interface MapPlace {
   readonly id: string
@@ -27,7 +28,7 @@ export interface MapViewProps {
   readonly ariaLabel: string
 }
 
-const LeafletMap = lazy(() => import('./LeafletMap'))
+const LeafletMap = lazyPage(() => import('./LeafletMap'))
 
 /**
  * Mapa de OpenStreetMap, cargado bajo demanda (2026-11-15).

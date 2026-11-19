@@ -140,3 +140,30 @@ describe('una pantalla que se carga aparte y sobrevive a un despliegue', () => {
     expect(recargas).toBe(0)
   })
 })
+
+describe('todo trozo que se carga aparte sobrevive a un despliegue', () => {
+  /**
+   * 2026-11-19 · En QAS, el asistente de la vitrina se cargaba con `lazy` a
+   * secas y, con la pestaña abierta durante un despliegue, salía «Failed to
+   * fetch dynamically imported module …/AssistantDrawer-….js». `lazyPage`
+   * existía, pero solo lo usaban las rutas. Cualquier `lazy(` suelto vuelve a
+   * abrir ese agujero.
+   */
+  it('ningún archivo de src usa `lazy(` de React directamente', async () => {
+    const { readdirSync, readFileSync, statSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const archivos: string[] = []
+    const recorrer = (dir: string) => {
+      for (const e of readdirSync(dir)) {
+        const ruta = join(dir, e)
+        if (statSync(ruta).isDirectory()) recorrer(ruta)
+        else if (/\.tsx?$/.test(e) && !/\.test\.tsx?$/.test(e)) archivos.push(ruta)
+      }
+    }
+    recorrer(join(process.cwd(), 'src'))
+    const culpables = archivos.filter(
+      (f) => !f.endsWith('lazyPage.ts') && /(?<![A-Za-z.])lazy\(/.test(readFileSync(f, 'utf8')),
+    )
+    expect(culpables).toEqual([])
+  })
+})
