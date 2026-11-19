@@ -24,9 +24,15 @@ import { useCartQuote } from './useCartQuote'
 export function useAgreementPrice(
   storeSlug: string | undefined,
   product: { product_id: string; price: string; currency: string } | null,
-): { amount: number; currency: string } | null {
+  /**
+   * Con variantes, la ELEGIDA (2026-11-18): el convenio se cotiza sobre ella y
+   * se compara con SU precio público. Sin variante elegida, el maestro.
+   */
+  variant: { variant_id: string; price: string } | null = null,
+): { amount: number; currency: string; reference: number; percent: number } | null {
   const { status } = useSessionContext()
   const productId = product?.product_id ?? null
+  const variantId = variant?.variant_id ?? null
   const preguntar = status === 'authenticated' && productId !== null
 
   // Una sola línea, cantidad 1: es el precio que anuncia la ficha. Las escalas
@@ -34,9 +40,9 @@ export function useAgreementPrice(
   const lines = useMemo(
     () =>
       preguntar && productId
-        ? [{ productId, variantId: null, uomCode: null, quantity: 1 }]
+        ? [{ productId, variantId, uomCode: null, quantity: 1 }]
         : [],
-    [preguntar, productId],
+    [preguntar, productId, variantId],
   )
 
   const quote = useCartQuote(storeSlug, product?.currency ?? '', lines)
@@ -45,7 +51,16 @@ export function useAgreementPrice(
   if (!product || !linea || linea.source !== 'price_list') return null
 
   const acordado = Number(linea.unitPrice.amount)
-  if (!Number.isFinite(acordado) || acordado >= Number(product.price)) return null
+  // El tachado es el precio público de lo que se compra: el de la variante si
+  // la hay, que puede no coincidir con el del maestro.
+  const referencia = Number(variant?.price ?? product.price)
+  if (!Number.isFinite(acordado) || !(referencia > 0) || acordado >= referencia) return null
 
-  return { amount: acordado, currency: quote.data?.currency ?? product.currency }
+  return {
+    amount: acordado,
+    currency: quote.data?.currency ?? product.currency,
+    reference: referencia,
+    // El mismo redondeo que el carrito, para que ficha y carrito digan igual.
+    percent: Math.round((1 - acordado / referencia) * 100),
+  }
 }

@@ -129,13 +129,15 @@ export function StoreProductPage() {
   /**
    * El precio del acuerdo, si quien mira tiene uno.
    *
-   * Con variantes NO se pregunta: la ficha anuncia un «desde» hasta que el
-   * comprador elige talla, y cotizar el maestro daría un número que no se
-   * corresponde con lo que va a comprar.
+   * Con variantes se cotiza la ELEGIDA (2026-11-18). Antes no se preguntaba
+   * nunca y el comprador con convenio veía «Desde S/ 9.07» en la ficha y su
+   * S/ 8.16 recién en el carrito: dos precios para el mismo frasco. Sin
+   * variante elegida todavía no hay qué cotizar y queda el «desde» público.
    */
   const conAcuerdo = useAgreementPrice(
     storeSlug,
-    product.data && product.data.kind !== 'variant' ? product.data : null,
+    product.data && (product.data.kind !== 'variant' || choice.selected) ? product.data : null,
+    product.data?.kind === 'variant' ? choice.selected : null,
   )
 
   // Relaciones CURADAS por el comercio (cierre): «Completa tu compra», «Mejora
@@ -305,7 +307,7 @@ export function StoreProductPage() {
   const precioDeLaFicha = formatMoney(
     conAcuerdo
       ? conAcuerdo.amount
-      : Number(hasVariants ? (item.price_from ?? item.price) : item.price),
+      : Number(hasVariants ? (choice.selected?.price ?? item.price_from ?? item.price) : item.price),
     conAcuerdo?.currency ?? item.currency,
     locale,
   )
@@ -593,7 +595,7 @@ export function StoreProductPage() {
             {/* Con variantes el precio de la ficha es un "desde" hasta que el
                 comprador elige: el maestro puede costar 60 y la talla XL 70,
                 y anunciar 60 a secas es un precio que no se va a cobrar. */}
-            {hasVariants && item.variant_count > 1 && (
+            {hasVariants && item.variant_count > 1 && !choice.selected && (
               <Typography sx={{ color: 'var(--muted)', fontWeight: 700 }}>
                 {t('store.product.priceFrom')}
               </Typography>
@@ -626,10 +628,12 @@ export function StoreProductPage() {
             {conAcuerdo && (
               <>
                 <Typography component="s" sx={{ color: 'var(--muted)', fontWeight: 600 }}>
-                  {formatMoney(Number(item.price), item.currency, locale)}
+                  {formatMoney(conAcuerdo.reference, item.currency, locale)}
                 </Typography>
+                {/* El mismo «−10 %» que el carrito: si la ficha no lo dice, el
+                    comprador lo descubre al abrir el carrito y desconfía. */}
                 <Chip
-                  label={t('store.cart.listPrice')}
+                  label={`${t('store.cart.listPrice')} −${conAcuerdo.percent} %`}
                   size="small"
                   sx={{ bgcolor: 'var(--accent)', color: '#FFFFFF', fontWeight: 800 }}
                 />
@@ -728,7 +732,7 @@ export function StoreProductPage() {
             tiers={conAcuerdo ? [] : (tiers.data ?? [])}
             {...(conAcuerdo
               ? { priceNote: t('store.product.agreementPrice') }
-              : hasVariants && item.variant_count > 1
+              : hasVariants && item.variant_count > 1 && !choice.selected
                 ? { priceNote: t('store.product.priceFrom') }
                 : {})}
           />
@@ -943,7 +947,7 @@ function AddToCart({
   /** Escalas públicas por cantidad; vacías si no las hay. */
   tiers?: readonly PriceTier[]
 }) {
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const { storeSlug } = useStorefront()
   const { agregar, pending } = useAddToCart()
   const [quantity, setQuantity] = useState(1)
@@ -1035,10 +1039,11 @@ function AddToCart({
         </Typography>
       )}
 
+      {/* El precio que llega aquí ya es el de la variante elegida —o el del
+          convenio, si la sesión tiene uno—: repetir `selected.price` decía el
+          público (S/ 36.70) bajo un S/ 33.03 acordado (2026-11-18). */}
       {hasVariants && selected && (
-        <Typography sx={{ fontSize: 20, fontWeight: 800 }}>
-          {formatMoney(Number(selected.price), selected.currency, locale)}
-        </Typography>
+        <Typography sx={{ fontSize: 20, fontWeight: 800 }}>{priceLabel}</Typography>
       )}
 
       <PriceTiers tiers={tiers} currency={product.currency} quantity={quantity} onChoose={setQuantity} />
@@ -1111,9 +1116,7 @@ function AddToCart({
       */}
     {available && !fueraDeSurtido ? (
       <StoreProductPurchaseBar
-        priceLabel={
-          selected ? formatMoney(Number(selected.price), selected.currency, locale) : priceLabel
-        }
+        priceLabel={priceLabel}
         // El nombre de la variante elegida —«Talla XL»— dice más que «desde»,
         // y cuando no hay ninguna elegida vale la nota de la página.
         note={selected?.name ?? priceNote}

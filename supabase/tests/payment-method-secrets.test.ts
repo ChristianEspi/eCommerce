@@ -259,3 +259,39 @@ describe('vitrina y ciclo de vida', () => {
     expect(await su(`select 1 from vault.secrets`)).toHaveLength(0)
   })
 })
+
+/**
+ * 2026-11-19 · Yape por Culqi. Interruptor del medio de tarjeta con Culqi,
+ * apagado por defecto, visible para la vitrina y aislado por tenant.
+ */
+describe('Yape por Culqi', () => {
+  it('nace apagado, se enciende en un medio Culqi y la vitrina lo ve', async () => {
+    const medio = await metodoCulqi(TENANT_A, storeA, 'tarjeta-yape')
+    const [antes] = await asAnon(`select accepts_yape from public.public_payment_methods where payment_method_id = $1`, [medio])
+    expect(antes?.accepts_yape).toBe(false)
+
+    await asUser(TENANT_A, `update public.payment_methods set accepts_yape = true where id = $1`, [medio])
+    const [despues] = await asAnon(`select accepts_yape from public.public_payment_methods where payment_method_id = $1`, [medio])
+    expect(despues?.accepts_yape).toBe(true)
+    await svc(`delete from public.payment_methods where id = $1`, [medio])
+  })
+
+  it('no se puede encender en un medio sin Culqi ni en uno que no es de tarjeta', async () => {
+    const [manual] = await svc(
+      `insert into public.payment_methods
+         (organization_id, company_id, store_id, code, kind, display_name, capture_mode, is_active)
+       values ($1, $2, $3, 'yape-manual', 'wallet', 'Yape', 'manual', true) returning id`,
+      [TENANT_A.organizationId, TENANT_A.companyId, storeA],
+    )
+    const error = await expectFailure(() =>
+      asUser(TENANT_A, `update public.payment_methods set accepts_yape = true where id = $1`, [manual?.id]))
+    expect(error).toMatch(/payment_methods_yape_culqi/)
+    await svc(`delete from public.payment_methods where id = $1`, [manual?.id])
+  })
+
+  it('un tenant no enciende Yape en el medio de otro', async () => {
+    await asUser(TENANT_A, `update public.payment_methods set accepts_yape = true where id = $1`, [metodoB])
+    const [fila] = await svc(`select accepts_yape from public.payment_methods where id = $1`, [metodoB])
+    expect(fila?.accepts_yape).toBe(false)
+  })
+})

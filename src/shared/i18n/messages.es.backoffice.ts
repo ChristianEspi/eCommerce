@@ -642,6 +642,9 @@ export const esBackoffice = {
   'payments.culqi.env.none': 'Sin conectar',
   'payments.culqi.mismatch':
       'La llave pública y la secreta deben ser las dos de pruebas o las dos de producción.',
+  'payments.culqi.yape': 'Aceptar también Yape en la ventana de Culqi',
+  'payments.culqi.yapeHelp':
+      'El comprador paga con su celular y el código de aprobación de su app Yape, y el pedido queda pagado solo. Actívalo únicamente si tu cuenta Culqi tiene Yape habilitado. Solo soles, hasta S/ 2,000 por compra.',
   'payments.culqi.error.publicKey': 'La llave pública de Culqi empieza por pk_test_ o pk_live_.',
   'payments.culqi.error.secretKey': 'La llave secreta de Culqi empieza por sk_test_ o sk_live_.',
   'payments.culqi.error.sameEnv':

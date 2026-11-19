@@ -51,6 +51,8 @@ export const paymentMethodSchema = z.object({
    * tarjeta en el navegador. Pública por diseño; la secreta nunca sale de Vault.
    */
   checkout_public_key: z.string().nullable().default(null),
+  /** 2026-11-19 · La ventana de Culqi de este medio ofrece también Yape. */
+  accepts_yape: z.boolean().nullable().default(false),
 })
 export type StorePaymentMethod = z.infer<typeof paymentMethodSchema>
 
@@ -60,7 +62,7 @@ export const paymentMethodsKey = (storeId: string) =>
 export async function fetchPaymentMethods(storeId: string): Promise<StorePaymentMethod[]> {
   const { data, error } = await storefrontClient()
     .from(PUBLIC_PAYMENT_METHODS_VIEW)
-    .select('payment_method_id, code, kind, display_name, position, instructions, checkout_public_key')
+    .select('payment_method_id, code, kind, display_name, position, instructions, checkout_public_key, accepts_yape')
     .eq('store_id', storeId)
     .order('position', { ascending: true })
 

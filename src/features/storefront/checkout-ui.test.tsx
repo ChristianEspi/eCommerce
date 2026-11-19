@@ -1236,6 +1236,17 @@ const OPCION_RECOJO = {
       proximity: 'city',
       stock: { state: 'unavailable', missing: ['Silla de roble'] },
     },
+    {
+      pickup_point_id: PUNTO_SAN_MIGUEL.replace(/.$/, '9'),
+      code: 'san-isidro',
+      name: 'Botica San Isidro',
+      address: { address: 'Av. Camino Real 456', city: 'Lima' },
+      district: 'San Isidro',
+      contact_phone: null,
+      proximity: 'city',
+      // Sin almacén propio: el stock no se puede mirar.
+      stock: { state: 'unknown', missing: [] },
+    },
   ],
 }
 
@@ -1292,6 +1303,9 @@ describe('recojo en tienda: las más cercanas y con stock', () => {
     expect(screen.getByText('Disponible para recoger')).toBeInTheDocument()
     expect(screen.getByText('Sin stock: Silla de roble')).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: 'Botica San Miguel' })).toBeDisabled()
+    // Sin almacén propio: se puede elegir y dice de dónde sale el pedido.
+    expect(screen.getByText('Se prepara desde el almacén central')).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Botica San Isidro' })).toBeEnabled()
   })
 
   it('sin tienda elegida no se avanza, y el aviso dice qué falta', async () => {

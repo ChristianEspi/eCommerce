@@ -55,6 +55,7 @@ const EMPTY: PaymentMethodFormValues = {
   position: 100,
   instructions: '',
   publicKey: '',
+  acceptsYape: false,
   secretKey: '',
   clearSecret: false,
 }
@@ -71,6 +72,7 @@ function toForm(method: PaymentMethod): PaymentMethodFormValues {
     position: method.position,
     instructions: method.instructions ?? '',
     publicKey: method.checkout_public_key ?? '',
+    acceptsYape: method.accepts_yape,
     // La secreta NUNCA se rellena: no se lee de la base. Vacía = no se toca.
     secretKey: '',
     clearSecret: false,
@@ -458,6 +460,22 @@ export function MethodsSection() {
                 />
               )}
               {mezcla && <Alert severity="error">{t('payments.culqi.mismatch')}</Alert>}
+              {values.providerCode === 'culqi' && values.kind === 'card' && (
+                <Stack spacing={0.5} data-culqi-yape>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={values.acceptsYape}
+                        onChange={(event) => setValues((v) => ({ ...v, acceptsYape: event.target.checked }))}
+                      />
+                    }
+                    label={t('payments.culqi.yape')}
+                  />
+                  <Typography variant="body2" sx={{ color: 'var(--muted)' }}>
+                    {t('payments.culqi.yapeHelp')}
+                  </Typography>
+                </Stack>
+              )}
             </Stack>
           )}
           <Field
