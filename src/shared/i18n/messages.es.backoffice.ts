@@ -2914,6 +2914,7 @@ export const esBackoffice = {
   'code.aiFeature.insights': 'Analista',
   'code.aiFeature.analyst': 'Analista',
   'code.aiFeature.assistant': 'Asistente',
+  'code.aiFeature.intake': 'Pedido desde foto o documento',
   'code.aiFeature.orders': 'Pedidos',
   'code.aiFeature.customers': 'Clientes',
   'code.aiFeature.inventory': 'Inventario',

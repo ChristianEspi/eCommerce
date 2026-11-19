@@ -270,6 +270,27 @@ export const AI_FEATURES = {
     maxTokens: 400,
     timeoutMs: 9000,
   },
+  /**
+   * 2026-11-19 · Pedido desde foto, PDF o texto libre (vitrina con sesión).
+   *
+   * Misma capacidad y módulo que el asistente —ayudar a comprar en la tienda—
+   * pero funcionalidad propia: lee imágenes y documentos, cuesta varias veces
+   * más por llamada y el comercio tiene que poder verlo aparte en su medidor.
+   * Sonnet y no Haiku: leer una lista escrita a mano o una orden de compra
+   * escaneada es donde el modelo pequeño se equivoca de cantidad, y una
+   * cantidad mal leída es un pedido mal hecho.
+   */
+  intake: {
+    capability: 'ai.assist',
+    module: 'storefront',
+    // Por JWT (backoffice: quien toma pedidos de un cliente). En la vitrina
+    // mide la tienda y estos roles no aplican.
+    roles: ['owner', 'admin', 'orders', 'sales_rep'],
+    tier: 'redaccion',
+    // Hasta sesenta líneas de {texto, cantidad, unidad, sku}.
+    maxTokens: 4096,
+    timeoutMs: 30000,
+  },
   'catalog.copy': {
     capability: 'ai.catalog.copy',
     module: 'catalog',

@@ -12,6 +12,7 @@ import { agotado, type AiEntitlement } from './types'
  */
 export const AI_FEATURE_ROLES = {
   assistant: ['owner', 'admin'],
+  intake: ['owner', 'admin', 'orders', 'sales_rep'],
   'catalog.copy': ['owner', 'admin', 'catalog'],
   insights: ['owner', 'admin'],
   orders: ['owner', 'admin', 'orders', 'viewer'],

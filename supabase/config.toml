@@ -74,6 +74,13 @@ verify_jwt = true
 [functions.shopping-assistant]
 verify_jwt = true
 
+# Pedido desde foto, PDF o texto (2026-11-19). Lo llama un comprador CON SESION
+# (el SKU no es publico); la sesion la vuelve a exigir `ai_intake_check` en la
+# base, y ahi vive tambien el freno por comprador. Lee archivos: es la llamada
+# mas cara de la vitrina.
+[functions.order-intake]
+verify_jwt = true
+
 # Redaccion de fichas con IA (backoffice). Explicito desde la fase 12: antes
 # dependia del valor por defecto de la CLI, y un cambio de defecto no puede
 # dejar abierta una funcion que gasta cuota.

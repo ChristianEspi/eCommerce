@@ -50,7 +50,12 @@ const FUNCIONES_IA = readdirSync(FUNCTIONS)
   .filter((dir) => leer(join(FUNCTIONS, dir, 'index.ts')).includes('pedirJson'))
   .sort()
 
-const PUBLICAS = new Set(['shopping-assistant'])
+/**
+ * Las de la VITRINA: quien llama es un comprador, no un miembro del tenant, así
+ * que la cuota la mide la tienda (slug resuelto en SQL) y no hay
+ * `requireTenantContext`. Cada una tiene abajo su propio bloque de reglas.
+ */
+const PUBLICAS = new Set(['shopping-assistant', 'order-intake'])
 const BACKOFFICE = FUNCIONES_IA.filter((f) => !PUBLICAS.has(f))
 
 function configDe(funcion: string): string | null {
@@ -121,6 +126,35 @@ describe('shopping-assistant: la única pública', () => {
   it('mide por tienda (sociedad resuelta en SQL desde el slug), nunca por cuerpo', () => {
     expect(src).toMatch(/\bmedidorDeTienda\(/)
     expect(src).not.toMatch(/\bmedidorDeUsuario\(/)
+  })
+})
+
+describe('order-intake: vitrina con sesión', () => {
+  const src = leer(join(FUNCTIONS, 'order-intake', 'index.ts'))
+
+  it('verify_jwt declarado explícitamente a true en config.toml', () => {
+    expect(configDe('order-intake')).toMatch(/verify_jwt\s*=\s*true/)
+  })
+
+  it('exige sesión y freno por comprador ANTES de gastar cuota', () => {
+    const guarda = src.indexOf("rpc('ai_intake_check'")
+    const ia = src.indexOf('ejecutarIA<')
+    expect(guarda).toBeGreaterThan(0)
+    expect(ia).toBeGreaterThan(guarda)
+    expect(src).toMatch(/\buserClient\(request/)
+  })
+
+  it('mide por tienda y valida el archivo antes de llamar al proveedor', () => {
+    expect(src).toMatch(/\bmedidorDeTienda\(/)
+    expect(src).not.toMatch(/\bmedidorDeUsuario\(/)
+    expect(src.indexOf('validarAdjunto(')).toBeLessThan(src.indexOf('ejecutarIA<'))
+  })
+
+  it('el producto lo decide el catálogo, no el modelo', () => {
+    expect(src).toMatch(/catalog_search_for_slug/)
+    expect(src).toMatch(/\bproponerLinea\(/)
+    // El modelo no ve candidatos: no hay lista de productos en la petición.
+    expect(src).not.toMatch(/listarCandidatos/)
   })
 })
 
