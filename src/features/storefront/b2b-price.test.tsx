@@ -307,7 +307,11 @@ describe('el precio del acuerdo en la ficha', () => {
     )
 
     expect(await screen.findByText('Precio especial −8 %')).toBeInTheDocument()
-    expect(screen.getAllByText('S/ 92.00').length).toBeGreaterThan(0)
+    // Cabecera y caja de compra dicen el acordado; el público solo tachado.
+    expect(screen.getAllByText('S/ 92.00').length).toBeGreaterThan(1)
+    expect(screen.getAllByText('S/ 100.00').map((n) => n.tagName)).toEqual(
+      expect.not.arrayContaining(['P']),
+    )
     expect(screen.getByText('S/ 100.00', { selector: 's' })).toBeInTheDocument()
     // Elegida la variante, ya no es un «desde».
     expect(screen.queryByText('Desde')).not.toBeInTheDocument()

@@ -947,7 +947,7 @@ function AddToCart({
   /** Escalas públicas por cantidad; vacías si no las hay. */
   tiers?: readonly PriceTier[]
 }) {
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const { storeSlug } = useStorefront()
   const { agregar, pending } = useAddToCart()
   const [quantity, setQuantity] = useState(1)
@@ -1039,10 +1039,11 @@ function AddToCart({
         </Typography>
       )}
 
+      {/* El precio que llega aquí ya es el de la variante elegida —o el del
+          convenio, si la sesión tiene uno—: repetir `selected.price` decía el
+          público (S/ 36.70) bajo un S/ 33.03 acordado (2026-11-18). */}
       {hasVariants && selected && (
-        <Typography sx={{ fontSize: 20, fontWeight: 800 }}>
-          {formatMoney(Number(selected.price), selected.currency, locale)}
-        </Typography>
+        <Typography sx={{ fontSize: 20, fontWeight: 800 }}>{priceLabel}</Typography>
       )}
 
       <PriceTiers tiers={tiers} currency={product.currency} quantity={quantity} onChoose={setQuantity} />
@@ -1115,9 +1116,7 @@ function AddToCart({
       */}
     {available && !fueraDeSurtido ? (
       <StoreProductPurchaseBar
-        priceLabel={
-          selected ? formatMoney(Number(selected.price), selected.currency, locale) : priceLabel
-        }
+        priceLabel={priceLabel}
         // El nombre de la variante elegida —«Talla XL»— dice más que «desde»,
         // y cuando no hay ninguna elegida vale la nota de la página.
         note={selected?.name ?? priceNote}
