@@ -221,14 +221,34 @@ describe('cancelar el pedido', () => {
 })
 
 describe('configuración y «Mi cuenta»', () => {
-  it('series de nota: B/F y distintas de la del comprobante', async () => {
+  it('series de nota: B para boletas y F para facturas', async () => {
     expect(
       await fallo(() =>
-        as(ownerA, `select public.invoice_settings_configure($1::uuid, 'B001', 'F001', 0.18, 'exonerado', false, null, null, 'B001', 'FC01')`, [storeA]),
+        as(ownerA, `select public.invoice_settings_configure($1::uuid, 'B001', 'F001', 0.18, 'exonerado', false, null, null, 'F001', 'FC01')`, [storeA]),
       ),
     ).toMatch(/SERIE_INVALIDA/)
     await as(ownerA, `select public.invoice_settings_configure($1::uuid, 'B001', 'F001', 0.18, 'exonerado', false, null, null, 'BN01', 'FN01')`, [storeA])
     expect((await as(ownerA, `select credit_note_receipt_series as s from public.invoice_settings`))[0]?.s).toBe('BN01')
+  })
+
+  it('2026-11-20 · MISMA serie para comprobante y nota (Nubefact BBB1): correlativos separados', async () => {
+    await as(ownerA, `select public.invoice_settings_configure($1::uuid, 'BBB1', 'FFF1', 0.18, 'exonerado', false, null, null, 'BBB1', 'FFF1')`, [storeA])
+    const a = await emitida()
+    const b = await emitida()
+    const [na] = await anular(ownerA, a.invoice)
+    const filas = await sql<{ id: string; series: string; number: string; document_type: string }>(
+      `select id, series, number, document_type from public.invoices where id in ($1, $2, $3) order by document_type, number`,
+      [a.invoice, b.invoice, na?.r?.credit_note_id],
+    )
+    // Dos boletas BBB1-1 y BBB1-2, y la nota BBB1-1: el número se repite entre tipos, no dentro.
+    expect(filas.map((f) => `${f.document_type}:${f.series}-${f.number}`)).toEqual([
+      'credit_note:BBB1-00000001',
+      'receipt:BBB1-00000001',
+      'receipt:BBB1-00000002',
+    ])
+    // La siguiente boleta sigue su propia cuenta, sin saltar por la nota.
+    const c = await emitida()
+    expect((await sql(`select number from public.invoices where id = $1`, [c.invoice]))[0]?.number).toBe('00000003')
   })
 
   it('«Mi cuenta» muestra el comprobante (anulado), nunca su nota', async () => {

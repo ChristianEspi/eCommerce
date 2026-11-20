@@ -100,9 +100,10 @@ export function InvoicingSettingsSection({ storeId }: { storeId: string | null }
 
   const pct = Number(shippingPct)
   const lastOf = (value: string) => (value.trim() === '' ? null : Number(value))
+  // La nota puede usar la misma serie que su comprobante (FFF1/BBB1 en Nubefact):
+  // el correlativo es por serie y TIPO.
   const seriesOk =
-    SERIE_B.test(receipt) && SERIE_F.test(invoice) && SERIE_B.test(noteReceipt) && SERIE_F.test(noteInvoice) &&
-    noteReceipt !== receipt && noteInvoice !== invoice
+    SERIE_B.test(receipt) && SERIE_F.test(invoice) && SERIE_B.test(noteReceipt) && SERIE_F.test(noteInvoice)
   const pctOk = Number.isFinite(pct) && pct >= 0 && pct < 100
   const lastOk = [receiptLast, invoiceLast].every((v) => v.trim() === '' || /^\d{1,8}$/.test(v.trim()))
   const canSaveSettings = seriesOk && pctOk && lastOk && !saveSettings.isPending
@@ -230,7 +231,7 @@ export function InvoicingSettingsSection({ storeId }: { storeId: string | null }
             value={noteReceipt}
             onChange={(e) => setNoteReceipt(e.target.value.toUpperCase())}
             maxLength={4}
-            error={!SERIE_B.test(noteReceipt) || noteReceipt === receipt}
+            error={!SERIE_B.test(noteReceipt)}
             helperText={t('invoicing.settings.current').replace('{n}', String(sequences[noteReceipt] ?? 0))}
           />
           <Field
@@ -238,7 +239,7 @@ export function InvoicingSettingsSection({ storeId }: { storeId: string | null }
             value={noteInvoice}
             onChange={(e) => setNoteInvoice(e.target.value.toUpperCase())}
             maxLength={4}
-            error={!SERIE_F.test(noteInvoice) || noteInvoice === invoice}
+            error={!SERIE_F.test(noteInvoice)}
             helperText={t('invoicing.settings.current').replace('{n}', String(sequences[noteInvoice] ?? 0))}
           />
           <Field
