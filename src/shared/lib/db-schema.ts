@@ -913,3 +913,7 @@ export const WATCH_ASSISTANT_FUNCTION = 'watch-assistant'
 // hasta regenerar los tipos contra una base que ya tenga la migración
 // `20260926120000_dashboard_sales_trend.sql`.
 export const DASHBOARD_SALES_TREND_RPC = 'dashboard_sales_trend'
+/** 2026-11-20 · Textos de correo por tienda (migración 20261120100000). Sin `satisfies` hasta regenerar tipos. */
+export const EMAIL_TEMPLATES_TABLE = 'email_templates'
+export const EMAIL_TEMPLATE_SAVE_RPC = 'email_template_save'
+export const EMAIL_TEMPLATE_RESET_RPC = 'email_template_reset'

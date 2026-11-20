@@ -22,6 +22,7 @@ import { serviceClient } from '../_runtime/clients.ts'
 import { timingSafeEqual } from '../_shared/auth.ts'
 import { dispatchPendingEmails, type ClaimedEmail, type DispatchPorts } from '../_shared/notifications/dispatch.ts'
 import { graphConfigFromEnv, graphToken, sendGraphMail } from '../_shared/notifications/graph.ts'
+import { isEditableKind, type CustomCopy } from '../_shared/notifications/customCopy.ts'
 import {
   mailhubConfigFromEnv,
   mailhubTemplateFor,
@@ -84,7 +85,11 @@ Deno.serve(async (request: Request): Promise<Response> => {
               ...message,
               emailId: email.id,
               referenceId: referenceFor(email.id, email.params),
-              template: mailhubTemplateFor(email.kind, email.locale, email.params, baseUrl, new Date()),
+              // Si la tienda escribió su texto, manda el suyo (HTML); si no, la
+              // plantilla publicada en MailHub cuando la hay.
+              template: message.custom
+                ? null
+                : mailhubTemplateFor(email.kind, email.locale, email.params, baseUrl, new Date()),
             },
             fetch,
           ),
@@ -113,6 +118,33 @@ Deno.serve(async (request: Request): Promise<Response> => {
           if (error) throw new Error(error.code ?? 'CIERRE_FALLIDO')
         },
         ...transporte,
+        async customCopies(emails) {
+          const ids = emails.filter((e) => isEditableKind(e.kind)).map((e) => e.id)
+          if (ids.length === 0) return new Map()
+          // La tienda de cada correo y el texto que guardó para ese aviso e idioma.
+          const { data: filas, error: e1 } = await client
+            .from('notification_emails')
+            .select('id, store_id, kind, locale')
+            .in('id', ids)
+          if (e1) throw new Error(e1.code ?? 'TEXTOS_FALLIDOS')
+          const tiendas = [...new Set((filas ?? []).map((f) => f.store_id).filter(Boolean))]
+          if (tiendas.length === 0) return new Map()
+          const { data: textos, error: e2 } = await client
+            .from('email_templates')
+            .select('store_id, kind, locale, subject, title, body')
+            .in('store_id', tiendas)
+          if (e2) throw new Error(e2.code ?? 'TEXTOS_FALLIDOS')
+          const porClave = new Map(
+            (textos ?? []).map((t) => [`${t.store_id}|${t.kind}|${t.locale}`, { subject: t.subject, title: t.title, body: t.body }]),
+          )
+          const resultado = new Map<string, CustomCopy>()
+          for (const f of filas ?? []) {
+            const locale = f.locale === 'en' ? 'en' : 'es'
+            const texto = porClave.get(`${f.store_id}|${f.kind}|${locale}`)
+            if (texto) resultado.set(f.id, texto)
+          }
+          return resultado
+        },
       },
       { limit: 25, baseUrl },
     )

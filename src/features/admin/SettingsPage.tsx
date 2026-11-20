@@ -49,6 +49,8 @@ import GroupRoundedIcon from '@mui/icons-material/GroupRounded'
 import { useSessionContext } from '@/features/auth/session-context'
 import { MembersSection } from './settings/MembersSection'
 import { MailSettingsSection } from '@/features/notifications/MailSettingsSection'
+import { EmailTemplatesSection } from '@/features/notifications/EmailTemplatesSection'
+import EditNoteRoundedIcon from '@mui/icons-material/EditNoteRounded'
 import { CartRecoverySection } from '@/features/notifications/CartRecoverySection'
 import { AiDigestSection } from '@/features/notifications/AiDigestSection'
 import RemoveShoppingCartRoundedIcon from '@mui/icons-material/RemoveShoppingCartRounded'
@@ -1005,6 +1007,23 @@ export function SettingsPage() {
                       padded
                     >
                       <MailSettingsSection />
+                    </SectionCard>
+                  </CardContent>
+                </Card>
+                {/* 2026-11-20 · Textos de los correos al comprador, por tienda. */}
+                <Card sx={{ mt: 2.5 }}>
+                  <CardContent>
+                    <SectionCard
+                      icon={<EditNoteRoundedIcon />}
+                      title={t('emailTemplates.title')}
+                      subtitle={t('emailTemplates.subtitle')}
+                      padded
+                    >
+                      <EmailTemplatesSection
+                        storeId={storeId}
+                        storeName={activeStore?.name ?? ''}
+                        storeSlug={activeStore?.slug ?? ''}
+                      />
                     </SectionCard>
                   </CardContent>
                 </Card>

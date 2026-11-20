@@ -21,6 +21,8 @@
  * acabar dentro del HTML de un correo.
  */
 
+import type { ResolvedCopy } from './customCopy.ts'
+
 export type Locale = 'es' | 'en'
 
 export interface RenderedEmail {
@@ -482,12 +484,21 @@ export function renderEmail(
   locale: string,
   params: Params,
   baseUrl: string,
+  /**
+   * El texto que escribió la tienda (`customCopy.ts`), ya con sus variables
+   * resueltas y el mensaje escapado. Cambia asunto, título y mensaje; botón,
+   * marca, pie y enlace de baja siguen siendo los de la plantilla.
+   */
+  custom: ResolvedCopy | null = null,
 ): RenderedEmail | null {
   const builders = COPY[kind]
   if (!builders) return null
   const lang: Locale = locale === 'en' ? 'en' : 'es'
   const esc = (key: string) => escapeHtml(text(params, key))
-  const copy = builders[lang](params, lang, esc)
+  const base = builders[lang](params, lang, esc)
+  const copy: Copy = custom
+    ? { ...base, subject: custom.subject, title: custom.title, body: custom.bodyHtml }
+    : base
   const href = copy.action ? actionUrl(kind, params, baseUrl) : null
   const unsubscribe = unsubscribeUrl(kind, params, baseUrl)
   // Un recordatorio sin enlace de baja, o sin a dónde volver, no se envía roto:

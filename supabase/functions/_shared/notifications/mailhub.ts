@@ -23,6 +23,7 @@
  * TypeScript puro con `fetch` inyectado: se prueba sin red y sin secretos.
  */
 import type { FetchLike, SendOutcome } from './graph.ts'
+import { fechaLima, formatTotal } from './customCopy.ts'
 import { actionUrl } from './templates.ts'
 
 /** Secretos de las Edge Functions. El token NUNCA va al front ni a git. */
@@ -69,26 +70,8 @@ const str = (params: Readonly<Record<string, unknown>>, key: string): string => 
   return typeof value === 'string' || typeof value === 'number' ? String(value).trim() : ''
 }
 
-const SIMBOLO: Record<string, string> = { PEN: 'S/', USD: 'US$', EUR: '€' }
-
-/** `715.2` + `PEN` → `S/ 715.20`. MailHub no da formato: llega ya escrito. */
-export function formatTotal(amount: string, currency: string): string | null {
-  const value = Number(amount)
-  if (!amount || !Number.isFinite(value)) return null
-  const cifra = value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  const code = currency.toUpperCase()
-  return `${SIMBOLO[code] ?? code} ${cifra}`.trim()
-}
-
-/** Fecha de Lima, `dd/mm/aaaa`: el correo sale al minuto de crearse el pedido. */
-export function fechaLima(now: Date): string {
-  return new Intl.DateTimeFormat('es-PE', {
-    timeZone: 'America/Lima',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(now)
-}
+// MailHub no da formato: el total y la fecha llegan ya escritos.
+export { fechaLima, formatTotal }
 
 /**
  * Plantillas publicadas en MailHub, por `kind` de la cola. Solo en español:
