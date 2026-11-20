@@ -18,7 +18,8 @@ import {
 import { Link, useLocation } from 'react-router-dom'
 import { useSessionContext } from '@/features/auth/session-context'
 import { useMyAccounts, useMyPendingAccounts } from '@/features/customers/hooks'
-import { StoreNotificationsSection } from '@/features/notifications/StoreNotificationsSection'
+import { StorePreferencesSection } from '@/features/notifications/StorePreferencesSection'
+import { resolveShowThemeToggle } from './identity'
 import { formatAddress } from '@/features/customers/types'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { useDocumentMeta } from '@/shared/seo/useDocumentMeta'
@@ -405,8 +406,19 @@ export function StoreAccountPage() {
                 },
               ]
             : []),
-          { id: 'avisos', label: t('account.tab.notifications'), content: <StoreNotificationsSection /> },
-          { id: 'cuenta', label: t('account.tab.summary'), content: resumen },
+          {
+            id: 'cuenta',
+            label: t('account.tab.summary'),
+            // 2026-11-20 · Preferencias (claro/oscuro, recordatorios) al pie de «Mi cuenta».
+            content: (
+              <Stack spacing={3}>
+                {resumen}
+                <StorePreferencesSection
+                  showThemeOption={resolveShowThemeToggle(storefront?.store.show_theme_toggle)}
+                />
+              </Stack>
+            ),
+          },
         ]}
       />
     </Stack>

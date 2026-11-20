@@ -7,7 +7,6 @@ import ContactMailRoundedIcon from '@mui/icons-material/ContactMailRounded'
 import LockRoundedIcon from '@mui/icons-material/LockRounded'
 import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded'
 import DensityMediumRoundedIcon from '@mui/icons-material/DensityMediumRounded'
-import LaunchRoundedIcon from '@mui/icons-material/LaunchRounded'
 import MailOutlineRoundedIcon from '@mui/icons-material/MailOutlineRounded'
 import CampaignRoundedIcon from '@mui/icons-material/CampaignRounded'
 import PaletteRoundedIcon from '@mui/icons-material/PaletteRounded'
@@ -19,13 +18,11 @@ import WorkspacePremiumRoundedIcon from '@mui/icons-material/WorkspacePremiumRou
 import {
   Alert,
   Box,
-  Button,
   Card,
   CardContent,
   FormControlLabel,
   Grid,
   MenuItem,
-  Link as MuiLink,
   Stack,
   Switch,
   ToggleButton,
@@ -286,7 +283,6 @@ export function SettingsPage() {
   }
 
   const busy = save.isPending || form.formState.isSubmitting
-  const storeUrl = activeStore ? `/s/${activeStore.slug}` : null
 
   /**
    * Estado previo al formulario, calculado UNA vez.
@@ -323,20 +319,6 @@ export function SettingsPage() {
             title={t('admin.settings.title')}
             subtitle={activeStore?.name}
             center={tabs}
-            actions={
-              storeUrl && (
-                <Button
-                  component={MuiLink}
-                  href={storeUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  variant="outlined"
-                  endIcon={<LaunchRoundedIcon fontSize="small" />}
-                >
-                  {t('settings.viewStore')}
-                </Button>
-              )
-            }
           />
         )}
         ariaLabel={t('admin.settings.title')}

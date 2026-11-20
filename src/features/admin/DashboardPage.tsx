@@ -1,3 +1,4 @@
+import LaunchRoundedIcon from '@mui/icons-material/LaunchRounded'
 import SpaceDashboardRoundedIcon from '@mui/icons-material/SpaceDashboardRounded'
 import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded'
 import StorefrontRoundedIcon from '@mui/icons-material/StorefrontRounded'
@@ -60,7 +61,30 @@ export function DashboardPage() {
   const findings = watch.data?.items ?? []
 
   const subtitle = [tenant?.name, activeStore?.name].filter(Boolean).join(' · ')
-  const header = <PageHeader icon={<SpaceDashboardRoundedIcon />} title={t('admin.dashboard.title')} subtitle={subtitle || tenant?.name} />
+  // 2026-11-20 · «Ver la tienda» vive en Inicio (antes en Configuración): es lo
+  // primero que se ve al entrar y desde donde se quiere echar un vistazo.
+  const storeUrl = activeStore ? `/s/${activeStore.slug}` : null
+  const header = (
+    <PageHeader
+      icon={<SpaceDashboardRoundedIcon />}
+      title={t('admin.dashboard.title')}
+      subtitle={subtitle || tenant?.name}
+      actions={
+        storeUrl && (
+          <Button
+            component="a"
+            href={storeUrl}
+            target="_blank"
+            rel="noreferrer"
+            variant="outlined"
+            endIcon={<LaunchRoundedIcon fontSize="small" />}
+          >
+            {t('settings.viewStore')}
+          </Button>
+        )
+      }
+    />
+  )
 
   if (!storeId) {
     return (

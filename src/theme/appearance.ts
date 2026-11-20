@@ -38,18 +38,17 @@ function readKey<T extends string>(key: string, allowed: readonly T[]): T | null
   }
 }
 
-function prefersDark(): boolean {
-  try {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches
-  } catch {
-    return false
-  }
-}
-
-/** Lee la apariencia del dispositivo (anti-flash). El servidor la hidrata al login. */
+/**
+ * Lee la apariencia del dispositivo (anti-flash). El servidor la hidrata al login.
+ *
+ * Sin elección guardada, CLARO (default de suite, CLAUDE.md), no el tema del
+ * sistema operativo (2026-11-20, a pedido del operador): quien tiene Windows en
+ * oscuro veía la tienda oscura sin haberlo pedido. El oscuro se elige —en
+ * «Mi cuenta» de la tienda o en Apariencia del backoffice— y entonces se guarda.
+ */
 export function readStoredAppearance(): Appearance {
   return {
-    mode: readKey(STORAGE_KEYS.mode, COLOR_MODES) ?? (prefersDark() ? 'dark' : DEFAULT_COLOR_MODE),
+    mode: readKey(STORAGE_KEYS.mode, COLOR_MODES) ?? DEFAULT_COLOR_MODE,
     accent: readKey(STORAGE_KEYS.accent, ACCENTS) ?? DEFAULT_ACCENT,
     density: readKey(STORAGE_KEYS.density, DENSITIES) ?? DEFAULT_DENSITY,
   }
