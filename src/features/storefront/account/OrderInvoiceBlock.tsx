@@ -1,8 +1,11 @@
-import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded'
+import PictureAsPdfRoundedIcon from '@mui/icons-material/PictureAsPdfRounded'
 import { Box, Button, Stack, Typography } from '@mui/material'
 import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
+import { fetchInvoicePdf } from '@/shared/lib/invoicePdf'
+import { PdfPreviewDialog } from '@/shared/ui/PdfPreviewDialog'
 import { TS } from '@/theme/tokens'
 import { fetchMyOrderInvoice, myOrderInvoiceKey, type MyOrderInvoice } from './myOrderInvoice'
 
@@ -29,6 +32,7 @@ export function OrderInvoiceBlock({ orderId }: { orderId: string }) {
     // Un fallo aquí no tapa el pedido: simplemente no se muestra el bloque.
     retry: false,
   })
+  const [viendo, setViendo] = useState(false)
   const inv = query.data
   if (!inv) return null
 
@@ -46,15 +50,20 @@ export function OrderInvoiceBlock({ orderId }: { orderId: string }) {
           <Button
             size="small"
             variant="outlined"
-            startIcon={<DownloadRoundedIcon fontSize="small" />}
-            href={inv.pdf_url}
-            target="_blank"
-            rel="noopener noreferrer"
+            startIcon={<PictureAsPdfRoundedIcon fontSize="small" />}
+            onClick={() => setViendo(true)}
           >
-            {t('account.invoice.download')}
+            {t('account.invoice.view')}
           </Button>
         )}
       </Stack>
+      {/* El PDF, dentro de la tienda: la función vuelve a comprobar que es suyo. */}
+      <PdfPreviewDialog
+        open={viendo}
+        title={`${label} ${numero}`}
+        load={() => fetchInvoicePdf(inv.id)}
+        onClose={() => setViendo(false)}
+      />
     </Box>
   )
 }

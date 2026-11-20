@@ -36,6 +36,12 @@ vi.mock('@/shared/lib/supabase', () => ({
   getStorefrontClient: () => holder.client,
 }))
 
+// jsdom no dibuja canvas: pdf.js se sustituye por una página en blanco.
+vi.mock('@/shared/lib/pdf/renderPdf', async (original) => ({
+  ...(await original<typeof import('@/shared/lib/pdf/renderPdf')>()),
+  renderPdf: async () => [{ canvas: document.createElement('canvas'), width: 600, height: 800 }],
+}))
+
 const { TenantProvider } = await import('@/features/tenant/TenantProvider')
 const { CapabilitiesProvider } = await import('@/features/capabilities/CapabilitiesProvider')
 const { CapabilityGate } = await import('@/features/capabilities/CapabilityGate')
@@ -304,7 +310,7 @@ describe('la emisión de un comprobante', () => {
     pintar(fake)
     await screen.findByText('F001-100')
     await user.click(screen.getByRole('tab', { name: 'Comprobantes' }))
-    await screen.findByText('Bodega Central', { selector: 'td' })
+    await screen.findByText('Bodega Central')
     return user
   }
 
@@ -369,6 +375,24 @@ describe('la emisión de un comprobante', () => {
       ]),
     )
     expect(await screen.findByText('Nota de crédito encolada para el emisor')).toBeInTheDocument()
+  })
+
+  it('2026-11-20 · el PDF se ve dentro de la web, sin salir a Nubefact', async () => {
+    const emitida = {
+      ...factura, number: '00000012', status: 'issued', document_type: 'invoice',
+      pdf_url: 'https://www.nubefact.com/cpe/abc.pdf',
+    }
+    const fake = backend({ entitlements: [...COBRANZA, 'ecommerce.invoicing'], invoices: [emitida] })
+    fake.state.functions['invoice-pdf'] = () => ({
+      filename: 'F001-00000012.pdf', title: 'F001-00000012', content_base64: btoa('%PDF-1.4 x'),
+    })
+    const user = await abrirComprobantes(fake)
+    expect(screen.queryByRole('link', { name: 'PDF' })).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Ver PDF de F001-00000012' }))
+    const visor = await screen.findByRole('dialog')
+    expect(within(visor).getByText('Factura F001-00000012')).toBeInTheDocument()
+    await vi.waitFor(() => expect(within(visor).getByRole('button', { name: 'Descargar' })).toBeEnabled())
+    expect(fake.state.invocations).toContainEqual({ name: 'invoice-pdf', body: { invoice_id: FACTURA } })
   })
 
   it('2026-11-20 · la nota se ve como tal y su comprobante ya no ofrece anular', async () => {

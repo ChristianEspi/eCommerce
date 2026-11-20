@@ -12,6 +12,7 @@ export const MY_ORDER_INVOICE_RPC = 'my_order_invoice'
 
 const invoiceSchema = z
   .object({
+    id: z.string().uuid(),
     document_type: z.enum(['receipt', 'invoice']).catch('receipt'),
     series: z.string(),
     number: z.string().nullable(),

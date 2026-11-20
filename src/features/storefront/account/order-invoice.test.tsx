@@ -1,14 +1,16 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '@/test/render'
 import { createFakeSupabase, makeSession } from '@/test/supabaseMock'
 
 /**
- * «Mi cuenta» › detalle del pedido › comprobante (facturación fase 4).
- * Quién puede verlo lo decide la base (`supabase/tests/invoicing-buyer.test.ts`).
+ * «Mi cuenta» › detalle del pedido › comprobante (facturación fase 4) y su PDF
+ * en el visor de la propia tienda (2026-11-20). Quién puede verlo lo decide la
+ * base (`supabase/tests/invoicing-buyer.test.ts`, `invoicing-pdf.test.ts`).
  */
 
-const holder = vi.hoisted(() => ({ client: null as unknown }))
+const holder = vi.hoisted(() => ({ client: null as unknown, rendered: 0 }))
 
 vi.mock('@/shared/lib/supabase', () => ({
   tryGetSupabaseClient: () => holder.client,
@@ -18,38 +20,75 @@ vi.mock('@/shared/lib/supabase', () => ({
   getStorefrontClient: () => holder.client,
 }))
 
+// jsdom no dibuja canvas: pdf.js se sustituye por un dibujo de una página.
+vi.mock('@/shared/lib/pdf/renderPdf', async (original) => ({
+  ...(await original<typeof import('@/shared/lib/pdf/renderPdf')>()),
+  renderPdf: async () => {
+    holder.rendered += 1
+    return [{ canvas: document.createElement('canvas'), width: 600, height: 800 }]
+  },
+}))
+
 const { OrderInvoiceBlock } = await import('./OrderInvoiceBlock')
 
 const ORDER = '11111111-1111-4111-8111-111111111111'
+const INVOICE = '22222222-2222-4222-8222-222222222222'
 
-function pintar(respuesta: () => unknown) {
-  const fake = createFakeSupabase({ session: makeSession(), rpc: { my_order_invoice: respuesta } })
+function pintar(respuesta: () => unknown, pdf?: () => unknown) {
+  const fake = createFakeSupabase({
+    session: makeSession(),
+    rpc: { my_order_invoice: respuesta },
+    functions: {
+      'invoice-pdf': pdf ?? (() => ({ filename: 'BBB1-00000001.pdf', title: 'BBB1-00000001', content_base64: btoa('%PDF-1.4 x') })),
+    },
+  })
   holder.client = fake
   renderWithProviders(<OrderInvoiceBlock orderId={ORDER} />, { session: fake.state.session })
   return fake
 }
 
 describe('comprobante del pedido', () => {
-  it('emitida con PDF: número, estado y descarga en pestaña nueva', async () => {
-    pintar(() => ({
-      document_type: 'receipt', series: 'B001', number: '00000123', status: 'accepted',
+  it('emitida con PDF: número, estado y «Ver comprobante» abre el visor en la tienda', async () => {
+    const user = userEvent.setup()
+    const fake = pintar(() => ({
+      id: INVOICE, document_type: 'receipt', series: 'B001', number: '00000123', status: 'accepted',
       pdf_url: 'https://www.nubefact.com/cpe/abc.pdf',
     }))
     expect(await screen.findByText('Boleta B001-00000123')).toBeInTheDocument()
     expect(screen.getByText('Aceptada por SUNAT')).toBeInTheDocument()
-    const link = screen.getByRole('link', { name: 'Descargar PDF' })
-    expect(link).toHaveAttribute('href', 'https://www.nubefact.com/cpe/abc.pdf')
-    expect(link).toHaveAttribute('target', '_blank')
+    // Ya no hay enlace que saque al comprador de la tienda.
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Ver comprobante' }))
+    const visor = await screen.findByRole('dialog')
+    await waitFor(() => expect(holder.rendered).toBeGreaterThan(0))
+    expect(within(visor).getByRole('button', { name: 'Descargar' })).toBeEnabled()
+    // Se pide por id: la base vuelve a comprobar que es suyo.
+    expect(fake.state.invocations).toContainEqual(
+      expect.objectContaining({ name: 'invoice-pdf', body: { invoice_id: INVOICE } }),
+    )
   })
 
-  it('pendiente: sin número ni botón; un PDF que no es https no se enlaza', async () => {
-    pintar(() => ({ document_type: 'invoice', series: 'F001', number: null, status: 'pending', pdf_url: 'http://x.pe/a.pdf' }))
+  it('si el PDF no se puede traer, el visor lo dice', async () => {
+    const user = userEvent.setup()
+    pintar(
+      () => ({ id: INVOICE, document_type: 'receipt', series: 'B001', number: '00000123', status: 'issued', pdf_url: 'https://www.nubefact.com/cpe/abc.pdf' }),
+      () => {
+        throw new Error('PDF_NO_DISPONIBLE')
+      },
+    )
+    await user.click(await screen.findByRole('button', { name: 'Ver comprobante' }))
+    expect(await screen.findByText(/No se pudo mostrar el PDF/)).toBeInTheDocument()
+  })
+
+  it('pendiente: sin número ni botón; un PDF que no es https no se ofrece', async () => {
+    pintar(() => ({ id: INVOICE, document_type: 'invoice', series: 'F001', number: null, status: 'pending', pdf_url: 'http://x.pe/a.pdf' }))
     expect(await screen.findByText('Factura F001')).toBeInTheDocument()
     expect(screen.getByText('En preparación')).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Descargar PDF' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Ver comprobante' })).not.toBeInTheDocument()
   })
 
-  it('sin comprobante o con error: no se pinta nada', async () => {
+  it('sin comprobante: no se pinta nada', async () => {
     pintar(() => null)
     await new Promise((r) => setTimeout(r, 50))
     expect(screen.queryByText(/Boleta|Factura/)).not.toBeInTheDocument()

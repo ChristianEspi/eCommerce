@@ -215,3 +215,7 @@ verify_jwt = false
 # 2026-11-20 · Botón «Probar conexión» de Configuración › Facturación. Owner/admin.
 [functions.invoicing-test]
 verify_jwt = true
+
+# 2026-11-20 · PDF del comprobante para el visor de la web. Backoffice y tienda, con sesión.
+[functions.invoice-pdf]
+verify_jwt = true
