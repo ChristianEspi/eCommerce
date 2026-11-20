@@ -9,6 +9,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Link,
   Stack,
   Table,
   TableBody,
@@ -223,6 +224,17 @@ export function InvoicesSection() {
                         <Typography sx={{ fontSize: 11, color: 'var(--red)' }}>
                           {invoice.reject_reason}
                         </Typography>
+                      )}
+                      {/* 2026-11-20 · Lo que respondió SUNAT vía el emisor, y el PDF. */}
+                      {invoice.sunat_description && !invoice.reject_reason && (
+                        <Typography sx={{ fontSize: 11, color: 'var(--muted)' }}>
+                          {`${t('credit.invoice.sunat')}: ${invoice.sunat_description}`}
+                        </Typography>
+                      )}
+                      {invoice.pdf_url && (
+                        <Link href={invoice.pdf_url} target="_blank" rel="noopener noreferrer" sx={{ fontSize: 12, fontWeight: 600 }}>
+                          {t('credit.invoice.pdf')}
+                        </Link>
                       )}
                     </Stack>
                   </TableCell>

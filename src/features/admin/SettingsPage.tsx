@@ -50,6 +50,9 @@ import { useSessionContext } from '@/features/auth/session-context'
 import { MembersSection } from './settings/MembersSection'
 import { MailSettingsSection } from '@/features/notifications/MailSettingsSection'
 import { EmailTemplatesSection } from '@/features/notifications/EmailTemplatesSection'
+import { InvoicingSettingsSection } from '@/features/invoicing/InvoicingSettingsSection'
+import { CapabilityGate } from '@/features/capabilities/CapabilityGate'
+import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import EditNoteRoundedIcon from '@mui/icons-material/EditNoteRounded'
 import { CartRecoverySection } from '@/features/notifications/CartRecoverySection'
 import { AiDigestSection } from '@/features/notifications/AiDigestSection'
@@ -1055,6 +1058,30 @@ export function SettingsPage() {
                     </SectionCard>
                   </CardContent>
                 </Card>
+              </ManagedSection>
+            ),
+          },
+          // 2026-11-20 · Facturación electrónica (Nubefact). Solo con el addon
+          // `invoicing`; la base vuelve a exigir owner/admin al guardar.
+          {
+            id: 'facturacion',
+            label: t('admin.settings.tab.invoicing'),
+            content: (
+              <ManagedSection>
+                <CapabilityGate capability="invoicing">
+                  <Card>
+                    <CardContent>
+                      <SectionCard
+                        icon={<ReceiptLongRoundedIcon />}
+                        title={t('invoicing.title')}
+                        subtitle={t('invoicing.subtitle')}
+                        padded
+                      >
+                        <InvoicingSettingsSection storeId={storeId} />
+                      </SectionCard>
+                    </CardContent>
+                  </Card>
+                </CapabilityGate>
               </ManagedSection>
             ),
           },

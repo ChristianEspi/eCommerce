@@ -171,6 +171,7 @@ export async function createInvoiceForOrder(orderNumber: string): Promise<void> 
 const INVOICE_SELECT =
   'id, order_id, series, number, status, currency, issued_at, customer_name, ' +
   'customer_tax_id, net_total::text, tax_total::text, gross_total::text, reject_reason, ' +
+  'pdf_url, sunat_description, ' +
   'invoice_items(count)'
 
 export async function fetchInvoices(): Promise<Invoice[]> {
