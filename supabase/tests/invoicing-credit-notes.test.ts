@@ -231,6 +231,23 @@ describe('configuración y «Mi cuenta»', () => {
     expect((await as(ownerA, `select credit_note_receipt_series as s from public.invoice_settings`))[0]?.s).toBe('BN01')
   })
 
+  it('2026-11-20 · formato del PDF: se guarda, viaja en el mensaje y se valida', async () => {
+    expect(
+      await fallo(() =>
+        as(ownerA, `select public.invoice_settings_configure($1::uuid, 'B001', 'F001', 0.18, 'exonerado', false, null, null, null, null, 'CARTA')`, [storeA]),
+      ),
+    ).toMatch(/FORMATO_PDF_INVALIDO/)
+    await as(ownerA, `select public.invoice_settings_configure($1::uuid, 'B001', 'F001', 0.18, 'exonerado', false, null, null, null, null, 'a4')`, [storeA])
+    const order = await pedido()
+    const [inv] = await sql<{ id: string }>(`select ebim.invoice_for_order($1) as id`, [order])
+    const [r] = await as<{ r: Row }>(ownerA, `select public.invoice_request_issue($1) as r`, [inv?.id])
+    const [msg] = await sql<{ payload: Row }>(`select payload from public.integration_outbox where id = $1`, [r?.r?.outbox_id])
+    expect(msg?.payload).toMatchObject({ pdf_format: 'A4' })
+    // Vacío vuelve al predeterminado del emisor.
+    await as(ownerA, `select public.invoice_settings_configure($1::uuid, 'B001', 'F001', 0.18, 'exonerado', false, null, null, null, null, '')`, [storeA])
+    expect((await as(ownerA, `select pdf_format from public.invoice_settings`))[0]?.pdf_format).toBeNull()
+  })
+
   it('2026-11-20 · MISMA serie para comprobante y nota (Nubefact BBB1): correlativos separados', async () => {
     await as(ownerA, `select public.invoice_settings_configure($1::uuid, 'BBB1', 'FFF1', 0.18, 'exonerado', false, null, null, 'BBB1', 'FFF1')`, [storeA])
     const a = await emitida()

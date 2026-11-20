@@ -150,6 +150,14 @@ describe('petición generar_comprobante', () => {
     expect(buildConsultarComprobante('credit_note', 'FC01', '00000002')).toMatchObject({ tipo_de_comprobante: 3, numero: 2 })
   })
 
+  it('formato del PDF: solo se envía si la tienda lo eligió', () => {
+    const a4 = buildGenerarComprobante(boleta({ schema_version: 3, pdf_format: 'A4' }), NOW)
+    const defecto = buildGenerarComprobante(boleta({ schema_version: 3, pdf_format: null }), NOW)
+    if (!a4.ok || !defecto.ok) throw new Error('no armó')
+    expect(a4.body.formato_de_pdf).toBe('A4')
+    expect(defecto.body).not.toHaveProperty('formato_de_pdf')
+  })
+
   it('versión vieja del mensaje o moneda desconocida: no se arma', () => {
     expect(buildGenerarComprobante(boleta({ schema_version: 1 }), NOW).ok).toBe(false)
     expect(buildGenerarComprobante(boleta({ currency: 'BOB' }), NOW).ok).toBe(false)

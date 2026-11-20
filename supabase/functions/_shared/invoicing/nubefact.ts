@@ -65,6 +65,8 @@ export interface InvoiceIssuePayloadV1 {
   /** v3 · solo en notas de crédito. */
   readonly reference?: { readonly document_type: 'receipt' | 'invoice'; readonly series: string; readonly number: string } | null
   readonly credit_note?: { readonly type: number; readonly reason: string } | null
+  /** Formato del PDF pedido por la tienda; null = el predeterminado de la cuenta. */
+  readonly pdf_format?: 'A4' | 'A5' | 'TICKET' | null
 }
 
 /** `tipo_de_comprobante` de Nubefact: 1 factura, 2 boleta, 3 nota de crédito. */
@@ -194,6 +196,9 @@ export function buildGenerarComprobante(
     enviar_automaticamente_a_la_sunat: true,
     enviar_automaticamente_al_cliente: false,
     items,
+  }
+  if (payload.pdf_format === 'A4' || payload.pdf_format === 'A5' || payload.pdf_format === 'TICKET') {
+    body.formato_de_pdf = payload.pdf_format
   }
   if (nota && ref && payload.credit_note) {
     body.documento_que_se_modifica_tipo = ref.document_type === 'invoice' ? 1 : 2

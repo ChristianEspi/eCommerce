@@ -23,6 +23,8 @@ import { tryGetSupabaseClient } from '@/shared/lib/supabase'
  * Y «Probar conexión» (`invoicing-test`), que tampoco devuelve credenciales.
  */
 
+export type PdfFormat = 'A4' | 'A5' | 'TICKET'
+
 export const DEFAULT_SETTINGS = {
   receipt_series: 'B001',
   invoice_series: 'F001',
@@ -31,6 +33,7 @@ export const DEFAULT_SETTINGS = {
   shipping_tax_rate: '0.18',
   zero_rate_affectation: 'exonerado' as 'exonerado' | 'inafecto',
   auto_issue: false,
+  pdf_format: null as PdfFormat | null,
 }
 
 const settingsSchema = z.object({
@@ -41,6 +44,7 @@ const settingsSchema = z.object({
   shipping_tax_rate: z.coerce.string(),
   zero_rate_affectation: z.enum(['exonerado', 'inafecto']).catch('exonerado'),
   auto_issue: z.boolean(),
+  pdf_format: z.enum(['A4', 'A5', 'TICKET']).nullable().catch(null).default(null),
 })
 export type InvoicingSettings = z.infer<typeof settingsSchema>
 
@@ -83,7 +87,7 @@ export async function fetchInvoicingOverview(storeId: string): Promise<Invoicing
   const c = client()
   const [settings, sequences, provider] = await Promise.all([
     c.from(INVOICE_SETTINGS_TABLE)
-      .select('receipt_series, invoice_series, credit_note_receipt_series, credit_note_invoice_series, shipping_tax_rate, zero_rate_affectation, auto_issue')
+      .select('receipt_series, invoice_series, credit_note_receipt_series, credit_note_invoice_series, shipping_tax_rate, zero_rate_affectation, auto_issue, pdf_format')
       .eq('store_id', storeId)
       .maybeSingle(),
     c.from(INVOICE_SEQUENCES_TABLE).select('series, last_number'),
@@ -112,6 +116,7 @@ export interface SettingsInput {
   readonly shipping_tax_rate: string
   readonly zero_rate_affectation: 'exonerado' | 'inafecto'
   readonly auto_issue: boolean
+  readonly pdf_format: PdfFormat | null
   readonly receipt_last_number: number | null
   readonly invoice_last_number: number | null
 }
@@ -128,6 +133,7 @@ export async function saveInvoicingSettings(storeId: string, input: SettingsInpu
     p_invoice_last_number: input.invoice_last_number,
     p_credit_note_receipt_series: input.credit_note_receipt_series,
     p_credit_note_invoice_series: input.credit_note_invoice_series,
+    p_pdf_format: input.pdf_format ?? '',
   })
   if (error) throw new InvoicingError(codeFromDbError(error))
 }

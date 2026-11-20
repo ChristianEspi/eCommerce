@@ -137,6 +137,8 @@ export interface InvoiceIssuePayloadV1 {
   } | null
   /** v3 · Tipo (catálogo 09 de SUNAT, 1 = anulación de la operación) y motivo. */
   readonly credit_note: { readonly type: number; readonly reason: string } | null
+  /** v3 (aditivo, 2026-11-20) · Formato del PDF; null = el predeterminado del emisor. */
+  readonly pdf_format: 'A4' | 'A5' | 'TICKET' | null
 }
 
 /** Claves de primer nivel del payload v1. La base y TypeScript no pueden separarse. */
@@ -157,6 +159,7 @@ export const INVOICE_ISSUE_PAYLOAD_KEYS = [
   'lines',
   'reference',
   'credit_note',
+  'pdf_format',
 ] as const satisfies readonly (keyof InvoiceIssuePayloadV1)[]
 
 export const INVOICE_ISSUE_LINE_KEYS = [

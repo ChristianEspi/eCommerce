@@ -33,6 +33,7 @@ const ERROR_KEY: Record<string, MessageKey> = {
   TASA_INVALIDA: 'invoicing.error.rate',
   CORRELATIVO_NO_RETROCEDE: 'invoicing.error.backwards',
   CORRELATIVO_INVALIDO: 'invoicing.error.number',
+  FORMATO_PDF_INVALIDO: 'invoicing.error.pdfFormat',
   SIN_PERMISO: 'invoicing.error.permission',
   OPERADOR_NO_ES_ACTOR: 'invoicing.error.permission',
 }
@@ -71,6 +72,7 @@ export function InvoicingSettingsSection({ storeId }: { storeId: string | null }
   const [shippingPct, setShippingPct] = useState('18')
   const [zero, setZero] = useState<'exonerado' | 'inafecto'>('exonerado')
   const [autoIssue, setAutoIssue] = useState(false)
+  const [pdfFormat, setPdfFormat] = useState<'' | 'A4' | 'A5' | 'TICKET'>('')
 
   useEffect(() => {
     const d = overview.data
@@ -83,6 +85,7 @@ export function InvoicingSettingsSection({ storeId }: { storeId: string | null }
     setShippingPct(String(Math.round(Number(d.settings.shipping_tax_rate) * 10000) / 100))
     setZero(d.settings.zero_rate_affectation)
     setAutoIssue(d.settings.auto_issue)
+    setPdfFormat(d.settings.pdf_format ?? '')
     setReceiptLast('')
     setInvoiceLast('')
   }, [overview.data])
@@ -129,6 +132,7 @@ export function InvoicingSettingsSection({ storeId }: { storeId: string | null }
         shipping_tax_rate: String(pct / 100),
         zero_rate_affectation: zero,
         auto_issue: autoIssue,
+        pdf_format: pdfFormat === '' ? null : pdfFormat,
         receipt_last_number: lastOf(receiptLast),
         invoice_last_number: lastOf(invoiceLast),
       },
@@ -274,6 +278,17 @@ export function InvoicingSettingsSection({ storeId }: { storeId: string | null }
           >
             <MenuItem value="exonerado">{t('invoicing.settings.zero.exonerado')}</MenuItem>
             <MenuItem value="inafecto">{t('invoicing.settings.zero.inafecto')}</MenuItem>
+          </SelectField>
+          <SelectField
+            label={t('invoicing.settings.pdfFormat')}
+            value={pdfFormat}
+            onChange={(e) => setPdfFormat(e.target.value as '' | 'A4' | 'A5' | 'TICKET')}
+            helperText={t('invoicing.settings.pdfFormatHelp')}
+          >
+            <MenuItem value="">{t('invoicing.settings.pdfFormat.default')}</MenuItem>
+            <MenuItem value="A4">A4</MenuItem>
+            <MenuItem value="A5">A5</MenuItem>
+            <MenuItem value="TICKET">{t('invoicing.settings.pdfFormat.ticket')}</MenuItem>
           </SelectField>
         </Box>
         <FormControlLabel

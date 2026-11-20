@@ -126,6 +126,7 @@ describe('Configuración › Facturación', () => {
       p_invoice_last_number: null,
       p_credit_note_receipt_series: 'BC01',
       p_credit_note_invoice_series: 'FC01',
+      p_pdf_format: '',
     })
     expect(await screen.findByText(/no puede retroceder/)).toBeInTheDocument()
   })
