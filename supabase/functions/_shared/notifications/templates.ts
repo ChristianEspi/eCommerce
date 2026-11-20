@@ -104,6 +104,27 @@ const COPY: Record<string, Record<Locale, CopyBuilder>> = {
       action: 'View my order',
     }),
   },
+  // 2026-11-20 · Facturación fase 4: el comprobante salió y aquí está su PDF.
+  'invoice.issued': {
+    es: (p, _l, e) => {
+      const factura = text(p, 'document_type') === 'invoice'
+      return {
+        subject: `${factura ? 'Tu factura' : 'Tu boleta'} ${text(p, 'invoice_number')} del pedido ${text(p, 'order_number')}`,
+        title: factura ? 'Tu factura electrónica' : 'Tu boleta electrónica',
+        body: `Emitimos ${factura ? 'la factura' : 'la boleta'} <strong>${e('invoice_number')}</strong> de tu pedido <strong>${e('order_number')}</strong> por <strong>${e('grand_total')} ${e('currency')}</strong>. Puedes descargarla en PDF.`,
+        action: 'Descargar PDF',
+      }
+    },
+    en: (p, _l, e) => {
+      const invoice = text(p, 'document_type') === 'invoice'
+      return {
+        subject: `Your ${invoice ? 'invoice' : 'receipt'} ${text(p, 'invoice_number')} for order ${text(p, 'order_number')}`,
+        title: invoice ? 'Your electronic invoice' : 'Your electronic receipt',
+        body: `We issued ${invoice ? 'invoice' : 'receipt'} <strong>${e('invoice_number')}</strong> for your order <strong>${e('order_number')}</strong> of <strong>${e('grand_total')} ${e('currency')}</strong>. You can download it as a PDF.`,
+        action: 'Download PDF',
+      }
+    },
+  },
   'order.approval_requested': {
     es: (p, _l, e) => ({
       subject: `Pedido ${text(p, 'order_number')} espera aprobación`,
@@ -463,6 +484,12 @@ export function actionUrl(kind: string, params: Params, baseUrl: string): string
   if (kind.startsWith('auth.')) {
     const url = text(params, 'action_url')
     return isSafeAbsoluteUrl(url) ? url : null
+  }
+  // El PDF del emisor (fase 4 de facturación): solo https, o sale sin botón. No
+  // depende de la base de la app: el enlace es del emisor.
+  if (kind === 'invoice.issued') {
+    const pdf = text(params, 'pdf_url')
+    return pdf.startsWith('https://') && isSafeAbsoluteUrl(pdf) ? pdf : null
   }
   if (!isSafeAbsoluteUrl(base)) return null
   if (kind === 'cart.recovery') {
