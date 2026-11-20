@@ -30,7 +30,11 @@ export interface DispatchPorts {
   complete(id: string, reference: string | null): Promise<void>
   fail(id: string, code: string, retryable: boolean): Promise<void>
   token(): Promise<string | null>
-  send(token: string, message: MailMessage): Promise<SendOutcome>
+  /**
+   * `email` es el correo tal como salió de la cola: Graph no lo necesita, pero
+   * MailHub decide con él si va por plantilla y usa su id como idempotencia.
+   */
+  send(token: string, message: MailMessage, email: ClaimedEmail): Promise<SendOutcome>
 }
 
 export interface DispatchReport {
@@ -64,7 +68,7 @@ export async function dispatchPendingEmails(
       continue
     }
 
-    const outcome = await ports.send(token, { to: email.to_address, ...rendered })
+    const outcome = await ports.send(token, { to: email.to_address, ...rendered }, email)
     if (outcome.ok) {
       await ports.complete(email.id, outcome.reference)
       sent += 1

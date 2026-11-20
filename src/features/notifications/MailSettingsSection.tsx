@@ -47,9 +47,11 @@ export function MailSettingsSection() {
     <Stack spacing={2}>
       {data.configured ? (
         <Alert severity="success">
-          {t('mail.configured')
-            .replace('{name}', data.sender_name ?? '')
-            .replace('{email}', data.sender_email ?? '')}
+          {data.sender_email
+            ? t('mail.configured')
+                .replace('{name}', data.sender_name ?? '')
+                .replace('{email}', data.sender_email)
+            : t('mail.configuredMailhub')}
         </Alert>
       ) : (
         <Alert severity="warning">

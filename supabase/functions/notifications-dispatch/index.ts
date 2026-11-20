@@ -20,8 +20,14 @@
  */
 import { serviceClient } from '../_runtime/clients.ts'
 import { timingSafeEqual } from '../_shared/auth.ts'
-import { dispatchPendingEmails, type ClaimedEmail } from '../_shared/notifications/dispatch.ts'
+import { dispatchPendingEmails, type ClaimedEmail, type DispatchPorts } from '../_shared/notifications/dispatch.ts'
 import { graphConfigFromEnv, graphToken, sendGraphMail } from '../_shared/notifications/graph.ts'
+import {
+  mailhubConfigFromEnv,
+  mailhubTemplateFor,
+  referenceFor,
+  sendMailhubMail,
+} from '../_shared/notifications/mailhub.ts'
 import { resolveTrace, traceHeaders } from '../_shared/observability/index.ts'
 import { edgeSecurityHeaders } from '../_shared/securityHeaders.ts'
 
@@ -50,10 +56,39 @@ Deno.serve(async (request: Request): Promise<Response> => {
     return json({ error: { code: 'NO_AUTENTICADO', message: 'Clave inválida' } }, 401, headers)
   }
 
-  const { config, missing } = graphConfigFromEnv((key) => Deno.env.get(key))
-  if (!config) {
-    return json({ data: { configured: false, missing } }, 200, headers)
+  // Graph es el método del contrato (§14) y manda si está configurado. Sin
+  // Graph, MailHub (vía de QAS, 2026-11-20). Sin ninguno, no se toca la cola.
+  const env = (key: string) => Deno.env.get(key)
+  const graph = graphConfigFromEnv(env)
+  const mailhub = graph.config ? null : mailhubConfigFromEnv(env).config
+  if (!graph.config && !mailhub) {
+    return json(
+      { data: { configured: false, missing: [...graph.missing, ...mailhubConfigFromEnv(env).missing] } },
+      200,
+      headers,
+    )
   }
+
+  const baseUrl = Deno.env.get('EBIM_APP_BASE_URL') ?? ''
+  const transporte: Pick<DispatchPorts, 'token' | 'send'> = graph.config
+    ? {
+        token: () => graphToken(graph.config!, fetch),
+        send: (token, message) => sendGraphMail(graph.config!, token, message, fetch),
+      }
+    : {
+        token: () => Promise.resolve(mailhub!.token),
+        send: (_token, message, email) =>
+          sendMailhubMail(
+            mailhub!,
+            {
+              ...message,
+              emailId: email.id,
+              referenceId: referenceFor(email.id, email.params),
+              template: mailhubTemplateFor(email.kind, email.locale, email.params, baseUrl, new Date()),
+            },
+            fetch,
+          ),
+      }
 
   const client = serviceClient(trace)
 
@@ -77,12 +112,11 @@ Deno.serve(async (request: Request): Promise<Response> => {
           })
           if (error) throw new Error(error.code ?? 'CIERRE_FALLIDO')
         },
-        token: () => graphToken(config, fetch),
-        send: (token, message) => sendGraphMail(config, token, message, fetch),
+        ...transporte,
       },
-      { limit: 25, baseUrl: Deno.env.get('EBIM_APP_BASE_URL') ?? '' },
+      { limit: 25, baseUrl },
     )
-    return json({ data: { configured: true, ...report } }, 200, headers)
+    return json({ data: { configured: true, provider: graph.config ? 'graph' : 'mailhub', ...report } }, 200, headers)
   } catch (error) {
     // 503: fue la base o la red, y ahí sí conviene que el planificador vuelva a
     // intentarlo en la siguiente pasada. Sin detalle: no se registra ni una

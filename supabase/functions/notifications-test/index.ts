@@ -20,6 +20,7 @@ import { parseAllowedOrigins } from '../_shared/cors.ts'
 import { forbidden, fromDatabaseError } from '../_shared/errors.ts'
 import { serveJson } from '../_shared/http.ts'
 import { graphConfigFromEnv, graphToken, sendGraphMail } from '../_shared/notifications/graph.ts'
+import { mailhubConfigFromEnv, sendMailhubMail } from '../_shared/notifications/mailhub.ts'
 import { renderEmail } from '../_shared/notifications/templates.ts'
 import { rejectUnknownFields } from '../_shared/validation.ts'
 import { userClient } from '../_runtime/clients.ts'
@@ -47,19 +48,39 @@ const handler = serveJson(
       throw forbidden('Hace falta rol owner o admin para probar el correo')
     }
 
-    const { config, missing } = graphConfigFromEnv((key) => Deno.env.get(key))
+    const env = (key: string) => Deno.env.get(key)
+    const { config, missing } = graphConfigFromEnv(env)
+    // Sin Graph, MailHub (vía de QAS): el remitente lo fija el proyecto en
+    // MailHub, así que aquí no se conoce la dirección.
+    const mailhub = config ? null : mailhubConfigFromEnv(env)
     const estado = {
-      configured: config !== null,
-      missing,
+      configured: config !== null || mailhub?.config != null,
+      missing: config || mailhub?.config ? [] : [...missing, ...(mailhub?.missing ?? [])],
       sender_email: config?.senderEmail ?? null,
-      sender_name: config?.senderName ?? null,
+      sender_name: config?.senderName ?? (mailhub?.config ? 'EBIM MailHub' : null),
     }
 
-    if (!config || body.send !== true) {
+    if (!estado.configured || body.send !== true) {
       return { status: 200, body: { data: { ...estado, sent: false, code: null } } }
     }
 
     const rendered = renderEmail('mail.test', 'es', {}, Deno.env.get('EBIM_APP_BASE_URL') ?? '')
+
+    if (!config && mailhub?.config) {
+      if (!rendered) return { status: 200, body: { data: { ...estado, sent: false, code: 'PLANTILLA_DESCONOCIDA' } } }
+      const id = crypto.randomUUID()
+      const outcome = await sendMailhubMail(
+        mailhub.config,
+        { to: context.email, ...rendered, emailId: `test-${id}`, referenceId: `mail-test-${id}`, template: null },
+        fetch,
+      )
+      return {
+        status: 200,
+        body: { data: { ...estado, sent: outcome.ok, code: outcome.ok ? null : outcome.code } },
+      }
+    }
+    if (!config) return { status: 200, body: { data: { ...estado, sent: false, code: null } } }
+
     const token = rendered ? await graphToken(config, fetch) : null
     if (!rendered || !token) {
       return { status: 200, body: { data: { ...estado, sent: false, code: 'GRAPH_TOKEN' } } }
