@@ -11,6 +11,32 @@ el recorrido SaaS P00–P17 queda cerrado)
 > (`claude-saas-opus/config/phases.json`), que se identifica siempre como «P0x-SaaS». No son la misma
 > serie: el P12 histórico es el framework de integraciones; el P12-SaaS es fulfillment y devoluciones.
 
+## Facturación electrónica Perú con Nubefact, fases 1–5 (2026-11-20)
+
+Commits locales en `dev`: `bd6fb72`, `0894861` (f1) · `f15f160` (f2) · `b91f169` (f3) · `f990e32` (f4)
+· `50af14f` (f5). **Las 4 migraciones aplicadas en QAS** (`20261120110000`…`140000`, por API de
+gestión, sin registrar como las previas). Funciones `invoicing-worker`, `invoicing-test` y
+`notifications-dispatch` desplegadas; cron `ecommerce-invoicing-worker` (*/2) conectado con
+`scripts/configurar-facturacion.mjs` (`EBIM_INVOICING_WORKER_KEY` + Vault).
+
+- **F1 datos fiscales:** `invoice_settings` por tienda (series, IGV del envío, afectación de la tasa
+  0, emisión automática); correlativo por SOCIEDAD+serie asignado al encolar, arranca tras el más alto
+  y no retrocede; envío facturado con su IGV dentro (antes IGV 0; corregidos 2 pendientes en QAS, total
+  igual); tipo de documento y dirección del cliente; boleta ≥ S/700 sin documento y factura sin RUC no
+  se emiten. Mensaje `invoice.issue` v2.
+- **F2 emisor:** traducción y trabajador puros según el manual oficial Nubefact API JSON v3.1; «ya
+  existe» (23) consulta, nunca emite dos veces; rechazo por datos cierra sin reintento y deja el número.
+  Credenciales por sociedad en Vault (`invoicing_nubefact_configure` / `invoicing_credentials_for`).
+- **F3 pantalla:** Configuración › Facturación (addon `invoicing`): emisor (token que no vuelve),
+  series, correlativos, IGV del envío, emisión automática, «Probar conexión». PDF y SUNAT en Crédito.
+- **F4 comprador:** `my_order_invoice` + bloque en «Mi cuenta»; correo `invoice.issued` una vez.
+- **F5 nota de crédito:** `invoice_request_credit_note`, series BC01/FC01, mensaje v3; nota aceptada
+  anula el original; cancelar con emisión automática la emite sola; mensaje encolado se retira al
+  cancelar.
+- **Pendiente:** ninguna cuenta real de Nubefact probada (falta cuenta DEMO: verificar cabecera de
+  auth, «varios» con «-», comportamiento de boletas por resumen diario); en QAS nadie cargó todavía
+  credenciales, así que nada se emite. Comunicación de baja (`generar_anulacion`) no implementada.
+
 ## Correo por EBIM MailHub y textos por tienda (2026-11-20)
 
 Commits locales en `dev`: `10d0987`, `71d51ac`, `d2f2794`, `4a963fe`.
