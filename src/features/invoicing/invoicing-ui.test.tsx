@@ -124,6 +124,8 @@ describe('Configuración › Facturación', () => {
       p_auto_issue: true,
       p_receipt_last_number: 10,
       p_invoice_last_number: null,
+      p_credit_note_receipt_series: 'BC01',
+      p_credit_note_invoice_series: 'FC01',
     })
     expect(await screen.findByText(/no puede retroceder/)).toBeInTheDocument()
   })

@@ -60,6 +60,16 @@ export function mapCreditCode(code: string): MessageKey {
       return 'credit.error.invoiceNeedsRuc'
     case 'SERIE_AGOTADA':
       return 'credit.error.seriesExhausted'
+    // Facturación Perú · fase 5: nota de crédito.
+    case 'NOTA_YA_EXISTE':
+      return 'credit.error.creditNoteExists'
+    case 'COMPROBANTE_NO_EMITIDO':
+    case 'REFERENCIA_NO_EMITIDA':
+      return 'credit.error.notIssuedYet'
+    case 'NOTA_DE_NOTA':
+      return 'credit.error.noteOfNote'
+    case 'MOTIVO_REQUERIDO':
+      return 'credit.error.reasonRequired'
     case 'COMPROBANTE_NO_ENCONTRADO':
       return 'credit.error.notFound'
     case 'DUPLICADO':

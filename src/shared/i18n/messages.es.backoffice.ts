@@ -608,6 +608,8 @@ export const esBackoffice = {
   'invoicing.settings.help': 'Las series deben ser las mismas que tienes registradas en Nubefact. El número lo asigna el sistema, consecutivo por serie.',
   'invoicing.settings.receiptSeries': 'Serie de boletas',
   'invoicing.settings.invoiceSeries': 'Serie de facturas',
+  'invoicing.settings.noteReceiptSeries': 'Serie de notas de crédito de boletas',
+  'invoicing.settings.noteInvoiceSeries': 'Serie de notas de crédito de facturas',
   'invoicing.settings.current': 'Último número emitido: {n}',
   'invoicing.settings.receiptLast': 'Último número de boleta ya emitido (opcional)',
   'invoicing.settings.invoiceLast': 'Último número de factura ya emitido (opcional)',

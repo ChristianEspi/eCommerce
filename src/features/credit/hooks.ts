@@ -8,6 +8,7 @@ import {
   fetchInvoiceIssueStatuses,
   fetchInvoices,
   registerReceipt,
+  requestCreditNote,
   requestInvoiceIssue,
 } from './api'
 import type { Aging, ArDocument, ArReceipt, CreditLine, Invoice, InvoiceIssueStatus } from './types'
@@ -65,6 +66,18 @@ export function useRequestInvoiceIssue() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: requestInvoiceIssue,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: invoiceIssueKey() })
+      await queryClient.invalidateQueries({ queryKey: invoicesKey() })
+    },
+  })
+}
+
+/** 2026-11-20 · Anular un comprobante emitido con su nota de crédito. */
+export function useRequestCreditNote() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: requestCreditNote,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: invoiceIssueKey() })
       await queryClient.invalidateQueries({ queryKey: invoicesKey() })

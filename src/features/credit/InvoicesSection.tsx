@@ -35,6 +35,7 @@ import { EmptyState, ErrorState } from '@/shared/ui/states'
 import { CreditError } from './errors'
 import {
   useCreateInvoiceForOrder,
+  useRequestCreditNote,
   useInvoiceIssueStatuses,
   useInvoices,
   useRequestInvoiceIssue,
@@ -84,6 +85,44 @@ export function InvoicesSection() {
       setNumeroPedido('')
     } catch (error) {
       setErrorGenerar(error instanceof CreditError ? error.key : 'credit.error.generic')
+    }
+  }
+
+  // 2026-11-20 · Facturación fase 5: anular con nota de crédito.
+  const requestCreditNote = useRequestCreditNote()
+  const [anulando, setAnulando] = useState<Invoice | null>(null)
+  const [motivo, setMotivo] = useState('')
+  const [errorAnular, setErrorAnular] = useState<MessageKey | null>(null)
+  const byId = useMemo(() => new Map((query.data ?? []).map((i) => [i.id, i])), [query.data])
+  const conNota = useMemo(
+    () =>
+      new Set(
+        (query.data ?? [])
+          .filter((i) => i.document_type === 'credit_note' && i.status !== 'rejected' && i.status !== 'cancelled')
+          .map((i) => i.reference_invoice_id),
+      ),
+    [query.data],
+  )
+  const anulable = (invoice: Invoice) =>
+    canIssue &&
+    invoice.document_type !== 'credit_note' &&
+    (invoice.status === 'issued' || invoice.status === 'accepted') &&
+    Boolean(invoice.number) &&
+    !conNota.has(invoice.id)
+
+  async function anular() {
+    if (!anulando) return
+    setErrorAnular(null)
+    try {
+      const result = await requestCreditNote.mutateAsync({ invoiceId: anulando.id, reason: motivo.trim() })
+      notify(
+        t(result.state === 'enqueued' ? 'credit.toast.creditNoteQueued' : 'credit.toast.issuePendingConfig'),
+        result.state === 'enqueued' ? 'success' : 'warning',
+      )
+      setAnulando(null)
+      setMotivo('')
+    } catch (error) {
+      setErrorAnular(error instanceof CreditError ? error.key : 'credit.error.generic')
     }
   }
 
@@ -195,6 +234,15 @@ export function InvoicesSection() {
                         {t('credit.invoices.unnumbered')}
                       </Typography>
                     )}
+                    {invoice.document_type === 'credit_note' && (
+                      <Typography sx={{ fontSize: 11, color: 'var(--muted)', fontWeight: 400 }}>
+                        {(() => {
+                          const ref = invoice.reference_invoice_id ? byId.get(invoice.reference_invoice_id) : undefined
+                          const refLabel = ref ? `${ref.series}${ref.number ? `-${ref.number}` : ''}` : '—'
+                          return t('credit.invoices.creditNoteOf').replace('{ref}', refLabel)
+                        })()}
+                      </Typography>
+                    )}
                   </TableCell>
                   <TableCell>{invoice.customer_name}</TableCell>
                   <TableCell>{invoice.issued_at.slice(0, 10)}</TableCell>
@@ -246,6 +294,21 @@ export function InvoicesSection() {
                       busy={requestIssue.isPending}
                       onIssue={() => void emitir(invoice)}
                     />
+                    {anulable(invoice) && (
+                      <Button
+                        size="small"
+                        color="error"
+                        variant="text"
+                        sx={{ mt: 0.5, px: 0 }}
+                        onClick={() => {
+                          setErrorAnular(null)
+                          setMotivo('')
+                          setAnulando(invoice)
+                        }}
+                      >
+                        {t('credit.invoices.void')}
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -292,6 +355,43 @@ export function InvoicesSection() {
             onClick={() => void generar()}
           >
             {t('credit.invoices.generate')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 2026-11-20 · Facturación fase 5: anular con nota de crédito. */}
+      <Dialog open={anulando !== null} onClose={() => setAnulando(null)} fullWidth maxWidth="xs">
+        <DialogTitle>
+          {t('credit.invoices.voidTitle').replace(
+            '{doc}',
+            anulando ? `${anulando.series}-${anulando.number ?? ''}` : '',
+          )}
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <Typography sx={{ fontSize: 14, color: 'var(--muted)' }}>{t('credit.invoices.voidHelp')}</Typography>
+            {errorAnular && <Alert severity="error">{t(errorAnular)}</Alert>}
+            <Field
+              autoFocus
+              fullWidth
+              multiline
+              minRows={2}
+              maxLength={250}
+              label={t('credit.invoices.voidReason')}
+              value={motivo}
+              onChange={(event) => setMotivo(event.target.value)}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAnulando(null)}>{t('common.cancel')}</Button>
+          <Button
+            variant="contained"
+            color="error"
+            disabled={requestCreditNote.isPending || motivo.trim().length < 3}
+            onClick={() => void anular()}
+          >
+            {t('credit.invoices.voidConfirm')}
           </Button>
         </DialogActions>
       </Dialog>

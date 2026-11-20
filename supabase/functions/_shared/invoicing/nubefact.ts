@@ -49,7 +49,7 @@ export interface InvoiceIssuePayloadV1 {
   readonly store_id: string
   readonly invoice_id: string
   readonly order_id: string
-  readonly document_type: 'receipt' | 'invoice'
+  readonly document_type: 'receipt' | 'invoice' | 'credit_note'
   readonly series: string
   readonly number: string
   readonly issued_at: string
@@ -62,6 +62,14 @@ export interface InvoiceIssuePayloadV1 {
   }
   readonly totals: { readonly net: string; readonly tax: string; readonly gross: string }
   readonly lines: readonly InvoiceIssueLineV1[]
+  /** v3 · solo en notas de crédito. */
+  readonly reference?: { readonly document_type: 'receipt' | 'invoice'; readonly series: string; readonly number: string } | null
+  readonly credit_note?: { readonly type: number; readonly reason: string } | null
+}
+
+/** `tipo_de_comprobante` de Nubefact: 1 factura, 2 boleta, 3 nota de crédito. */
+export function tipoDeComprobante(documentType: string): number {
+  return documentType === 'invoice' ? 1 : documentType === 'credit_note' ? 3 : 2
 }
 
 export interface NubefactCredentials {
@@ -113,8 +121,14 @@ export function buildGenerarComprobante(
   payload: InvoiceIssuePayloadV1,
   now: Date,
 ): { ok: true; body: Record<string, unknown> } | { ok: false; error: NubefactIssueError } {
-  if (payload.schema_version !== 2) {
+  if (payload.schema_version !== 2 && payload.schema_version !== 3) {
     return { ok: false, error: { code: 'PAYLOAD_NO_SOPORTADO', detail: `schema_version ${String(payload.schema_version)}` } }
+  }
+  const nota = payload.document_type === 'credit_note'
+  const ref = payload.reference
+  const refNumero = ref ? Number.parseInt(ref.number, 10) : Number.NaN
+  if (nota && (!ref || !Number.isInteger(refNumero) || !payload.credit_note)) {
+    return { ok: false, error: { code: 'PAYLOAD_NO_SOPORTADO', detail: 'nota sin referencia' } }
   }
   const moneda = MONEDA[payload.currency.toUpperCase()]
   if (!moneda) return { ok: false, error: { code: 'PAYLOAD_NO_SOPORTADO', detail: `moneda ${payload.currency}` } }
@@ -160,7 +174,7 @@ export function buildGenerarComprobante(
 
   const body: Record<string, unknown> = {
     operacion: 'generar_comprobante',
-    tipo_de_comprobante: payload.document_type === 'invoice' ? 1 : 2,
+    tipo_de_comprobante: tipoDeComprobante(payload.document_type),
     serie: payload.series,
     numero,
     sunat_transaction: 1,
@@ -181,13 +195,20 @@ export function buildGenerarComprobante(
     enviar_automaticamente_al_cliente: false,
     items,
   }
+  if (nota && ref && payload.credit_note) {
+    body.documento_que_se_modifica_tipo = ref.document_type === 'invoice' ? 1 : 2
+    body.documento_que_se_modifica_serie = ref.series
+    body.documento_que_se_modifica_numero = refNumero
+    body.tipo_de_nota_de_credito = payload.credit_note.type
+    body.observaciones = cut(payload.credit_note.reason, 1000)
+  }
   return { ok: true, body }
 }
 
 export function buildConsultarComprobante(documentType: string, series: string, number: string) {
   return {
     operacion: 'consultar_comprobante',
-    tipo_de_comprobante: documentType === 'invoice' ? 1 : 2,
+    tipo_de_comprobante: tipoDeComprobante(documentType),
     serie: series,
     numero: Number.parseInt(number, 10),
   }

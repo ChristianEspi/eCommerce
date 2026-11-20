@@ -74,7 +74,7 @@ export const INVOICING_OPERATIONS: readonly ProviderOperation[] = ['invoice.issu
  * La sociedad NO viaja en el cuerpo: es la de la fila del outbox, que escribe
  * la base. El adaptador la toma de ahí y nunca de un campo del payload.
  */
-export const INVOICE_ISSUE_SCHEMA_VERSION = 2
+export const INVOICE_ISSUE_SCHEMA_VERSION = 3
 
 /** Afectación al IGV de una línea (SUNAT, catálogo 07): gravado, exonerado o inafecto. */
 export type TaxAffectation = 'gravado' | 'exonerado' | 'inafecto'
@@ -110,7 +110,8 @@ export interface InvoiceIssuePayloadV1 {
   readonly store_id: string
   readonly invoice_id: string
   readonly order_id: string
-  readonly document_type: 'receipt' | 'invoice'
+  /** v3 · `credit_note`: nota de crédito que anula `reference`. */
+  readonly document_type: 'receipt' | 'invoice' | 'credit_note'
   readonly series: string
   /** Correlativo de 8 dígitos (`00000123`). */
   readonly number: string
@@ -128,6 +129,14 @@ export interface InvoiceIssuePayloadV1 {
     readonly gross: MoneyAmount
   }
   readonly lines: readonly InvoiceIssueLineV1[]
+  /** v3 · El comprobante que anula una nota de crédito; null en los demás. */
+  readonly reference: {
+    readonly document_type: 'receipt' | 'invoice'
+    readonly series: string
+    readonly number: string
+  } | null
+  /** v3 · Tipo (catálogo 09 de SUNAT, 1 = anulación de la operación) y motivo. */
+  readonly credit_note: { readonly type: number; readonly reason: string } | null
 }
 
 /** Claves de primer nivel del payload v1. La base y TypeScript no pueden separarse. */
@@ -146,6 +155,8 @@ export const INVOICE_ISSUE_PAYLOAD_KEYS = [
   'customer',
   'totals',
   'lines',
+  'reference',
+  'credit_note',
 ] as const satisfies readonly (keyof InvoiceIssuePayloadV1)[]
 
 export const INVOICE_ISSUE_LINE_KEYS = [

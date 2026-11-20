@@ -243,7 +243,7 @@ describe('correlativo y emisión', () => {
 
     const [msg] = await sql<{ payload: Row }>(`select payload from public.integration_outbox where id = $1`, [ra.outbox_id])
     expect(msg?.payload).toMatchObject({
-      schema_version: 2,
+      schema_version: 3,
       document_type: 'receipt',
       series: 'B001',
       number: '00000001',
@@ -316,9 +316,14 @@ describe('migración sobre datos existentes', () => {
     )
     await sql(`update public.invoices set document_type = null where id = $1`, [inv])
     await sql(`update public.invoices set status = 'accepted', number = '00000999' where id = $1`, [inv])
-    const { readFileSync } = await import('node:fs')
+    const { readFileSync, readdirSync } = await import('node:fs')
     const migracion = readFileSync('supabase/migrations/20261120110000_invoicing_peru_fiscal_data.sql', 'utf8')
     await db.exec(migracion)
+    // Y las posteriores, en orden: re-aplicar una vieja sola deja funciones
+    // de una versión anterior (otra firma) que en la base real ya no existen.
+    for (const f of readdirSync('supabase/migrations').filter((n) => n > '20261120110000_z').sort()) {
+      await db.exec(readFileSync(`supabase/migrations/${f}`, 'utf8'))
+    }
     expect((await sql(`select document_type, status from public.invoices where id = $1`, [inv]))[0]).toEqual({
       document_type: null,
       status: 'accepted',

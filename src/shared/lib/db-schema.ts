@@ -923,3 +923,5 @@ export const INVOICE_SEQUENCES_TABLE = 'invoice_sequences'
 export const INVOICE_SETTINGS_CONFIGURE_RPC = 'invoice_settings_configure'
 export const INVOICING_NUBEFACT_CONFIGURE_RPC = 'invoicing_nubefact_configure'
 export const INVOICING_TEST_FUNCTION = 'invoicing-test'
+/** 2026-11-20 · Facturación fase 5 (migración 20261120140000). */
+export const INVOICE_REQUEST_CREDIT_NOTE_RPC = 'invoice_request_credit_note'

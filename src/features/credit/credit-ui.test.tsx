@@ -122,6 +122,7 @@ function backend(
       // 2026-11-17 · el cobro es UNA llamada: recibo y aplicaciones juntos.
       ar_register_receipt: () => ({ receipt_number: 'RC-20261117-001', applied: '1200.00', unapplied: '0.00' }),
       invoice_create_for_order: () => ({ invoice_id: 'x', lines: 2 }),
+      invoice_request_credit_note: () => ({ invoice_id: 'nc', state: 'enqueued', replay: false }),
     },
   })
 }
@@ -351,6 +352,41 @@ describe('la emisión de un comprobante', () => {
     await abrirComprobantes(fake)
     expect(await screen.findByText('No tiene líneas: genéralo de nuevo desde su pedido.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Emitir comprobante F001' })).not.toBeInTheDocument()
+  })
+
+  it('2026-11-20 · un comprobante emitido se anula con nota: motivo obligatorio y solo el id', async () => {
+    const emitida = { ...factura, number: '00000012', status: 'accepted', document_type: 'invoice' }
+    const fake = backend({ entitlements: [...COBRANZA, 'ecommerce.invoicing'], invoices: [emitida] })
+    const user = await abrirComprobantes(fake)
+    await user.click(await screen.findByRole('button', { name: 'Anular con nota de crédito' }))
+    const confirmar = await screen.findByRole('button', { name: 'Emitir nota de crédito' })
+    expect(confirmar).toBeDisabled()
+    await user.type(screen.getByLabelText('Motivo'), 'Devolución total')
+    await user.click(confirmar)
+    await vi.waitFor(() =>
+      expect(fake.state.rpcCalls.filter((c) => c.name === 'invoice_request_credit_note')).toEqual([
+        { name: 'invoice_request_credit_note', args: { p_invoice_id: FACTURA, p_reason: 'Devolución total' } },
+      ]),
+    )
+    expect(await screen.findByText('Nota de crédito encolada para el emisor')).toBeInTheDocument()
+  })
+
+  it('2026-11-20 · la nota se ve como tal y su comprobante ya no ofrece anular', async () => {
+    const emitida = { ...factura, number: '00000012', status: 'accepted', document_type: 'invoice' }
+    const nota = {
+      ...factura,
+      id: '99999999-9999-4999-9999-999999999933',
+      series: 'FC01',
+      number: '00000001',
+      status: 'issued',
+      document_type: 'credit_note',
+      reference_invoice_id: FACTURA,
+      customer_name: 'Bodega Central NC',
+    }
+    const fake = backend({ entitlements: [...COBRANZA, 'ecommerce.invoicing'], invoices: [emitida, nota] })
+    await abrirComprobantes(fake)
+    expect(await screen.findByText('Nota de crédito · anula F001-00000012')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Anular con nota de crédito' })).not.toBeInTheDocument()
   })
 
   it('«Generar comprobante» manda solo el número de pedido', async () => {

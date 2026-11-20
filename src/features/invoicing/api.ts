@@ -26,6 +26,8 @@ import { tryGetSupabaseClient } from '@/shared/lib/supabase'
 export const DEFAULT_SETTINGS = {
   receipt_series: 'B001',
   invoice_series: 'F001',
+  credit_note_receipt_series: 'BC01',
+  credit_note_invoice_series: 'FC01',
   shipping_tax_rate: '0.18',
   zero_rate_affectation: 'exonerado' as 'exonerado' | 'inafecto',
   auto_issue: false,
@@ -34,6 +36,8 @@ export const DEFAULT_SETTINGS = {
 const settingsSchema = z.object({
   receipt_series: z.string(),
   invoice_series: z.string(),
+  credit_note_receipt_series: z.string().catch('BC01'),
+  credit_note_invoice_series: z.string().catch('FC01'),
   shipping_tax_rate: z.coerce.string(),
   zero_rate_affectation: z.enum(['exonerado', 'inafecto']).catch('exonerado'),
   auto_issue: z.boolean(),
@@ -79,7 +83,7 @@ export async function fetchInvoicingOverview(storeId: string): Promise<Invoicing
   const c = client()
   const [settings, sequences, provider] = await Promise.all([
     c.from(INVOICE_SETTINGS_TABLE)
-      .select('receipt_series, invoice_series, shipping_tax_rate, zero_rate_affectation, auto_issue')
+      .select('receipt_series, invoice_series, credit_note_receipt_series, credit_note_invoice_series, shipping_tax_rate, zero_rate_affectation, auto_issue')
       .eq('store_id', storeId)
       .maybeSingle(),
     c.from(INVOICE_SEQUENCES_TABLE).select('series, last_number'),
@@ -103,6 +107,8 @@ export async function fetchInvoicingOverview(storeId: string): Promise<Invoicing
 export interface SettingsInput {
   readonly receipt_series: string
   readonly invoice_series: string
+  readonly credit_note_receipt_series: string
+  readonly credit_note_invoice_series: string
   readonly shipping_tax_rate: string
   readonly zero_rate_affectation: 'exonerado' | 'inafecto'
   readonly auto_issue: boolean
@@ -120,6 +126,8 @@ export async function saveInvoicingSettings(storeId: string, input: SettingsInpu
     p_auto_issue: input.auto_issue,
     p_receipt_last_number: input.receipt_last_number,
     p_invoice_last_number: input.invoice_last_number,
+    p_credit_note_receipt_series: input.credit_note_receipt_series,
+    p_credit_note_invoice_series: input.credit_note_invoice_series,
   })
   if (error) throw new InvoicingError(codeFromDbError(error))
 }

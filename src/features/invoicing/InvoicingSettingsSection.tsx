@@ -64,6 +64,8 @@ export function InvoicingSettingsSection({ storeId }: { storeId: string | null }
 
   const [receipt, setReceipt] = useState('B001')
   const [invoice, setInvoice] = useState('F001')
+  const [noteReceipt, setNoteReceipt] = useState('BC01')
+  const [noteInvoice, setNoteInvoice] = useState('FC01')
   const [receiptLast, setReceiptLast] = useState('')
   const [invoiceLast, setInvoiceLast] = useState('')
   const [shippingPct, setShippingPct] = useState('18')
@@ -76,6 +78,8 @@ export function InvoicingSettingsSection({ storeId }: { storeId: string | null }
     setActive(d.nubefact.active)
     setReceipt(d.settings.receipt_series)
     setInvoice(d.settings.invoice_series)
+    setNoteReceipt(d.settings.credit_note_receipt_series)
+    setNoteInvoice(d.settings.credit_note_invoice_series)
     setShippingPct(String(Math.round(Number(d.settings.shipping_tax_rate) * 10000) / 100))
     setZero(d.settings.zero_rate_affectation)
     setAutoIssue(d.settings.auto_issue)
@@ -96,7 +100,9 @@ export function InvoicingSettingsSection({ storeId }: { storeId: string | null }
 
   const pct = Number(shippingPct)
   const lastOf = (value: string) => (value.trim() === '' ? null : Number(value))
-  const seriesOk = SERIE_B.test(receipt) && SERIE_F.test(invoice)
+  const seriesOk =
+    SERIE_B.test(receipt) && SERIE_F.test(invoice) && SERIE_B.test(noteReceipt) && SERIE_F.test(noteInvoice) &&
+    noteReceipt !== receipt && noteInvoice !== invoice
   const pctOk = Number.isFinite(pct) && pct >= 0 && pct < 100
   const lastOk = [receiptLast, invoiceLast].every((v) => v.trim() === '' || /^\d{1,8}$/.test(v.trim()))
   const canSaveSettings = seriesOk && pctOk && lastOk && !saveSettings.isPending
@@ -117,6 +123,8 @@ export function InvoicingSettingsSection({ storeId }: { storeId: string | null }
       {
         receipt_series: receipt,
         invoice_series: invoice,
+        credit_note_receipt_series: noteReceipt,
+        credit_note_invoice_series: noteInvoice,
         shipping_tax_rate: String(pct / 100),
         zero_rate_affectation: zero,
         auto_issue: autoIssue,
@@ -216,6 +224,22 @@ export function InvoicingSettingsSection({ storeId }: { storeId: string | null }
             maxLength={4}
             error={!SERIE_F.test(invoice)}
             helperText={t('invoicing.settings.current').replace('{n}', String(sequences[invoice] ?? 0))}
+          />
+          <Field
+            label={t('invoicing.settings.noteReceiptSeries')}
+            value={noteReceipt}
+            onChange={(e) => setNoteReceipt(e.target.value.toUpperCase())}
+            maxLength={4}
+            error={!SERIE_B.test(noteReceipt) || noteReceipt === receipt}
+            helperText={t('invoicing.settings.current').replace('{n}', String(sequences[noteReceipt] ?? 0))}
+          />
+          <Field
+            label={t('invoicing.settings.noteInvoiceSeries')}
+            value={noteInvoice}
+            onChange={(e) => setNoteInvoice(e.target.value.toUpperCase())}
+            maxLength={4}
+            error={!SERIE_F.test(noteInvoice) || noteInvoice === invoice}
+            helperText={t('invoicing.settings.current').replace('{n}', String(sequences[noteInvoice] ?? 0))}
           />
           <Field
             label={t('invoicing.settings.receiptLast')}

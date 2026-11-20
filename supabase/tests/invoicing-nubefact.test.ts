@@ -122,6 +122,34 @@ describe('petición generar_comprobante', () => {
     expect([ce.body.cliente_tipo_de_documento, pas.body.cliente_tipo_de_documento]).toEqual(['4', '7'])
   })
 
+  it('nota de crédito (v3): tipo 3, documento que modifica, tipo de nota y motivo', () => {
+    const r = buildGenerarComprobante(
+      boleta({
+        schema_version: 3,
+        document_type: 'credit_note',
+        series: 'BC01',
+        number: '00000004',
+        reference: { document_type: 'receipt', series: 'B001', number: '00000123' },
+        credit_note: { type: 1, reason: 'Pedido EC-1 cancelado' },
+      }),
+      NOW,
+    )
+    if (!r.ok) throw new Error('no armó')
+    expect(r.body).toMatchObject({
+      tipo_de_comprobante: 3,
+      serie: 'BC01',
+      numero: 4,
+      documento_que_se_modifica_tipo: 2,
+      documento_que_se_modifica_serie: 'B001',
+      documento_que_se_modifica_numero: 123,
+      tipo_de_nota_de_credito: 1,
+      observaciones: 'Pedido EC-1 cancelado',
+      total: 145,
+    })
+    expect(buildGenerarComprobante(boleta({ schema_version: 3, document_type: 'credit_note' }), NOW).ok).toBe(false)
+    expect(buildConsultarComprobante('credit_note', 'FC01', '00000002')).toMatchObject({ tipo_de_comprobante: 3, numero: 2 })
+  })
+
   it('versión vieja del mensaje o moneda desconocida: no se arma', () => {
     expect(buildGenerarComprobante(boleta({ schema_version: 1 }), NOW).ok).toBe(false)
     expect(buildGenerarComprobante(boleta({ currency: 'BOB' }), NOW).ok).toBe(false)
