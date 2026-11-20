@@ -50,12 +50,18 @@ const lineSchema = z.object({
   sku_propuesto: z.string().nullable(),
   coincidencia: productSchema.nullable(),
   alternativas: z.array(productSchema).max(3),
+  /** Solo en «Mejora esta cotización»: precio unitario del OTRO proveedor. */
+  precio_competencia: z.number().positive().nullable().optional(),
 })
 export type IntakeLine = z.infer<typeof lineSchema>
 
 export const intakeDataSchema = z.object({
   lineas: z.array(lineSchema).max(60),
   notas: z.string().nullable(),
+  /** Solo en «Mejora esta cotización»: moneda y si los precios llevan IGV. */
+  cotizacion: z
+    .object({ moneda: z.enum(['PEN', 'USD']).nullable(), incluye_igv: z.boolean().nullable() })
+    .optional(),
 })
 export type IntakeData = z.infer<typeof intakeDataSchema>
 
@@ -88,6 +94,8 @@ export async function readIntake(input: {
   locale: 'es' | 'en'
   text?: string | null
   file?: { mediaType: string; data: string } | null
+  /** `quote` = la cotización de otro proveedor (2026-11-20). Por defecto, un pedido. */
+  purpose?: 'order' | 'quote'
 }): Promise<AiResult<IntakeData>> {
   const client = tryGetSupabaseClient()
   if (!client) throw new IntakeError('CONFIG_INCOMPLETA')
@@ -96,6 +104,7 @@ export async function readIntake(input: {
   const text = input.text?.trim()
   if (text) body.text = text.slice(0, INTAKE_MAX_TEXT)
   if (input.file) body.file = { media_type: input.file.mediaType, data: input.file.data }
+  if (input.purpose === 'quote') body.purpose = 'quote'
 
   const { data, error } = await client.functions.invoke<{ data: unknown }>(ORDER_INTAKE_FUNCTION, { body })
   if (error) throw new IntakeError(await codeFromInvokeError(error))

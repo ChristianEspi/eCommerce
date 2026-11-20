@@ -25,6 +25,14 @@
  *
  * Sin proveedor, sin cuota o con el modelo caído responde 200 con `data: null`
  * y el motivo tipado: el pedido rápido de siempre sigue en la misma pantalla.
+ *
+ * ## `purpose: 'quote'` — «Mejora esta cotización» (2026-11-20)
+ *
+ * El archivo es la cotización de OTRO proveedor. Mismo camino, mismo freno y
+ * misma cuota (funcionalidad `intake`); el modelo además copia el precio
+ * unitario de cada línea, la moneda y si lleva IGV. Cada línea vuelve con
+ * `precio_competencia`. El precio de ESTA tienda no sale de aquí: lo calcula
+ * el servidor de precios con la sesión del comprador, como el carrito.
  */
 import { assertNoTenantInPayload } from '../_shared/auth.ts'
 import { parseAllowedOrigins } from '../_shared/cors.ts'
@@ -35,27 +43,34 @@ import { anonClient, serviceClient, userClient } from '../_runtime/clients.ts'
 import { hayProveedorIA, pedirJson } from '../_runtime/anthropic.ts'
 import { medidorDeTienda } from '../_runtime/aiMeter.ts'
 import { delimitarDatos, sistemaConFrontera } from '../_shared/aiCore.ts'
-import { cuerpoIA, ejecutarIA } from '../_shared/aiPipeline.ts'
+import { cuerpoIA, ejecutarIA, type ResultadoIA } from '../_shared/aiPipeline.ts'
 import { resumenAdjuntos, validarAdjunto, type AdjuntoIA } from '../_shared/aiAttachments.ts'
 import {
+  ESQUEMA_COTIZACION,
   ESQUEMA_INTAKE,
   INTAKE_MAX_TEXTO,
+  SISTEMA_COTIZACION,
   SISTEMA_INTAKE,
   consultaDeLinea,
   proponerLinea,
   resumenIntake,
+  revisarCotizacion,
   revisarIntake,
+  type CotizacionRevisada,
   type HitCatalogo,
   type LecturaRevisada,
+  type LineaLeidaCotizacion,
   type LineaPropuesta,
+  type RespuestaModeloCotizacion,
   type RespuestaModeloIntake,
   type ResultadoBusqueda,
 } from '../_shared/aiIntake.ts'
 import { sanitizeTextForModel } from '../_shared/observability/redact.ts'
 
 const FEATURE = 'intake'
-const ALLOWED_FIELDS = ['store_slug', 'text', 'file', 'locale'] as const
+const ALLOWED_FIELDS = ['store_slug', 'text', 'file', 'locale', 'purpose'] as const
 const LOCALES = ['es', 'en'] as const
+const PURPOSES = ['order', 'quote'] as const
 
 /** Un PDF de 6 MB en base64 son ~8 MB; con el resto del JSON, este techo. */
 const MAX_BODY_BYTES = 9_500_000
@@ -91,6 +106,7 @@ const handler = serveJson(
     const storeSlug = requireSlug(body, 'store_slug')
     const locale = body.locale === undefined ? 'es' : requireEnum(body, 'locale', LOCALES)
     const texto = optionalText(body, 'text', INTAKE_MAX_TEXTO)
+    const esCotizacion = (body.purpose === undefined ? 'order' : requireEnum(body, 'purpose', PURPOSES)) === 'quote'
 
     const adjuntos: AdjuntoIA[] = []
     if (body.file !== undefined && body.file !== null) {
@@ -123,34 +139,61 @@ const handler = serveJson(
     const instruccion = [
       `Idioma de las notas: ${locale === 'en' ? 'inglés' : 'español'}.`,
       texto
-        ? delimitarDatos('pedido_escrito', sanitizeTextForModel(texto, INTAKE_MAX_TEXTO) ?? '')
-        : 'El pedido está en el archivo adjunto.',
+        ? delimitarDatos(esCotizacion ? 'cotizacion_escrita' : 'pedido_escrito', sanitizeTextForModel(texto, INTAKE_MAX_TEXTO) ?? '')
+        : esCotizacion
+          ? 'La cotización está en el archivo adjunto.'
+          : 'El pedido está en el archivo adjunto.',
     ].join('\n\n')
 
-    const lectura = await ejecutarIA<RespuestaModeloIntake, LecturaRevisada>(
-      {
-        feature: FEATURE,
-        prompt: `pedido · ${resumenAdjuntos(adjuntos)}${texto ? ` · texto ${texto.length} car.` : ''}`,
-        revisar: (data) => {
-          const revision = revisarIntake(data)
-          if (!revision.ok) return { ok: false, motivo: revision.motivo }
-          return { ok: true, value: revision.value, reply: `${revision.value.lineas.length} líneas leídas` }
-        },
-      },
-      {
-        hayProveedor: hayProveedorIA,
-        consumir: medidor.consumir,
-        registrar: medidor.registrar,
-        llamar: () =>
-          pedirJson<RespuestaModeloIntake>({
-            feature: FEATURE,
-            system: sistemaConFrontera(SISTEMA_INTAKE),
-            user: instruccion,
-            schema: ESQUEMA_INTAKE,
-            adjuntos,
-          }),
-      },
-    )
+    const resumenEntrada = `${resumenAdjuntos(adjuntos)}${texto ? ` · texto ${texto.length} car.` : ''}`
+    const puertos = { hayProveedor: hayProveedorIA, consumir: medidor.consumir, registrar: medidor.registrar }
+
+    const lectura: ResultadoIA<LecturaRevisada | CotizacionRevisada> =
+      esCotizacion
+        ? await ejecutarIA<RespuestaModeloCotizacion, CotizacionRevisada>(
+            {
+              feature: FEATURE,
+              prompt: `cotización · ${resumenEntrada}`,
+              revisar: (data) => {
+                const revision = revisarCotizacion(data)
+                if (!revision.ok) return { ok: false, motivo: revision.motivo }
+                return { ok: true, value: revision.value, reply: `${revision.value.lineas.length} líneas cotizadas leídas` }
+              },
+            },
+            {
+              ...puertos,
+              llamar: () =>
+                pedirJson<RespuestaModeloCotizacion>({
+                  feature: FEATURE,
+                  system: sistemaConFrontera(SISTEMA_COTIZACION),
+                  user: instruccion,
+                  schema: ESQUEMA_COTIZACION,
+                  adjuntos,
+                }),
+            },
+          )
+        : await ejecutarIA<RespuestaModeloIntake, LecturaRevisada>(
+            {
+              feature: FEATURE,
+              prompt: `pedido · ${resumenEntrada}`,
+              revisar: (data) => {
+                const revision = revisarIntake(data)
+                if (!revision.ok) return { ok: false, motivo: revision.motivo }
+                return { ok: true, value: revision.value, reply: `${revision.value.lineas.length} líneas leídas` }
+              },
+            },
+            {
+              ...puertos,
+              llamar: () =>
+                pedirJson<RespuestaModeloIntake>({
+                  feature: FEATURE,
+                  system: sistemaConFrontera(SISTEMA_INTAKE),
+                  user: instruccion,
+                  schema: ESQUEMA_INTAKE,
+                  adjuntos,
+                }),
+            },
+          )
 
     if (!lectura.data) {
       return { status: 200, body: { data: cuerpoIA({ ...lectura, data: null }) } }
@@ -192,20 +235,37 @@ const handler = serveJson(
     }
 
     const leidas = lectura.data.lineas
-    const propuestas: LineaPropuesta[] = []
+    const propuestas: Array<LineaPropuesta & { precio_competencia?: number | null }> = []
     for (let i = 0; i < leidas.length; i += TANDA) {
       const tanda = leidas.slice(i, i + TANDA)
       const resultados = await Promise.all(
         tanda.map((linea) => buscar(consultaDeLinea(linea) || linea.sku || '')),
       )
-      tanda.forEach((linea, j) => propuestas.push(proponerLinea(i + j, linea, resultados[j])))
+      tanda.forEach((linea, j) => {
+        const propuesta = proponerLinea(i + j, linea, resultados[j])
+        // En cotización, cada línea lleva el precio que puso el OTRO proveedor.
+        propuestas.push(
+          esCotizacion
+            ? { ...propuesta, precio_competencia: (linea as LineaLeidaCotizacion).precio ?? null }
+            : propuesta,
+        )
+      })
     }
+    const cotizacion =
+      esCotizacion && 'moneda' in lectura.data
+        ? { moneda: lectura.data.moneda, incluye_igv: lectura.data.incluyeIgv }
+        : undefined
 
     return {
       status: 200,
       body: {
         data: {
-          data: { lineas: propuestas, notas: lectura.data.notas, resumen: resumenIntake(propuestas) },
+          data: {
+            lineas: propuestas,
+            notas: lectura.data.notas,
+            resumen: resumenIntake(propuestas),
+            ...(cotizacion ? { cotizacion } : {}),
+          },
           motivo: null,
           interaction_id: lectura.interactionId,
         },
