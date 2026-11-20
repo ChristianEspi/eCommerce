@@ -309,6 +309,23 @@ describe('correlativo y emisión', () => {
   })
 })
 
+describe('migración sobre datos existentes', () => {
+  it('volver a aplicarla con un comprobante ACEPTADO no falla ni lo toca', async () => {
+    const inv = await generar(
+      await pedido({ billing: { document_type: 'invoice', tax_id: '20123456789', legal_name: 'Aceptado SAC' } }),
+    )
+    await sql(`update public.invoices set document_type = null where id = $1`, [inv])
+    await sql(`update public.invoices set status = 'accepted', number = '00000999' where id = $1`, [inv])
+    const { readFileSync } = await import('node:fs')
+    const migracion = readFileSync('supabase/migrations/20261120110000_invoicing_peru_fiscal_data.sql', 'utf8')
+    await db.exec(migracion)
+    expect((await sql(`select document_type, status from public.invoices where id = $1`, [inv]))[0]).toEqual({
+      document_type: null,
+      status: 'accepted',
+    })
+  })
+})
+
 describe('configuración: permisos y aislamiento', () => {
   it('series y tasas inválidas se rechazan', async () => {
     expect(await fallo(() => configurar(ownerA, storeA, { receipt: 'F001' }))).toMatch(/SERIE_INVALIDA/)

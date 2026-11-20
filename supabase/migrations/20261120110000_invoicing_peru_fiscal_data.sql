@@ -207,10 +207,13 @@ do $$ begin
     check (customer_doc_type is null or customer_doc_type in ('ruc', 'dni', 'ce', 'passport'));
 exception when duplicate_object then null; end $$;
 
--- Los existentes: la serie dice qué son.
+-- Los existentes: la serie dice qué son. Un comprobante ACEPTADO no se edita
+-- (`invoice_guard`, «se corrige con una nota»): se queda en null y quien lo lea
+-- lo deduce de la serie, igual que hace `invoice_issue_enqueue`.
 update public.invoices
    set document_type = case when series like 'F%' then 'invoice' else 'receipt' end
- where document_type is null;
+ where document_type is null
+   and status <> 'accepted';
 
 alter table public.invoice_items
   add column if not exists tax_affectation text,
