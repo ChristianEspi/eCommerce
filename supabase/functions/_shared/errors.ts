@@ -75,6 +75,11 @@ const DB_CODE_STATUS: Record<string, ErrorStatus> = {
   // lifecycle.v1: el guardián de la base (trigger) rechaza toda escritura de un
   // tenant suspendido. La lectura sigue; por eso no es 403 ni 404.
   TENANT_SUSPENDED: 423,
+  // 2026-11-20 · PDF del comprobante (`invoice_pdf_source`). «No encontrado»
+  // también cuando no es tuyo: no se confirma que el id exista.
+  COMPROBANTE_NO_ENCONTRADO: 404,
+  PDF_NO_DISPONIBLE: 404,
+  NO_AUTENTICADO: 401,
 }
 
 /** Lo que levanta `ebim.enforce_tenant_lifecycle` (lifecycle.v1). */

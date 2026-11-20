@@ -451,6 +451,10 @@ describe('errores', () => {
     expect(fromDatabaseError({ message: 'TENANT_YA_EXISTE: ya existe' }).status).toBe(409)
     expect(fromDatabaseError({ message: 'STOCK_INSUFICIENTE: sin stock' }).status).toBe(409)
     expect(fromDatabaseError({ message: 'TIENDA_NO_DISPONIBLE: nope' }).status).toBe(404)
+    // 2026-11-20 · PDF del comprobante: antes salían como 500 genérico.
+    expect(fromDatabaseError({ message: 'COMPROBANTE_NO_ENCONTRADO: no existe', code: '22023' }).status).toBe(404)
+    expect(fromDatabaseError({ message: 'PDF_NO_DISPONIBLE: aún no', code: '22023' }).status).toBe(404)
+    expect(fromDatabaseError({ message: 'NO_AUTENTICADO: hace falta sesion', code: '42501' }).status).toBe(401)
   })
 
   it('una violacion de RLS es 403, no un 500 con detalle interno', () => {
