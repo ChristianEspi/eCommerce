@@ -545,3 +545,46 @@ describe('el indice no puede desincronizarse', () => {
     expect(names(await search('trail'))).toEqual([])
   })
 })
+
+describe('2026-11-20 · los productos de UNA campaña (filtro promotion)', () => {
+  async function campana(code: string, store: string, tenant: typeof TENANT_A, status: string, productName: string | null) {
+    const promo = await id(
+      `insert into public.promotions
+         (organization_id, company_id, store_id, code, name, kind, value_percent, status, valid_from)
+       values ($1, $2, $3, $4, 'Liquidación', 'percentage', 15, $5::public.promotion_status, now() - interval '1 day')
+       returning id`,
+      [tenant.organizationId, tenant.companyId, store, code, status],
+    )
+    if (productName) {
+      const [prod] = await svc(`select id from public.products where name = $1 and store_id = $2`, [productName, store])
+      await svc(
+        `insert into public.promotion_scopes
+           (organization_id, company_id, store_id, promotion_id, promotion_kind, scope_kind, product_id)
+         values ($1, $2, $3, $4, 'percentage', 'product', $5)`,
+        [tenant.organizationId, tenant.companyId, store, promo, prod?.id],
+      )
+    }
+    return promo
+  }
+
+  it('enseña solo los productos de la campaña, y la portada sabe que los tiene', async () => {
+    const promo = await campana('liq-activa', storeA, TENANT_A, 'active', 'Bota de montaña')
+    expect(names(await search(null, { promotion: promo }))).toEqual(['Bota de montaña'])
+
+    const rows = await asRole(db, 'anon', null, () =>
+      sql(`select public.store_promotions_for_slug($1) as r`, [STORE_A_SLUG]),
+    )
+    const promos = ((rows[0]?.r as Json).promotions ?? []) as Json[]
+    expect(promos.find((p) => p.id === promo)?.has_products).toBe(true)
+  })
+
+  it('un borrador, una campaña de otra tienda o un id roto no enseñan nada', async () => {
+    const borradorPromo = await campana('liq-borrador', storeA, TENANT_A, 'draft', 'Bota de montaña')
+    expect(names(await search(null, { promotion: borradorPromo }))).toEqual([])
+
+    const ajena = await campana('liq-ajena', storeB, TENANT_B, 'active', null)
+    expect(names(await search(null, { promotion: ajena }))).toEqual([])
+
+    expect(names(await search(null, { promotion: 'no-es-un-uuid' }))).toEqual([])
+  })
+})

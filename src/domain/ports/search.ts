@@ -65,6 +65,11 @@ export interface SearchFilters {
    * cálculo es cierto para todas las tiendas.
    */
   readonly discounted?: boolean
+  /**
+   * 2026-11-20 · Solo los productos de UNA campaña (su id). Lo resuelve la base
+   * y solo para una campaña que la tienda esté anunciando.
+   */
+  readonly promotion?: string | null
   readonly priceMin?: MoneyAmount | null
   readonly priceMax?: MoneyAmount | null
 }

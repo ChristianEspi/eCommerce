@@ -3,7 +3,7 @@ import { Box, Stack, Typography } from '@mui/material'
 import { Link } from 'react-router-dom'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { offerBadge, vigenciaTexto } from '../offer'
-import type { StorePromotion } from '../promotions'
+import { promotionHref, type StorePromotion } from '../promotions'
 
 /**
  * Rediseño v3 · Las campañas de UNIVERSAL (lámina «Universal · Home»): hasta
@@ -51,11 +51,7 @@ export function PromoUniversal({
         const tono = TONOS[i % TONOS.length]!
         const badge = offerBadge(promo, t, locale, currency)
         const vigencia = vigenciaTexto(promo.endsAt, t, locale)
-        const destino = promo.categorySlug
-          ? `/s/${storeSlug}?c=${encodeURIComponent(promo.categorySlug)}`
-          : promo.brandCode
-            ? `/s/${storeSlug}?b=${encodeURIComponent(promo.brandCode)}`
-            : `/s/${storeSlug}?ver=todo&oferta=1`
+        const destino = promotionHref(promo, storeSlug)
         return (
           <Stack
             key={promo.id}

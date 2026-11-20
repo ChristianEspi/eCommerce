@@ -557,6 +557,7 @@ export const es = {
     'store.nav.brands': 'Marcas',
     'store.categories.title': 'Categorías',
     'store.filter.discounted': 'Solo en oferta',
+    'store.filter.campaign': 'Productos de la campaña',
     'store.filter.inStock': 'Solo disponibles',
     'store.sort.label': 'Ordenar por',
     'store.sort.recent': 'Novedades',

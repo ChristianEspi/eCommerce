@@ -8,7 +8,7 @@ import { iconoDe } from '../categoryIcon'
 import { usePublicCategories } from '../hooks'
 import type { PublicCategory } from '../types'
 import { offerBadge, vigenciaTexto } from '../offer'
-import type { StorePromotion } from '../promotions'
+import { promotionHref, type StorePromotion } from '../promotions'
 import type { ResolvedValueProp } from '../valueProps'
 import { Countdown } from './Countdown'
 import { ProductMedia } from './ProductMedia'
@@ -265,11 +265,7 @@ function fuenteDe(referencia: string | null, firmadas: Record<string, string>) {
 }
 
 function destinoDe(promo: StorePromotion, storeSlug: string) {
-  return promo.categorySlug
-    ? `/s/${storeSlug}?c=${encodeURIComponent(promo.categorySlug)}`
-    : promo.brandCode
-      ? `/s/${storeSlug}?b=${encodeURIComponent(promo.brandCode)}`
-      : `/s/${storeSlug}?ver=todo&oferta=1`
+  return promotionHref(promo, storeSlug)
 }
 
 /** El banner de campañas: una a la vez, con puntos para pasar. */

@@ -604,6 +604,7 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.nav.brands': 'Brands',
     'store.categories.title': 'Categories',
     'store.filter.discounted': 'On sale only',
+    'store.filter.campaign': 'Campaign products',
     'store.filter.inStock': 'In stock only',
     'store.sort.label': 'Sort by',
     'store.sort.recent': 'Newest',

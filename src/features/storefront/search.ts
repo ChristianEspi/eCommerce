@@ -122,6 +122,7 @@ export function toFilterPayload(filters: SearchFilters | undefined): Record<stri
   if (filters.brands && filters.brands.length > 0) payload.brands = [...filters.brands]
   if (filters.availability === 'in-stock') payload.availability = 'in-stock'
   if (filters.discounted) payload.discounted = true
+  if (filters.promotion) payload.promotion = filters.promotion
   // Los importes viajan como TEXTO. Un número de JSON es un double, y un double
   // no es un importe (regla del repositorio desde P02).
   if (filters.priceMin) payload.price_min = filters.priceMin

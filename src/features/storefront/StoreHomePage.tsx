@@ -56,6 +56,7 @@ import {
 } from './hooks'
 import { categoryBarAllSlug, categoryBarItems, categoryTrail, rollUpCategoryCounts } from './categoryTree'
 import { hitToPublicProduct } from './search'
+import { promotionHref } from './promotions'
 import { homeMeta } from './seo'
 
 /**
@@ -196,6 +197,12 @@ export function StoreHomePage() {
    * banda—; lo que faltaba era poder pedirlo desde la vitrina.
    */
   const soloOferta = params.get('oferta') === '1'
+  /**
+   * 2026-11-20 · Los productos de UNA campaña (`?campana=<id>`): lo que abre
+   * «Ver los productos» de una campaña de productos concretos. Antes caía en
+   * `?oferta=1` y mezclaba los descuentos de otras campañas.
+   */
+  const campanaId = params.get('campana')?.trim() || null
   const sortParam = params.get('sort')
   const sort: SearchSort = (SORTS as readonly string[]).includes(sortParam ?? '')
     ? (sortParam as SearchSort)
@@ -269,6 +276,7 @@ export function StoreHomePage() {
         brands,
         availability,
         ...(soloOferta ? { discounted: true } : {}),
+        ...(campanaId ? { promotion: campanaId } : {}),
         ...(priceMin ? { priceMin } : {}),
         ...(priceMax ? { priceMax } : {}),
       },
@@ -276,7 +284,7 @@ export function StoreHomePage() {
       limit: PAGE_SIZE,
       offset: 0,
     }),
-    [search, categorySlug, brands, availability, soloOferta, sort, priceMin, priceMax],
+    [search, categorySlug, brands, availability, soloOferta, campanaId, sort, priceMin, priceMax],
   )
 
   const filtered = Boolean(
@@ -285,6 +293,7 @@ export function StoreHomePage() {
       brands.length > 0 ||
       availability === 'in-stock' ||
       soloOferta ||
+      campanaId ||
       priceMin ||
       priceMax,
   )
@@ -818,8 +827,17 @@ export function StoreHomePage() {
         onRemove: () => update('oferta', null),
       })
     }
+    if (campanaId) {
+      puestos.push({
+        id: 'campana',
+        label: (promotions.data ?? []).find((promo) => promo.id === campanaId)?.name ?? t('store.filter.campaign'),
+        onRemove: () => update('campana', null),
+      })
+    }
     return puestos
   }, [
+    campanaId,
+    promotions.data,
     categorySlug,
     brands,
     priceMin,
@@ -1428,13 +1446,7 @@ export function StoreHomePage() {
               </Typography>
               <MuiLink
                 component={Link}
-                to={
-                  promosVigentes[0].categorySlug
-                    ? `/s/${storeSlug}?c=${encodeURIComponent(promosVigentes[0].categorySlug)}`
-                    : promosVigentes[0].brandCode
-                      ? `/s/${storeSlug}?b=${encodeURIComponent(promosVigentes[0].brandCode)}`
-                      : `/s/${storeSlug}?ver=todo&oferta=1`
-                }
+                to={promotionHref(promosVigentes[0], storeSlug)}
                 sx={{ fontSize: TS.label, fontWeight: 700, color: 'var(--accent-deep)', flexShrink: 0 }}
               >
                 {t('store.promos.see')}

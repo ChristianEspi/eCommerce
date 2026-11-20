@@ -3,7 +3,7 @@ import { Box, Stack, Typography } from '@mui/material'
 import { Link } from 'react-router-dom'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { offerBadge, vigenciaTexto } from '../offer'
-import type { StorePromotion } from '../promotions'
+import { promotionHref, type StorePromotion } from '../promotions'
 
 /**
  * Las campañas como DOS BANNERS lado a lado (Resumen v2 · contrato V5,
@@ -79,11 +79,7 @@ function Banner({
   const badge = offerBadge(promo, t, locale, currency)
   const vigencia = vigenciaTexto(promo.endsAt, t, locale)
   // A los productos que alcanza la campaña; al catálogo si es de pedido entero.
-  const destino = promo.categorySlug
-    ? `/s/${storeSlug}?c=${encodeURIComponent(promo.categorySlug)}`
-    : promo.brandCode
-      ? `/s/${storeSlug}?b=${encodeURIComponent(promo.brandCode)}`
-      : `/s/${storeSlug}?ver=todo&oferta=1`
+  const destino = promotionHref(promo, storeSlug)
 
   /*
    * Una FRANJA, no un cartel. Antes era una caja de 184 px de alto con el
