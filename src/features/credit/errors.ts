@@ -53,6 +53,13 @@ export function mapCreditCode(code: string): MessageKey {
       return 'credit.error.unbalanced'
     case 'COMPROBANTE_NO_EMITIBLE':
       return 'credit.error.notIssuable'
+    // Facturación Perú · fase 1 (2026-11-20).
+    case 'BOLETA_REQUIERE_DOCUMENTO':
+      return 'credit.error.receiptNeedsId'
+    case 'FACTURA_REQUIERE_RUC':
+      return 'credit.error.invoiceNeedsRuc'
+    case 'SERIE_AGOTADA':
+      return 'credit.error.seriesExhausted'
     case 'COMPROBANTE_NO_ENCONTRADO':
       return 'credit.error.notFound'
     case 'DUPLICADO':
