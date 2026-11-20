@@ -39,7 +39,8 @@ import { parseAllowedOrigins } from '../_shared/cors.ts'
 import { AppError, badRequest, fromDatabaseError, unauthorized } from '../_shared/errors.ts'
 import { serveJson } from '../_shared/http.ts'
 import { optionalText, rejectUnknownFields, requireEnum, requireSlug } from '../_shared/validation.ts'
-import { anonClient, serviceClient, userClient } from '../_runtime/clients.ts'
+import { serviceClient, userClient } from '../_runtime/clients.ts'
+import { errorCode } from '../_shared/observability/logger.ts'
 import { hayProveedorIA, pedirJson } from '../_runtime/anthropic.ts'
 import { medidorDeTienda } from '../_runtime/aiMeter.ts'
 import { delimitarDatos, sistemaConFrontera } from '../_shared/aiCore.ts'
@@ -75,8 +76,14 @@ const PURPOSES = ['order', 'quote'] as const
 /** Un PDF de 6 MB en base64 son ~8 MB; con el resto del JSON, este techo. */
 const MAX_BODY_BYTES = 9_500_000
 
-/** Búsquedas en paralelo por tanda: 60 líneas no pueden ser 60 a la vez. */
-const TANDA = 6
+/**
+ * Búsquedas en paralelo por tanda: 60 líneas no pueden ser 60 a la vez.
+ *
+ * 3 y no 6 (2026-11-20): en QAS cada búsqueda de miquimica tarda ~1,5 s sola
+ * (calcula precio y foto del catálogo publicado); 5 a la vez se pisaban y
+ * TODAS caían por statement timeout, y el pedido entero respondía 500.
+ */
+const TANDA = 3
 const CANDIDATOS = 1 + 3
 
 function motivoDeGuarda(reason: unknown): AppError {
@@ -95,7 +102,7 @@ const handler = serveJson(
     allowedOrigins: parseAllowedOrigins(Deno.env.get('EBIM_STOREFRONT_ORIGINS')),
     service: 'order-intake',
   },
-  async ({ request, body, trace }) => {
+  async ({ request, body, trace, logger }) => {
     const declarado = Number(request.headers.get('content-length') ?? '0')
     if (declarado > MAX_BODY_BYTES) {
       throw new AppError('ARCHIVO_DEMASIADO_GRANDE', 'El archivo supera el tamaño admitido', 413)
@@ -200,11 +207,23 @@ const handler = serveJson(
     }
 
     // 3 · Decidir el producto de cada línea con el catálogo, sin modelo.
-    //     `anonClient`: el buscador es público y `security definer`; no hace
-    //     falta ni conviene más permiso que el de cualquier visitante.
-    const catalogo = anonClient(trace)
+    //     Con la sesión del comprador (`authenticated`), no con `anon`: el
+    //     buscador es el mismo, público y `security definer`, pero `anon`
+    //     corta a los 3 s y `authenticated` a los 8 s. No da más permiso que
+    //     el que el comprador ya tiene en la tienda.
+    const catalogo = usuario
     async function buscar(consulta: string): Promise<ResultadoBusqueda> {
       if (consulta.length < 2) return { mode: 'empty', items: [] }
+      try {
+        return await buscarEnCatalogo(consulta)
+      } catch (error) {
+        // Una búsqueda caída no tumba el pedido: esa línea sale «sin
+        // coincidencia» y la persona la resuelve a mano. El resto sigue.
+        logger.warn('intake.search_failed', { original_code: errorCode(error) })
+        return { mode: 'empty', items: [] }
+      }
+    }
+    async function buscarEnCatalogo(consulta: string): Promise<ResultadoBusqueda> {
       const { data, error } = await catalogo.rpc('catalog_search_for_slug', {
         p_store_slug: storeSlug,
         p_query: consulta,
