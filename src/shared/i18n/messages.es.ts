@@ -2734,6 +2734,8 @@ export const es = {
     'store.intake.error.generic': 'No pudimos leer el pedido ahora. Prueba otra vez o usa las otras pestañas.',
     'store.intake.empty': 'No encontramos productos para pedir en lo que subiste. Prueba con una foto más nítida o escribe el pedido.',
     'store.intake.unavailable': 'La lectura con IA no está disponible ahora. Puedes escribir los códigos en la pestaña Líneas o subir el Excel.',
+    'store.intake.noCredits': 'Se acabaron los créditos de IA de la tienda por este periodo. Puedes escribir los códigos en la pestaña Líneas o subir el Excel.',
+    'store.intake.busy': 'La IA está saturada en este momento. Vuelve a intentarlo en un minuto.',
     'store.intake.review.title': 'Revisa lo que leímos',
     'store.intake.review.hint': 'Marca lo que quieras pasar al pedido. Lo dudoso empieza sin marcar. El precio, el stock y tu surtido se confirman al validar.',
     'store.intake.review.include': 'Incluir en el pedido',

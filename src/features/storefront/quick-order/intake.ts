@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { parseAiResult, type AiResult } from '@/features/ai/result'
+import { esReintentable, parseAiResult, type AiErrorKind, type AiResult } from '@/features/ai/result'
 import { ORDER_INTAKE_FUNCTION } from '@/shared/lib/db-schema'
 import { codeFromInvokeError } from '@/shared/lib/edgeError'
 import { tryGetSupabaseClient } from '@/shared/lib/supabase'
@@ -64,6 +64,22 @@ export const intakeDataSchema = z.object({
     .optional(),
 })
 export type IntakeData = z.infer<typeof intakeDataSchema>
+
+/**
+ * El aviso que ve el comprador cuando la IA no devolvió lectura. Un «no está
+ * disponible» genérico escondía que la tienda se había quedado sin créditos:
+ * cada causa dice qué toca (esperar, reintentar, o seguir sin IA).
+ */
+export type IntakeMotivoKey =
+  | 'store.intake.noCredits'
+  | 'store.intake.busy'
+  | 'store.intake.unavailable'
+
+export function intakeMotivoKey(motivo: AiErrorKind): IntakeMotivoKey {
+  if (motivo === 'sin_cuota') return 'store.intake.noCredits'
+  if (esReintentable(motivo)) return 'store.intake.busy'
+  return 'store.intake.unavailable'
+}
 
 /** Fallos ANTES de la IA (archivo, sesión, freno). La IA degrada con `motivo`. */
 export type IntakeFileIssue = 'TIPO_NO_ADMITIDO' | 'ARCHIVO_DEMASIADO_GRANDE' | 'ARCHIVO_VACIO'

@@ -47,6 +47,7 @@ import {
   IntakeError,
   checkIntakeFile,
   fileToBase64,
+  intakeMotivoKey,
   preselected,
   readIntake,
   type IntakeFileIssue,
@@ -286,7 +287,7 @@ export function CompetitorQuotePanel({
         {read.isError && <Alert severity="error">{t(errorKey(read.error))}</Alert>}
         {read.isSuccess && motivo && (
           <Alert severity={motivo === 'vacia' ? 'info' : 'warning'}>
-            {t(motivo === 'vacia' ? 'store.compareQuote.empty' : 'store.intake.unavailable')}
+            {t(motivo === 'vacia' ? 'store.compareQuote.empty' : intakeMotivoKey(motivo))}
           </Alert>
         )}
 

@@ -3263,6 +3263,8 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.intake.error.generic': 'We could not read the order right now. Try again or use the other tabs.',
     'store.intake.empty': 'We found no products to order in what you uploaded. Try a sharper photo or type the order.',
     'store.intake.unavailable': 'AI reading is not available right now. You can type the codes in the Lines tab or upload the Excel file.',
+    'store.intake.noCredits': 'The store has used up its AI credits for this period. You can type the codes in the Lines tab or upload the Excel file.',
+    'store.intake.busy': 'The AI is busy right now. Try again in a minute.',
     'store.intake.review.title': 'Review what we read',
     'store.intake.review.hint': 'Tick what you want to move to the order. Uncertain lines start unticked. Price, stock and your assortment are confirmed when validating.',
     'store.intake.review.include': 'Include in the order',

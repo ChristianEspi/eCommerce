@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '@/test/render'
-import { checkIntakeFile, preselected, type IntakeLine } from './intake'
+import { checkIntakeFile, intakeMotivoKey, preselected, type IntakeLine } from './intake'
 
 /**
  * «Con IA» del pedido rápido, en pantalla (2026-11-19).
@@ -65,6 +65,13 @@ describe('preselección y archivo', () => {
     expect(checkIntakeFile({ type: 'image/png', size: 5 * 1024 * 1024 })).toBe('ARCHIVO_DEMASIADO_GRANDE')
     expect(checkIntakeFile({ type: 'application/pdf', size: 0 })).toBe('ARCHIVO_VACIO')
   })
+
+  it('sin créditos no se disfraza de «no disponible»', () => {
+    expect(intakeMotivoKey('sin_cuota')).toBe('store.intake.noCredits')
+    expect(intakeMotivoKey('rate_limit')).toBe('store.intake.busy')
+    expect(intakeMotivoKey('timeout')).toBe('store.intake.busy')
+    expect(intakeMotivoKey('sin_proveedor')).toBe('store.intake.unavailable')
+  })
 })
 
 describe('IntakePanel', () => {
@@ -99,12 +106,12 @@ describe('IntakePanel', () => {
     expect(onAccept).toHaveBeenCalledWith([{ sku: 'DON-10', quantity: 3 }])
   })
 
-  it('sin IA disponible lo dice y no enseña revisión', async () => {
+  it('sin créditos lo dice tal cual y no enseña revisión', async () => {
     holder.result = { data: null, motivo: 'sin_cuota', interactionId: null }
     renderWithProviders(<IntakePanel storeSlug="botica" onAccept={vi.fn()} />)
     await userEvent.type(screen.getByRole('textbox', { name: /escribe tu pedido/i }), '2 jabones')
     await userEvent.click(screen.getByRole('button', { name: /leer pedido/i }))
-    await waitFor(() => expect(screen.getByText(/no está disponible ahora/i)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText(/se acabaron los créditos de ia/i)).toBeInTheDocument())
     expect(screen.queryByText(/revisa lo que leímos/i)).not.toBeInTheDocument()
   })
 })
