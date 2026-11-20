@@ -3,13 +3,37 @@
 GUIDELINES_STATUS: VERIFIED (**por lectura directa** en la 2ª pasada de P00-SaaS: contrato v1.15,
 `PROTOCOLO.md`, `BANDEJA.md` y `EBIM-CREW-ROSTER.md`). La unidad montada es `G:`, no `H:`.
 Fuentes: ver `docs/EBIM_GUIDELINES_TRACE.md`.
-Última actualización: 2026-11-19 (IA diferenciadora, 8 frentes). Antes: 2026-09-26 (Resumen v2 · vitrina B2B). Antes: 2026-08-30 (**P17-SaaS terminada — quality gate final y línea base releaseable**;
+Última actualización: 2026-11-20 (correo por MailHub y textos por tienda). Antes: 2026-11-19 (IA diferenciadora, 8 frentes). Antes: 2026-09-26 (Resumen v2 · vitrina B2B). Antes: 2026-08-30 (**P17-SaaS terminada — quality gate final y línea base releaseable**;
 el recorrido SaaS P00–P17 queda cerrado)
 
 > **Dos numeraciones de fase.** Lo que sigue como «P00…P12» es el trabajo histórico de este repo. A
 > partir del 2026-08-27 arranca un segundo recorrido, **P00–P17 de productización SaaS**
 > (`claude-saas-opus/config/phases.json`), que se identifica siempre como «P0x-SaaS». No son la misma
 > serie: el P12 histórico es el framework de integraciones; el P12-SaaS es fulfillment y devoluciones.
+
+## Correo por EBIM MailHub y textos por tienda (2026-11-20)
+
+Commits locales en `dev`: `10d0987`, `71d51ac`, `d2f2794`, `4a963fe`.
+
+- **QAS nunca había enviado un correo**: sin secretos `MS_*` (Graph, contrato §14) y sin destino del
+  cron en Vault. Se integra **EBIM MailHub** como respaldo: `notifications-dispatch` y
+  `notifications-test` usan Graph si está y MailHub si no (`_shared/notifications/mailhub.ts`).
+  `order.confirmed` en ES va por la plantilla MailHub `pedido-recibido`; el resto, HTML propio.
+  `idempotencyKey = ecommerce-<id cola>`. Nada se envía a `.demo`/`.test`/`example.*`.
+- **En QAS (a pedido del operador):** secretos `EBIM_MAILHUB_URL`/`EBIM_MAILHUB_TOKEN`;
+  `scripts/configurar-correo.mjs` conectó el cron (Vault + `EBIM_NOTIFICATIONS_KEY`, hook de Auth
+  apagado). Primer envío real OK (pedido `EC-20261120-00058`). **Rotar el token**: se pegó en el chat.
+- **Propuesta de contrato** en el buzón: `2026-11-20-ecommerce-001` (MailHub como canal de suite).
+  **No configurar PRD** hasta que GMAO edite §14.
+- **Textos por tienda («opción A»)**: Configuración › Correo › «Textos de los correos». Owner/admin
+  editan asunto/título/mensaje de pedido recibido/aprobado/rechazado/en camino (ES/EN) con variables
+  de lista cerrada; vista previa con el mismo motor del envío (`customCopy.ts`). Migración
+  `20261120100000_email_templates.sql` **aplicada en QAS** por API de gestión (no registrada, como las
+  previas): RLS forzada, escritura solo por `email_template_save/reset`, guardián, auditoría.
+- Otros: miquimica pasó a plan IA `active` (500/mes) en `ai_quotas`; `order-intake` busca con la
+  sesión del comprador en tandas de 3 (antes 500 por timeout de `anon`).
+- **Pendiente:** buscador de catálogo lento (~1,5 s por consulta con 701 productos); «media docena»
+  se lee como 1; «flodin» propone el inyectable antes que la tableta. Frontend NO promovido.
 
 ## IA diferenciadora — 8 frentes (2026-11-19, a pedido del operador: «haz todo»)
 
