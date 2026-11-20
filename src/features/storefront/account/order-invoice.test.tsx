@@ -69,6 +69,24 @@ describe('comprobante del pedido', () => {
     )
   })
 
+  it('el visor arranca a tamaño real (100 %) y acerca/aleja sin volver a pedir el PDF', async () => {
+    const user = userEvent.setup()
+    const fake = pintar(() => ({
+      id: INVOICE, document_type: 'receipt', series: 'BBB1', number: '00000001', status: 'issued',
+      pdf_url: 'https://www.nubefact.com/cpe/abc.pdf',
+    }))
+    await user.click(await screen.findByRole('button', { name: 'Ver comprobante' }))
+    const visor = await screen.findByRole('dialog')
+    expect(within(visor).getByText('100 %')).toBeInTheDocument()
+    await waitFor(() => expect(within(visor).getByRole('button', { name: 'Acercar' })).toBeEnabled())
+    await user.click(within(visor).getByRole('button', { name: 'Acercar' }))
+    expect(within(visor).getByText('125 %')).toBeInTheDocument()
+    await user.click(within(visor).getByRole('button', { name: 'Alejar' }))
+    await user.click(within(visor).getByRole('button', { name: 'Alejar' }))
+    expect(within(visor).getByText('75 %')).toBeInTheDocument()
+    expect(fake.state.invocations.filter((c) => c.name === 'invoice-pdf')).toHaveLength(1)
+  })
+
   it('si el PDF no se puede traer, el visor lo dice', async () => {
     const user = userEvent.setup()
     pintar(

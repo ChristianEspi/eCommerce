@@ -34,11 +34,20 @@ async function pdfjs(): Promise<PdfJs> {
   return loader
 }
 
+/** Puntos PDF (1/72 in) a px CSS (1/96 in): el tamaño REAL del papel en pantalla. */
+const PT_TO_PX = 96 / 72
+
 /**
- * Dibuja todas las páginas al ancho pedido (CSS px), nítidas en pantallas de
- * alta densidad. Devuelve los canvas para que el componente los coloque.
+ * Dibuja todas las páginas a su tamaño REAL por `zoom` (1 = 100 %), sin pasar
+ * de `maxCssWidth`: un ticket de 80 mm se ve como ticket, un A4 como A4, y en
+ * el celular se reduce para caber. Nítidas en pantallas de alta densidad.
  */
-export async function renderPdf(bytes: Uint8Array, cssWidth: number, maxPages = 30): Promise<RenderedPage[]> {
+export async function renderPdf(
+  bytes: Uint8Array,
+  maxCssWidth: number,
+  zoom = 1,
+  maxPages = 30,
+): Promise<RenderedPage[]> {
   const lib = await pdfjs()
   // pdf.js se queda con el buffer: se le pasa una copia para no vaciar el original.
   const task = lib.getDocument({ data: bytes.slice(), useSystemFonts: true })
@@ -49,6 +58,7 @@ export async function renderPdf(bytes: Uint8Array, cssWidth: number, maxPages = 
     for (let n = 1; n <= Math.min(doc.numPages, maxPages); n += 1) {
       const page = await doc.getPage(n)
       const base = page.getViewport({ scale: 1 })
+      const cssWidth = Math.min(base.width * PT_TO_PX * zoom, maxCssWidth)
       const scale = (cssWidth / base.width) * ratio
       const viewport = page.getViewport({ scale })
       const canvas = document.createElement('canvas')
