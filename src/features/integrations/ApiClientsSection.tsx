@@ -1,7 +1,12 @@
 import { usePagedRows } from '@/shared/ui/usePagedRows'
 import { TablePager } from '@/shared/ui/TablePager'
 import { StatusChip } from '@/shared/ui/StatusChip'
+import CheckRoundedIcon from '@mui/icons-material/CheckRounded'
+import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded'
 import {
+  Box,
+  IconButton,
+  Tooltip,
   Alert,
   Button,
   Card,
@@ -58,6 +63,41 @@ import type { NewCredential } from './types'
  * primero en la primera revisión.
  */
 
+/**
+ * Un valor del diálogo con su botón de copiar (2026-11-20). Copiar a mano un
+ * secreto de 64 caracteres es la forma más fácil de perder uno; si el navegador
+ * no deja usar el portapapeles, el valor sigue a la vista para seleccionarlo.
+ */
+function CopyableValue({ label, value }: { label: string; value: string }) {
+  const { t } = useI18n()
+  const [copied, setCopied] = useState(false)
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Sin permiso de portapapeles: el valor sigue visible para copiarlo a mano.
+    }
+  }
+
+  const action = `${copied ? t('integrations.api.copied') : t('integrations.api.copy')}: ${label}`
+  return (
+    <Box sx={{ mb: 1.5 }}>
+      <Typography sx={{ fontSize: 12, color: 'var(--muted)' }}>{label}</Typography>
+      <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+        <Typography sx={{ fontSize: 13, wordBreak: 'break-all', fontFamily: 'monospace', flex: 1 }}>{value}</Typography>
+        <Tooltip title={copied ? t('integrations.api.copied') : t('integrations.api.copy')}>
+          <IconButton size="small" onClick={() => void copy()} aria-label={action}>
+            {copied ? <CheckRoundedIcon fontSize="small" color="success" /> : <ContentCopyRoundedIcon fontSize="small" />}
+          </IconButton>
+        </Tooltip>
+      </Stack>
+    </Box>
+  )
+}
+
 function SecretDialog({
   credential,
   onClose,
@@ -66,6 +106,21 @@ function SecretDialog({
   onClose: () => void
 }) {
   const { t } = useI18n()
+  const [copiedBoth, setCopiedBoth] = useState(false)
+
+  async function copyBoth() {
+    if (!credential) return
+    try {
+      await navigator.clipboard.writeText(
+        [`client_id=${credential.client_id}`, `client_secret=${credential.client_secret}`].join('\n'),
+      )
+      setCopiedBoth(true)
+      window.setTimeout(() => setCopiedBoth(false), 2000)
+    } catch {
+      // Igual que arriba: los valores siguen a la vista.
+    }
+  }
+
   return (
     <Dialog open={credential !== null} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>{t('integrations.api.secretTitle')}</DialogTitle>
@@ -73,16 +128,16 @@ function SecretDialog({
         <Alert severity="warning" sx={{ mb: 2 }}>
           {t('integrations.api.secretWarning')}
         </Alert>
-        <Typography sx={{ fontSize: 12, color: 'var(--muted)' }}>client_id</Typography>
-        <Typography sx={{ fontSize: 13, wordBreak: 'break-all', mb: 1.5 }}>
-          {credential?.client_id}
-        </Typography>
-        <Typography sx={{ fontSize: 12, color: 'var(--muted)' }}>client_secret</Typography>
-        <Typography sx={{ fontSize: 13, wordBreak: 'break-all' }}>
-          {credential?.client_secret}
-        </Typography>
+        <CopyableValue label="client_id" value={credential?.client_id ?? ''} />
+        <CopyableValue label="client_secret" value={credential?.client_secret ?? ''} />
       </DialogContent>
       <DialogActions>
+        <Button
+          startIcon={copiedBoth ? <CheckRoundedIcon /> : <ContentCopyRoundedIcon />}
+          onClick={() => void copyBoth()}
+        >
+          {copiedBoth ? t('integrations.api.copied') : t('integrations.api.copyBoth')}
+        </Button>
         <Button variant="contained" onClick={onClose}>
           {t('integrations.api.secretDone')}
         </Button>

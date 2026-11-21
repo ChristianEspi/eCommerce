@@ -536,6 +536,13 @@ describe('Integraciones — credenciales de la API', () => {
     expect(await screen.findByText(/unica vez que se muestra|única vez que se muestra/)).toBeInTheDocument()
     expect(await screen.findByText('f'.repeat(64))).toBeInTheDocument()
 
+    // 2026-11-20 · Cada valor se copia con un botón, y los dos a la vez.
+    await user.click(screen.getByRole('button', { name: 'Copiar: client_secret' }))
+    expect(await navigator.clipboard.readText()).toBe('f'.repeat(64))
+    expect(await screen.findByRole('button', { name: 'Copiado: client_secret' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Copiar ambos' }))
+    expect(await navigator.clipboard.readText()).toBe(`client_id=ec_${'b'.repeat(32)}\nclient_secret=${'f'.repeat(64)}`)
+
     const llamada = fake.state.rpcCalls.find((call) => call.name === 'api_client_create')
     expect(llamada?.args.p_scopes).toEqual(['order.read'])
     expect(JSON.stringify(llamada?.args)).not.toContain('organization_id')
