@@ -441,6 +441,26 @@ describe('limite de tasa', () => {
     expect(message).toMatch(/LIMITE_DE_TASA/)
   })
 
+  // 2026-11-21 · `/v1/catalog/products:batch` chocaba con el CHECK de la ruta
+  // y el socio recibía un 500 sin registro. Toda ruta publicada se registra.
+  it('cada ruta publicada de la API se puede registrar', async () => {
+    const credential = await createCredential(TENANT_A, ['order.read'], 'todas-las-rutas')
+    await svc(`update public.api_clients set rate_limit_per_minute = 1000 where id = $1`, [
+      credential.id,
+    ])
+    for (const route of API_ROUTES) {
+      await svc(`select public.api_rate_limit_hit($1, $2, $3)`, [
+        credential.id,
+        route.method,
+        route.path,
+      ])
+    }
+    const rows = await svc(`select route from public.api_requests where api_client_id = $1`, [
+      credential.id,
+    ])
+    expect(rows.map((row) => row.route)).toContain('/v1/catalog/products:batch')
+  })
+
   it('el cupo de un socio no gasta el del otro', async () => {
     const uno = await createCredential(TENANT_A, ['order.read'], 'erp-uno')
     const dos = await createCredential(TENANT_A, ['order.read'], 'erp-dos')
