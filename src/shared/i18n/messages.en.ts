@@ -5252,6 +5252,8 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'integrations.queue.emptyBody': 'Outbound messages to external systems show up here: waiting, retrying and dead.',
     'integrations.webhooks.new': 'New endpoint',
     'integrations.webhooks.newTitle': 'New webhook endpoint',
+    'integrations.webhooks.edit': 'Edit',
+    'integrations.webhooks.editTitle': 'Edit webhook endpoint',
     'integrations.webhooks.name': 'Name',
     'integrations.webhooks.nameHelp': 'Lowercase, digits, dash and underscore. This is what the queue shows.',
     'integrations.webhooks.url': 'URL',

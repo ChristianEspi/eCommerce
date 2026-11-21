@@ -188,6 +188,49 @@ export async function createEndpoint(draft: EndpointDraft): Promise<WebhookEndpo
   return endpoint
 }
 
+/**
+ * Edición de un destino (2026-11-20): datos y eventos.
+ *
+ * Los eventos se aplican por DIFERENCIA con los que tenía: se suscriben los
+ * nuevos y se dan de baja los quitados, sin tocar los que siguen. Primero las
+ * altas: si la baja fallara, el destino recibe de más y no se pierde nada. Como
+ * en el alta, no viaja ningún identificador de tenant: lo decide la RLS.
+ */
+export async function updateEndpoint(
+  id: string,
+  draft: EndpointDraft,
+  previousEvents: readonly string[],
+): Promise<void> {
+  const { error } = await client()
+    .from(WEBHOOK_ENDPOINTS_TABLE)
+    .update({
+      name: draft.name.trim().toLowerCase(),
+      url: draft.url.trim(),
+      secret_ref: draft.secretRef.trim().toUpperCase(),
+      description: draft.description.trim() === '' ? null : draft.description.trim(),
+    })
+    .eq('id', id)
+  if (error) throw integrationsErrorFromDb(error)
+
+  const added = draft.eventTypes.filter((eventType) => !previousEvents.includes(eventType))
+  const removed = previousEvents.filter((eventType) => !draft.eventTypes.includes(eventType))
+
+  if (added.length > 0) {
+    const { error: addError } = await client()
+      .from(WEBHOOK_SUBSCRIPTIONS_TABLE)
+      .insert(added.map((eventType) => ({ endpoint_id: id, event_type: eventType })))
+    if (addError) throw integrationsErrorFromDb(addError)
+  }
+  if (removed.length > 0) {
+    const { error: removeError } = await client()
+      .from(WEBHOOK_SUBSCRIPTIONS_TABLE)
+      .delete()
+      .eq('endpoint_id', id)
+      .in('event_type', removed)
+    if (removeError) throw integrationsErrorFromDb(removeError)
+  }
+}
+
 export async function setEndpointActive(id: string, isActive: boolean): Promise<void> {
   const { error } = await client()
     .from(WEBHOOK_ENDPOINTS_TABLE)

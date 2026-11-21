@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '@/test/render'
@@ -449,6 +449,36 @@ describe('Integraciones — webhooks', () => {
     await user.clear(await screen.findByLabelText('URL'))
     await user.type(await screen.findByLabelText('URL'), 'https://nuevo.cliente.test/hooks')
     expect(guardar).toBeEnabled()
+  })
+
+  it('editar llega relleno y aplica los eventos por diferencia (2026-11-20)', async () => {
+    const fake = backend()
+    await abrirWebhooks(fake)
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'Editar' }))
+    expect(await screen.findByText('Editar destino de webhook')).toBeInTheDocument()
+    expect(await screen.findByLabelText('URL')).toHaveValue('https://erp.cliente.test/hooks')
+    expect(await screen.findByLabelText(/Pedido recibido/)).toBeChecked()
+
+    await user.clear(await screen.findByLabelText('URL'))
+    await user.type(await screen.findByLabelText('URL'), 'https://nuevo.cliente.test/hooks')
+    await user.click(await screen.findByLabelText(/Pedido recibido/))
+    await user.click(await screen.findByLabelText(/Cobro confirmado/))
+    await user.click(await screen.findByRole('button', { name: 'Guardar' }))
+
+    await waitFor(() =>
+      expect(fake.state.tables.webhook_endpoints?.[0]?.url).toBe('https://nuevo.cliente.test/hooks'),
+    )
+    const eventos = (fake.state.tables.webhook_subscriptions ?? [])
+      .filter((row) => row.endpoint_id === ENDPOINT_ID)
+      .map((row) => row.event_type)
+    expect(eventos).toEqual(['payment.captured'])
+    // Como en el alta: el tenant lo pone la base, no el navegador.
+    const nueva = (fake.state.tables.webhook_subscriptions ?? []).find(
+      (row) => row.event_type === 'payment.captured',
+    )
+    expect(nueva).not.toHaveProperty('company_id')
   })
 
   it('reproducir EXIGE motivo y avisa de que el evento es el MISMO', async () => {

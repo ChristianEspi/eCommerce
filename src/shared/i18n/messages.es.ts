@@ -4004,6 +4004,8 @@ export const es = {
     'integrations.queue.emptyBody': 'Aquí aparecen los envíos hacia sistemas externos: los que esperan, los que se están reintentando y los que murieron.',
     'integrations.webhooks.new': 'Nuevo destino',
     'integrations.webhooks.newTitle': 'Nuevo destino de webhook',
+    'integrations.webhooks.edit': 'Editar',
+    'integrations.webhooks.editTitle': 'Editar destino de webhook',
     'integrations.webhooks.name': 'Nombre',
     'integrations.webhooks.nameHelp': 'Minúsculas, números, guion y guion bajo. Es lo que se ve en la cola.',
     'integrations.webhooks.url': 'URL',
