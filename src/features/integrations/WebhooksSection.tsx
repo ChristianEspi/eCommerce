@@ -43,6 +43,7 @@ import {
   useUpdateEndpoint,
 } from './hooks'
 import type { WebhookEndpoint } from './types'
+import { WEBHOOK_EVENT_TYPES } from './webhookEvents'
 
 /**
  * Webhooks: a quién avisamos, de qué, y qué pasó con cada aviso.
@@ -71,35 +72,7 @@ import type { WebhookEndpoint } from './types'
  * ofrecer el botón sin miedo a duplicar pedidos en el sistema del cliente.
  */
 
-/** Espejo del vocabulario de hechos que publica el dominio. Cerrado a propósito. */
-const EVENT_TYPES = [
-  // 2026-11-12 · Solo lo que `domain_events` publica de verdad (comprobado en
-  // QAS). Antes ofrecía `shipment.dispatched` y `shipment.delivered`, que no se
-  // emiten nunca: un destino suscrito a ellos no recibía nada y nadie sabía por qué.
-  'order.*',
-  'order.created',
-  'order.status_changed',
-  'order.payment_status_changed',
-  'order.fulfillment_status_changed',
-  'order.approval_requested',
-  'order.approval_decided',
-  'payment.*',
-  'payment.captured',
-  'payment.failed',
-  'fulfillment.*',
-  'fulfillment.created',
-  // 2026-11-20 · Cada paso de la entrega (empacada, lista, en camino…).
-  'fulfillment.state_changed',
-  'fulfillment.delivered',
-  'return.*',
-  'return.requested',
-  'return.approved',
-  'return.completed',
-  'quote.*',
-  'quote.requested',
-  'quote.accepted',
-  'quote.converted',
-] as const
+const EVENT_TYPES = WEBHOOK_EVENT_TYPES
 
 /** Lo que se edita: el destino tal como está y los eventos a los que ya escucha. */
 interface EditingEndpoint {
