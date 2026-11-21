@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { HORIZONTE_RELOJ_MS } from '../feria'
 import { offerBadge, vigenciaTexto } from '../offer'
-import type { StorePromotion } from '../promotions'
+import { promotionHref, type StorePromotion } from '../promotions'
 import { Countdown } from './Countdown'
 import { PromoBackgroundVideo } from './PromoBackgroundVideo'
 
@@ -73,11 +73,7 @@ function fuenteDe(referencia: string | null, firmadas: Record<string, string>) {
 
 /** A los productos que alcanza la campaña; al catálogo si es de pedido entero. */
 function destinoDe(promo: StorePromotion, storeSlug: string) {
-  return promo.categorySlug
-    ? `/s/${storeSlug}?c=${encodeURIComponent(promo.categorySlug)}`
-    : promo.brandCode
-      ? `/s/${storeSlug}?b=${encodeURIComponent(promo.brandCode)}`
-      : `/s/${storeSlug}?ver=todo&oferta=1`
+  return promotionHref(promo, storeSlug)
 }
 
 /** El reloj solo en la recta final, como en la portada de ofertas. */

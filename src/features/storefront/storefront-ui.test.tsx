@@ -364,20 +364,13 @@ describe('resolución del tenant por slug', () => {
     expect(within(header).queryByRole('button', { name: 'Tema claro' })).not.toBeInTheDocument()
   })
 
-  it('si el comercio lo enciende, deja cambiar de tema y dice a dónde va', async () => {
-    const user = userEvent.setup()
+  it('2026-11-20 · aunque el comercio permita el modo oscuro, la cabecera no tiene botón de tema', async () => {
     renderStorefront(
       backend({ public_stores: [store({ show_theme_toggle: true })] }),
       '/s/casa-nordica',
     )
-
     const header = await screen.findByRole('banner')
-    const boton = within(header).getByRole('button', { name: 'Tema oscuro' })
-
-    await user.click(boton)
-
-    // Ya en oscuro, ahora ofrece volver: el mismo botón, el otro destino.
-    expect(await within(header).findByRole('button', { name: 'Tema claro' })).toBeInTheDocument()
+    expect(within(header).queryByRole('button', { name: /tema (oscuro|claro)/i })).not.toBeInTheDocument()
   })
 
   it('sin logo cae a iniciales neutras: no planta el isotipo EBIM como marca del tenant', async () => {

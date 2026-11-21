@@ -913,3 +913,15 @@ export const WATCH_ASSISTANT_FUNCTION = 'watch-assistant'
 // hasta regenerar los tipos contra una base que ya tenga la migración
 // `20260926120000_dashboard_sales_trend.sql`.
 export const DASHBOARD_SALES_TREND_RPC = 'dashboard_sales_trend'
+/** 2026-11-20 · Textos de correo por tienda (migración 20261120100000). Sin `satisfies` hasta regenerar tipos. */
+export const EMAIL_TEMPLATES_TABLE = 'email_templates'
+export const EMAIL_TEMPLATE_SAVE_RPC = 'email_template_save'
+export const EMAIL_TEMPLATE_RESET_RPC = 'email_template_reset'
+/** 2026-11-20 · Facturación Perú (migraciones 20261120110000 y 20261120120000). Sin `satisfies` hasta regenerar tipos. */
+export const INVOICE_SETTINGS_TABLE = 'invoice_settings'
+export const INVOICE_SEQUENCES_TABLE = 'invoice_sequences'
+export const INVOICE_SETTINGS_CONFIGURE_RPC = 'invoice_settings_configure'
+export const INVOICING_NUBEFACT_CONFIGURE_RPC = 'invoicing_nubefact_configure'
+export const INVOICING_TEST_FUNCTION = 'invoicing-test'
+/** 2026-11-20 · Facturación fase 5 (migración 20261120140000). */
+export const INVOICE_REQUEST_CREDIT_NOTE_RPC = 'invoice_request_credit_note'

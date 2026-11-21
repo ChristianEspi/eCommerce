@@ -16,6 +16,7 @@ import { consumerOrderDetailKey, fetchConsumerOrderDetail, formatSavedAddress } 
 import { fetchMyOrderDetail, fetchMyOrderToken, myOrderDetailKey } from '../portal'
 import { useNavigate } from 'react-router-dom'
 import { EstadoChip } from './EstadoChip'
+import { OrderInvoiceBlock } from './OrderInvoiceBlock'
 
 /** De quién son los pedidos que se enseñan: de la empresa o de la persona. */
 export type OrdersSource = 'business' | 'consumer'
@@ -207,6 +208,8 @@ export function MyOrderDrawer({
                     : ''}
                 </Typography>
               )}
+              {/* 2026-11-20 · Facturación fase 4: su boleta o factura, con el PDF. */}
+              {orderId && <OrderInvoiceBlock orderId={orderId} />}
             </>
           )}
         </Box>

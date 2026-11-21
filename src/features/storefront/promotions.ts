@@ -39,6 +39,7 @@ const promotionSchema = z.object({
     .default(null),
   category_slug: z.string().nullable().default(null),
   brand_code: z.string().nullable().default(null),
+  has_products: z.boolean().nullable().default(false),
 })
 
 const responseSchema = z.object({
@@ -67,6 +68,30 @@ export interface StorePromotion {
   /** A dónde lleva el botón: la categoría o la marca a la que alcanza. */
   readonly categorySlug: string | null
   readonly brandCode: string | null
+  /**
+   * 2026-11-20 · Alcanza productos CONCRETOS (p. ej. la liquidación que propone
+   * la IA): el botón lleva a ESOS productos, no a todo lo rebajado.
+   */
+  readonly hasProducts?: boolean
+}
+
+/**
+ * A dónde lleva «Ver los productos» de una campaña. UNA sola regla para todos
+ * los banners: antes había siete copias y la campaña de productos concretos
+ * caía en «todas las ofertas», enseñando los descuentos de otra campaña.
+ *
+ * Categoría o marca primero (enseñan más que la lista de productos); después
+ * sus productos (`?campana=`); y si es de pedido entero, `fallback`.
+ */
+export function promotionHref(
+  promo: Pick<StorePromotion, 'id' | 'categorySlug' | 'brandCode' | 'hasProducts'>,
+  storeSlug: string,
+  fallback = `/s/${storeSlug}?ver=todo&oferta=1`,
+): string {
+  if (promo.categorySlug) return `/s/${storeSlug}?c=${encodeURIComponent(promo.categorySlug)}`
+  if (promo.brandCode) return `/s/${storeSlug}?b=${encodeURIComponent(promo.brandCode)}`
+  if (promo.hasProducts) return `/s/${storeSlug}?ver=todo&campana=${encodeURIComponent(promo.id)}`
+  return fallback
 }
 
 export const promotionsKey = (storeSlug: string) =>
@@ -109,5 +134,6 @@ export async function fetchStorePromotions(
     videoUrl: promotion.video_url,
     categorySlug: promotion.category_slug,
     brandCode: promotion.brand_code,
+    hasProducts: promotion.has_products === true,
   }))
 }

@@ -20,6 +20,13 @@ import {
   type LineaLeida,
   type RespuestaModeloIntake,
 } from '../functions/_shared/aiIntake.ts'
+import {
+  ESQUEMA_COTIZACION,
+  SISTEMA_COTIZACION,
+  limpiarPrecio,
+  revisarCotizacion,
+  type RespuestaModeloCotizacion,
+} from '../functions/_shared/aiIntake.ts'
 import { AI_FEATURES, validarEsquema } from '../functions/_shared/aiCore.ts'
 
 /**
@@ -248,5 +255,59 @@ describe('ai_intake_check: sesión y freno por comprador', () => {
     for (let i = 0; i < 29; i++) expect(await revisar(COMPRADOR)).toEqual({ allowed: true })
     expect(await revisar(COMPRADOR)).toEqual({ allowed: false, reason: 'RATE_LIMITED' })
     expect(await revisar(otro)).toEqual({ allowed: true })
+  })
+})
+
+/** 2026-11-20 · «Mejora esta cotización»: la IA copia los precios del OTRO proveedor. */
+describe('lectura de una cotización de la competencia', () => {
+  const linea = (extra: Partial<RespuestaModeloCotizacion['lineas'][number]> = {}) => ({
+    texto: 'Lejía 5L', cantidad: 4, cantidad_supuesta: false, unidad: 'galón', sku: '',
+    precio_unitario: 12.5, precio_leido: true, legible: true, ...extra,
+  })
+
+  it('el esquema valida una respuesta completa y el sistema prohíbe comparar y copiar datos de empresas', () => {
+    const respuesta = { es_cotizacion: true, moneda: 'PEN', incluye_igv: 'no', lineas: [linea()], notas: '' }
+    expect(validarEsquema(ESQUEMA_COTIZACION, respuesta).ok).toBe(true)
+    expect(validarEsquema(ESQUEMA_COTIZACION, { ...respuesta, moneda: 'EUR' }).ok).toBe(false)
+    expect(SISTEMA_COTIZACION).toMatch(/No comparas/)
+    expect(SISTEMA_COTIZACION).toMatch(/RUC/)
+  })
+
+  it('copia precio, moneda e IGV; un precio no leído o absurdo queda en null', () => {
+    const r = revisarCotizacion({
+      es_cotizacion: true,
+      moneda: 'PEN',
+      incluye_igv: 'si',
+      lineas: [
+        linea(),
+        linea({ texto: 'Detergente 15kg', precio_leido: false, precio_unitario: 99 }),
+        linea({ texto: 'Guantes nitrilo', precio_unitario: 0 }),
+      ],
+      notas: 'Revisa el precio 3',
+    })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.value.moneda).toBe('PEN')
+    expect(r.value.incluyeIgv).toBe(true)
+    expect(r.value.lineas.map((l) => l.precio)).toEqual([12.5, null, null])
+    expect(r.value.notas).not.toMatch(/d/)
+  })
+
+  it('la misma descripción con dos precios son dos líneas, no una suma', () => {
+    const r = revisarCotizacion({ es_cotizacion: true, moneda: '', incluye_igv: 'desconocido', lineas: [linea(), linea({ precio_unitario: 11 })], notas: '' })
+    expect(r.ok && r.value.lineas.length).toBe(2)
+    expect(r.ok && r.value.moneda).toBeNull()
+    expect(r.ok && r.value.incluyeIgv).toBeNull()
+  })
+
+  it('lo que no es una cotización no se revisa', () => {
+    expect(revisarCotizacion({ es_cotizacion: false, moneda: 'PEN', incluye_igv: 'si', lineas: [linea()], notas: '' })).toEqual({ ok: false, motivo: 'vacia' })
+  })
+
+  it('el precio se redondea a 4 decimales y solo cuenta si se leyó', () => {
+    expect(limpiarPrecio(1.234567, true)).toBe(1.2346)
+    expect(limpiarPrecio(5, false)).toBeNull()
+    expect(limpiarPrecio('abc', true)).toBeNull()
+    expect(limpiarPrecio(-3, true)).toBeNull()
   })
 })

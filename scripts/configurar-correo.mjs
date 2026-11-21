@@ -17,7 +17,10 @@
  *  3. Si ESTÁN: genera la clave del envío y el secreto del hook, los guarda
  *     como secretos de funciones, deja en Vault la URL y la clave que usa el
  *     planificador y activa el hook de envío de correo de Auth.
- *  4. Si NO están: desactiva el hook y no deja nada en Vault. Así el
+ *  4. Si NO están pero sí MailHub (`EBIM_MAILHUB_URL` + `EBIM_MAILHUB_TOKEN`,
+ *     vía de QAS desde 2026-11-20, ver ecommerce-001 en el buzón): conecta SOLO
+ *     la cola. El hook de Auth sigue apagado: envía por Graph, no por MailHub.
+ *  5. Si no hay ninguno: desactiva el hook y no deja nada en Vault. Así el
  *     planificador no llama a nada y Auth no intenta enviar por una función que
  *     respondería error.
  *
@@ -26,6 +29,9 @@
  *
  * Uso:
  *   node scripts/configurar-correo.mjs [--base-url http://localhost:5173]
+ *
+ * Sin `--base-url` no se toca `EBIM_APP_BASE_URL` si ya existe; si no existe,
+ * se usa `http://localhost:5173`.
  */
 import { randomBytes } from 'node:crypto'
 import { readFileSync } from 'node:fs'
@@ -44,7 +50,7 @@ const env = Object.fromEntries(
 )
 
 const argBase = process.argv.indexOf('--base-url')
-const BASE_URL = (argBase > 0 ? process.argv[argBase + 1] : 'http://localhost:5173').replace(/\/+$/, '')
+const BASE_URL_ARG = argBase > 0 ? process.argv[argBase + 1].replace(/\/+$/, '') : null
 const SUPABASE_URL = env.VITE_SUPABASE_URL.replace(/\/+$/, '')
 const REF = new URL(SUPABASE_URL).hostname.split('.')[0]
 const MS_KEYS = ['MS_TENANT_ID', 'MS_CLIENT_ID', 'MS_CLIENT_SECRET', 'MS_SENDER_EMAIL', 'MS_SENDER_NAME']
@@ -80,13 +86,16 @@ async function vaultDelete(name) {
 }
 
 // 1. Base de los enlaces.
-await api('POST', '/secrets', [{ name: 'EBIM_APP_BASE_URL', value: BASE_URL }])
+const previos = new Set(((await api('GET', '/secrets')) ?? []).map((s) => s.name))
+const BASE_URL = BASE_URL_ARG ?? (previos.has('EBIM_APP_BASE_URL') ? null : 'http://localhost:5173')
+if (BASE_URL) await api('POST', '/secrets', [{ name: 'EBIM_APP_BASE_URL', value: BASE_URL }])
 
-// 2. ¿Está Graph?
+// 2. ¿Está Graph? ¿Y MailHub?
 const secretos = await api('GET', '/secrets')
 const nombres = new Set((secretos ?? []).map((s) => s.name))
 const faltan = MS_KEYS.filter((k) => !nombres.has(k))
 const graph = faltan.length === 0
+const mailhub = !graph && nombres.has('EBIM_MAILHUB_URL') && nombres.has('EBIM_MAILHUB_TOKEN')
 
 if (graph) {
   // 3. Envío y hook.
@@ -104,8 +113,15 @@ if (graph) {
     hook_send_email_uri: `${SUPABASE_URL}/functions/v1/auth-email-hook`,
     hook_send_email_secrets: hookSecret,
   })
+} else if (mailhub) {
+  // 4. Solo la cola: el hook de Auth envía por Graph, así que sigue apagado.
+  const clave = randomBytes(36).toString('base64url')
+  await api('POST', '/secrets', [{ name: 'EBIM_NOTIFICATIONS_KEY', value: clave }])
+  await vaultUpsert('notifications_dispatch_url', `${SUPABASE_URL}/functions/v1/notifications-dispatch`)
+  await vaultUpsert('notifications_dispatch_key', clave)
+  await api('PATCH', '/config/auth', { hook_send_email_enabled: false })
 } else {
-  // 4. Sin Graph: nada que llame a una función que va a fallar.
+  // 5. Sin envío: nada que llame a una función que va a fallar.
   await api('PATCH', '/config/auth', { hook_send_email_enabled: false })
   await vaultDelete('notifications_dispatch_url')
   await vaultDelete('notifications_dispatch_key')
@@ -116,12 +132,13 @@ console.log(
   JSON.stringify(
     {
       proyecto: REF,
-      enlaces: BASE_URL,
+      enlaces: BASE_URL ?? '(sin cambios)',
       graph_configurado: graph,
+      mailhub_configurado: mailhub,
       secretos_ms_que_faltan: faltan,
       hook_de_auth_activo: Boolean(auth.hook_send_email_enabled),
       smtp_host: auth.smtp_host ?? null,
-      planificador: graph ? 'con destino en Vault' : 'sin destino: no llama a nada',
+      planificador: graph || mailhub ? 'con destino en Vault' : 'sin destino: no llama a nada',
     },
     null,
     2,

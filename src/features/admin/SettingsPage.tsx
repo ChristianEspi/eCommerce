@@ -7,7 +7,6 @@ import ContactMailRoundedIcon from '@mui/icons-material/ContactMailRounded'
 import LockRoundedIcon from '@mui/icons-material/LockRounded'
 import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded'
 import DensityMediumRoundedIcon from '@mui/icons-material/DensityMediumRounded'
-import LaunchRoundedIcon from '@mui/icons-material/LaunchRounded'
 import MailOutlineRoundedIcon from '@mui/icons-material/MailOutlineRounded'
 import CampaignRoundedIcon from '@mui/icons-material/CampaignRounded'
 import PaletteRoundedIcon from '@mui/icons-material/PaletteRounded'
@@ -19,13 +18,11 @@ import WorkspacePremiumRoundedIcon from '@mui/icons-material/WorkspacePremiumRou
 import {
   Alert,
   Box,
-  Button,
   Card,
   CardContent,
   FormControlLabel,
   Grid,
   MenuItem,
-  Link as MuiLink,
   Stack,
   Switch,
   ToggleButton,
@@ -49,6 +46,11 @@ import GroupRoundedIcon from '@mui/icons-material/GroupRounded'
 import { useSessionContext } from '@/features/auth/session-context'
 import { MembersSection } from './settings/MembersSection'
 import { MailSettingsSection } from '@/features/notifications/MailSettingsSection'
+import { EmailTemplatesSection } from '@/features/notifications/EmailTemplatesSection'
+import { InvoicingSettingsSection } from '@/features/invoicing/InvoicingSettingsSection'
+import { CapabilityGate } from '@/features/capabilities/CapabilityGate'
+import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
+import EditNoteRoundedIcon from '@mui/icons-material/EditNoteRounded'
 import { CartRecoverySection } from '@/features/notifications/CartRecoverySection'
 import { AiDigestSection } from '@/features/notifications/AiDigestSection'
 import RemoveShoppingCartRoundedIcon from '@mui/icons-material/RemoveShoppingCartRounded'
@@ -281,7 +283,6 @@ export function SettingsPage() {
   }
 
   const busy = save.isPending || form.formState.isSubmitting
-  const storeUrl = activeStore ? `/s/${activeStore.slug}` : null
 
   /**
    * Estado previo al formulario, calculado UNA vez.
@@ -318,20 +319,6 @@ export function SettingsPage() {
             title={t('admin.settings.title')}
             subtitle={activeStore?.name}
             center={tabs}
-            actions={
-              storeUrl && (
-                <Button
-                  component={MuiLink}
-                  href={storeUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  variant="outlined"
-                  endIcon={<LaunchRoundedIcon fontSize="small" />}
-                >
-                  {t('settings.viewStore')}
-                </Button>
-              )
-            }
           />
         )}
         ariaLabel={t('admin.settings.title')}
@@ -1008,6 +995,23 @@ export function SettingsPage() {
                     </SectionCard>
                   </CardContent>
                 </Card>
+                {/* 2026-11-20 · Textos de los correos al comprador, por tienda. */}
+                <Card sx={{ mt: 2.5 }}>
+                  <CardContent>
+                    <SectionCard
+                      icon={<EditNoteRoundedIcon />}
+                      title={t('emailTemplates.title')}
+                      subtitle={t('emailTemplates.subtitle')}
+                      padded
+                    >
+                      <EmailTemplatesSection
+                        storeId={storeId}
+                        storeName={activeStore?.name ?? ''}
+                        storeSlug={activeStore?.slug ?? ''}
+                      />
+                    </SectionCard>
+                  </CardContent>
+                </Card>
                 {/* Cierre 8. Va con el correo porque ES correo: sale por la misma
                     cola y sin el envío configurado no sale nada. */}
                 <Card sx={{ mt: 2.5 }}>
@@ -1036,6 +1040,30 @@ export function SettingsPage() {
                     </SectionCard>
                   </CardContent>
                 </Card>
+              </ManagedSection>
+            ),
+          },
+          // 2026-11-20 · Facturación electrónica (Nubefact). Solo con el addon
+          // `invoicing`; la base vuelve a exigir owner/admin al guardar.
+          {
+            id: 'facturacion',
+            label: t('admin.settings.tab.invoicing'),
+            content: (
+              <ManagedSection>
+                <CapabilityGate capability="invoicing">
+                  <Card>
+                    <CardContent>
+                      <SectionCard
+                        icon={<ReceiptLongRoundedIcon />}
+                        title={t('invoicing.title')}
+                        subtitle={t('invoicing.subtitle')}
+                        padded
+                      >
+                        <InvoicingSettingsSection storeId={storeId} />
+                      </SectionCard>
+                    </CardContent>
+                  </Card>
+                </CapabilityGate>
               </ManagedSection>
             ),
           },

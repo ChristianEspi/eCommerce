@@ -1,5 +1,4 @@
 import { cleanup, screen, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router-dom'
 import { renderWithProviders } from '@/test/render'
@@ -282,17 +281,11 @@ describe('el selector de tema es del comercio', () => {
     }
   })
 
-  it('encendido, aparece y funciona con el teclado', async () => {
-    const user = userEvent.setup()
+  // 2026-11-20 · Ni encendido: el claro/oscuro pasó a «Mi cuenta» del
+  // comprador (StorePreferencesSection). La cabecera es para vender.
+  it('encendido tampoco aparece en la cabecera: vive en «Mi cuenta»', async () => {
     const cabecera = await pintar({ show_theme_toggle: true })
-
-    const boton = within(cabecera).getByRole('button', { name: 'Tema oscuro' })
-    boton.focus()
-    await user.keyboard('{Enter}')
-
-    expect(
-      await within(cabecera).findByRole('button', { name: 'Tema claro' }),
-    ).toBeInTheDocument()
+    expect(within(cabecera).queryByRole('button', { name: /tema (oscuro|claro)/i })).not.toBeInTheDocument()
   })
 })
 

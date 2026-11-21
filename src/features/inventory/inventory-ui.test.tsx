@@ -207,7 +207,7 @@ function backend(options: { entitlements?: string[]; links?: boolean } = {}): Fa
   })
 }
 
-function renderInventory(fake: FakeSupabase) {
+function renderInventory(fake: FakeSupabase, route?: string) {
   holder.client = fake
   return renderWithProviders(
     <TenantProvider>
@@ -217,7 +217,7 @@ function renderInventory(fake: FakeSupabase) {
         </CapabilityGate>
       </CapabilitiesProvider>
     </TenantProvider>,
-    { session: fake.state.session },
+    { session: fake.state.session, ...(route ? { route } : {}) },
   )
 }
 
@@ -406,7 +406,29 @@ describe('Inventario — la pantalla', () => {
     // Fila 0 es la cabecera. «Publicado sin existencia» pesa más que «bajo el
     // umbral», así que va primero aunque llegue después de la base.
     expect(rows[1]?.textContent).toContain('Publicado sin existencia')
-    expect(rows[2]?.textContent).toContain('Bajo el umbral')
+    expect(rows[2]?.textContent).toContain('Bajo punto de pedido')
+  })
+
+  it('2026-11-20 · las alertas se filtran por tipo, con su cantidad', async () => {
+    const user = userEvent.setup()
+    renderInventory(backend())
+    await screen.findByText('CD Lima')
+    await user.click(screen.getByRole('tab', { name: 'Alertas' }))
+    await user.click(await screen.findByRole('tab', { name: /^Bajo punto de pedido \(\d+\)$/ }))
+    const rows = screen.getAllByRole('row').slice(1)
+    expect(rows.length).toBeGreaterThan(0)
+    expect(rows.every((r) => r.textContent?.includes('Bajo punto de pedido'))).toBe(true)
+  })
+
+  it('2026-11-20 · el enlace del centro de vigilancia abre las alertas ya filtradas', async () => {
+    // SectionTabs lee la pestaña del hash de la ventana (en el navegador lo pone la URL).
+    window.location.hash = '#alertas'
+    renderInventory(backend(), '/app/inventory?alerta=below_reorder#alertas')
+    const filtro = await screen.findByRole('tab', { name: /^Bajo punto de pedido \(\d+\)$/ })
+    expect(filtro).toHaveAttribute('aria-selected', 'true')
+    const rows = screen.getAllByRole('row').slice(1)
+    expect(rows.every((r) => !r.textContent?.includes('Publicado sin existencia'))).toBe(true)
+    window.location.hash = ''
   })
 })
 

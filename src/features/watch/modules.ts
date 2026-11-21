@@ -17,7 +17,7 @@ const RUTAS: ReadonlyArray<readonly [string, string]> = [
   ['/app/products', 'catalog'],
   ['/app/categories', 'catalog'],
   ['/app/integrations', 'integrations'],
-  ['/app/ops', 'ops'],
+  ['/app/operations', 'ops'],
 ]
 
 export function watchModuleFromPath(pathname: string): string | null {

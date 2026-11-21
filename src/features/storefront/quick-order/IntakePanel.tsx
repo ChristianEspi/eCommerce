@@ -32,6 +32,7 @@ import {
   IntakeError,
   checkIntakeFile,
   fileToBase64,
+  intakeMotivoKey,
   preselected,
   readIntake,
   type Confidence,
@@ -203,7 +204,7 @@ export function IntakePanel({
         {read.isError && <Alert severity="error">{t(errorKey(read.error))}</Alert>}
         {read.isSuccess && motivo && (
           <Alert severity={motivo === 'vacia' ? 'info' : 'warning'}>
-            {t(motivo === 'vacia' ? 'store.intake.empty' : 'store.intake.unavailable')}
+            {t(motivo === 'vacia' ? 'store.intake.empty' : intakeMotivoKey(motivo))}
           </Alert>
         )}
 

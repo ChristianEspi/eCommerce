@@ -124,6 +124,16 @@ export const invoiceSchema = z.object({
   tax_total: money,
   gross_total: money,
   reject_reason: z.string().nullable().default(null),
+  /** 2026-11-20 · Lo que devolvió el emisor (Nubefact). Solo enlaces https. */
+  pdf_url: z
+    .string()
+    .nullable()
+    .default(null)
+    .transform((v) => (v && v.startsWith('https://') ? v : null)),
+  sunat_description: z.string().nullable().default(null),
+  /** 2026-11-20 · fase 5: boleta, factura o nota de crédito (y a quién anula). */
+  document_type: z.enum(['receipt', 'invoice', 'credit_note']).nullable().catch(null).default(null),
+  reference_invoice_id: z.string().uuid().nullable().default(null),
   /** Cuántas líneas tiene: sin líneas no se puede emitir. */
   item_count: z.coerce.number().catch(0),
 })

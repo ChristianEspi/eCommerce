@@ -206,3 +206,16 @@ verify_jwt = true
 # roles y el modulo de su funcionalidad. Sin SQL libre, sin escrituras.
 [functions.copilot]
 verify_jwt = true
+
+# 2026-11-20 · Facturación fase 2: entrega `invoice.issue` a Nubefact. Lo llama
+# el planificador con `x-ebim-worker-key` (EBIM_INVOICING_WORKER_KEY), sin JWT.
+[functions.invoicing-worker]
+verify_jwt = false
+
+# 2026-11-20 · Botón «Probar conexión» de Configuración › Facturación. Owner/admin.
+[functions.invoicing-test]
+verify_jwt = true
+
+# 2026-11-20 · PDF del comprobante para el visor de la web. Backoffice y tienda, con sesión.
+[functions.invoice-pdf]
+verify_jwt = true

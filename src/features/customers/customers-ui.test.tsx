@@ -360,7 +360,8 @@ describe('Área de cuenta del comprador', () => {
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Mi cuenta' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Mis datos' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Avisos' })).toBeInTheDocument()
+    // 2026-11-20 · Los avisos ya no son pestaña: son la campanita de la cabecera.
+    expect(screen.queryByRole('tab', { name: 'Avisos' })).not.toBeInTheDocument()
     expect(screen.queryByText('Tu usuario no está vinculado a ninguna empresa')).not.toBeInTheDocument()
     // Ni una pestaña del portal B2B.
     expect(screen.queryByRole('tab', { name: 'Estado de cuenta' })).not.toBeInTheDocument()

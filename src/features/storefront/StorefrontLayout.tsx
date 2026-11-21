@@ -1,12 +1,11 @@
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded'
 import BoltRoundedIcon from '@mui/icons-material/BoltRounded'
 import RequestQuoteRoundedIcon from '@mui/icons-material/RequestQuoteRounded'
-import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded'
 import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded'
 import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded'
-import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded'
 import LoginRoundedIcon from '@mui/icons-material/LoginRounded'
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded'
+import NotificationsNoneRoundedIcon from '@mui/icons-material/NotificationsNoneRounded'
 import PersonRoundedIcon from '@mui/icons-material/PersonRounded'
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded'
 import ShoppingCartRoundedIcon from '@mui/icons-material/ShoppingCartRounded'
@@ -28,18 +27,18 @@ import { Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ErrorBoundary } from '@/app/ErrorBoundary'
 import { useSessionContext } from '@/features/auth/session-context'
+import { useIsBusinessBuyer } from './commerce/businessBuyer'
+import { StoreNotificationBell } from '@/features/notifications/StoreNotificationBell'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { formatMoney } from '@/shared/lib/format'
 import { useDocumentMeta } from '@/shared/seo/useDocumentMeta'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
 import { SkipToContentLink, CONTENT_ANCHOR } from '@/shared/ui/SkipToContentLink'
 import { AppearanceProvider } from '@/theme/AppearanceProvider'
-import { useAppearance } from '@/theme/appearance-context'
 import { SH, TS } from '@/theme/tokens'
 import { StorefrontNotFoundError } from './api'
 import { notFoundMeta } from './seo'
 import { initials } from './branding'
-import { resolveShowThemeToggle } from './identity'
 import { StoreCategoryNav } from './components/StoreCategoryNav'
 import { StoreFooter } from './components/StoreFooter'
 import { StoreAnnouncementBar } from './components/StoreAnnouncementBar'
@@ -490,7 +489,7 @@ function StoreHeader({ store, storeSlug }: { store: PublicStore; storeSlug: stri
           tuyo y ver el carrito; cada enlace que se le añade compite con esos
           tres y ninguno de ellos vende. Se leen una vez, casi siempre
           buscándolas, y su sitio de siempre es el pie. */}
-      <ThemeButton store={store} />
+      <NotificationsButton />
       <FavoritesButton storeSlug={storeSlug} storeId={store.store_id} />
       <AccountButton storeSlug={storeSlug} />
       <CartButton />
@@ -675,11 +674,12 @@ function CommerceBarInMain({ storeSlug }: { storeSlug: string }) {
  */
 function HeaderTools({ storeSlug }: { storeSlug: string }) {
   const { t } = useI18n()
-  const { status } = useSessionContext()
+  const esEmpresa = useIsBusinessBuyer()
   const enlaces = [
     { to: `/s/${storeSlug}/pedido-rapido`, label: t('store.quickOrder.open'), icon: <BoltRoundedIcon /> },
-    // Las cotizaciones viven en la cuenta: sin sesión no hay ninguna que ver.
-    ...(status === 'authenticated'
+    // Las cotizaciones viven en la cuenta DE EMPRESA: sin sesión no hay ninguna
+    // que ver, y quien compra para sí no tiene esa pestaña (2026-11-20).
+    ...(esEmpresa
       ? [{ to: `/s/${storeSlug}/account#cotizaciones`, label: t('account.tab.quotes'), icon: <RequestQuoteRoundedIcon /> }]
       : []),
   ]
@@ -909,36 +909,25 @@ function HeaderAction({
  * igual.
  */
 /**
- * El selector claro/oscuro, que ahora lo decide el COMERCIO (V3 · P01/P03).
- *
- * Estaba en la cabecera de toda tienda sin que ningún comercio lo hubiera
- * pedido. En una herramienta de trabajo un botón de tema es útil; en una tienda
- * compite por atención con el carrito, y lo que se ve en la primera pantalla es
- * lo que dice a qué se dedica la página.
- *
- * Viene APAGADO. Lo que no desaparece es el tema oscuro: la vitrina sigue
- * respetando la preferencia del sistema de quien llega y lo que ese visitante
- * hubiera elegido antes. Lo que se va es el control, no el modo.
- *
- * Y no toca el backoffice, que tiene el suyo en Apariencia: esto solo mira la
- * configuración de la tienda pública.
+ * La campanita del comprador (2026-11-20). Solo con sesión: los avisos son de
+ * una persona. Antes eran una pestaña de «Tu cuenta»; el claro/oscuro, que
+ * ocupaba este sitio, pasó a «Mi cuenta» como preferencia.
  */
-function ThemeButton({ store }: { store: PublicStore }) {
-  const { t } = useI18n()
-  const { appearance, toggleMode } = useAppearance()
-  const oscuro = appearance.mode === 'dark'
-
-  if (!resolveShowThemeToggle(store.show_theme_toggle)) return null
-
+function NotificationsButton() {
+  const { status } = useSessionContext()
+  if (status !== 'authenticated') return null
   return (
-    <HeaderAction
-      onClick={toggleMode}
-      icon={oscuro ? <LightModeRoundedIcon /> : <DarkModeRoundedIcon />}
-      // Dice a DÓNDE va, no dónde está: es un interruptor, y lo útil de leer
-      // antes de pulsarlo es qué va a pasar.
-      label={oscuro ? t('common.theme.light') : t('common.theme.dark')}
-      tone="neutral"
-      iconOnly
+    <StoreNotificationBell
+      renderTrigger={({ onClick, unread, label }) => (
+        <HeaderAction
+          onClick={onClick}
+          icon={<NotificationsNoneRoundedIcon />}
+          label={label}
+          badge={unread}
+          tone="neutral"
+          iconOnly
+        />
+      )}
     />
   )
 }

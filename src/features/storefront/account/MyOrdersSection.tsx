@@ -12,7 +12,8 @@ import {
   Typography,
 } from '@mui/material'
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import { BrandLoader } from '@/shared/ui/BrandLoader'
@@ -61,6 +62,21 @@ export function MyOrdersSection({
     retry: (count, error) => !isMissingFunction(error) && count < 2,
   })
   const [abierto, setAbierto] = useState<MyOrder | null>(null)
+  /*
+   * 2026-11-20 · El aviso y el correo de un pedido llegan con `?pedido=<número>`
+   * y lo abren directamente: antes llevaban a «Mi cuenta» y había que buscarlo.
+   * Se abre UNA vez por número: cerrarlo no lo vuelve a abrir al refrescar la
+   * lista. Si no está entre los listados, se queda la lista.
+   */
+  const [params] = useSearchParams()
+  const pedido = params.get('pedido')
+  const yaAbierto = useRef<string | null>(null)
+  useEffect(() => {
+    if (!pedido || yaAbierto.current === pedido || !query.data) return
+    const encontrado = query.data.find((order) => order.order_number === pedido)
+    yaAbierto.current = pedido
+    if (encontrado) setAbierto(encontrado)
+  }, [pedido, query.data])
 
   if (consumer && storeSlug === '') return null
   if (query.isPending) return <BrandLoader />

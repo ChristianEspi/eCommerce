@@ -16,7 +16,7 @@
       (function () {
         try {
           var s = localStorage.getItem('ecommerce-color-mode');
-          var m = s || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          var m = s === 'dark' ? 'dark' : 'light';
           document.documentElement.setAttribute('data-theme', m);
           var a = localStorage.getItem('ecommerce-accent');
           if (a && a !== 'forest') document.documentElement.setAttribute('data-accent', a);

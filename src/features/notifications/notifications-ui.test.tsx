@@ -37,7 +37,7 @@ vi.mock('@/shared/lib/supabase', () => ({
 
 const { TenantProvider } = await import('@/features/tenant/TenantProvider')
 const { NotificationBell } = await import('./NotificationBell')
-const { StoreNotificationsSection } = await import('./StoreNotificationsSection')
+const { StoreNotificationBell } = await import('./StoreNotificationBell')
 const { MailSettingsSection } = await import('./MailSettingsSection')
 const { KNOWN_KINDS, notificationText } = await import('./text')
 
@@ -192,19 +192,42 @@ describe('la campanita', () => {
   })
 })
 
-describe('«Tu cuenta» del comprador', () => {
-  it('enseña sus avisos de tienda y no los del backoffice', async () => {
-    const fake = backend([
-      aviso({ audience: 'storefront', kind: 'business_account.invited', params: { account_name: 'Policlinico Andino SAC' } }),
-      aviso({ audience: 'backoffice' }),
-    ])
+describe('la campanita del comprador (2026-11-20)', () => {
+  function pintarCampana(fake: FakeSupabase) {
     holder.client = fake
-    renderWithProviders(<StoreNotificationsSection />, { session: fake.state.session })
+    renderWithProviders(
+      <StoreNotificationBell
+        renderTrigger={({ onClick, unread, label }) => (
+          <button type="button" onClick={onClick} aria-label={label}>
+            {unread}
+          </button>
+        )}
+      />,
+      { session: fake.state.session },
+    )
+  }
 
+  it('cuenta y enseña sus avisos de tienda, no los del backoffice', async () => {
+    const user = userEvent.setup()
+    pintarCampana(
+      backend([
+        aviso({ audience: 'storefront', kind: 'business_account.invited', params: { account_name: 'Policlinico Andino SAC' } }),
+        aviso({ audience: 'backoffice' }),
+      ]),
+    )
+    await user.click(await screen.findByRole('button', { name: 'Abrir avisos: 1 sin leer' }))
     expect(
       await screen.findByText('Te vincularon a Policlinico Andino SAC; falta que activen tu acceso'),
     ).toBeInTheDocument()
     expect(screen.queryByText(/Nuevo pedido/)).not.toBeInTheDocument()
+  })
+
+  it('marcar todo como leído apaga el contador', async () => {
+    const user = userEvent.setup()
+    pintarCampana(backend([aviso({ audience: 'storefront', kind: 'business_account.invited', params: { account_name: 'X SAC' } })]))
+    await user.click(await screen.findByRole('button', { name: 'Abrir avisos: 1 sin leer' }))
+    await user.click(await screen.findByRole('button', { name: 'Marcar todo como leído' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Abrir avisos', hidden: true })).toBeInTheDocument())
   })
 })
 

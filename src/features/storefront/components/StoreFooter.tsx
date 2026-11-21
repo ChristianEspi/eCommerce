@@ -18,6 +18,13 @@ import { useStorefrontTheme } from '../theme/useStorefrontTheme'
 import { usePaymentMethods } from '../payment'
 import type { PublicCategory, PublicStore } from '../types'
 import { StoreBrandLockup } from './StoreBrandLockup'
+import { useIsBusinessBuyer } from '../commerce/businessBuyer'
+
+/**
+ * Entrar desde la tienda VUELVE a la tienda (2026-11-20). Sin `from`, el login
+ * se mostraba en modo plataforma («crea tu tienda») y al entrar llevaba al panel.
+ */
+const conVuelta = (ruta: string, storeSlug: string) => `${ruta}?from=${encodeURIComponent(`/s/${storeSlug}`)}`
 
 /**
  * El pie de la tienda.
@@ -195,10 +202,10 @@ export function StoreFooter({ store, storeSlug }: { store: PublicStore; storeSlu
 
           <BloqueDelPie titulo={t('store.footer.account')}>
             <Stack component="nav" aria-label={t('store.footer.account')} sx={{ gap: 0.75 }}>
-              <EnlaceDelPie to="/login">{t('store.footer.signIn')}</EnlaceDelPie>
+              <EnlaceDelPie to={conVuelta('/login', storeSlug)}>{t('store.footer.signIn')}</EnlaceDelPie>
               <EnlaceDelPie to={`/s/${storeSlug}/account#pedidos`}>{t('store.footer.orders')}</EnlaceDelPie>
               <EnlaceDelPie to={`/s/${storeSlug}/register`}>{t('store.footer.register')}</EnlaceDelPie>
-              <EnlaceDelPie to="/recuperar">{t('store.footer.recover')}</EnlaceDelPie>
+              <EnlaceDelPie to={conVuelta('/recuperar', storeSlug)}>{t('store.footer.recover')}</EnlaceDelPie>
             </Stack>
           </BloqueDelPie>
 
@@ -802,6 +809,7 @@ function PieCatalogo({
 }) {
   const { t } = useI18n()
   const { style } = useStorefrontTheme()
+  const esEmpresa = useIsBusinessBuyer()
   const enlace = {
     fontSize: 13.5,
     fontWeight: 500,
@@ -852,8 +860,13 @@ function PieCatalogo({
           {columna(t('store.footer.business'), [
             { to: `/s/${storeSlug}/register`, label: t('store.footer.openAccount') },
             { to: `/s/${storeSlug}/account#pedidos`, label: t('store.footer.orders') },
-            { to: `/s/${storeSlug}/account#cotizaciones`, label: t('account.tab.quotes') },
-            { to: `/s/${storeSlug}/account#estado`, label: t('account.tab.statement') },
+            // Solo la cuenta de EMPRESA tiene estas dos pestañas (2026-11-20).
+            ...(esEmpresa
+              ? [
+                  { to: `/s/${storeSlug}/account#cotizaciones`, label: t('account.tab.quotes') },
+                  { to: `/s/${storeSlug}/account#estado`, label: t('account.tab.statement') },
+                ]
+              : []),
           ])}
           {columna(
             t('store.footer.helpColumn'),

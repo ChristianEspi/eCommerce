@@ -5,21 +5,24 @@ import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
 import {
   Card,
   Stack,
+  Tab,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
+  Tabs,
   Typography,
 } from '@mui/material'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { EmptyState, ErrorState } from '@/shared/ui/states'
 import { useInventoryAlerts } from './hooks'
-import { compareAlerts, formatQuantity, type AlertKind } from './types'
+import { ALERT_KINDS, compareAlerts, formatQuantity, type AlertKind } from './types'
 
 /**
  * Los avisos, ordenados por lo que de verdad urge.
@@ -41,7 +44,21 @@ export function AlertsSection() {
   const { activeStore } = useTenant()
   const query = useInventoryAlerts(activeStore?.id ?? null)
 
-  const alerts = useMemo(() => [...(query.data ?? [])].sort(compareAlerts), [query.data])
+  // 2026-11-20 · Filtro por tipo. El enlace del centro de vigilancia llega con
+  // `?alerta=below_reorder#alertas` y la lista abre ya filtrada: «Reponer» lleva
+  // a esos artículos, no al inventario entero.
+  const [params] = useSearchParams()
+  const pedido = params.get('alerta')
+  const [kind, setKind] = useState<AlertKind | 'all'>(
+    (ALERT_KINDS as readonly string[]).includes(pedido ?? '') ? (pedido as AlertKind) : 'all',
+  )
+  const all = useMemo(() => [...(query.data ?? [])].sort(compareAlerts), [query.data])
+  const counts = useMemo(() => {
+    const map = new Map<AlertKind, number>()
+    for (const a of all) map.set(a.kind, (map.get(a.kind) ?? 0) + 1)
+    return map
+  }, [all])
+  const alerts = useMemo(() => (kind === 'all' ? all : all.filter((a) => a.kind === kind)), [all, kind])
   const isEmpty = !query.isPending && !query.isError && alerts.length === 0
 
   // Pagina lo que YA esta cargado: es para poder leer la tabla, no para
@@ -54,13 +71,32 @@ export function AlertsSection() {
     <Stack spacing={2}>
       <Typography sx={{ color: 'var(--muted)' }}>{t('inventory.alerts.help')}</Typography>
 
+      {all.length > 0 && (
+        <Tabs
+          value={kind}
+          onChange={(_e, value: AlertKind | 'all') => setKind(value)}
+          variant="scrollable"
+          allowScrollButtonsMobile
+          aria-label={t('inventory.alerts.filter')}
+        >
+          <Tab value="all" label={`${t('inventory.alerts.all')} (${all.length})`} />
+          {ALERT_KINDS.filter((k) => (counts.get(k) ?? 0) > 0 || k === kind).map((k) => (
+            <Tab
+              key={k}
+              value={k}
+              label={`${t(`inventory.alert.${k}` as MessageKey)} (${counts.get(k) ?? 0})`}
+            />
+          ))}
+        </Tabs>
+      )}
+
       <Card>
         {query.isPending && <TableSkeleton columns={4} />}
         {query.isError && <ErrorState error={query.error} onRetry={() => void query.refetch()} />}
         {isEmpty && (
           <EmptyState
-            title={t('inventory.alerts.empty')}
-            description={t('inventory.alerts.emptyBody')}
+            title={kind === 'all' ? t('inventory.alerts.empty') : t('inventory.alerts.emptyKind')}
+            description={kind === 'all' ? t('inventory.alerts.emptyBody') : undefined}
             icon={<CheckCircleRoundedIcon fontSize="small" />}
           />
         )}

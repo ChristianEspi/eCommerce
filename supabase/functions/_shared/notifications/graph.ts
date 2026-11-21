@@ -59,6 +59,8 @@ export interface MailMessage {
   readonly to: string
   readonly subject: string
   readonly html: string
+  /** El texto lo escribió la tienda: MailHub NO debe usar su plantilla. */
+  readonly custom?: boolean
 }
 
 export type SendOutcome =

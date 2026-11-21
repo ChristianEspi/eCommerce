@@ -8,7 +8,7 @@ import { useI18n } from '@/shared/i18n/i18n-context'
 import { TS } from '@/theme/tokens'
 import { SectionHeading } from './SectionHeading'
 import { moneyCorto, offerBadge, vigenciaTexto } from '../offer'
-import type { StorePromotion } from '../promotions'
+import { promotionHref, type StorePromotion } from '../promotions'
 import { PromoBackgroundVideo } from './PromoBackgroundVideo'
 
 /** Cada cuánto pasa sola. Seis segundos: lo que se tarda en leer un cartel. */
@@ -251,11 +251,7 @@ function PromoSlide({
    * marca—; al catálogo cuando la campaña es de pedido entero. Un botón que
    * lleva a una lista donde no se ve la oferta es peor que no ponerlo.
    */
-  const destino = promo.categorySlug
-    ? `/s/${storeSlug}?c=${encodeURIComponent(promo.categorySlug)}`
-    : promo.brandCode
-      ? `/s/${storeSlug}?b=${encodeURIComponent(promo.brandCode)}`
-      : `/s/${storeSlug}`
+  const destino = promotionHref(promo, storeSlug, `/s/${storeSlug}`)
 
   return (
     <Card

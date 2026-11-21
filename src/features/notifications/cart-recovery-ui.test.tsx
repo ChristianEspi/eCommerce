@@ -26,7 +26,7 @@ vi.mock('@/shared/lib/supabase', () => ({
 }))
 
 const { StoreUnsubscribePage } = await import('./StoreUnsubscribePage')
-const { StoreNotificationsSection } = await import('./StoreNotificationsSection')
+const { StorePreferencesSection } = await import('./StorePreferencesSection')
 const { CartRecoverySection } = await import('./CartRecoverySection')
 
 const TOKEN = 'cd'.repeat(32)
@@ -92,7 +92,7 @@ describe('la preferencia en «Tu cuenta»', () => {
     holder.client = fake
     renderWithProviders(
       <Routes>
-        <Route path="/s/:storeSlug/account" element={<StoreNotificationsSection />} />
+        <Route path="/s/:storeSlug/account" element={<StorePreferencesSection showThemeOption={false} />} />
       </Routes>,
       { route: '/s/tienda/account', session: fake.state.session },
     )
@@ -119,7 +119,8 @@ describe('la preferencia en «Tu cuenta»', () => {
 
   it('si la tienda no los tiene encendidos, no se ofrece', async () => {
     pintar({ store_enabled: false, receive: true })
-    expect(await screen.findByText('No tienes avisos')).toBeInTheDocument()
+    expect(await screen.findByText('Preferencias')).toBeInTheDocument()
+    await new Promise((r) => setTimeout(r, 50))
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
   })
 })

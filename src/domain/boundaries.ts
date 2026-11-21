@@ -382,8 +382,8 @@ export const BOUNDARIES: readonly Boundary[] = [
     // `create_order`.
     state: 'implemented',
     responsibility:
-      'Cuánto se le fía a un cliente y cuánto debe: línea, documento por cobrar, cobro, aplicación y antigüedad de saldos.',
-    paths: ['features/credit'],
+      'Cuánto se le fía a un cliente y cuánto debe: línea, documento por cobrar, cobro, aplicación y antigüedad de saldos. Y el comprobante fiscal: su configuración y su emisor (`features/invoicing`, 2026-11-20).',
+    paths: ['features/credit', 'features/invoicing'],
     serverSide: [
       'ar_documents, ar_receipts y ar_applications con RLS default deny (20260902120000)',
       'el saldo lo mantiene un trigger, no la aplicación: ebim.ar_apply_balance',

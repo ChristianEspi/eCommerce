@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { tryGetSupabaseClient } from '@/shared/lib/supabase'
+import { INVOICE_REQUEST_CREDIT_NOTE_RPC } from '@/shared/lib/db-schema'
 import { CreditError, creditErrorFromDb } from './errors'
 import {
   AR_DOCUMENTS_TABLE,
@@ -171,6 +172,7 @@ export async function createInvoiceForOrder(orderNumber: string): Promise<void> 
 const INVOICE_SELECT =
   'id, order_id, series, number, status, currency, issued_at, customer_name, ' +
   'customer_tax_id, net_total::text, tax_total::text, gross_total::text, reject_reason, ' +
+  'pdf_url, sunat_description, document_type, reference_invoice_id, ' +
   'invoice_items(count)'
 
 export async function fetchInvoices(): Promise<Invoice[]> {
@@ -206,6 +208,20 @@ export async function fetchInvoiceIssueStatuses(): Promise<InvoiceIssueStatus[]>
  * la fila, y sin proveedor fiscal la respuesta es `pending_configuration`, no
  * un error.
  */
+/**
+ * 2026-11-20 · Facturación fase 5: anula un comprobante YA emitido con su nota
+ * de crédito (`invoice_request_credit_note`). La base exige owner/admin, que
+ * esté emitido, que no tenga otra nota y un motivo.
+ */
+export async function requestCreditNote(input: { invoiceId: string; reason: string }): Promise<InvoiceIssueResult> {
+  const { data, error } = await client().rpc(INVOICE_REQUEST_CREDIT_NOTE_RPC, {
+    p_invoice_id: input.invoiceId,
+    p_reason: input.reason,
+  })
+  if (error) throw creditErrorFromDb(error)
+  return invoiceIssueResultSchema.parse(data)
+}
+
 export async function requestInvoiceIssue(invoiceId: string): Promise<InvoiceIssueResult> {
   const { data, error } = await client().rpc(INVOICE_REQUEST_ISSUE_RPC, {
     p_invoice_id: invoiceId,

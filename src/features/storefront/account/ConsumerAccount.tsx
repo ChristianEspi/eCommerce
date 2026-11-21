@@ -4,7 +4,9 @@ import StorefrontRoundedIcon from '@mui/icons-material/StorefrontRounded'
 import { Alert, Box, Button, Stack, Typography } from '@mui/material'
 import { Link } from 'react-router-dom'
 import { useSessionContext } from '@/features/auth/session-context'
-import { StoreNotificationsSection } from '@/features/notifications/StoreNotificationsSection'
+import { StorePreferencesSection } from '@/features/notifications/StorePreferencesSection'
+import { useStorefrontOptional } from '../hooks'
+import { resolveShowThemeToggle } from '../identity'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { SectionTabs } from '@/shared/ui/SectionTabs'
 import { TS } from '@/theme/tokens'
@@ -43,6 +45,7 @@ export function ConsumerAccount({
 }) {
   const { t } = useI18n()
   const { session } = useSessionContext()
+  const storefront = useStorefrontOptional()
   const profile = profileFromSession(session)
   const nombre = greetingName(profile)
 
@@ -63,7 +66,17 @@ export function ConsumerAccount({
           },
         ]
       : []),
-    { id: 'datos', label: t('account.consumer.tab.profile'), content: <ConsumerProfileSection /> },
+    {
+      id: 'datos',
+      label: t('account.consumer.tab.profile'),
+      // 2026-11-20 · Preferencias (claro/oscuro, recordatorios) bajo «Mis datos».
+      content: (
+        <Stack spacing={3}>
+          <ConsumerProfileSection />
+          <StorePreferencesSection showThemeOption={resolveShowThemeToggle(storefront?.store.show_theme_toggle)} />
+        </Stack>
+      ),
+    },
     ...(storeSlug
       ? [
           {
@@ -80,7 +93,6 @@ export function ConsumerAccount({
     ...(storeId
       ? [{ id: 'cupones', label: t('account.tab.coupons'), content: <MyCouponsSection storeId={storeId} /> }]
       : []),
-    { id: 'avisos', label: t('account.tab.notifications'), content: <StoreNotificationsSection /> },
   ]
 
   return (

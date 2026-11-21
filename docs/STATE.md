@@ -3,13 +3,63 @@
 GUIDELINES_STATUS: VERIFIED (**por lectura directa** en la 2ª pasada de P00-SaaS: contrato v1.15,
 `PROTOCOLO.md`, `BANDEJA.md` y `EBIM-CREW-ROSTER.md`). La unidad montada es `G:`, no `H:`.
 Fuentes: ver `docs/EBIM_GUIDELINES_TRACE.md`.
-Última actualización: 2026-11-19 (IA diferenciadora, 8 frentes). Antes: 2026-09-26 (Resumen v2 · vitrina B2B). Antes: 2026-08-30 (**P17-SaaS terminada — quality gate final y línea base releaseable**;
+Última actualización: 2026-11-20 (correo por MailHub y textos por tienda). Antes: 2026-11-19 (IA diferenciadora, 8 frentes). Antes: 2026-09-26 (Resumen v2 · vitrina B2B). Antes: 2026-08-30 (**P17-SaaS terminada — quality gate final y línea base releaseable**;
 el recorrido SaaS P00–P17 queda cerrado)
 
 > **Dos numeraciones de fase.** Lo que sigue como «P00…P12» es el trabajo histórico de este repo. A
 > partir del 2026-08-27 arranca un segundo recorrido, **P00–P17 de productización SaaS**
 > (`claude-saas-opus/config/phases.json`), que se identifica siempre como «P0x-SaaS». No son la misma
 > serie: el P12 histórico es el framework de integraciones; el P12-SaaS es fulfillment y devoluciones.
+
+## Facturación electrónica Perú con Nubefact, fases 1–5 (2026-11-20)
+
+Commits locales en `dev`: `bd6fb72`, `0894861` (f1) · `f15f160` (f2) · `b91f169` (f3) · `f990e32` (f4)
+· `50af14f` (f5). **Las 4 migraciones aplicadas en QAS** (`20261120110000`…`140000`, por API de
+gestión, sin registrar como las previas). Funciones `invoicing-worker`, `invoicing-test` y
+`notifications-dispatch` desplegadas; cron `ecommerce-invoicing-worker` (*/2) conectado con
+`scripts/configurar-facturacion.mjs` (`EBIM_INVOICING_WORKER_KEY` + Vault).
+
+- **F1 datos fiscales:** `invoice_settings` por tienda (series, IGV del envío, afectación de la tasa
+  0, emisión automática); correlativo por SOCIEDAD+serie asignado al encolar, arranca tras el más alto
+  y no retrocede; envío facturado con su IGV dentro (antes IGV 0; corregidos 2 pendientes en QAS, total
+  igual); tipo de documento y dirección del cliente; boleta ≥ S/700 sin documento y factura sin RUC no
+  se emiten. Mensaje `invoice.issue` v2.
+- **F2 emisor:** traducción y trabajador puros según el manual oficial Nubefact API JSON v3.1; «ya
+  existe» (23) consulta, nunca emite dos veces; rechazo por datos cierra sin reintento y deja el número.
+  Credenciales por sociedad en Vault (`invoicing_nubefact_configure` / `invoicing_credentials_for`).
+- **F3 pantalla:** Configuración › Facturación (addon `invoicing`): emisor (token que no vuelve),
+  series, correlativos, IGV del envío, emisión automática, «Probar conexión». PDF y SUNAT en Crédito.
+- **F4 comprador:** `my_order_invoice` + bloque en «Mi cuenta»; correo `invoice.issued` una vez.
+- **F5 nota de crédito:** `invoice_request_credit_note`, series BC01/FC01, mensaje v3; nota aceptada
+  anula el original; cancelar con emisión automática la emite sola; mensaje encolado se retira al
+  cancelar.
+- **Pendiente:** ninguna cuenta real de Nubefact probada (falta cuenta DEMO: verificar cabecera de
+  auth, «varios» con «-», comportamiento de boletas por resumen diario); en QAS nadie cargó todavía
+  credenciales, así que nada se emite. Comunicación de baja (`generar_anulacion`) no implementada.
+
+## Correo por EBIM MailHub y textos por tienda (2026-11-20)
+
+Commits locales en `dev`: `10d0987`, `71d51ac`, `d2f2794`, `4a963fe`.
+
+- **QAS nunca había enviado un correo**: sin secretos `MS_*` (Graph, contrato §14) y sin destino del
+  cron en Vault. Se integra **EBIM MailHub** como respaldo: `notifications-dispatch` y
+  `notifications-test` usan Graph si está y MailHub si no (`_shared/notifications/mailhub.ts`).
+  `order.confirmed` en ES va por la plantilla MailHub `pedido-recibido`; el resto, HTML propio.
+  `idempotencyKey = ecommerce-<id cola>`. Nada se envía a `.demo`/`.test`/`example.*`.
+- **En QAS (a pedido del operador):** secretos `EBIM_MAILHUB_URL`/`EBIM_MAILHUB_TOKEN`;
+  `scripts/configurar-correo.mjs` conectó el cron (Vault + `EBIM_NOTIFICATIONS_KEY`, hook de Auth
+  apagado). Primer envío real OK (pedido `EC-20261120-00058`). **Rotar el token**: se pegó en el chat.
+- **Propuesta de contrato** en el buzón: `2026-11-20-ecommerce-001` (MailHub como canal de suite).
+  **No configurar PRD** hasta que GMAO edite §14.
+- **Textos por tienda («opción A»)**: Configuración › Correo › «Textos de los correos». Owner/admin
+  editan asunto/título/mensaje de pedido recibido/aprobado/rechazado/en camino (ES/EN) con variables
+  de lista cerrada; vista previa con el mismo motor del envío (`customCopy.ts`). Migración
+  `20261120100000_email_templates.sql` **aplicada en QAS** por API de gestión (no registrada, como las
+  previas): RLS forzada, escritura solo por `email_template_save/reset`, guardián, auditoría.
+- Otros: miquimica pasó a plan IA `active` (500/mes) en `ai_quotas`; `order-intake` busca con la
+  sesión del comprador en tandas de 3 (antes 500 por timeout de `anon`).
+- **Pendiente:** buscador de catálogo lento (~1,5 s por consulta con 701 productos); «media docena»
+  se lee como 1; «flodin» propone el inyectable antes que la tableta. Frontend NO promovido.
 
 ## IA diferenciadora — 8 frentes (2026-11-19, a pedido del operador: «haz todo»)
 

@@ -21,6 +21,8 @@
  * acabar dentro del HTML de un correo.
  */
 
+import type { ResolvedCopy } from './customCopy.ts'
+
 export type Locale = 'es' | 'en'
 
 export interface RenderedEmail {
@@ -101,6 +103,27 @@ const COPY: Record<string, Record<Locale, CopyBuilder>> = {
       body: `Your order <strong>${e('order_number')}</strong> for <strong>${e('grand_total')} ${e('currency')}</strong> is confirmed. We will let you know when it ships.`,
       action: 'View my order',
     }),
+  },
+  // 2026-11-20 · Facturación fase 4: el comprobante salió y aquí está su PDF.
+  'invoice.issued': {
+    es: (p, _l, e) => {
+      const factura = text(p, 'document_type') === 'invoice'
+      return {
+        subject: `${factura ? 'Tu factura' : 'Tu boleta'} ${text(p, 'invoice_number')} del pedido ${text(p, 'order_number')}`,
+        title: factura ? 'Tu factura electrónica' : 'Tu boleta electrónica',
+        body: `Emitimos ${factura ? 'la factura' : 'la boleta'} <strong>${e('invoice_number')}</strong> de tu pedido <strong>${e('order_number')}</strong> por <strong>${e('grand_total')} ${e('currency')}</strong>. Puedes descargarla en PDF.`,
+        action: 'Descargar PDF',
+      }
+    },
+    en: (p, _l, e) => {
+      const invoice = text(p, 'document_type') === 'invoice'
+      return {
+        subject: `Your ${invoice ? 'invoice' : 'receipt'} ${text(p, 'invoice_number')} for order ${text(p, 'order_number')}`,
+        title: invoice ? 'Your electronic invoice' : 'Your electronic receipt',
+        body: `We issued ${invoice ? 'invoice' : 'receipt'} <strong>${e('invoice_number')}</strong> for your order <strong>${e('order_number')}</strong> of <strong>${e('grand_total')} ${e('currency')}</strong>. You can download it as a PDF.`,
+        action: 'Download PDF',
+      }
+    },
   },
   'order.approval_requested': {
     es: (p, _l, e) => ({
@@ -462,6 +485,12 @@ export function actionUrl(kind: string, params: Params, baseUrl: string): string
     const url = text(params, 'action_url')
     return isSafeAbsoluteUrl(url) ? url : null
   }
+  // El PDF del emisor (fase 4 de facturación): solo https, o sale sin botón. No
+  // depende de la base de la app: el enlace es del emisor.
+  if (kind === 'invoice.issued') {
+    const pdf = text(params, 'pdf_url')
+    return pdf.startsWith('https://') && isSafeAbsoluteUrl(pdf) ? pdf : null
+  }
   if (!isSafeAbsoluteUrl(base)) return null
   if (kind === 'cart.recovery') {
     const slug = text(params, 'store_slug')
@@ -470,7 +499,14 @@ export function actionUrl(kind: string, params: Params, baseUrl: string): string
   if (STOREFRONT_KINDS.has(kind)) {
     const slug = text(params, 'store_slug')
     if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) return null
-    return `${base}/s/${slug}/account${kind === 'suggestion.sent' ? '#sugeridos' : ''}`
+    if (kind === 'suggestion.sent') return `${base}/s/${slug}/account#sugeridos`
+    // 2026-11-20 · Un correo de pedido abre ESE pedido en «Mis pedidos»
+    // (`?pedido=`), como el aviso de la campanita (`ebim.buyer_order_link`).
+    const pedido = text(params, 'order_number')
+    if (kind.startsWith('order.') && /^[A-Za-z0-9-]{1,40}$/.test(pedido)) {
+      return `${base}/s/${slug}/account?pedido=${pedido}#pedidos`
+    }
+    return `${base}/s/${slug}/account`
   }
   if (kind === 'mail.test') return `${base}/app`
   const path = text(params, 'path')
@@ -482,12 +518,21 @@ export function renderEmail(
   locale: string,
   params: Params,
   baseUrl: string,
+  /**
+   * El texto que escribió la tienda (`customCopy.ts`), ya con sus variables
+   * resueltas y el mensaje escapado. Cambia asunto, título y mensaje; botón,
+   * marca, pie y enlace de baja siguen siendo los de la plantilla.
+   */
+  custom: ResolvedCopy | null = null,
 ): RenderedEmail | null {
   const builders = COPY[kind]
   if (!builders) return null
   const lang: Locale = locale === 'en' ? 'en' : 'es'
   const esc = (key: string) => escapeHtml(text(params, key))
-  const copy = builders[lang](params, lang, esc)
+  const base = builders[lang](params, lang, esc)
+  const copy: Copy = custom
+    ? { ...base, subject: custom.subject, title: custom.title, body: custom.bodyHtml }
+    : base
   const href = copy.action ? actionUrl(kind, params, baseUrl) : null
   const unsubscribe = unsubscribeUrl(kind, params, baseUrl)
   // Un recordatorio sin enlace de baja, o sin a dónde volver, no se envía roto:

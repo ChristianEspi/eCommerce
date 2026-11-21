@@ -74,7 +74,13 @@ export const INVOICING_OPERATIONS: readonly ProviderOperation[] = ['invoice.issu
  * La sociedad NO viaja en el cuerpo: es la de la fila del outbox, que escribe
  * la base. El adaptador la toma de ahí y nunca de un campo del payload.
  */
-export const INVOICE_ISSUE_SCHEMA_VERSION = 1
+export const INVOICE_ISSUE_SCHEMA_VERSION = 3
+
+/** Afectación al IGV de una línea (SUNAT, catálogo 07): gravado, exonerado o inafecto. */
+export type TaxAffectation = 'gravado' | 'exonerado' | 'inafecto'
+
+/** Tipo de documento del cliente (SUNAT, catálogo 06: 6, 1, 4, 7). */
+export type CustomerDocType = 'ruc' | 'dni' | 'ce' | 'passport'
 
 export interface InvoiceIssueLineV1 {
   readonly position: number
@@ -84,8 +90,18 @@ export interface InvoiceIssueLineV1 {
   readonly net_amount: MoneyAmount
   readonly tax_rate: MoneyAmount
   readonly tax_amount: MoneyAmount
+  /** v2 */
+  readonly tax_affectation: TaxAffectation
+  /** v2 · `shipping` es el envío; lo demás, producto. */
+  readonly line_kind: 'item' | 'shipping'
 }
 
+/**
+ * v2 (2026-11-20, facturación Perú fase 1, migración `20261120110000`): añade
+ * el tipo de comprobante, el NÚMERO correlativo —asignado al encolar, con el
+ * emisor ya elegido—, el tipo de documento y la dirección del cliente, y la
+ * afectación de cada línea. El nombre del tipo se conserva por compatibilidad.
+ */
 export interface InvoiceIssuePayloadV1 {
   readonly schema_version: typeof INVOICE_ISSUE_SCHEMA_VERSION
   readonly operation: 'invoice.issue'
@@ -94,16 +110,35 @@ export interface InvoiceIssuePayloadV1 {
   readonly store_id: string
   readonly invoice_id: string
   readonly order_id: string
+  /** v3 · `credit_note`: nota de crédito que anula `reference`. */
+  readonly document_type: 'receipt' | 'invoice' | 'credit_note'
   readonly series: string
+  /** Correlativo de 8 dígitos (`00000123`). */
+  readonly number: string
   readonly issued_at: string
   readonly currency: string
-  readonly customer: { readonly name: string; readonly tax_id: string | null }
+  readonly customer: {
+    readonly name: string
+    readonly tax_id: string | null
+    readonly doc_type: CustomerDocType | null
+    readonly address: string | null
+  }
   readonly totals: {
     readonly net: MoneyAmount
     readonly tax: MoneyAmount
     readonly gross: MoneyAmount
   }
   readonly lines: readonly InvoiceIssueLineV1[]
+  /** v3 · El comprobante que anula una nota de crédito; null en los demás. */
+  readonly reference: {
+    readonly document_type: 'receipt' | 'invoice'
+    readonly series: string
+    readonly number: string
+  } | null
+  /** v3 · Tipo (catálogo 09 de SUNAT, 1 = anulación de la operación) y motivo. */
+  readonly credit_note: { readonly type: number; readonly reason: string } | null
+  /** v3 (aditivo, 2026-11-20) · Formato del PDF; null = el predeterminado del emisor. */
+  readonly pdf_format: 'A4' | 'A5' | 'TICKET' | null
 }
 
 /** Claves de primer nivel del payload v1. La base y TypeScript no pueden separarse. */
@@ -114,12 +149,17 @@ export const INVOICE_ISSUE_PAYLOAD_KEYS = [
   'store_id',
   'invoice_id',
   'order_id',
+  'document_type',
   'series',
+  'number',
   'issued_at',
   'currency',
   'customer',
   'totals',
   'lines',
+  'reference',
+  'credit_note',
+  'pdf_format',
 ] as const satisfies readonly (keyof InvoiceIssuePayloadV1)[]
 
 export const INVOICE_ISSUE_LINE_KEYS = [
@@ -130,6 +170,8 @@ export const INVOICE_ISSUE_LINE_KEYS = [
   'net_amount',
   'tax_rate',
   'tax_amount',
+  'tax_affectation',
+  'line_kind',
 ] as const satisfies readonly (keyof InvoiceIssueLineV1)[]
 
 /**

@@ -313,3 +313,150 @@ export function resumenIntake(lineas: readonly LineaPropuesta[]): string {
   for (const l of lineas) cuenta.set(l.confianza, (cuenta.get(l.confianza) ?? 0) + 1)
   return `${lineas.length} líneas · ${[...cuenta].map(([c, n]) => `${c}=${n}`).join(' ')}`
 }
+
+// ---------------------------------------------------------------------------
+// «Mejora esta cotización» (2026-11-20)
+// ---------------------------------------------------------------------------
+//
+// El comprador sube la cotización de OTRO proveedor. El modelo hace lo mismo
+// que con un pedido —transcribir líneas— y además copia el PRECIO UNITARIO que
+// esa cotización pone a cada línea, la moneda y si los precios llevan IGV.
+//
+// Lo que NO hace: decir cuánto cuesta en esta tienda. Ese precio lo calcula el
+// servidor de precios con la sesión del comprador (lista, convenio, escala),
+// igual que el carrito. El modelo no ve un solo precio propio, así que no puede
+// «mejorar» nada por su cuenta: solo lee lo que trae el papel.
+
+export const COTIZACION_MAX_PRECIO = 1_000_000
+
+export const SISTEMA_COTIZACION = [
+  'Eres el lector de cotizaciones de una tienda online. Recibes una foto, un PDF o un texto con la cotización que OTRO proveedor le hizo a un cliente.',
+  'Tu único trabajo es TRANSCRIBIR sus líneas tal como están. No comparas, no recomiendas, no corriges, no calculas y no inventas productos ni precios.',
+  '',
+  'Por cada producto cotizado devuelve una línea con:',
+  '- texto: el producto tal como está escrito (nombre, presentación, concentración). Sin cantidad ni precio. Máximo 120 caracteres.',
+  '- cantidad: entero positivo cotizado. Si no se indica, 1 y cantidad_supuesta = true.',
+  '- unidad: la unidad de venta si aparece (caja, unidad, frasco, galón, paquete…); si no, cadena vacía.',
+  '- sku: SOLO si junto a esa línea aparece un código de producto. Si no, cadena vacía. Nunca lo deduzcas.',
+  '- precio_unitario: el precio por UNA unidad de esa línea, tal como figura. Si solo aparece el importe de la línea, divídelo entre la cantidad. Si no aparece ningún precio, 0 y precio_leido = false.',
+  '- precio_leido: true solo si el precio está escrito y lo lees con claridad.',
+  '- legible: false si no estás seguro de lo que dice la línea.',
+  '',
+  'De la cotización completa:',
+  '- moneda: «PEN» si los precios están en soles (S/), «USD» si están en dólares (US$, $), «otra» si es otra moneda, cadena vacía si no se ve.',
+  '- incluye_igv: «si» si los precios unitarios ya incluyen IGV o impuestos, «no» si el IGV se suma aparte (por ejemplo una fila «IGV 18%» sobre un subtotal), «desconocido» si no se puede saber.',
+  '',
+  'Reglas:',
+  '- Subtotales, totales, IGV, descuentos globales, fletes, fechas, condiciones de pago, firmas y sellos NO son líneas.',
+  '- No copies datos personales ni de empresas (nombres, RUC, DNI, direcciones, teléfonos, correos, cuentas bancarias).',
+  '- Si el contenido no es una cotización ni una lista de productos con precios, devuelve lineas vacía y es_cotizacion = false.',
+  `- Como máximo ${INTAKE_MAX_LINEAS} líneas.`,
+  '- notas: una frase corta en el idioma pedido si hay algo que el cliente deba revisar (precios ilegibles, unidades raras). Si no, cadena vacía. Sin cifras.',
+].join('\n')
+
+export const ESQUEMA_COTIZACION = {
+  type: 'object',
+  properties: {
+    es_cotizacion: { type: 'boolean' },
+    moneda: { type: 'string', enum: ['PEN', 'USD', 'otra', ''] },
+    incluye_igv: { type: 'string', enum: ['si', 'no', 'desconocido'] },
+    lineas: {
+      type: 'array',
+      maxItems: INTAKE_MAX_LINEAS,
+      items: {
+        type: 'object',
+        properties: {
+          texto: { type: 'string', maxLength: 160 },
+          cantidad: { type: 'integer', minimum: 1, maximum: INTAKE_MAX_CANTIDAD },
+          cantidad_supuesta: { type: 'boolean' },
+          unidad: { type: 'string', maxLength: 30 },
+          sku: { type: 'string', maxLength: 80 },
+          precio_unitario: { type: 'number', minimum: 0, maximum: COTIZACION_MAX_PRECIO },
+          precio_leido: { type: 'boolean' },
+          legible: { type: 'boolean' },
+        },
+        required: ['texto', 'cantidad', 'cantidad_supuesta', 'unidad', 'sku', 'precio_unitario', 'precio_leido', 'legible'],
+        additionalProperties: false,
+      },
+    },
+    notas: { type: 'string', maxLength: 300 },
+  },
+  required: ['es_cotizacion', 'moneda', 'incluye_igv', 'lineas', 'notas'],
+  additionalProperties: false,
+} as const satisfies EsquemaIA
+
+export interface LineaModeloCotizacion extends LineaModelo {
+  precio_unitario: number
+  precio_leido: boolean
+}
+
+export interface RespuestaModeloCotizacion {
+  es_cotizacion: boolean
+  moneda: 'PEN' | 'USD' | 'otra' | ''
+  incluye_igv: 'si' | 'no' | 'desconocido'
+  lineas: LineaModeloCotizacion[]
+  notas: string
+}
+
+export interface LineaLeidaCotizacion extends LineaLeida {
+  /** Precio unitario de la OTRA cotización; `null` si no se leyó con claridad. */
+  readonly precio: number | null
+}
+
+export interface CotizacionRevisada {
+  readonly lineas: readonly LineaLeidaCotizacion[]
+  readonly notas: string | null
+  /** `null` = no se vio o no es soles ni dólares: no se puede comparar. */
+  readonly moneda: 'PEN' | 'USD' | null
+  /** `null` = no se sabe; la pantalla deja elegir. */
+  readonly incluyeIgv: boolean | null
+}
+
+/** Precio con forma: positivo, en rango y con 4 decimales como mucho. */
+export function limpiarPrecio(valor: unknown, leido: unknown): number | null {
+  if (leido !== true) return null
+  const n = Number(valor)
+  if (!Number.isFinite(n) || n <= 0 || n > COTIZACION_MAX_PRECIO) return null
+  return Math.round(n * 10_000) / 10_000
+}
+
+/**
+ * La cotización del modelo, pasada por las reglas de dominio. Igual que el
+ * pedido salvo en una cosa: las líneas repetidas NO se fusionan, porque en una
+ * cotización la misma descripción con dos precios son dos ofertas distintas.
+ */
+export function revisarCotizacion(
+  data: RespuestaModeloCotizacion,
+): { ok: true; value: CotizacionRevisada } | { ok: false; motivo: 'vacia' } {
+  if (!data.es_cotizacion) return { ok: false, motivo: 'vacia' }
+
+  const lineas: LineaLeidaCotizacion[] = []
+  for (const cruda of data.lineas.slice(0, INTAKE_MAX_LINEAS)) {
+    const texto = limpiarTexto(String(cruda.texto ?? ''))
+    const sku = limpiarSku(String(cruda.sku ?? ''))
+    if (texto.length < 2 && !sku) continue
+    const cantidad = Math.trunc(Number(cruda.cantidad))
+    if (!Number.isFinite(cantidad) || cantidad < 1 || cantidad > INTAKE_MAX_CANTIDAD) continue
+    lineas.push({
+      texto: texto || (sku ?? ''),
+      cantidad,
+      cantidadSupuesta: Boolean(cruda.cantidad_supuesta),
+      unidad: limpiarTexto(String(cruda.unidad ?? '')).slice(0, 30) || null,
+      sku,
+      legible: Boolean(cruda.legible),
+      precio: limpiarPrecio(cruda.precio_unitario, cruda.precio_leido),
+    })
+  }
+  if (lineas.length === 0) return { ok: false, motivo: 'vacia' }
+
+  const notas = limpiarTexto(String(data.notas ?? '')).replace(/\d/g, '').replace(/\s+/g, ' ').trim()
+  return {
+    ok: true,
+    value: {
+      lineas,
+      notas: notas.length >= 3 ? notas.slice(0, 300) : null,
+      moneda: data.moneda === 'PEN' || data.moneda === 'USD' ? data.moneda : null,
+      incluyeIgv: data.incluye_igv === 'si' ? true : data.incluye_igv === 'no' ? false : null,
+    },
+  }
+}

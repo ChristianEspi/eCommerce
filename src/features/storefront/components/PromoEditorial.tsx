@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { offerBadge, vigenciaTexto } from '../offer'
-import type { StorePromotion } from '../promotions'
+import { promotionHref, type StorePromotion } from '../promotions'
 import { PromoBackgroundVideo } from './PromoBackgroundVideo'
 
 /**
@@ -56,11 +56,7 @@ export function PromoEditorial({
   const vigencia = vigenciaTexto(promo.endsAt, t, locale)
   const imagen = fuenteDe(promo.imageUrl, assets)
   const conFoto = imagen !== null
-  const destino = promo.categorySlug
-    ? `/s/${storeSlug}?c=${encodeURIComponent(promo.categorySlug)}`
-    : promo.brandCode
-      ? `/s/${storeSlug}?b=${encodeURIComponent(promo.brandCode)}`
-      : `/s/${storeSlug}?ver=todo&oferta=1`
+  const destino = promotionHref(promo, storeSlug)
   const ir = (paso: number) => setActual((i) => (((i + paso) % total) + total) % total)
   const dos = (n: number) => String(n).padStart(2, '0')
 

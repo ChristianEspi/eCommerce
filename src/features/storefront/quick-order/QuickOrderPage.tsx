@@ -35,6 +35,7 @@ import { useStorefront } from '../hooks'
 import { privateMeta } from '../seo'
 import { resolveOrderLines } from './api'
 import { importIntoCart, type CartImportResult } from './importToCart'
+import { CompetitorQuotePanel } from './CompetitorQuotePanel'
 import { IntakePanel, type IntakeAcceptedLine } from './IntakePanel'
 import {
   QUICK_ORDER_MAX_ROWS,
@@ -411,6 +412,11 @@ export function QuickOrderView({ storeId, storeSlug }: { storeId: string; storeS
             id: 'ia',
             label: t('store.quickOrder.tab.intake'),
             content: <IntakePanel storeSlug={storeSlug} onAccept={acceptIntake} />,
+          },
+          {
+            id: 'cotizacion',
+            label: t('store.quickOrder.tab.compare'),
+            content: <CompetitorQuotePanel storeSlug={storeSlug} currency={cart?.currency ?? 'PEN'} onAccept={acceptIntake} />,
           },
         ]}
       />
