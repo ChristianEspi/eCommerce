@@ -106,6 +106,12 @@ verify_jwt = false
 [functions.usage-outbox-worker]
 verify_jwt = false
 
+# Entrega de webhooks (P14). La llama el planificador cada minuto con
+# EBIM_WORKER_KEY en cabecera, sin usuario. Con verify_jwt el gateway la
+# rechazaba antes de llegar a la clave (2026-11-20).
+[functions.integration-worker]
+verify_jwt = false
+
 # Fuentes de lectura (2026-11-12): consulta la API del ERP. La llama el
 # planificador de la base cada minuto con EBIM_CONNECTOR_PULL_KEY en cabecera,
 # sin usuario: mismo patron que integration-worker.
