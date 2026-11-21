@@ -86,6 +86,8 @@ const EVENT_TYPES = [
   'payment.failed',
   'fulfillment.*',
   'fulfillment.created',
+  // 2026-11-20 · Cada paso de la entrega (empacada, lista, en camino…).
+  'fulfillment.state_changed',
   'fulfillment.delivered',
   'return.*',
   'return.requested',

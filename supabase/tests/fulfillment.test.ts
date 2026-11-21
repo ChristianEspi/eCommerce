@@ -518,6 +518,34 @@ describe('despacho parcial', () => {
     expect(types).toContain('fulfillment.state_changed')
     expect(types).toContain('order.fulfillment_status_changed')
   })
+
+  // 2026-11-20 · Lo que ve un ERP por webhook: cada paso de la entrega y el
+  // estado de entrega del pedido, aunque lo recalcule el sistema.
+  it('cada paso de una entrega se publica como hecho de dominio', async () => {
+    const rows = await svc(
+      `select payload->>'from' as de, payload->>'to' as a, payload->>'order_number' as numero
+         from public.domain_events
+        where event_type = 'fulfillment.state_changed' and payload->>'order_id' = $1
+        order by created_at, id`,
+      [orderId],
+    )
+    const pasos = rows.map((r) => `${r.de}>${r.a}`)
+    // La primera entrega recorrió seis pasos; la segunda, cuatro.
+    expect(pasos).toHaveLength(10)
+    expect(pasos).toContain('ready>in_transit')
+    expect(pasos).toContain('packed>ready')
+    expect(rows.every((r) => typeof r.numero === 'string' && r.numero !== '')).toBe(true)
+  })
+
+  it('el estado de entrega del pedido recalculado también se publica, una vez por estado', async () => {
+    const rows = await svc(
+      `select payload->>'to' as a from public.domain_events
+        where event_type = 'order.fulfillment_status_changed' and aggregate_id = $1
+        order by created_at, id`,
+      [orderId],
+    )
+    expect(rows.map((r) => r.a)).toEqual(['in_progress', 'partially_fulfilled', 'fulfilled'])
+  })
 })
 
 /**
