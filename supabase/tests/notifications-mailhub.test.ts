@@ -72,7 +72,7 @@ describe('plantilla pedido-recibido', () => {
         fecha: '20/11/2026',
         total: 'S/ 1,250.40',
         tienda: { nombre: 'Quimica Suiza' },
-        enlace: 'https://tienda.ebim.pe/s/miquimica/account',
+        enlace: 'https://tienda.ebim.pe/s/miquimica/account?pedido=EC-20261120-00001#pedidos',
       },
     })
   })

@@ -273,7 +273,8 @@ describe('tienda: por vínculo', () => {
     const [aviso] = await avisos(`kind = 'order.confirmed'`)
     expect(aviso?.recipient_user_id).toBe(INVITADO_B2C)
     expect(aviso?.audience).toBe('storefront')
-    expect(aviso?.link).toBe(`/s/${TENANT_A.storeSlug}/account`)
+    // 2026-11-20 · Abre ESE pedido en «Mis pedidos», no la cuenta en general.
+    expect(aviso?.link).toBe(`/s/${TENANT_A.storeSlug}/account?pedido=${aviso?.params.order_number}#pedidos`)
   })
 
   it('en B2B le llega a quien compró, no a toda la empresa', async () => {

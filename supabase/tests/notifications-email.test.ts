@@ -68,7 +68,7 @@ describe('plantillas', () => {
   it('la confirmación nombra el pedido y lleva a la cuenta de ESA tienda', () => {
     const correo = renderEmail('order.confirmed', 'es', pedido, BASE)
     expect(correo?.subject).toBe('Recibimos tu pedido EC-00042')
-    expect(correo?.html).toContain('http://localhost:5173/s/miquimica/account')
+    expect(correo?.html).toContain('http://localhost:5173/s/miquimica/account?pedido=EC-00042#pedidos')
     expect(correo?.html).toContain('Quimica Suiza')
   })
 

@@ -499,7 +499,14 @@ export function actionUrl(kind: string, params: Params, baseUrl: string): string
   if (STOREFRONT_KINDS.has(kind)) {
     const slug = text(params, 'store_slug')
     if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) return null
-    return `${base}/s/${slug}/account${kind === 'suggestion.sent' ? '#sugeridos' : ''}`
+    if (kind === 'suggestion.sent') return `${base}/s/${slug}/account#sugeridos`
+    // 2026-11-20 · Un correo de pedido abre ESE pedido en «Mis pedidos»
+    // (`?pedido=`), como el aviso de la campanita (`ebim.buyer_order_link`).
+    const pedido = text(params, 'order_number')
+    if (kind.startsWith('order.') && /^[A-Za-z0-9-]{1,40}$/.test(pedido)) {
+      return `${base}/s/${slug}/account?pedido=${pedido}#pedidos`
+    }
+    return `${base}/s/${slug}/account`
   }
   if (kind === 'mail.test') return `${base}/app`
   const path = text(params, 'path')

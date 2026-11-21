@@ -27,6 +27,7 @@ import { Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ErrorBoundary } from '@/app/ErrorBoundary'
 import { useSessionContext } from '@/features/auth/session-context'
+import { useIsBusinessBuyer } from './commerce/businessBuyer'
 import { StoreNotificationBell } from '@/features/notifications/StoreNotificationBell'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { formatMoney } from '@/shared/lib/format'
@@ -673,11 +674,12 @@ function CommerceBarInMain({ storeSlug }: { storeSlug: string }) {
  */
 function HeaderTools({ storeSlug }: { storeSlug: string }) {
   const { t } = useI18n()
-  const { status } = useSessionContext()
+  const esEmpresa = useIsBusinessBuyer()
   const enlaces = [
     { to: `/s/${storeSlug}/pedido-rapido`, label: t('store.quickOrder.open'), icon: <BoltRoundedIcon /> },
-    // Las cotizaciones viven en la cuenta: sin sesión no hay ninguna que ver.
-    ...(status === 'authenticated'
+    // Las cotizaciones viven en la cuenta DE EMPRESA: sin sesión no hay ninguna
+    // que ver, y quien compra para sí no tiene esa pestaña (2026-11-20).
+    ...(esEmpresa
       ? [{ to: `/s/${storeSlug}/account#cotizaciones`, label: t('account.tab.quotes'), icon: <RequestQuoteRoundedIcon /> }]
       : []),
   ]
