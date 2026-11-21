@@ -40,7 +40,10 @@ import {
   useReplayDelivery,
   useSetEndpointActive,
   useSubscriptions,
+  useUpdateEndpoint,
 } from './hooks'
+import type { WebhookEndpoint } from './types'
+import { WEBHOOK_EVENT_TYPES } from './webhookEvents'
 
 /**
  * Webhooks: a quién avisamos, de qué, y qué pasó con cada aviso.
@@ -69,42 +72,43 @@ import {
  * ofrecer el botón sin miedo a duplicar pedidos en el sistema del cliente.
  */
 
-/** Espejo del vocabulario de hechos que publica el dominio. Cerrado a propósito. */
-const EVENT_TYPES = [
-  // 2026-11-12 · Solo lo que `domain_events` publica de verdad (comprobado en
-  // QAS). Antes ofrecía `shipment.dispatched` y `shipment.delivered`, que no se
-  // emiten nunca: un destino suscrito a ellos no recibía nada y nadie sabía por qué.
-  'order.*',
-  'order.created',
-  'order.status_changed',
-  'order.payment_status_changed',
-  'order.fulfillment_status_changed',
-  'order.approval_requested',
-  'order.approval_decided',
-  'payment.*',
-  'payment.captured',
-  'payment.failed',
-  'fulfillment.*',
-  'fulfillment.created',
-  'fulfillment.delivered',
-  'return.*',
-  'return.requested',
-  'return.approved',
-  'return.completed',
-  'quote.*',
-  'quote.requested',
-  'quote.accepted',
-  'quote.converted',
-] as const
+const EVENT_TYPES = WEBHOOK_EVENT_TYPES
 
-function NewEndpointDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+/** Lo que se edita: el destino tal como está y los eventos a los que ya escucha. */
+interface EditingEndpoint {
+  endpoint: WebhookEndpoint
+  events: string[]
+}
+
+/**
+ * Alta y edición del destino (2026-11-20). Es el mismo formulario: editar solo
+ * llega relleno. El padre lo monta con `key` por destino, así que el estado
+ * inicial se toma al abrir y no se arrastra de un destino a otro.
+ */
+function EndpointDialog({
+  open,
+  onClose,
+  editing = null,
+}: {
+  open: boolean
+  onClose: () => void
+  editing?: EditingEndpoint | null
+}) {
   const { t } = useI18n()
   const create = useCreateEndpoint()
-  const [name, setName] = useState('')
-  const [url, setUrl] = useState('')
-  const [secretRef, setSecretRef] = useState('')
-  const [description, setDescription] = useState('')
-  const [events, setEvents] = useState<string[]>([])
+  const update = useUpdateEndpoint()
+  const saving = editing ? update : create
+  const [name, setName] = useState(editing?.endpoint.name ?? '')
+  const [url, setUrl] = useState(editing?.endpoint.url ?? '')
+  const [secretRef, setSecretRef] = useState(editing?.endpoint.secret_ref ?? '')
+  const [description, setDescription] = useState(editing?.endpoint.description ?? '')
+  const [events, setEvents] = useState<string[]>(editing?.events ?? [])
+  // Un destino creado antes con un evento que ya no se ofrece lo conserva: se
+  // muestra para poder quitarlo, en vez de borrarlo en silencio al guardar.
+  const offered: string[] = [
+    ...EVENT_TYPES,
+    ...(editing?.events ?? []).filter((eventType) => !(EVENT_TYPES as readonly string[]).includes(eventType)),
+  ]
 
   const nameOk = /^[a-z0-9][a-z0-9_-]{1,60}$/.test(name.trim().toLowerCase())
   // Mismo prefijo que exige el CHECK de la base. Un botón habilitado para algo
@@ -114,12 +118,14 @@ function NewEndpointDialog({ open, onClose }: { open: boolean; onClose: () => vo
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>{t('integrations.webhooks.newTitle')}</DialogTitle>
+      <DialogTitle>
+        {t(editing ? 'integrations.webhooks.editTitle' : 'integrations.webhooks.newTitle')}
+      </DialogTitle>
       <DialogContent>
         <Stack sx={{ gap: 2, pt: 1 }}>
-          {create.isError && (
+          {saving.isError && (
             <Alert severity="error">
-              {t(create.error instanceof IntegrationsError ? create.error.key : 'integrations.error.generic')}
+              {t(saving.error instanceof IntegrationsError ? saving.error.key : 'integrations.error.generic')}
             </Alert>
           )}
           <Field
@@ -156,7 +162,7 @@ function NewEndpointDialog({ open, onClose }: { open: boolean; onClose: () => vo
             {t('integrations.webhooks.events')}
           </Typography>
           <Stack direction="row" sx={{ flexWrap: 'wrap' }}>
-            {EVENT_TYPES.map((eventType) => (
+            {offered.map((eventType) => (
               <FormControlLabel
                 key={eventType}
                 control={
@@ -189,28 +195,27 @@ function NewEndpointDialog({ open, onClose }: { open: boolean; onClose: () => vo
         <Button onClick={onClose}>{t('common.cancel')}</Button>
         <Button
           variant="contained"
-          disabled={!nameOk || !urlOk || !secretOk || events.length === 0 || create.isPending}
-          onClick={() =>
-            create.mutate(
-              {
-                name,
-                url,
-                secretRef,
-                description,
-                eventTypes: events,
+          disabled={!nameOk || !urlOk || !secretOk || events.length === 0 || saving.isPending}
+          onClick={() => {
+            const draft = { name, url, secretRef, description, eventTypes: events }
+            if (editing) {
+              update.mutate(
+                { id: editing.endpoint.id, draft, previousEvents: editing.events },
+                { onSuccess: onClose },
+              )
+              return
+            }
+            create.mutate(draft, {
+              onSuccess: () => {
+                setName('')
+                setUrl('')
+                setSecretRef('')
+                setDescription('')
+                setEvents([])
+                onClose()
               },
-              {
-                onSuccess: () => {
-                  setName('')
-                  setUrl('')
-                  setSecretRef('')
-                  setDescription('')
-                  setEvents([])
-                  onClose()
-                },
-              },
-            )
-          }
+            })
+          }}
         >
           {t('common.save')}
         </Button>
@@ -229,6 +234,7 @@ export function WebhooksSection() {
   const debounced = useDebouncedValue(term, 300)
   const deliveries = useDeliveries(debounced)
   const [creating, setCreating] = useState(false)
+  const [editing, setEditing] = useState<EditingEndpoint | null>(null)
   const [replayId, setReplayId] = useState<string | null>(null)
   // Mismo criterio que la pestaña API: leer no exige el módulo, publicar sí.
   const { has } = useCapabilities()
@@ -315,7 +321,18 @@ export function WebhooksSection() {
                       ))}
                     </Stack>
                   </TableCell>
-                  <TableCell align="right">
+                  <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                    {/* Editar es publicar: sin el módulo, la base lo rechazaría. */}
+                    {contratado && (
+                      <Button
+                        size="small"
+                        onClick={() =>
+                          setEditing({ endpoint, events: byEndpoint.get(endpoint.id) ?? [] })
+                        }
+                      >
+                        {t('integrations.webhooks.edit')}
+                      </Button>
+                    )}
                     <Button
                       size="small"
                       onClick={() =>
@@ -423,7 +440,15 @@ export function WebhooksSection() {
         )}
       </Card>
 
-      <NewEndpointDialog open={creating} onClose={() => setCreating(false)} />
+      <EndpointDialog open={creating} onClose={() => setCreating(false)} />
+      {editing && (
+        <EndpointDialog
+          key={editing.endpoint.id}
+          open
+          editing={editing}
+          onClose={() => setEditing(null)}
+        />
+      )}
 
       <ReasonDialog
         open={replayId !== null}

@@ -170,6 +170,13 @@ const StoreOrderPage = lazyPage(() =>
 const LandingPage = lazyPage(() =>
   import('@/features/storefront/pages').then((m) => ({ default: m.LandingPage })),
 )
+// Guía pública de la API de socio (2026-11-21). Trae los textos del backoffice
+// porque nombra los eventos de webhook con las mismas etiquetas que el panel.
+const ApiDocsPage = lazyPage(() =>
+  Promise.all([import('@/features/integrations/docs/ApiDocsPage'), loadBackofficeMessages()]).then(([m]) => ({
+    default: m.ApiDocsPage,
+  })),
+)
 
 function withSuspense(node: ReactNode): ReactNode {
   return <Suspense fallback={<LoadingState />}>{node}</Suspense>
@@ -192,6 +199,10 @@ export const routes: RouteObject[] = [
   { path: '/login', element: withSuspense(<LoginPage />), errorElement: <RootErrorRoute /> },
   { path: '/recuperar', element: withSuspense(<ForgotPasswordPage />), errorElement: <RootErrorRoute /> },
   { path: '/nueva-clave', element: withSuspense(<ResetPasswordPage />), errorElement: <RootErrorRoute /> },
+  // Pública: la lee el técnico del ERP del cliente, que no tiene cuenta en el
+  // panel. `/api/*` cae en la misma guía (`/api/v1`, `/api/docs`…).
+  { path: '/api', element: withSuspense(<ApiDocsPage />), errorElement: <RootErrorRoute /> },
+  { path: '/api/*', element: withSuspense(<ApiDocsPage />), errorElement: <RootErrorRoute /> },
   {
     // Ruta sin path: agrupa TODO lo que exige sesión bajo un mismo guard y un
     // mismo `TenantProvider`, para que el alta de espacio y el backoffice

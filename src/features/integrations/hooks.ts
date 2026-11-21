@@ -15,6 +15,7 @@ import {
   rotateApiClientSecret,
   setApiClientActive,
   setEndpointActive,
+  updateEndpoint,
   type EndpointDraft,
   type QueueFilter,
 } from './api'
@@ -134,6 +135,17 @@ export function useCreateEndpoint() {
   return useMutation({
     mutationFn: (draft: EndpointDraft) => createEndpoint(draft),
     onSuccess: () => invalidateAll(queryClient),
+  })
+}
+
+export function useUpdateEndpoint() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { id: string; draft: EndpointDraft; previousEvents: readonly string[] }) =>
+      updateEndpoint(input.id, input.draft, input.previousEvents),
+    // También tras un fallo: si las altas entraron y la baja no, la tabla
+    // debe enseñar lo que de verdad quedó.
+    onSettled: () => invalidateAll(queryClient),
   })
 }
 
