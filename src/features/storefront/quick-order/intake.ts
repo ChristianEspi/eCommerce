@@ -63,7 +63,7 @@ export const intakeLineSchema = z.object({
   /** Solo en líneas `variante`: sus presentaciones con SKU. Vacío = elegir en la ficha. */
   presentaciones: z.array(presentationSchema).max(20).optional().default([]),
   /** 2026-11-22 · Las alternativas son por componente: la tienda no tiene lo pedido. */
-  sustituto: z.object({ componente: z.string().max(80) }).nullable().optional(),
+  sustituto: z.object({ componente: z.string().max(80), sinAlternativas: z.boolean().optional() }).nullable().optional(),
 })
 export type IntakeLine = z.infer<typeof intakeLineSchema>
 

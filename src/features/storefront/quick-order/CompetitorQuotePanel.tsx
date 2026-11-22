@@ -388,7 +388,7 @@ export function CompetitorQuotePanel({
                           </Stack>
                         </TableCell>
                         <TableCell sx={{ minWidth: 200 }}>
-                          {line.sustituto && <SubstituteNote componente={line.sustituto.componente} />}
+                          {line.sustituto && !line.sustituto.sinAlternativas && <SubstituteNote componente={line.sustituto.componente} />}
                           {offersPresentation(line) ? (
                             <PresentationPicker
                               storeSlug={storeSlug}
@@ -420,7 +420,9 @@ export function CompetitorQuotePanel({
                             </SelectField>
                           ) : (
                             <Typography variant="body2" sx={{ color: 'var(--muted)' }}>
-                              {t('store.intake.review.noMatch')}
+                              {line.sustituto?.sinAlternativas
+                                ? t('store.intake.review.noSubstitute').replace('{component}', line.sustituto.componente)
+                                : t('store.intake.review.noMatch')}
                             </Typography>
                           )}
                         </TableCell>

@@ -263,7 +263,7 @@ export function IntakePanel({
                           </Stack>
                         </TableCell>
                         <TableCell sx={{ minWidth: 220 }}>
-                          {line.sustituto && <SubstituteNote componente={line.sustituto.componente} />}
+                          {line.sustituto && !line.sustituto.sinAlternativas && <SubstituteNote componente={line.sustituto.componente} />}
                           {offersPresentation(line) ? (
                             <PresentationPicker
                               storeSlug={storeSlug}
@@ -299,7 +299,9 @@ export function IntakePanel({
                             </Typography>
                           ) : (
                             <Typography variant="body2" sx={{ color: 'var(--muted)' }}>
-                              {t('store.intake.review.noMatch')}
+                              {line.sustituto?.sinAlternativas
+                                ? t('store.intake.review.noSubstitute').replace('{component}', line.sustituto.componente)
+                                : t('store.intake.review.noMatch')}
                             </Typography>
                           )}
                         </TableCell>
