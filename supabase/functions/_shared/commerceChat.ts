@@ -454,5 +454,47 @@ export const SISTEMA_RESPUESTA_CHAT = [
   'La pantalla muestra aparte los productos, pedidos, el crédito y el carrito propuesto con sus precios y cifras: NO escribas precios, importes, saldos, descuentos ni cantidades de stock.',
   'Si propones un carrito, dilo y pide que lo revise y lo confirme con el botón; menciona las líneas sin coincidencia o donde debe elegir presentación.',
   'Si ofreces alternativas por componente principal, di que comparten ese componente y que confirme que le sirvan (con un profesional si es un medicamento). Nunca digas para qué sirve un medicamento, dosis, síntomas ni recomiendes uno por una dolencia.',
-  'Si los datos no responden la pregunta, dilo y sugiere cómo seguir. Si mencionas productos, devuelve sus product_id SOLO de los datos.',
+  'Si los datos no responden la pregunta, dilo y sugiere cómo seguir. product_ids: SOLO identificadores product_id que aparezcan en los datos; si los datos no traen product_id (pedidos, crédito, carrito), lista vacía. Nunca nombres.',
 ].join('\n')
+
+/**
+ * Los números de pedido que trae el resultado. «EC-20261119-00056» tiene
+ * dígitos de sobra para parecer un teléfono al candado de contacto; para
+ * revisar la frase se tapan SOLO estos (salen de la base, del propio
+ * comprador), y la frase que llega es la original.
+ */
+export function numerosDePedido(datos: DatosChat): string[] {
+  switch (datos.tipo) {
+    case 'pedidos':
+      return datos.pedidos.map((p) => p.order_number)
+    case 'pedido':
+      return datos.pedido ? [datos.pedido.order_number] : []
+    case 'carrito':
+      return datos.origen ? [datos.origen] : []
+    case 'credito':
+      return datos.credito?.proximo ? [datos.credito.proximo.order_number] : []
+    default:
+      return []
+  }
+}
+
+export function taparNumeros(texto: string, numeros: readonly string[]): string {
+  return numeros.filter(Boolean).reduce((t, n) => t.split(n).join('pedido'), texto)
+}
+
+/**
+ * Esquema de la redacción del chat. Más holgado que el del núcleo en
+ * `product_ids`: con un carrito los datos no traen ids y el modelo rellenaba
+ * nombres largos, que el esquema estricto rechazaba entera («esquema») y la
+ * frase se perdía. Los ids se filtran igual contra la lista cerrada
+ * (`revisarRespuesta`); lo que no es un id permitido no llega a la vitrina.
+ */
+export const ESQUEMA_RESPUESTA_CHAT = {
+  type: 'object',
+  properties: {
+    texto: { type: 'string', maxLength: 600 },
+    product_ids: { type: 'array', maxItems: 8, items: { type: 'string', maxLength: 160 } },
+  },
+  required: ['texto', 'product_ids'],
+  additionalProperties: false,
+} as const satisfies EsquemaIA

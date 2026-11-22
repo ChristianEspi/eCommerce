@@ -31,12 +31,15 @@ import { medidorDeTienda } from '../_runtime/aiMeter.ts'
 import { AI_TIER_MODELS, delimitarDatos, sistemaConFrontera } from '../_shared/aiCore.ts'
 import { ejecutarIA } from '../_shared/aiPipeline.ts'
 import { respuestaVitrinaSinSalud } from '../_shared/ai.ts'
-import { ESQUEMA_RESPUESTA, historialParaModelo, revisarRespuesta, type Respuesta, type Turno } from '../_shared/commerceAgent.ts'
+import { historialParaModelo, revisarRespuesta, type Respuesta, type Turno } from '../_shared/commerceAgent.ts'
 import {
   ESQUEMA_PLAN_CHAT,
+  ESQUEMA_RESPUESTA_CHAT,
   SISTEMA_PLAN_CHAT,
   SISTEMA_RESPUESTA_CHAT,
   ejecutarChat,
+  numerosDePedido,
+  taparNumeros,
   validarPlanChat,
   type CreditoComprador,
   type LineaDePedido,
@@ -291,10 +294,14 @@ const handler = serveJson(
         feature: FEATURE,
         prompt: `chat · ${plan.data.herramienta}`,
         revisar: (d) => {
-          const r = revisarRespuesta(d, resultado.productosPermitidos)
+          // Los candados se pasan con los números de pedido del resultado
+          // tapados (parecen teléfonos); la frase que sale es la original.
+          const original = typeof d.texto === 'string' ? d.texto : ''
+          const r = revisarRespuesta({ ...d, texto: taparNumeros(original, numerosDePedido(resultado.datos)) }, resultado.productosPermitidos)
           if (!r.ok) return { ok: false, motivo: r.motivo }
           if (!respuestaVitrinaSinSalud(r.value.texto)) return { ok: false, motivo: 'bloqueada' }
-          return { ok: true, value: r.value, reply: r.value.texto }
+          const texto = original.replace(/\s+/g, ' ').trim().slice(0, 600)
+          return { ok: true, value: { ...r.value, texto }, reply: texto }
         },
       },
       {
@@ -308,7 +315,10 @@ const handler = serveJson(
               delimitarDatos('conversacion', historial),
               delimitarDatos(`resultado_${plan.data!.herramienta}`, resultado.paraModelo),
             ].join('\n\n'),
-            schema: ESQUEMA_RESPUESTA,
+            schema: ESQUEMA_RESPUESTA_CHAT,
+            // El techo por defecto (512) cortaba la frase de un carrito largo y
+            // la respuesta llegaba como «esquema» (sin texto).
+            maxTokens: 1024,
             timeoutMs: TIMEOUT_MS,
           }),
       },

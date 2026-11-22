@@ -17,6 +17,8 @@ import {
   aplicarCambios,
   ejecutarChat,
   nombreCoincide,
+  numerosDePedido,
+  taparNumeros,
   proponerCarrito,
   validarPlanChat,
   type PuertosChat,
@@ -177,6 +179,14 @@ describe('sustitutos por principio activo', () => {
     expect(p.busquedas).toEqual(['metilfenidato'])
     expect(r.datos).toMatchObject({ tipo: 'sustitutos', principio_activo: 'metilfenidato', product_ids: [CONSIV] })
     expect(r.productosPermitidos).toEqual([CONSIV])
+  })
+})
+
+describe('candado de contacto y números de pedido (2026-11-22)', () => {
+  it('el número de pedido del resultado no cuenta como teléfono; uno inventado sí', () => {
+    const datos = { tipo: 'carrito' as const, origen: 'EC-20261119-00056', lineas: [], avisos: [] }
+    expect(taparNumeros('Tu pedido EC-20261119-00056 está listo', numerosDePedido(datos))).toBe('Tu pedido pedido está listo')
+    expect(taparNumeros('Llama al 999 888 777', numerosDePedido(datos))).toBe('Llama al 999 888 777')
   })
 })
 
