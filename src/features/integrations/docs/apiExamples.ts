@@ -95,7 +95,7 @@ export const RESPONSE_EXAMPLES: Record<string, unknown> = {
         index: 0,
         sku: 'PRUEBA-API-001',
         status: 'created',
-        product_id: '2c428293-f73a-4354-87a7-5b997b03127c',
+        product_id: '2c428293-…',
         publications: [{ store: 'miquimica', status: 'created' }],
         errors: [],
       },
