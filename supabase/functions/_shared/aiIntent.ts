@@ -97,9 +97,16 @@ export function revisarIntencion(
  * ¿Hace falta reescribir? Solo cuando la búsqueda normal no sirvió: sin
  * resultados, o con parecidos por letras (`fuzzy`), que para un asistente es
  * la diferencia entre responder e inventar.
+ *
+ * 2026-11-22 · También cuando lo hallado salió de UNA palabra suelta de la
+ * frase y no de la frase entera. «algo para el sol en la playa» se quedaba en
+ * «playa», y el lematizador español reduce «playa» y «player» a `play`: el
+ * «Gel Capilar Sebman Player» contaba como coincidencia real y la intención
+ * nunca se consultaba. Una palabra arrancada de la frase es una pista, no una
+ * respuesta.
  */
-export function hayQueReescribir(mode: string, resultados: number): boolean {
-  return resultados === 0 || mode === 'fuzzy'
+export function hayQueReescribir(mode: string, resultados: number, porPalabraSuelta = false): boolean {
+  return resultados === 0 || mode === 'fuzzy' || porPalabraSuelta
 }
 
 /** Junta los resultados de varios términos sin repetir producto, en orden. */

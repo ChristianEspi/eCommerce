@@ -329,11 +329,17 @@ const handler = serveJson(
      * La palabra más larga y no la primera: en castellano el sustantivo que
      * importa casi nunca abre la frase, pero sí suele ser el término largo.
      */
+    let porPalabraSuelta = false
     if (items.length === 0) {
       const palabras = query.split(' ').filter((p) => p.length > 3)
       const principal = palabras.sort((a, b) => b.length - a.length)[0]
-      if (principal && principal !== query) items = await buscar(principal)
+      if (principal && principal !== query) {
+        items = await buscar(principal)
+        porPalabraSuelta = items.length > 0
+      }
     }
+    // El modo de lo que se devolvería si la intención no encuentra nada.
+    const modoPrevio = match
 
     /**
      * 2026-11-19 · Búsqueda por intención.
@@ -344,7 +350,7 @@ const handler = serveJson(
      * término reescrito es dos saltos de distancia de lo que se pidió.
      */
     let terminosIntencion: string[] = []
-    if (hayQueReescribir(match, items.length)) {
+    if (hayQueReescribir(match, items.length, porPalabraSuelta)) {
       terminosIntencion = await reescribir(storeSlug, mensaje, query, trace)
       if (terminosIntencion.length > 0) {
         const listas: Candidato[][] = []
@@ -360,7 +366,7 @@ const handler = serveJson(
           terminosIntencion = []
           // `buscar` dejó el modo del último término; el resultado que se
           // devuelve es el de antes, así que su modo también.
-          match = items.length > 0 ? 'fuzzy' : 'empty'
+          match = items.length > 0 ? modoPrevio : 'empty'
         }
       }
     }
