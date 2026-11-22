@@ -794,6 +794,8 @@ export const CHECKOUT_FUNCTION = 'checkout'
  * precio, el stock y la foto los resuelve la vitrina contra el catálogo.
  */
 export const SHOPPING_ASSISTANT_FUNCTION = 'shopping-assistant'
+/** 2026-11-22 · Asistente de compra conversacional (con sesión). */
+export const SHOPPING_CHAT_FUNCTION = 'shopping-chat'
 /** Pedido desde foto, PDF o texto libre (2026-11-19). Exige sesión del comprador. */
 export const ORDER_INTAKE_FUNCTION = 'order-intake'
 /** Redacta el borrador de la ficha de un producto (addon `ai.catalog.copy`). */

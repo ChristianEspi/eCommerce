@@ -57,6 +57,7 @@ import {
   conPresentaciones,
   consultaDeLinea,
   leerResolucion,
+  ofrecerSustitutos,
   palabraPrincipal,
   propuestaPorCodigo,
   type CodigoResuelto,
@@ -312,6 +313,22 @@ const handler = serveJson(
         )
       })
     }
+    /**
+     * 2026-11-22 · Sustitutos: lo que la tienda no tiene, se busca por su
+     * componente principal (lo anota el modelo al leer, solo si lo conoce con
+     * certeza). Se ofrecen como alternativas, sin marcar; la persona decide.
+     */
+    const sinCoincidencia = propuestas.flatMap((p, k) => {
+      const componente = leidas[k]?.componente
+      return p.confianza === 'ninguna' && componente ? [{ k, componente }] : []
+    })
+    if (sinCoincidencia.length > 0) {
+      const busquedas = await Promise.all(sinCoincidencia.map(({ componente }) => buscar(componente)))
+      sinCoincidencia.forEach(({ k, componente }, j) => {
+        propuestas[k] = { ...propuestas[k]!, ...ofrecerSustitutos(propuestas[k]!, componente, busquedas[j]!) }
+      })
+    }
+
     /**
      * 2026-11-22 · Las presentaciones de cada producto con variantes, para
      * elegirlas en la misma fila. Antes la fila solo llevaba a la ficha y, al

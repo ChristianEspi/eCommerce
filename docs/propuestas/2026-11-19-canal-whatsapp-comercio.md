@@ -4,7 +4,7 @@ from: ecommerce
 fecha: 2026-11-19
 asunto: Propuesta de canal nuevo — venta y atención por WhatsApp (comercio conversacional)
 tipo: propuesta de canal (no cambia claims §2, jerarquía §3 ni Platform Context §5)
-estado: propuesta, sin código de canal hasta respuesta
+estado: enviada al buzón como 2026-11-22-ecommerce-002 (actualizada con shopping-chat); sin código de canal hasta respuesta
 ---
 
 # Venta y atención por WhatsApp

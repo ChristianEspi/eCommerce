@@ -36,6 +36,7 @@ export const SISTEMA_INTAKE = [
   '- unidad: la unidad que se pide si aparece (caja, unidad, blíster, frasco, paquete, docena…); si no aparece, cadena vacía.',
   '- sku: SOLO si en el documento aparece un código de producto junto a esa línea (código interno, SKU o código de barras). Si no, cadena vacía. Nunca lo deduzcas del nombre.',
   '- legible: false si no estás seguro de lo que dice (letra dudosa, imagen borrosa, texto cortado).',
+  '- componente: el componente o principio activo PRINCIPAL del producto SOLO si lo conoces con certeza por su nombre (por ejemplo «amoxicilina», «hipoclorito de sodio»); si no, cadena vacía. No sale del documento: sirve para buscar alternativas en la tienda si no lo tiene.',
   '',
   'Reglas:',
   '- Ignora precios, importes, totales, impuestos, fechas, firmas y sellos: no son líneas del pedido.',
@@ -62,8 +63,9 @@ export const ESQUEMA_INTAKE = {
           unidad: { type: 'string', maxLength: 30 },
           sku: { type: 'string', maxLength: 80 },
           legible: { type: 'boolean' },
+          componente: { type: 'string', maxLength: 80 },
         },
-        required: ['texto', 'cantidad', 'cantidad_supuesta', 'unidad', 'sku', 'legible'],
+        required: ['texto', 'cantidad', 'cantidad_supuesta', 'unidad', 'sku', 'legible', 'componente'],
         additionalProperties: false,
       },
     },
@@ -80,6 +82,8 @@ export interface LineaModelo {
   unidad: string
   sku: string
   legible: boolean
+  /** 2026-11-22 · Componente principal, si el modelo lo conoce con certeza. */
+  componente?: string
 }
 
 export interface RespuestaModeloIntake {
@@ -95,6 +99,8 @@ export interface LineaLeida {
   readonly unidad: string | null
   readonly sku: string | null
   readonly legible: boolean
+  /** 2026-11-22 · Para buscar alternativas si la tienda no tiene el producto. */
+  readonly componente?: string | null
 }
 
 export interface LecturaRevisada {
@@ -118,6 +124,17 @@ export function limpiarTexto(texto: string): string {
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 120)
+}
+
+/** Solo letras y espacios, de 3 a 60 caracteres y 4 palabras como mucho. */
+export function limpiarComponente(valor: unknown): string | null {
+  const c = String(valor ?? '')
+    .toLowerCase()
+    .replace(/[^\p{L}\s-]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (c.length < 3 || c.length > 60 || c.split(' ').length > 4) return null
+  return c
 }
 
 function limpiarSku(sku: string): string | null {
@@ -171,6 +188,7 @@ export function revisarIntake(
       unidad,
       sku,
       legible: Boolean(cruda.legible),
+      componente: limpiarComponente(cruda.componente),
     })
   }
 
@@ -236,6 +254,8 @@ export interface LineaPropuesta {
   readonly sku_propuesto: string | null
   readonly coincidencia: ProductoPropuesto | null
   readonly alternativas: readonly ProductoPropuesto[]
+  /** 2026-11-22 · Las alternativas son por componente: la tienda no tiene lo pedido. */
+  readonly sustituto?: { readonly componente: string } | null
 }
 
 /**
@@ -427,6 +447,19 @@ export function proponerLinea(
   return { ...base, confianza, sku_propuesto: primero.sku, coincidencia: aPropuesto(primero), alternativas }
 }
 
+/**
+ * 2026-11-22 · Sin coincidencia en la tienda, alternativas con el MISMO
+ * componente principal. La línea sigue «sin coincidencia» y sin marcar: las
+ * alternativas se ofrecen, no se eligen solas. Solo coincidencias de texto
+ * (`fts`): un parecido por letras de un componente no es un sustituto.
+ */
+export function ofrecerSustitutos(p: LineaPropuesta, componente: string, busqueda: ResultadoBusqueda): LineaPropuesta {
+  if (p.confianza !== 'ninguna' || busqueda.mode !== 'fts') return p
+  const items = busqueda.items.filter((hit) => hit.kind !== 'bundle' || hit.sku).slice(0, INTAKE_ALTERNATIVAS)
+  if (items.length === 0) return p
+  return { ...p, alternativas: items.map(aPropuesto), sustituto: { componente } }
+}
+
 /** Lo que se guarda en la traza: cuántas líneas y de qué confianza. Sin texto. */
 export function resumenIntake(lineas: readonly LineaPropuesta[]): string {
   const cuenta = new Map<Confianza, number>()
@@ -461,6 +494,7 @@ export const SISTEMA_COTIZACION = [
   '- precio_unitario: el precio por UNA unidad de esa línea, tal como figura. Si solo aparece el importe de la línea, divídelo entre la cantidad. Si no aparece ningún precio, 0 y precio_leido = false.',
   '- precio_leido: true solo si el precio está escrito y lo lees con claridad.',
   '- legible: false si no estás seguro de lo que dice la línea.',
+  '- componente: el componente o principio activo PRINCIPAL del producto SOLO si lo conoces con certeza por su nombre (por ejemplo «amoxicilina», «hipoclorito de sodio»); si no, cadena vacía. No sale del documento: sirve para buscar alternativas en la tienda si no lo tiene.',
   '',
   'De la cotización completa:',
   '- moneda: «PEN» si los precios están en soles (S/), «USD» si están en dólares (US$, $), «otra» si es otra moneda, cadena vacía si no se ve.',
@@ -494,8 +528,9 @@ export const ESQUEMA_COTIZACION = {
           precio_unitario: { type: 'number', minimum: 0, maximum: COTIZACION_MAX_PRECIO },
           precio_leido: { type: 'boolean' },
           legible: { type: 'boolean' },
+          componente: { type: 'string', maxLength: 80 },
         },
-        required: ['texto', 'cantidad', 'cantidad_supuesta', 'unidad', 'sku', 'precio_unitario', 'precio_leido', 'legible'],
+        required: ['texto', 'cantidad', 'cantidad_supuesta', 'unidad', 'sku', 'precio_unitario', 'precio_leido', 'legible', 'componente'],
         additionalProperties: false,
       },
     },
@@ -564,6 +599,7 @@ export function revisarCotizacion(
       unidad: limpiarTexto(String(cruda.unidad ?? '')).slice(0, 30) || null,
       sku,
       legible: Boolean(cruda.legible),
+      componente: limpiarComponente(cruda.componente),
       precio: limpiarPrecio(cruda.precio_unitario, cruda.precio_leido),
     })
   }

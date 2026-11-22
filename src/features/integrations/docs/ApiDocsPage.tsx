@@ -17,19 +17,22 @@ import {
 } from '@mui/material'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import {
-  API_ERROR_CODES,
-  API_ERROR_STATUS,
-  API_SCOPES,
-  API_VERSION,
-} from '../../../../supabase/functions/_shared/api/contract.ts'
-import { API_ROUTES, type ApiParam, type ApiRoute } from '../../../../supabase/functions/_shared/api/routes.ts'
 import { eventLabel } from '@/shared/i18n/codeLabels'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
-import { SUPABASE_URL } from '@/shared/lib/env'
 import { BrandLockup } from '@/shared/ui/BrandLockup'
 import { BRAND_FONT_STACKS, TS } from '@/theme/tokens'
+import {
+  API_BASE,
+  API_ERROR_CODES,
+  API_ERROR_STATUS,
+  API_ROUTES,
+  API_SCOPES,
+  API_VERSION,
+  OPENAPI_URL,
+  type ApiParam,
+  type ApiRoute,
+} from './apiReference'
 import { WEBHOOK_EVENT_TYPES } from '../webhookEvents'
 import {
   CATALOG_REQUEST_EXAMPLE,
@@ -55,8 +58,6 @@ import {
  */
 
 const MONO = BRAND_FONT_STACKS.mono
-const API_BASE = `${SUPABASE_URL.replace(/\/$/, '')}/functions/v1/api`
-const OPENAPI_URL = `${API_BASE}/${API_VERSION}/openapi.json`
 
 /** Para el índice y las anclas: la ficha del token no está en la tabla. */
 interface DocRoute {

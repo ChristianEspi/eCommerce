@@ -81,6 +81,9 @@ verify_jwt = true
 [functions.order-intake]
 verify_jwt = true
 
+[functions.shopping-chat]
+verify_jwt = true
+
 # Redaccion de fichas con IA (backoffice). Explicito desde la fase 12: antes
 # dependia del valor por defecto de la CLI, y un cambio de defecto no puede
 # dejar abierta una funcion que gasta cuota.

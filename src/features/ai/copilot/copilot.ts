@@ -55,6 +55,7 @@ export type CopilotEntityType = (typeof COPILOT_ENTITY_TYPES)[number]
 export const COPILOT_TOOL_IDS = [
   'dashboard_summary',
   'sales_summary',
+  'sales_trend',
   'search_orders',
   'order_detail',
   'orders_attention',
@@ -62,6 +63,7 @@ export const COPILOT_TOOL_IDS = [
   'product_detail',
   'inventory_summary',
   'customer_summary',
+  'lapsed_customers',
 ] as const
 export type CopilotTool = (typeof COPILOT_TOOL_IDS)[number]
 
@@ -69,6 +71,7 @@ export type CopilotTool = (typeof COPILOT_TOOL_IDS)[number]
 export const COPILOT_TOOL_FEATURE: Readonly<Record<CopilotTool, AiFeature>> = {
   dashboard_summary: 'insights',
   sales_summary: 'insights',
+  sales_trend: 'insights',
   search_orders: 'orders',
   order_detail: 'orders',
   orders_attention: 'orders',
@@ -76,12 +79,14 @@ export const COPILOT_TOOL_FEATURE: Readonly<Record<CopilotTool, AiFeature>> = {
   product_detail: 'catalog.copy',
   inventory_summary: 'inventory',
   customer_summary: 'customers',
+  lapsed_customers: 'sales',
 }
 
 /** Módulo que la herramienta exige contratado (espejo de `AI_FEATURES.module`). */
 export const COPILOT_TOOL_CAPABILITY: Readonly<Record<CopilotTool, CapabilityId>> = {
   dashboard_summary: 'analytics.basic',
   sales_summary: 'analytics.basic',
+  sales_trend: 'analytics.basic',
   search_orders: 'orders',
   order_detail: 'orders',
   orders_attention: 'orders',
@@ -89,6 +94,7 @@ export const COPILOT_TOOL_CAPABILITY: Readonly<Record<CopilotTool, CapabilityId>
   product_detail: 'catalog',
   inventory_summary: 'inventory.multiwarehouse',
   customer_summary: 'customers',
+  lapsed_customers: 'sales.force',
 }
 
 export const COPILOT_TOOL_STATUSES = [
@@ -223,19 +229,23 @@ const S = {
   product: { id: 'product_summary', tools: ['product_detail'], entity: 'product' },
   stock: { id: 'inventory_risk', tools: ['inventory_summary'] },
   customer: { id: 'customer_summary', tools: ['customer_summary'], entity: 'customer' },
+  // 2026-11-22 · «Pregúntale a tu tienda» y copiloto del vendedor.
+  trend: { id: 'sales_trend', tools: ['sales_trend'] },
+  lapsed: { id: 'lapsed_customers', tools: ['lapsed_customers'] },
+  winBack: { id: 'win_back_email', tools: ['lapsed_customers'] },
   help: { id: 'help', tools: [] },
 } as const satisfies Record<string, CopilotSuggestion>
 
 const SUGGESTIONS_BY_SCREEN: Partial<Record<CopilotScreen, readonly CopilotSuggestion[]>> = {
-  dashboard: [S.today, S.salesWeek, S.attention, S.stock],
-  analytics: [S.salesMonth, S.salesWeek, S.topProducts],
+  dashboard: [S.today, S.trend, S.attention, S.stock],
+  analytics: [S.trend, S.salesMonth, S.topProducts],
   orders: [S.order, S.attention, S.unpaid],
   products: [S.product, S.draft, S.topProducts],
   reviews: [S.product, S.draft],
   inventory: [S.stock, S.topProducts],
   planning: [S.stock, S.salesMonth],
-  customers: [S.customer, S.attention],
-  sales: [S.customer, S.salesMonth],
+  customers: [S.customer, S.lapsed, S.winBack],
+  sales: [S.customer, S.lapsed, S.winBack],
   quotes: [S.customer, S.attention],
   credit: [S.customer, S.today],
   fulfillment: [S.attention, S.unpaid],
@@ -301,6 +311,22 @@ const linkSchema = z.object({
 })
 export type CopilotLink = z.infer<typeof linkSchema>
 
+const pointSchema = z.object({
+  day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  revenue: z.string().nullable(),
+  orders: z.number().int().min(0),
+})
+export type CopilotPoint = z.infer<typeof pointSchema>
+
+const chartSchema = z.object({
+  kind: z.literal('sales_trend'),
+  days: z.number().int().min(1).max(366),
+  currency: z.string().length(3).nullable(),
+  current: z.array(pointSchema).max(120),
+  previous: z.array(pointSchema).max(120),
+})
+export type CopilotChart = z.infer<typeof chartSchema>
+
 export const copilotAnswerSchema = z.object({
   kind: z.enum(['answer', 'direct', 'no_data']),
   answerable: z.boolean(),
@@ -314,6 +340,10 @@ export const copilotAnswerSchema = z.object({
   discarded: z.number().int().min(0),
   metrics: z.record(z.string().max(60), metricSchema),
   entities: z.record(z.string().max(60), entitySchema),
+  /** 2026-11-22 · Series para dibujar (de la base). Ausentes contra un servidor anterior. */
+  charts: z.array(chartSchema).max(3).default([]),
+  /** 2026-11-22 · Borrador de correo con marcadores, o `null`. */
+  draft: z.object({ subject: z.string().max(400), body: z.string().max(4000) }).nullable().default(null),
 })
 export type CopilotAnswer = z.infer<typeof copilotAnswerSchema>
 

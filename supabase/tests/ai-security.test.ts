@@ -55,7 +55,7 @@ const FUNCIONES_IA = readdirSync(FUNCTIONS)
  * que la cuota la mide la tienda (slug resuelto en SQL) y no hay
  * `requireTenantContext`. Cada una tiene abajo su propio bloque de reglas.
  */
-const PUBLICAS = new Set(['shopping-assistant', 'order-intake'])
+const PUBLICAS = new Set(['shopping-assistant', 'order-intake', 'shopping-chat'])
 const BACKOFFICE = FUNCIONES_IA.filter((f) => !PUBLICAS.has(f))
 
 function configDe(funcion: string): string | null {
@@ -155,6 +155,44 @@ describe('order-intake: vitrina con sesión', () => {
     expect(src).toMatch(/\bproponerLinea\(/)
     // El modelo no ve candidatos: no hay lista de productos en la petición.
     expect(src).not.toMatch(/listarCandidatos/)
+  })
+})
+
+describe('shopping-chat: conversación con sesión (2026-11-22)', () => {
+  const src = leer(join(FUNCTIONS, 'shopping-chat', 'index.ts'))
+
+  it('verify_jwt declarado explícitamente a true en config.toml', () => {
+    expect(configDe('shopping-chat')).toMatch(/verify_jwt\s*=\s*true/)
+  })
+
+  it('exige sesión y freno por comprador ANTES de gastar cuota', () => {
+    const guarda = src.indexOf("rpc('ai_chat_check'")
+    expect(guarda).toBeGreaterThan(0)
+    expect(src.indexOf('ejecutarIA<')).toBeGreaterThan(guarda)
+    expect(src).toMatch(/\buserClient\(request/)
+  })
+
+  it('mide por tienda, sin tenant del cuerpo, y redacta con los candados de la vitrina', () => {
+    expect(src).toMatch(/\bmedidorDeTienda\(/)
+    expect(src).not.toMatch(/\bmedidorDeUsuario\(/)
+    expect(src).toMatch(/assertNoTenantInPayload\(body\)/)
+    expect(src).toMatch(/revisarRespuesta\(/)
+    expect(src).toMatch(/respuestaVitrinaSinSalud\(/)
+  })
+
+  it('ninguna herramienta escribe: solo lecturas y el verificador de SKU', () => {
+    const rpcs = [...src.matchAll(/\.rpc\('([a-z_]+)'/g)].map((m) => m[1]).sort()
+    expect([...new Set(rpcs)]).toEqual([
+      'ai_chat_check',
+      'catalog_search_for_slug',
+      'my_account_statement',
+      'my_business_order_detail',
+      'my_business_orders',
+      'my_consumer_order_detail',
+      'my_consumer_orders',
+      'resolve_order_lines_for_slug',
+    ])
+    expect(src).not.toMatch(/\.(insert|update|upsert|delete)\(/)
   })
 })
 

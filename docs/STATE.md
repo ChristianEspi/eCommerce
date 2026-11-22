@@ -3,13 +3,32 @@
 GUIDELINES_STATUS: VERIFIED (**por lectura directa** en la 2ª pasada de P00-SaaS: contrato v1.15,
 `PROTOCOLO.md`, `BANDEJA.md` y `EBIM-CREW-ROSTER.md`). La unidad montada es `G:`, no `H:`.
 Fuentes: ver `docs/EBIM_GUIDELINES_TRACE.md`.
-Última actualización: 2026-11-20 (correo por MailHub y textos por tienda). Antes: 2026-11-19 (IA diferenciadora, 8 frentes). Antes: 2026-09-26 (Resumen v2 · vitrina B2B). Antes: 2026-08-30 (**P17-SaaS terminada — quality gate final y línea base releaseable**;
+Última actualización: 2026-11-22 (IA visible: chat, copiloto y sustitutos). Antes: 2026-11-20 (correo por MailHub y textos por tienda). Antes: 2026-11-19 (IA diferenciadora, 8 frentes). Antes: 2026-09-26 (Resumen v2 · vitrina B2B). Antes: 2026-08-30 (**P17-SaaS terminada — quality gate final y línea base releaseable**;
 el recorrido SaaS P00–P17 queda cerrado)
 
 > **Dos numeraciones de fase.** Lo que sigue como «P00…P12» es el trabajo histórico de este repo. A
 > partir del 2026-08-27 arranca un segundo recorrido, **P00–P17 de productización SaaS**
 > (`claude-saas-opus/config/phases.json`), que se identifica siempre como «P0x-SaaS». No son la misma
 > serie: el P12 histórico es el framework de integraciones; el P12-SaaS es fulfillment y devoluciones.
+
+## IA visible: asistente conversacional, copiloto y sustitutos (2026-11-22, a pedido del operador)
+
+Commits locales en `dev`: `dd4aea0` (chat) · `ef700ac` (copiloto) · `6b8b820` (sustitutos).
+**Aplicado en QAS el 2026-11-22** (a pedido del operador): migraciones `20261122100000_ai_chat` y
+`20261122110000_ai_copilot_trend_lapsed` (API de gestión, sin registrar como las previas; `anon` sin EXECUTE
+verificado) y funciones `shopping-chat` (nueva, `verify_jwt = true`), `copilot` y `order-intake`. Humo con
+`prueba.b2b@miquimica.demo`: crédito, repetir pedido (EC-20261119-00056) y sustitutos responden 200 con frase.
+
+| # | Qué | Dónde |
+|---|---|---|
+| 1 | **Asistente de compra conversacional** (vitrina, con sesión): busca, mis pedidos, estado de un pedido, crédito y vencimientos, repetir un pedido con cambios, armar uno dictado, alternativas por componente. El modelo elige una herramienta de lista cerrada; las herramientas leen con la sesión del comprador; ninguna escribe; el carrito propuesto se revisa (presentación en la fila) y «Añadir» lo valida con `resolve_order_lines_for_slug`. Freno `ai_chat_check` 60/h por comprador. Sin sesión, el buscador de siempre. | `shopping-chat`, `_shared/commerceChat.ts`, `storefront/chat/` |
+| 2 | **Copiloto del vendedor**: `lapsed_customers` (`ai_copilot_lapsed_customers`, DEFINER con guard: rol de ventas + `sales.force` + sociedad del JWT; el vendedor solo su cartera) y **borradores de correo** con marcadores y los candados de la respuesta; «Copiar», no enviar. | `aiCopilot.ts`, `CopilotDrawer.tsx` |
+| 3 | **«Pregúntale a tu tienda»**: `sales_trend` (`ai_copilot_sales_trend`, venta diaria de la ventana y la anterior); el sistema suma y compara, el panel DIBUJA la serie (líneas, un eje, anterior discontinuo, leyenda, cursor, tabla accesible). | `CopilotTrendChart.tsx` |
+| 4 | **WhatsApp**: propuesta enviada al buzón (`2026-11-22-ecommerce-002`). Sin endpoint hasta respuesta de GMAO. | `docs/propuestas/2026-11-19-canal-whatsapp-comercio.md` |
+| 5 | **Sustitutos por componente**: el modelo anota el componente principal al leer pedido/cotización; sin coincidencia, `order-intake` ofrece hasta 3 alternativas con ese componente, sin marcar. | `aiIntake.ts` (`ofrecerSustitutos`) |
+
+Pendiente: respuesta de GMAO a
+`ecommerce-002`; la propuesta MCP sigue sin enviar.
 
 ## Facturación electrónica Perú con Nubefact, fases 1–5 (2026-11-20)
 

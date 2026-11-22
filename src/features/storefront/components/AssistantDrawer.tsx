@@ -19,6 +19,7 @@ import { markAiAttribution } from '../aiAttribution'
 import { useAssistant } from '../assistant'
 import { useSignedThumbnails } from '../hooks'
 import { ProductCard } from './ProductCard'
+import { ChatPanel } from '../chat/ChatPanel'
 
 /** Lo que se puede preguntar sin saber qué preguntar. */
 const EJEMPLOS = [
@@ -128,6 +129,12 @@ export function AssistantDrawer({
           </IconButton>
         </Stack>
 
+        {status === 'authenticated' ? (
+          // 2026-11-22 · Con sesión, el asistente CONVERSA: sus pedidos, su
+          // crédito, repetir o armar un pedido. Sin sesión, el buscador de siempre.
+          <ChatPanel storeSlug={storeSlug} storeId={storeId} />
+        ) : (
+        <>
         <Box sx={{ flex: 1, overflowY: 'auto', px: 2, py: 2 }}>
           {asistente.isIdle && (
             <Stack sx={{ gap: 1.5 }}>
@@ -265,6 +272,8 @@ export function AssistantDrawer({
             </IconButton>
           </Stack>
         </Box>
+        </>
+        )}
       </Stack>
     </Drawer>
   )

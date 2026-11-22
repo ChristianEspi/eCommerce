@@ -18,6 +18,8 @@ import {
   conPresentaciones,
   consultaDeLinea,
   leerResolucion,
+  limpiarComponente,
+  ofrecerSustitutos,
   palabraPrincipal,
   propuestaPorCodigo,
   limpiarTexto,
@@ -103,6 +105,7 @@ function respuesta(lineas: Partial<RespuestaModeloIntake['lineas'][number]>[], e
       unidad: '',
       sku: '',
       legible: true,
+      componente: '',
       ...l,
     })),
   }
@@ -230,6 +233,26 @@ describe('el producto lo decide el catálogo, sin modelo', () => {
     expect(p.confianza).toBe('dudosa')
   })
 
+  it('sustitutos: sin coincidencia, alternativas por componente, sin marcar (2026-11-22)', () => {
+    expect(limpiarComponente('Amoxicilina + ácido clavulánico')).toBe('amoxicilina ácido clavulánico')
+    expect(limpiarComponente('x')).toBeNull()
+    expect(limpiarComponente('uno dos tres cuatro cinco')).toBeNull()
+    const ninguna = proponerLinea(0, leida({ texto: 'Amoxidal Duo 875' }), { mode: 'empty', items: [] })
+    const p = ofrecerSustitutos(ninguna, 'amoxicilina', { mode: 'fts', items: [hit({ sku: 'AMX-500', name: 'Amoxicilina 500 mg' })] })
+    expect(p).toMatchObject({ confianza: 'ninguna', sku_propuesto: null, sustituto: { componente: 'amoxicilina' } })
+    expect(p.alternativas.map((a) => a.sku)).toEqual(['AMX-500'])
+    // Un parecido por letras no es un sustituto; y lo que sí coincidió no se toca.
+    expect(ofrecerSustitutos(ninguna, 'amoxicilina', { mode: 'fuzzy', items: [hit({})] })).toBe(ninguna)
+    const probable = proponerLinea(0, leida(), { mode: 'fts', items: [hit({})] })
+    expect(ofrecerSustitutos(probable, 'x', { mode: 'fts', items: [hit({ sku: 'OTRO' })] })).toBe(probable)
+  })
+
+  it('order-intake busca por componente solo lo que no tiene coincidencia', () => {
+    const src = readFileSync(join(process.cwd(), 'supabase', 'functions', 'order-intake', 'index.ts'), 'utf8')
+    expect(src).toMatch(/p\.confianza === 'ninguna' && componente/)
+    expect(src).toMatch(/ofrecerSustitutos\(/)
+  })
+
   it('las presentaciones se agrupan por producto y sin SKU no se ofrecen', () => {
     const p1 = '11111111-1111-4111-8111-111111111111'
     const porProducto = agruparPresentaciones([
@@ -342,7 +365,7 @@ describe('ai_intake_check: sesión y freno por comprador', () => {
 describe('lectura de una cotización de la competencia', () => {
   const linea = (extra: Partial<RespuestaModeloCotizacion['lineas'][number]> = {}) => ({
     texto: 'Lejía 5L', cantidad: 4, cantidad_supuesta: false, unidad: 'galón', sku: '',
-    precio_unitario: 12.5, precio_leido: true, legible: true, ...extra,
+    precio_unitario: 12.5, precio_leido: true, legible: true, componente: '', ...extra,
   })
 
   it('el esquema valida una respuesta completa y el sistema prohíbe comparar y copiar datos de empresas', () => {

@@ -58,6 +58,7 @@ import {
 } from './intake'
 import type { IntakeAcceptedLine } from './IntakePanel'
 import { PresentationPicker } from './PresentationPicker'
+import { SubstituteNote } from './SubstituteNote'
 
 interface Choice {
   readonly checked: boolean
@@ -387,6 +388,7 @@ export function CompetitorQuotePanel({
                           </Stack>
                         </TableCell>
                         <TableCell sx={{ minWidth: 200 }}>
+                          {line.sustituto && <SubstituteNote componente={line.sustituto.componente} />}
                           {offersPresentation(line) ? (
                             <PresentationPicker
                               storeSlug={storeSlug}
@@ -399,9 +401,16 @@ export function CompetitorQuotePanel({
                               size="small"
                               label={t('store.intake.review.product')}
                               value={choice.sku ?? ''}
-                              onChange={(event) => update(index, { sku: event.target.value || null })}
+                              onChange={(event) =>
+                                update(index, {
+                                  sku: event.target.value || null,
+                                  // Una alternativa elegida a propósito entra marcada.
+                                  ...(line.sustituto ? { checked: Boolean(event.target.value) } : {}),
+                                })
+                              }
                               fullWidth
                             >
+                              {line.sustituto && <MenuItem value="">{t('store.intake.review.pickSubstitute')}</MenuItem>}
                               {options.map((p) => (
                                 <MenuItem key={p.product_id} value={p.sku ?? ''}>
                                   {p.name}

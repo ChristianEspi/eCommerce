@@ -461,6 +461,9 @@ describe('la puerta que PostgREST ve', () => {
       // 2026-11-19 · Anotar lo que llegó al carrito con ayuda de la IA. Exige
       // sesión; tienda por slug activo; solo productos publicados en ella.
       'ai_attribution_mark',
+      // 2026-11-22 · Freno por comprador del asistente conversacional (60/h).
+      // Exige sesión; no consume cuota (eso lo hace `ai_consume_for_store`).
+      'ai_chat_check',
       // Fase 08: cobranza (cartera o cliente). INVOKER, roles de `credit` +
       // `credit.management`; solo lectura.
       'ai_collections_facts',
@@ -469,9 +472,14 @@ describe('la puerta que PostgREST ve', () => {
       // Fase 11: herramientas del Copilot. `ai_copilot_tools` describe qué
       // herramientas tiene quien llama (rol + módulo); productos, ficha y
       // ventas son datasets INVOKER + STABLE con su propio guard.
+      // 2026-11-22 · Clientes que dejaron de comprar: DEFINER con guard (rol de
+      // ventas + sales.force + sociedad del JWT; el vendedor, su cartera).
+      'ai_copilot_lapsed_customers',
       'ai_copilot_product',
       'ai_copilot_products',
       'ai_copilot_sales_facts',
+      // 2026-11-22 · Venta diaria para dibujar. INVOKER, insights + analytics.basic.
+      'ai_copilot_sales_trend',
       'ai_copilot_tools',
       // Fase 06: el resumen 360 del cliente y el dataset de la visita.
       // INVOKER, roles de su funcionalidad + cartera del vendedor + crédito
