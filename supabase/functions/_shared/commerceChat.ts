@@ -49,6 +49,7 @@ export const HERRAMIENTAS_CHAT = [
   'repetir_pedido',
   'armar_pedido',
   'sustitutos',
+  'reponer',
   'responder',
 ] as const
 export type HerramientaChat = (typeof HERRAMIENTAS_CHAT)[number]
@@ -70,6 +71,7 @@ export type PlanChat =
   | { readonly herramienta: 'repetir_pedido'; readonly numero: string | null; readonly cambios: readonly ItemPedido[] }
   | { readonly herramienta: 'armar_pedido'; readonly items: readonly ItemPedido[] }
   | { readonly herramienta: 'sustitutos'; readonly producto: string; readonly principioActivo: string }
+  | { readonly herramienta: 'reponer' }
   | { readonly herramienta: 'responder' }
 
 export interface PlanChatCrudo {
@@ -132,6 +134,8 @@ export function validarPlanChat(crudo: PlanChatCrudo): PlanChat {
         ? { herramienta: 'sustitutos', producto, principioActivo }
         : { herramienta: 'responder' }
     }
+    case 'reponer':
+      return { herramienta: 'reponer' }
     default:
       return { herramienta: 'responder' }
   }
@@ -146,6 +150,7 @@ export const SISTEMA_PLAN_CHAT = [
   '- repetir_pedido: quiere volver a pedir un pedido anterior. numero_pedido si lo dio (vacío = el más reciente). items = SOLO los cambios: {producto, cantidad} con la cantidad final; cantidad 0 = quitarlo. «el doble de X» sin saber cuánto era: deja items vacío para X y dilo al redactar.',
   '- armar_pedido: dicta productos para pedir. items = {producto, cantidad} (cantidad 1 si no la dice).',
   '- sustitutos: un producto no está, no tiene stock o pide una alternativa. consulta = el producto que busca; principio_activo = su principio activo SOLO si lo conoces con certeza; si es una combinación, TODOS sus componentes sin conectores («amoxicilina ácido clavulánico»), porque una alternativa con solo uno no es equivalente (si no lo sabes, vacío).',
+  '- reponer: pregunta qué le toca reponer, qué se le está acabando o pide «lo de siempre» / su pedido habitual. Sin campos.',
   '- responder: saludo, agradecimiento, fuera de tema o falta información.',
   'Nunca inventes números de pedido. Rellena solo los campos de la herramienta elegida; los demás vacíos.',
 ].join('\n')
@@ -204,7 +209,36 @@ export interface CreditoComprador {
   readonly proximo: { readonly order_number: string; readonly due_at: string | null; readonly total: string; readonly days_overdue: number } | null
 }
 
+/**
+ * Un producto que el comprador compra con regularidad y le toca reponer. Sale de
+ * `my_replenishment` (aritmética sobre SU historial), nunca del modelo.
+ */
+export interface ItemReposicion {
+  readonly sku: string
+  readonly nombre: string
+  readonly cantidad: number
+  readonly compras: number
+  readonly cada_dias: number
+  readonly dias_restantes: number
+}
+
+/** De la respuesta de `my_replenishment` a items tipados; lo que no encaja se descarta. */
+export function leerReposicion(data: unknown): ItemReposicion[] {
+  const filas = Array.isArray(data) ? (data as Array<Record<string, unknown>>) : []
+  return filas.flatMap((f): ItemReposicion[] => {
+    const cantidad = Number(f.cantidad)
+    const compras = Number(f.compras)
+    const cadaDias = Number(f.cada_dias)
+    const diasRestantes = Number(f.dias_restantes)
+    if (typeof f.sku !== 'string' || !f.sku || typeof f.nombre !== 'string' || !f.nombre) return []
+    if (![cantidad, compras, cadaDias, diasRestantes].every(Number.isInteger)) return []
+    if (cantidad < 1 || cantidad > MAX_CANTIDAD || cadaDias < 1) return []
+    return [{ sku: f.sku, nombre: f.nombre.slice(0, 200), cantidad, compras, cada_dias: cadaDias, dias_restantes: diasRestantes }]
+  }).slice(0, MAX_ITEMS_CHAT)
+}
+
 export interface PuertosChat {
+  reposicion(): Promise<readonly ItemReposicion[]>
   buscar(consulta: string, soloConStock: boolean): Promise<ResultadoBusqueda>
   pedidos(): Promise<readonly PedidoResumen[]>
   detallePedido(orderId: string): Promise<readonly LineaDePedido[]>
@@ -223,6 +257,7 @@ export type DatosChat =
   | { readonly tipo: 'credito'; readonly credito: CreditoComprador | null }
   | { readonly tipo: 'carrito'; readonly origen: string | null; readonly lineas: readonly LineaCarrito[]; readonly avisos: readonly string[] }
   | { readonly tipo: 'sustitutos'; readonly producto: string; readonly principio_activo: string | null; readonly product_ids: readonly string[] }
+  | { readonly tipo: 'reposicion'; readonly items: readonly ItemReposicion[]; readonly lineas: readonly LineaCarrito[] }
   | { readonly tipo: 'ninguno' }
 
 export interface ResultadoChat {
@@ -441,6 +476,22 @@ export async function ejecutarChat(plan: PlanChat, puertos: PuertosChat): Promis
         productosPermitidos: ids,
       }
     }
+    case 'reponer': {
+      const items = await puertos.reposicion()
+      // El SKU es el de su último pedido: el carrito lo resuelve por código y,
+      // si ya no se vende, cae a buscar por nombre como cualquier otra línea.
+      const lineas = items.length > 0 ? await proponerCarrito(items.map((i) => ({ texto: i.nombre, cantidad: i.cantidad, sku: i.sku })), puertos) : []
+      return {
+        datos: { tipo: 'reposicion', items, lineas },
+        paraModelo: items.length > 0
+          ? JSON.stringify({
+              reponer: items.map((i) => ({ producto: i.nombre, cada_dias: i.cada_dias, dias_restantes: i.dias_restantes })),
+              lineas: resumenCarrito(lineas),
+            })
+          : '(no hay productos que compre con regularidad y le toquen ahora; puede repetir un pedido o dictar lo que necesita)',
+        productosPermitidos: [],
+      }
+    }
     case 'responder':
       return { datos: { tipo: 'ninguno' }, paraModelo: '(sin datos)', productosPermitidos: [] }
   }
@@ -453,6 +504,7 @@ export async function ejecutarChat(plan: PlanChat, puertos: PuertosChat): Promis
 export const SISTEMA_RESPUESTA_CHAT = [
   'Eres el asistente de compra de una tienda online y conversas con un cliente con sesión. Responde en su idioma, cálido y directo, en tres frases como máximo, con lo que dicen los datos.',
   'La pantalla muestra aparte los productos, pedidos, el crédito y el carrito propuesto con sus precios y cifras: NO escribas precios, importes, saldos, descuentos ni cantidades de stock.',
+  'Si es una reposición, di que es según cada cuánto suele comprar (dias_restantes negativo = ya le tocaba) y que revise las cantidades.',
   'Si propones un carrito, dilo y pide que lo revise y lo confirme con el botón; menciona las líneas sin coincidencia o donde debe elegir presentación.',
   'Si ofreces alternativas por componente principal, di que comparten ese componente y que confirme que le sirvan (con un profesional si es un medicamento). Nunca digas para qué sirve un medicamento, dosis, síntomas ni recomiendes uno por una dolencia.',
   'Si los datos no responden la pregunta, dilo y sugiere cómo seguir. product_ids: SOLO identificadores product_id que aparezcan en los datos; si los datos no traen product_id (pedidos, crédito, carrito), lista vacía. Nunca nombres.',

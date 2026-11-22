@@ -317,3 +317,46 @@ export async function acceptSuggestion(
 export async function discardSuggestion(suggestionId: string): Promise<void> {
   await rpc(DISCARD_SUGGESTION_RPC, { p_suggestion_id: suggestionId })
 }
+
+// ---------------------------------------------------------------------------
+// Reposición predictiva (2026-11-22)
+// ---------------------------------------------------------------------------
+
+export const MY_REPLENISHMENT_RPC = 'my_replenishment'
+
+/**
+ * Un producto que el comprador compra con regularidad. Lo calcula la base sobre
+ * SU historial (y el de su cuenta de empresa): cada cuántos días, cuánto suele
+ * pedir y cuánto falta. Sin importes: el precio de hoy lo pone el carrito.
+ */
+export interface ReplenishmentItem {
+  readonly sku: string
+  readonly nombre: string
+  readonly cantidad: number
+  readonly compras: number
+  readonly cada_dias: number
+  readonly ultima_compra: string
+  readonly le_toca: string
+  /** Negativo = ya le tocaba. */
+  readonly dias_restantes: number
+}
+
+function esItemDeReposicion(x: unknown): x is ReplenishmentItem {
+  if (!x || typeof x !== 'object') return false
+  const r = x as Record<string, unknown>
+  return (
+    typeof r.sku === 'string' &&
+    r.sku.length > 0 &&
+    typeof r.nombre === 'string' &&
+    typeof r.ultima_compra === 'string' &&
+    typeof r.le_toca === 'string' &&
+    [r.cantidad, r.compras, r.cada_dias, r.dias_restantes].every((n) => Number.isInteger(n)) &&
+    (r.cantidad as number) >= 1
+  )
+}
+
+/** Lo que le toca reponer en los próximos `horizonDays` días (y lo que ya se le pasó). */
+export async function fetchMyReplenishment(storeSlug: string, horizonDays = 7): Promise<ReplenishmentItem[]> {
+  const data = await rpc<unknown>(MY_REPLENISHMENT_RPC, { p_store_slug: storeSlug, p_horizon_days: horizonDays })
+  return (Array.isArray(data) ? data : []).filter(esItemDeReposicion)
+}

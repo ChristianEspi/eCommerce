@@ -25,15 +25,15 @@ import { fetchPublicProductsByIds } from '../api'
 import { CartContext } from '../cart/cart-context'
 import { ProductCard } from '../components/ProductCard'
 import { useSignedThumbnails } from '../hooks'
-import { resolveOrderLines } from '../quick-order/api'
-import { importIntoCart, type CartImportResult } from '../quick-order/importToCart'
+import { addSkuLinesToCart } from '../quick-order/addBySku'
+import type { CartImportResult } from '../quick-order/importToCart'
 import { offersPresentation, preselected, resolveChoice, type IntakeLine } from '../quick-order/intake'
-import { buildReport, type AcceptedLine } from '../quick-order/lines'
 import { PresentationPicker } from '../quick-order/PresentationPicker'
+import { restockNote } from '../restockText'
 import { CHAT_MAX_TEXT, ChatError, sendChat, type ChatCredit, type ChatData, type ChatOrder, type ChatReply, type ChatTurn } from './chat'
 
 /** Lo que se puede pedir sin saber qué pedir. */
-const EJEMPLOS = ['store.chat.example.1', 'store.chat.example.2', 'store.chat.example.3', 'store.chat.example.4'] as const
+const EJEMPLOS = ['store.chat.example.1', 'store.chat.example.5', 'store.chat.example.2', 'store.chat.example.3', 'store.chat.example.4'] as const
 
 interface Mensaje extends ChatTurn {
   readonly id: number
@@ -221,6 +221,19 @@ function ChatDataView({ datos, storeSlug, storeId }: { datos: ChatData; storeSlu
       return datos.lineas.length > 0 ? (
         <ChatCartProposal lines={datos.lineas} origin={datos.origen} storeSlug={storeSlug} storeId={storeId} />
       ) : null
+    case 'reposicion':
+      return datos.lineas.length > 0 ? (
+        <ChatCartProposal
+          lines={datos.lineas}
+          origin={null}
+          title={t('store.chat.restock.title')}
+          notes={datos.lineas.map((_, i) => (datos.items[i] ? restockNote(t, datos.items[i]) : null))}
+          storeSlug={storeSlug}
+          storeId={storeId}
+        />
+      ) : (
+        <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>{t('store.restock.empty')}</Typography>
+      )
     case 'ninguno':
       return null
   }
@@ -322,11 +335,17 @@ interface Eleccion {
 function ChatCartProposal({
   lines,
   origin,
+  title,
+  notes,
   storeSlug,
   storeId,
 }: {
   lines: readonly IntakeLine[]
   origin: string | null
+  /** Título propio (reposición); si no, el de «repetir» o el genérico. */
+  title?: string
+  /** Una nota por línea (el motivo de la reposición). */
+  notes?: ReadonlyArray<string | null>
   storeSlug: string
   storeId: string | null
 }) {
@@ -351,12 +370,9 @@ function ChatCartProposal({
     mutationFn: async (): Promise<{ result: CartImportResult; rejected: number }> => {
       if (!cart || !storeId) throw new Error('CARRITO_NO_DISPONIBLE')
       const valid = seleccion.map(({ row, sku, quantity }) => ({ row, sku, quantity }))
-      const resolved = await resolveOrderLines({ storeSlug, lines: valid })
-      const report = buildReport(valid, [], resolved)
-      const accepted = report.filter((l): l is AcceptedLine => l.status === 'ok')
-      const result = await importIntoCart(cart, { storeId, storeSlug }, accepted)
+      const { result, rejected, accepted } = await addSkuLinesToCart(cart, { storeId, storeSlug }, valid)
       markAiAttribution(storeSlug, accepted.map((l) => l.product_id), 'assistant')
-      return { result, rejected: report.length - accepted.length }
+      return { result, rejected }
     },
   })
 
@@ -368,7 +384,7 @@ function ChatCartProposal({
   return (
     <Box sx={CARD_SX} data-chat-cart>
       <Typography sx={{ fontWeight: 800, fontSize: TS.body, mb: 1 }}>
-        {origin ? t('store.chat.cart.repeatTitle').replace('{number}', origin) : t('store.chat.cart.title')}
+        {title ?? (origin ? t('store.chat.cart.repeatTitle').replace('{number}', origin) : t('store.chat.cart.title'))}
       </Typography>
       <Stack sx={{ gap: 1.25 }}>
         {lines.map((line, index) => {
@@ -389,6 +405,11 @@ function ChatCartProposal({
                 <Typography sx={{ fontSize: TS.body, fontWeight: 600, overflowWrap: 'anywhere' }}>
                   {line.coincidencia?.name ?? line.texto}
                 </Typography>
+                {notes?.[index] && (
+                  <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }} data-chat-cart-note>
+                    {notes[index]}
+                  </Typography>
+                )}
                 {offersPresentation(line) ? (
                   <PresentationPicker
                     storeSlug={storeSlug}

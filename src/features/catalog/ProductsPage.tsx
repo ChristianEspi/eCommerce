@@ -50,6 +50,7 @@ import { categoryDescendants, categoryTree } from './types'
 import type { ProductKind, ProductMaster, ProductStatus } from './types'
 import { CategoryPicker } from './CategoryPicker'
 import { BulkImagesAction } from './bulkImages/BulkImagesAction'
+import { BulkCopyAction } from './BulkCopyAction'
 import { CatalogImportAction } from './import/CatalogImportAction'
 import { useCategories } from './useCategories'
 import { useBrands } from './pim/hooks'
@@ -342,6 +343,13 @@ export function ProductsPage() {
             {canWrite && <CatalogImportAction kind="products" storeId={activeStore?.id ?? null} />}
             {canWrite && (
               <BulkImagesAction
+                scope={{ organizationId: tenant.organization_id, companyId: activeCompanyId, storeId }}
+              />
+            )}
+            {canWrite && (
+              <BulkCopyAction
+                companyId={activeCompanyId}
+                storeId={storeId}
                 scope={{ organizationId: tenant.organization_id, companyId: activeCompanyId, storeId }}
               />
             )}

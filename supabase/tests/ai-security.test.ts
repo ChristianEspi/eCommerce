@@ -190,6 +190,8 @@ describe('shopping-chat: conversación con sesión (2026-11-22)', () => {
       'my_business_orders',
       'my_consumer_order_detail',
       'my_consumer_orders',
+      // 2026-11-22 · reposición: lectura del historial del comprador, sin escritura.
+      'my_replenishment',
       'resolve_order_lines_for_slug',
     ])
     expect(src).not.toMatch(/\.(insert|update|upsert|delete)\(/)
