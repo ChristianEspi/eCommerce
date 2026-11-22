@@ -27,6 +27,7 @@ import type { EsquemaIA } from './aiCore.ts'
 import {
   conPresentaciones,
   palabraPrincipal,
+  preferirPorNombre,
   proponerLinea,
   propuestaPorCodigo,
   type CodigoResuelto,
@@ -144,7 +145,7 @@ export const SISTEMA_PLAN_CHAT = [
   '- mi_credito: pregunta por su crédito, saldo, deuda, facturas o vencimientos.',
   '- repetir_pedido: quiere volver a pedir un pedido anterior. numero_pedido si lo dio (vacío = el más reciente). items = SOLO los cambios: {producto, cantidad} con la cantidad final; cantidad 0 = quitarlo. «el doble de X» sin saber cuánto era: deja items vacío para X y dilo al redactar.',
   '- armar_pedido: dicta productos para pedir. items = {producto, cantidad} (cantidad 1 si no la dice).',
-  '- sustitutos: un producto no está, no tiene stock o pide una alternativa. consulta = el producto que busca; principio_activo = su principio activo o componente principal SOLO si lo conoces con certeza (si no, vacío).',
+  '- sustitutos: un producto no está, no tiene stock o pide una alternativa. consulta = el producto que busca; principio_activo = su principio activo SOLO si lo conoces con certeza; si es una combinación, TODOS sus componentes sin conectores («amoxicilina ácido clavulánico»), porque una alternativa con solo uno no es equivalente (si no lo sabes, vacío).',
   '- responder: saludo, agradecimiento, fuera de tema o falta información.',
   'Nunca inventes números de pedido. Rellena solo los campos de la herramienta elegida; los demás vacíos.',
 ].join('\n')
@@ -426,9 +427,9 @@ export async function ejecutarChat(plan: PlanChat, puertos: PuertosChat): Promis
       const consulta = plan.principioActivo || plan.producto
       const r = await puertos.buscar(consulta, true)
       const original = normalizar(plan.producto)
-      const items = (r.mode === 'fts' ? r.items : [])
-        .filter((i) => !original || !normalizar(i.name).startsWith(original))
-        .slice(0, MAX_PRODUCTOS)
+      const encontrados = (r.mode === 'fts' ? r.items : []).filter((i) => !original || !normalizar(i.name).startsWith(original))
+      // Con principio activo: primero los que lo llevan en el NOMBRE (no Zaldiar por «paracetamol»).
+      const items = (plan.principioActivo ? preferirPorNombre(encontrados, plan.principioActivo) : encontrados).slice(0, MAX_PRODUCTOS)
       const ids = items.map((i) => i.product_id)
       return {
         datos: { tipo: 'sustitutos', producto: plan.producto, principio_activo: plan.principioActivo || null, product_ids: ids },

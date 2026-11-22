@@ -14,6 +14,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   ESQUEMA_INTAKE,
+  SISTEMA_INTAKE,
   agruparPresentaciones,
   conPresentaciones,
   consultaDeLinea,
@@ -21,6 +22,7 @@ import {
   limpiarComponente,
   ofrecerSustitutos,
   palabraPrincipal,
+  preferirPorNombre,
   propuestaPorCodigo,
   limpiarTexto,
   proponerLinea,
@@ -236,7 +238,10 @@ describe('el producto lo decide el catálogo, sin modelo', () => {
   it('sustitutos: sin coincidencia, alternativas por componente, sin marcar (2026-11-22)', () => {
     expect(limpiarComponente('Amoxicilina + ácido clavulánico')).toBe('amoxicilina ácido clavulánico')
     expect(limpiarComponente('x')).toBeNull()
-    expect(limpiarComponente('uno dos tres cuatro cinco')).toBeNull()
+    expect(limpiarComponente('uno dos tres cuatro cinco seis siete')).toBeNull()
+    // Una combinación necesita todos sus componentes: Amoxidal Duo no es amoxicilina sola.
+    expect(SISTEMA_INTAKE).toMatch(/COMBINACIÓN, TODOS sus componentes/)
+    expect(SISTEMA_COTIZACION).toMatch(/COMBINACIÓN, TODOS sus componentes/)
     const ninguna = proponerLinea(0, leida({ texto: 'Amoxidal Duo 875' }), { mode: 'empty', items: [] })
     const p = ofrecerSustitutos(ninguna, 'amoxicilina', { mode: 'fts', items: [hit({ sku: 'AMX-500', name: 'Amoxicilina 500 mg' })] })
     expect(p).toMatchObject({ confianza: 'ninguna', sku_propuesto: null, sustituto: { componente: 'amoxicilina' } })
@@ -245,6 +250,18 @@ describe('el producto lo decide el catálogo, sin modelo', () => {
     expect(ofrecerSustitutos(ninguna, 'amoxicilina', { mode: 'fuzzy', items: [hit({})] })).toBe(ninguna)
     const probable = proponerLinea(0, leida(), { mode: 'fts', items: [hit({})] })
     expect(ofrecerSustitutos(probable, 'x', { mode: 'fts', items: [hit({ sku: 'OTRO' })] })).toBe(probable)
+  })
+
+  it('sustitutos: con el componente en el NOMBRE, solo esos; si no hay, la descripción', () => {
+    const zaldiar = hit({ sku: 'ZAL', name: 'Zaldiar Comprimido 37.5 mg/325 mg' })
+    const generico = hit({ sku: 'PAR', name: 'Paracetamol 500 mg' })
+    expect(preferirPorNombre([zaldiar, generico], 'paracetamol').map((h) => h.sku)).toEqual(['PAR'])
+    // Marca sin genérico en la tienda: queda la de la descripción.
+    expect(preferirPorNombre([zaldiar], 'paracetamol').map((h) => h.sku)).toEqual(['ZAL'])
+    // Una combinación exige todos sus componentes en el nombre.
+    expect(preferirPorNombre([hit({ name: 'Amoxicilina Ácido Clavulánico 875/125' }), hit({ name: 'Amoxicilina 500 mg' })], 'amoxicilina ácido clavulánico').map((h) => h.name)).toEqual([
+      'Amoxicilina Ácido Clavulánico 875/125',
+    ])
   })
 
   it('order-intake busca por componente solo lo que no tiene coincidencia', () => {
