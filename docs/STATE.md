@@ -13,8 +13,9 @@ el recorrido SaaS P00–P17 queda cerrado)
 
 ## Reposición predictiva y fichas en lote (2026-11-22, a pedido del operador)
 
-Commit local en `dev`. **Sin aplicar en QAS**: falta la migración `20261122120000_my_replenishment` y
-desplegar `shopping-chat`; la web sale con la promoción a `qas`.
+`34e66d3`, promovido a `qas` (`d0a939c`). **Aplicado en QAS el 2026-11-22**: migración
+`20261122120000_my_replenishment` (API de gestión; `anon` sin EXECUTE verificado) y `shopping-chat`. Humo:
+«¿Qué me toca reponer?» → herramienta `reponer`, 200; `prueba.b2b@` aún sin ritmo (todo comprado el 19-nov).
 
 | # | Qué | Dónde |
 |---|---|---|
