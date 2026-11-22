@@ -58,6 +58,20 @@ export const chatDataSchema = z.discriminatedUnion('tipo', [
     principio_activo: z.string().nullable(),
     product_ids: z.array(z.string().uuid()),
   }),
+  z.object({
+    tipo: z.literal('reposicion'),
+    items: z.array(
+      z.object({
+        sku: z.string(),
+        nombre: z.string(),
+        cantidad: z.number().int(),
+        compras: z.number().int(),
+        cada_dias: z.number().int(),
+        dias_restantes: z.number().int(),
+      }),
+    ),
+    lineas: z.array(intakeLineSchema),
+  }),
   z.object({ tipo: z.literal('ninguno') }),
 ])
 export type ChatData = z.infer<typeof chatDataSchema>

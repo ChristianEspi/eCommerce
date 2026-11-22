@@ -31,6 +31,7 @@ import { ConsumerAccount } from './account/ConsumerAccount'
 import { useMyPendingApprovals } from './account/approvals'
 import { MyApprovalsSection } from './account/MyApprovalsSection'
 import { MyQuotesSection } from './account/MyQuotesSection'
+import { MyRestockSection } from './account/MyRestockSection'
 import { MyScheduledOrdersSection } from './account/MyScheduledOrdersSection'
 import { MyCouponsSection } from './account/MyCouponsSection'
 import { MyOrdersSection } from './account/MyOrdersSection'
@@ -373,6 +374,16 @@ export function StoreAccountPage() {
           { id: 'estado', label: t('account.tab.statement'), content: <AccountStatementSection storeSlug={storefront?.storeSlug} /> },
           // Los cupones son de UNA tienda: sin tienda resuelta no hay a quien
           // preguntarle, y la pestaña no se ofrece en vez de fallar dentro.
+          // 2026-11-22 · Reposición predictiva: lo que compra con regularidad y le toca.
+          ...(storefront
+            ? [
+                {
+                  id: 'reponer',
+                  label: t('account.tab.restock'),
+                  content: <MyRestockSection storeSlug={storefront.storeSlug} storeId={storefront.store.store_id} />,
+                },
+              ]
+            : []),
           ...(storefront
             ? [{ id: 'cupones', label: t('account.tab.coupons'), content: <MyCouponsSection storeId={storefront.store.store_id} /> }]
             : []),

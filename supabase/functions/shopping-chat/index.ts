@@ -38,6 +38,7 @@ import {
   SISTEMA_PLAN_CHAT,
   SISTEMA_RESPUESTA_CHAT,
   ejecutarChat,
+  leerReposicion,
   numerosDePedido,
   taparNumeros,
   validarPlanChat,
@@ -202,6 +203,14 @@ const handler = serveJson(
           const etiqueta = typeof i.variant_label === 'string' && i.variant_label ? ` · ${i.variant_label}` : ''
           return [{ sku: typeof i.sku === 'string' && i.sku ? i.sku : null, nombre: `${String(i.name ?? '')}${etiqueta}`, cantidad }]
         })
+      },
+      async reposicion() {
+        const { data, error } = await usuario.rpc('my_replenishment', { p_store_slug: storeSlug, p_horizon_days: 7 })
+        if (error) {
+          logger.warn('chat.replenishment_failed', { original_code: errorCode(error) })
+          return []
+        }
+        return leerReposicion(data)
       },
       async credito() {
         const { data, error } = await usuario.rpc('my_account_statement', { p_store_slug: storeSlug })

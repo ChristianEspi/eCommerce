@@ -3,13 +3,23 @@
 GUIDELINES_STATUS: VERIFIED (**por lectura directa** en la 2ª pasada de P00-SaaS: contrato v1.15,
 `PROTOCOLO.md`, `BANDEJA.md` y `EBIM-CREW-ROSTER.md`). La unidad montada es `G:`, no `H:`.
 Fuentes: ver `docs/EBIM_GUIDELINES_TRACE.md`.
-Última actualización: 2026-11-22 (IA visible: chat, copiloto y sustitutos). Antes: 2026-11-20 (correo por MailHub y textos por tienda). Antes: 2026-11-19 (IA diferenciadora, 8 frentes). Antes: 2026-09-26 (Resumen v2 · vitrina B2B). Antes: 2026-08-30 (**P17-SaaS terminada — quality gate final y línea base releaseable**;
+Última actualización: 2026-11-22 (reposición predictiva y fichas en lote). Antes: 2026-11-22 (IA visible: chat, copiloto y sustitutos). Antes: 2026-11-20 (correo por MailHub y textos por tienda). Antes: 2026-11-19 (IA diferenciadora, 8 frentes). Antes: 2026-09-26 (Resumen v2 · vitrina B2B). Antes: 2026-08-30 (**P17-SaaS terminada — quality gate final y línea base releaseable**;
 el recorrido SaaS P00–P17 queda cerrado)
 
 > **Dos numeraciones de fase.** Lo que sigue como «P00…P12» es el trabajo histórico de este repo. A
 > partir del 2026-08-27 arranca un segundo recorrido, **P00–P17 de productización SaaS**
 > (`claude-saas-opus/config/phases.json`), que se identifica siempre como «P0x-SaaS». No son la misma
 > serie: el P12 histórico es el framework de integraciones; el P12-SaaS es fulfillment y devoluciones.
+
+## Reposición predictiva y fichas en lote (2026-11-22, a pedido del operador)
+
+Commit local en `dev`. **Sin aplicar en QAS**: falta la migración `20261122120000_my_replenishment` y
+desplegar `shopping-chat`; la web sale con la promoción a `qas`.
+
+| # | Qué | Dónde |
+|---|---|---|
+| 1 | **Reposición predictiva** (vitrina, con sesión): `my_replenishment(slug, horizonte)` calcula sobre el historial del comprador y de sus cuentas de empresa activas (365 días, sin cancelados) cada cuántos días compra cada producto, la cantidad típica (mediana) y cuánto falta. Sale lo que toca en el horizonte (7 o 30 días) y lo que se pasó hace menos de vuelta y media. Sin importes, sin IA, no crea pedidos. Pestaña «Para reponer» en la cuenta (B2B y B2C) y herramienta `reponer` del chat; ambas añaden por `resolve_order_lines_for_slug` (`quick-order/addBySku.ts`). | migración, `MyRestockSection.tsx`, `commerceChat.ts` |
+| 2 | **Fichas en lote** («Completar fichas con IA» en Productos): lista los productos sin descripción de la tienda, limita el lote al saldo de IA, propone con el asistente de ficha de siempre (`catalog-copy` `assist`, descripción + atributos vacíos, mismos candados) de dos en dos con «Parar», y guarda SOLO lo revisado: la descripción por un parche (`updateProductDescription`, no pisa stock ni precio) y los atributos por `saveProductAttribute`. La categoría sigue en la ficha individual. | `BulkCopyAction.tsx`, `api/products.ts` |
 
 ## IA visible: asistente conversacional, copiloto y sustitutos (2026-11-22, a pedido del operador)
 

@@ -161,4 +161,44 @@ describe('ChatPanel', () => {
     expect(holder.importCart).toHaveBeenCalledTimes(1)
     expect(await screen.findByText(/listo: 1 en el carrito · 0 no disponibles/i)).toBeInTheDocument()
   })
+
+  it('reposición: cada línea dice cada cuánto lo pide y cuándo le toca; se añade validado', async () => {
+    holder.replies.push({
+      herramienta: 'reponer',
+      datos: {
+        tipo: 'reposicion',
+        items: [{ sku: 'QS-514574', nombre: 'Bloqueador Solar FPS 50', cantidad: 4, compras: 3, cada_dias: 15, dias_restantes: -2 }],
+        lineas: [
+          {
+            indice: 0,
+            texto: 'Bloqueador Solar FPS 50',
+            cantidad: 4,
+            cantidad_supuesta: false,
+            unidad: null,
+            sku_leido: 'QS-514574',
+            legible: true,
+            confianza: 'codigo',
+            sku_propuesto: 'QS-514574',
+            coincidencia: { product_id: CONSIV, slug: 'bloqueador', name: 'Bloqueador Solar FPS 50', sku: 'QS-514574', kind: 'simple', brand_name: null, in_stock: true },
+            alternativas: [],
+            presentaciones: [],
+          },
+        ],
+      },
+      respuesta: 'Según cada cuánto lo pides, ya te tocaba el bloqueador. Revisa la cantidad.',
+      product_ids: [],
+      motivo: null,
+    } satisfies ChatReply)
+    holder.resolve.mockResolvedValue([
+      { row: 1, sku: 'QS-514574', status: 'ok', product_id: CONSIV, variant_id: null, name: 'Bloqueador', variant_name: null, quantity: 4 },
+    ])
+    holder.importCart.mockResolvedValue({ added: 1, updated: 0, unchanged: 0, skipped: 0 })
+    pintar()
+    await escribir('que me toca reponer')
+
+    expect(await screen.findByText('Para reponer')).toBeInTheDocument()
+    expect(screen.getByText('Sueles pedirlo cada 15 días · te tocaba hace 2 días')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /añadir 1 al carrito/i }))
+    expect(holder.resolve).toHaveBeenCalledWith({ storeSlug: 'botica', lines: [{ row: 1, sku: 'QS-514574', quantity: 4 }] })
+  })
 })

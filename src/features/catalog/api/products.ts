@@ -381,3 +381,55 @@ export async function deleteProduct(productId: string): Promise<void> {
     await supabase.storage.from(PRODUCT_IMAGES_BUCKET).remove(paths)
   }
 }
+
+// ---------------------------------------------------------------------------
+// Fichas en lote (2026-11-22)
+// ---------------------------------------------------------------------------
+
+/** Cuántos productos sin ficha se listan para completar de una vez. */
+export const FICHAS_LOTE_MAX = 50
+
+export interface ProductoSinFicha {
+  readonly id: string
+  readonly sku: string
+  readonly name: string
+  readonly brand_name: string | null
+}
+
+/**
+ * Productos de la sociedad SIN descripción (vacía o nula), los que se venden en
+ * `storeId`. La vista y la RLS ponen el tenant; aquí solo se filtra.
+ */
+export async function fetchProductsWithoutDescription(input: {
+  companyId: string | null
+  storeId: string | null
+}): Promise<{ rows: ProductoSinFicha[]; total: number }> {
+  if (!input.companyId) return { rows: [], total: 0 }
+  let query = catalogClient()
+    .from(ADMIN_PRODUCT_MASTERS_VIEW)
+    .select('id, sku, name, brand_name', { count: 'exact' })
+    .or('description.is.null,description.eq.')
+  if (input.storeId) query = query.contains('store_ids', [input.storeId])
+  const { data, error, count } = await query
+    .order('name', { ascending: true })
+    .order('id', { ascending: true })
+    .range(0, FICHAS_LOTE_MAX - 1)
+  if (error) throw catalogErrorFromDb(error)
+  const rows = productMasterSchema
+    .pick({ id: true, sku: true, name: true, brand_name: true })
+    .array()
+    .parse(data ?? [])
+  return { rows, total: typeof count === 'number' ? count : rows.length }
+}
+
+/**
+ * Guarda SOLO la descripción. `catalog-product` aplica un parche con los campos
+ * que llegan: así el lote no pisa stock, precio ni nombre con valores viejos.
+ */
+export async function updateProductDescription(productId: string, description: string): Promise<void> {
+  const { data, error } = await catalogClient().functions.invoke<CatalogProductResponse>(CATALOG_PRODUCT_FUNCTION, {
+    body: { action: 'update', product_id: productId, description },
+  })
+  if (error) throw await catalogErrorFromInvoke(error)
+  if (!data?.data?.id) throw await catalogErrorFromInvoke(null)
+}

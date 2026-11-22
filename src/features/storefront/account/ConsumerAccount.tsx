@@ -16,6 +16,7 @@ import { ConsumerAddressesSection } from './ConsumerAddressesSection'
 import { ConsumerProfileSection } from './ConsumerProfileSection'
 import { MyCouponsSection } from './MyCouponsSection'
 import { MyOrdersSection } from './MyOrdersSection'
+import { MyRestockSection } from './MyRestockSection'
 
 /**
  * «Mi cuenta» del consumidor registrado (hardening H02).
@@ -57,6 +58,9 @@ export function ConsumerAccount({
             label: t('account.tab.orders'),
             content: <MyOrdersSection storeSlug={storeSlug} source="consumer" storeId={storeId} />,
           },
+          ...(storeId
+            ? [{ id: 'reponer', label: t('account.tab.restock'), content: <MyRestockSection storeSlug={storeSlug} storeId={storeId} /> }]
+            : []),
           {
             id: 'favoritos',
             label: t('account.consumer.tab.favorites'),

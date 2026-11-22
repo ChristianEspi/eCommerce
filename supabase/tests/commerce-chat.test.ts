@@ -16,6 +16,7 @@ import { asRole, createTestDatabase, TENANT_A } from './harness'
 import {
   aplicarCambios,
   ejecutarChat,
+  leerReposicion,
   nombreCoincide,
   numerosDePedido,
   taparNumeros,
@@ -66,6 +67,9 @@ function puertos(over: Partial<PuertosChat> = {}): PuertosChat & { busquedas: st
             { sku: 'QS-295212', nombre: 'Fanter 10 mg Comprimidos Recubiertos · Caja x 15', cantidad: 1 },
           ]
         : []
+    },
+    async reposicion() {
+      return [{ sku: 'QS-282484', nombre: 'Consiv Tableta Recubierta Caja 30 un · 18 mg', cantidad: 2, compras: 4, cada_dias: 15, dias_restantes: -1 }]
     },
     async credito() {
       return { cuenta: 'Distribuidora Prueba SAC', limite: '10000.00', disponible: '7500.00', saldo: '2500.00', vencido: '0', moneda: 'PEN', proximo: { order_number: 'EC-2', due_at: '2026-12-20', total: '300.00', days_overdue: 0 } }
@@ -169,6 +173,39 @@ describe('pedidos y crédito', () => {
     expect(r.datos).toMatchObject({ tipo: 'credito', credito: { disponible: '7500.00' } })
     expect(r.paraModelo).not.toMatch(/7500|2500|10000/)
     expect(JSON.parse(r.paraModelo)).toMatchObject({ tiene_linea: true, tiene_vencido: false })
+  })
+})
+
+describe('reposición predictiva (2026-11-22)', () => {
+  it('el plan la acepta sin campos', () => {
+    expect(validarPlanChat({ herramienta: 'reponer', consulta: 'lo de siempre' })).toEqual({ herramienta: 'reponer' })
+  })
+
+  it('arma el carrito con el SKU y la cantidad típica; el modelo ve el ritmo, no importes', async () => {
+    const r = await ejecutarChat({ herramienta: 'reponer' }, puertos())
+    expect(r.datos.tipo).toBe('reposicion')
+    if (r.datos.tipo !== 'reposicion') return
+    expect(r.datos.items).toHaveLength(1)
+    expect(r.datos.lineas[0]).toMatchObject({ cantidad: 2, sku_propuesto: 'QS-282484' })
+    expect(JSON.parse(r.paraModelo)).toMatchObject({ reponer: [{ cada_dias: 15, dias_restantes: -1 }] })
+    expect(r.productosPermitidos).toEqual([])
+  })
+
+  it('sin historial regular: carrito vacío y el modelo lo sabe', async () => {
+    const r = await ejecutarChat({ herramienta: 'reponer' }, puertos({ reposicion: async () => [] }))
+    expect(r.datos).toEqual({ tipo: 'reposicion', items: [], lineas: [] })
+    expect(r.paraModelo).toMatch(/no hay productos/)
+  })
+
+  it('leerReposicion descarta filas mal formadas', () => {
+    const filas = leerReposicion([
+      { sku: 'A', nombre: 'Uno', cantidad: 2, compras: 3, cada_dias: 10, dias_restantes: 1 },
+      { sku: '', nombre: 'Sin sku', cantidad: 2, compras: 3, cada_dias: 10, dias_restantes: 1 },
+      { sku: 'B', nombre: 'Cantidad rara', cantidad: 1.5, compras: 3, cada_dias: 10, dias_restantes: 1 },
+      { sku: 'C', nombre: 'Cada cero', cantidad: 1, compras: 3, cada_dias: 0, dias_restantes: 1 },
+    ])
+    expect(filas.map((f) => f.sku)).toEqual(['A'])
+    expect(leerReposicion(null)).toEqual([])
   })
 })
 
