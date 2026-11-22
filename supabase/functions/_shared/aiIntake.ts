@@ -36,7 +36,7 @@ export const SISTEMA_INTAKE = [
   '- unidad: la unidad que se pide si aparece (caja, unidad, blíster, frasco, paquete, docena…); si no aparece, cadena vacía.',
   '- sku: SOLO si en el documento aparece un código de producto junto a esa línea (código interno, SKU o código de barras). Si no, cadena vacía. Nunca lo deduzcas del nombre.',
   '- legible: false si no estás seguro de lo que dice (letra dudosa, imagen borrosa, texto cortado).',
-  '- componente: el componente o principio activo PRINCIPAL del producto SOLO si lo conoces con certeza por su nombre (por ejemplo «amoxicilina», «hipoclorito de sodio»); si no, cadena vacía. No sale del documento: sirve para buscar alternativas en la tienda si no lo tiene.',
+  '- componente: el componente o principio activo del producto SOLO si lo conoces con certeza por su nombre (por ejemplo «hipoclorito de sodio»). Si es una COMBINACIÓN, TODOS sus componentes activos, sin conectores (por ejemplo «amoxicilina ácido clavulánico»): una alternativa con solo uno de ellos NO es equivalente. Si no lo sabes con certeza, cadena vacía. No sale del documento: sirve para buscar alternativas en la tienda si no lo tiene.',
   '',
   'Reglas:',
   '- Ignora precios, importes, totales, impuestos, fechas, firmas y sellos: no son líneas del pedido.',
@@ -126,14 +126,14 @@ export function limpiarTexto(texto: string): string {
     .slice(0, 120)
 }
 
-/** Solo letras y espacios, de 3 a 60 caracteres y 4 palabras como mucho. */
+/** Solo letras y espacios, de 3 a 80 caracteres y 6 palabras como mucho (una combinación las necesita). */
 export function limpiarComponente(valor: unknown): string | null {
   const c = String(valor ?? '')
     .toLowerCase()
     .replace(/[^\p{L}\s-]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-  if (c.length < 3 || c.length > 60 || c.split(' ').length > 4) return null
+  if (c.length < 3 || c.length > 80 || c.split(' ').length > 6) return null
   return c
 }
 
@@ -455,9 +455,30 @@ export function proponerLinea(
  */
 export function ofrecerSustitutos(p: LineaPropuesta, componente: string, busqueda: ResultadoBusqueda): LineaPropuesta {
   if (p.confianza !== 'ninguna' || busqueda.mode !== 'fts') return p
-  const items = busqueda.items.filter((hit) => hit.kind !== 'bundle' || hit.sku).slice(0, INTAKE_ALTERNATIVAS)
+  const candidatos = busqueda.items.filter((hit) => hit.kind !== 'bundle' || hit.sku)
+  const items = preferirPorNombre(candidatos, componente).slice(0, INTAKE_ALTERNATIVAS)
   if (items.length === 0) return p
   return { ...p, alternativas: items.map(aPropuesto), sustituto: { componente } }
+}
+
+function sinTildes(valor: string): string {
+  return valor.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
+}
+
+/**
+ * 2026-11-22 · El buscador encuentra el componente también en la DESCRIPCIÓN:
+ * «paracetamol» trae «Paracetamol 500 mg», pero también Zaldiar (tramadol +
+ * paracetamol) o un inyectable, que no son equivalentes. Si hay productos con
+ * TODO el componente en el NOMBRE, solo esos; si no hay ninguno (una marca sin
+ * genérico en la tienda), los de la descripción, como último recurso.
+ */
+export function preferirPorNombre<T extends { name: string }>(items: readonly T[], componente: string): T[] {
+  const palabras = sinTildes(componente).split(/\s+/).filter((w) => w.length >= 3)
+  const porNombre = items.filter((hit) => {
+    const nombre = sinTildes(hit.name)
+    return palabras.length > 0 && palabras.every((w) => nombre.includes(w))
+  })
+  return porNombre.length > 0 ? porNombre : [...items]
 }
 
 /** Lo que se guarda en la traza: cuántas líneas y de qué confianza. Sin texto. */
@@ -494,7 +515,7 @@ export const SISTEMA_COTIZACION = [
   '- precio_unitario: el precio por UNA unidad de esa línea, tal como figura. Si solo aparece el importe de la línea, divídelo entre la cantidad. Si no aparece ningún precio, 0 y precio_leido = false.',
   '- precio_leido: true solo si el precio está escrito y lo lees con claridad.',
   '- legible: false si no estás seguro de lo que dice la línea.',
-  '- componente: el componente o principio activo PRINCIPAL del producto SOLO si lo conoces con certeza por su nombre (por ejemplo «amoxicilina», «hipoclorito de sodio»); si no, cadena vacía. No sale del documento: sirve para buscar alternativas en la tienda si no lo tiene.',
+  '- componente: el componente o principio activo del producto SOLO si lo conoces con certeza por su nombre (por ejemplo «hipoclorito de sodio»). Si es una COMBINACIÓN, TODOS sus componentes activos, sin conectores (por ejemplo «amoxicilina ácido clavulánico»): una alternativa con solo uno de ellos NO es equivalente. Si no lo sabes con certeza, cadena vacía. No sale del documento: sirve para buscar alternativas en la tienda si no lo tiene.',
   '',
   'De la cotización completa:',
   '- moneda: «PEN» si los precios están en soles (S/), «USD» si están en dólares (US$, $), «otra» si es otra moneda, cadena vacía si no se ve.',
