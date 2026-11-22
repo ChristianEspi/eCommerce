@@ -23,6 +23,16 @@ describe('cuándo se reescribe', () => {
     expect(hayQueReescribir('fuzzy', 5)).toBe(true)
     expect(hayQueReescribir('fts', 3)).toBe(false)
   })
+
+  it('lo hallado con una sola palabra de la frase también se reescribe (2026-11-22)', () => {
+    // «algo para el sol en la playa» → «playa» → `play` → «Sebman Player».
+    expect(hayQueReescribir('fts', 1, true)).toBe(true)
+  })
+
+  it('el asistente marca el intento con la palabra suelta', () => {
+    const src = readFileSync(join(process.cwd(), 'supabase', 'functions', 'shopping-assistant', 'index.ts'), 'utf8')
+    expect(src).toMatch(/hayQueReescribir\(match, items\.length, porPalabraSuelta\)/)
+  })
 })
 
 describe('los términos del modelo, revisados', () => {

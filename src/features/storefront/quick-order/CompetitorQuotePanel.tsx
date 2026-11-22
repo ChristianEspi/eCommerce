@@ -50,11 +50,13 @@ import {
   intakeMotivoKey,
   preselected,
   readIntake,
+  resolveChoice,
   type IntakeFileIssue,
   type IntakeLine,
   type IntakeProduct,
 } from './intake'
 import type { IntakeAcceptedLine } from './IntakePanel'
+import { PresentationPicker } from './PresentationPicker'
 
 interface Choice {
   readonly checked: boolean
@@ -126,7 +128,9 @@ export function CompetitorQuotePanel({
       setIncludesTax(result.data?.cotizacion?.incluye_igv ?? false)
       setChoices(
         (result.data?.lineas ?? []).map((line) => ({
-          checked: preselected(line),
+          // Solo se compara lo que es un producto de esta tienda: un código
+          // que no casa con ninguno no se puede cotizar ni marcar.
+          checked: preselected(line) && resolveChoice(line, line.sku_propuesto) !== null,
           sku: line.sku_propuesto,
           quantity: String(line.cantidad),
         })),
@@ -148,8 +152,8 @@ export function CompetitorQuotePanel({
         if (!line || !choice.checked || !choice.sku || !Number.isInteger(quantity) || quantity < 1 || quantity > 9999) {
           return []
         }
-        const product = optionsOf(line).find((p) => p.sku === choice.sku) ?? null
-        return [{ index, line, sku: choice.sku, quantity, product }]
+        const resolved = resolveChoice(line, choice.sku)
+        return [{ index, line, sku: choice.sku, quantity, product: resolved?.product ?? null, variantId: resolved?.variantId ?? null }]
       }),
     [choices, lines],
   )
@@ -158,7 +162,7 @@ export function CompetitorQuotePanel({
     () =>
       selected
         .filter((s) => s.product)
-        .map((s) => ({ productId: s.product!.product_id, variantId: null, uomCode: null, quantity: s.quantity })),
+        .map((s) => ({ productId: s.product!.product_id, variantId: s.variantId, uomCode: null, quantity: s.quantity })),
     [selected],
   )
 
@@ -367,7 +371,7 @@ export function CompetitorQuotePanel({
                         <TableCell padding="checkbox">
                           <Checkbox
                             checked={choice.checked}
-                            disabled={!choice.sku}
+                            disabled={resolveChoice(line, choice.sku) === null}
                             onChange={(event) => update(index, { checked: event.target.checked })}
                             slotProps={{ input: { 'aria-label': `${t('store.intake.review.include')} · ${label}` } }}
                           />
@@ -383,9 +387,12 @@ export function CompetitorQuotePanel({
                         </TableCell>
                         <TableCell sx={{ minWidth: 200 }}>
                           {line.confianza === 'variante' && line.coincidencia ? (
-                            <Button size="small" component={Link} to={`/s/${storeSlug}/product/${line.coincidencia.slug}`}>
-                              {t('store.intake.review.chooseVariant').replace('{name}', line.coincidencia.name)}
-                            </Button>
+                            <PresentationPicker
+                              storeSlug={storeSlug}
+                              line={line}
+                              value={choice.sku}
+                              onChange={(sku) => update(index, { sku, checked: sku !== null })}
+                            />
                           ) : options.length > 0 ? (
                             <SelectField
                               size="small"

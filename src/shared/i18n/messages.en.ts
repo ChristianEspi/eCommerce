@@ -3312,6 +3312,8 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.intake.review.product': 'Store product',
     'store.intake.review.lineLabel': 'line {n}',
     'store.intake.review.chooseVariant': 'Choose a presentation of {name}',
+    'store.intake.review.presentation': '{name} presentation',
+    'store.intake.review.pickPresentation': 'Choose a presentation',
     'store.intake.review.codeOnly': 'Code {sku}: confirmed when validating',
     'store.intake.review.noMatch': 'We could not find this product in the store',
     'store.intake.review.accept': 'Move {count} lines to the order',

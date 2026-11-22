@@ -254,14 +254,14 @@ const handler = serveJson(
     }
 
     const leidas = lectura.data.lineas
-    const propuestas: Array<LineaPropuesta & { precio_competencia?: number | null }> = []
+    const propuestas: Array<LineaPropuesta & { precio_competencia?: number | null; presentaciones?: Presentacion[] }> = []
     for (let i = 0; i < leidas.length; i += TANDA) {
       const tanda = leidas.slice(i, i + TANDA)
       const resultados = await Promise.all(
         tanda.map((linea) => buscar(consultaDeLinea(linea) || linea.sku || '')),
       )
       tanda.forEach((linea, j) => {
-        const propuesta = proponerLinea(i + j, linea, resultados[j])
+        const propuesta = proponerLinea(i + j, linea, resultados[j], { codigoAjeno: esCotizacion })
         // En cotización, cada línea lleva el precio que puso el OTRO proveedor.
         propuestas.push(
           esCotizacion
@@ -270,6 +270,43 @@ const handler = serveJson(
         )
       })
     }
+    /**
+     * 2026-11-22 · Las presentaciones de cada producto con variantes, para
+     * elegirlas en la misma fila. Antes la fila solo llevaba a la ficha y, al
+     * volver, la lectura se había perdido.
+     *
+     * Con `serviceClient` porque el SKU de la variante no es legible con la
+     * sesión del comprador; el alcance lo fija el `product_id`, que salió del
+     * buscador de ESTA tienda (solo productos publicados en ella). El comprador
+     * con sesión ya ve SKUs en el pedido rápido: no se le enseña nada nuevo.
+     */
+    const conVariantes = [
+      ...new Set(
+        propuestas.flatMap((p) => (p.confianza === 'variante' && p.coincidencia ? [p.coincidencia.product_id] : [])),
+      ),
+    ]
+    if (conVariantes.length > 0) {
+      const { data: filas, error } = await serviceClient(trace)
+        .from('product_variants')
+        .select('id, product_id, sku, name, position')
+        .in('product_id', conVariantes)
+        .eq('is_active', true)
+        .order('position')
+        .order('name')
+        .limit(conVariantes.length * INTAKE_MAX_PRESENTACIONES)
+      if (error) {
+        // Sin presentaciones la fila vuelve a ofrecer la ficha: no tumba la lectura.
+        logger.warn('intake.variants_failed', { original_code: errorCode(error) })
+      } else {
+        const porProducto = agruparPresentaciones((filas ?? []) as FilaVariante[])
+        for (let k = 0; k < propuestas.length; k++) {
+          const p = propuestas[k]
+          if (p.confianza !== 'variante' || !p.coincidencia) continue
+          propuestas[k] = { ...p, presentaciones: porProducto.get(p.coincidencia.product_id) ?? [] }
+        }
+      }
+    }
+
     const cotizacion =
       esCotizacion && 'moneda' in lectura.data
         ? { moneda: lectura.data.moneda, incluye_igv: lectura.data.incluyeIgv }

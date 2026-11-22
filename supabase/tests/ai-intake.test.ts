@@ -10,8 +10,11 @@ import {
   resumenAdjuntos,
   validarAdjunto,
 } from '../functions/_shared/aiAttachments.ts'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   ESQUEMA_INTAKE,
+  agruparPresentaciones,
   consultaDeLinea,
   limpiarTexto,
   proponerLinea,
@@ -185,6 +188,36 @@ describe('el producto lo decide el catálogo, sin modelo', () => {
     expect(conCodigo).toMatchObject({ confianza: 'codigo', sku_propuesto: 'DON-10' })
     const sinResultado = proponerLinea(0, leida({ sku: 'XYZ-9' }), { mode: 'empty', items: [] })
     expect(sinResultado).toMatchObject({ confianza: 'codigo', sku_propuesto: 'XYZ-9', coincidencia: null })
+  })
+
+  it('en la cotización de otro proveedor, su código no es nuestro SKU (2026-11-22)', () => {
+    // Sin coincidencia con un SKU de la tienda, la línea se resuelve por su texto.
+    const ajeno = proponerLinea(0, leida({ sku: 'CJA-77' }), { mode: 'empty', items: [] }, { codigoAjeno: true })
+    expect(ajeno).toMatchObject({ confianza: 'ninguna', sku_propuesto: null })
+    const porTexto = proponerLinea(0, leida({ sku: 'CJA-77' }), { mode: 'fts', items: [hit({})] }, { codigoAjeno: true })
+    expect(porTexto).toMatchObject({ confianza: 'probable', sku_propuesto: 'DON-10' })
+    // Si casa con uno nuestro, sí vale como código.
+    const nuestro = proponerLinea(0, leida({ sku: 'don-10' }), { mode: 'fts', items: [hit({})] }, { codigoAjeno: true })
+    expect(nuestro).toMatchObject({ confianza: 'codigo', sku_propuesto: 'DON-10' })
+  })
+
+  it('las presentaciones se agrupan por producto y sin SKU no se ofrecen', () => {
+    const p1 = '11111111-1111-4111-8111-111111111111'
+    const porProducto = agruparPresentaciones([
+      { id: 'a1111111-1111-4111-8111-111111111111', product_id: p1, sku: 'FLU-150-1', name: 'x1' },
+      { id: 'a2222222-1111-4111-8111-111111111111', product_id: p1, sku: null, name: 'sin sku' },
+      { id: 'a3333333-1111-4111-8111-111111111111', product_id: p1, sku: ' FLU-150-2 ', name: null },
+    ])
+    expect(porProducto.get(p1)).toEqual([
+      { variant_id: 'a1111111-1111-4111-8111-111111111111', sku: 'FLU-150-1', name: 'x1' },
+      { variant_id: 'a3333333-1111-4111-8111-111111111111', sku: 'FLU-150-2', name: 'FLU-150-2' },
+    ])
+  })
+
+  it('order-intake trata el código de la cotización como ajeno y trae las presentaciones', () => {
+    const src = readFileSync(join(process.cwd(), 'supabase', 'functions', 'order-intake', 'index.ts'), 'utf8')
+    expect(src).toMatch(/proponerLinea\([^)]*\{ codigoAjeno: esCotizacion \}\)/)
+    expect(src).toMatch(/from\('product_variants'\)[\s\S]*?\.in\('product_id', conVariantes\)/)
   })
 
   it('las alternativas son del buscador y como mucho tres', () => {

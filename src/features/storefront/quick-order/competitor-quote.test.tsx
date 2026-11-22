@@ -56,6 +56,7 @@ const product = (id: string, sku: string, name: string) => ({
 
 const line = (over: Partial<IntakeLine>): IntakeLine => ({
   indice: 0,
+  presentaciones: [],
   texto: 'Lejía 5L',
   cantidad: 10,
   cantidad_supuesta: false,
@@ -213,5 +214,56 @@ describe('CompetitorQuotePanel', () => {
     await leer()
     expect(await screen.findByText(/la cotización está en USD/i)).toBeInTheDocument()
     expect(screen.queryByText(/con nosotros ahorras/i)).not.toBeInTheDocument()
+  })
+
+  it('un código de la otra cotización que no es nuestro no sale marcado (2026-11-22)', async () => {
+    holder.result = {
+      data: {
+        lineas: [line({ confianza: 'codigo', sku_leido: 'CJA-77', sku_propuesto: 'CJA-77', coincidencia: null })],
+        notas: null,
+        cotizacion: { moneda: 'PEN', incluye_igv: false },
+      },
+      motivo: null,
+      interactionId: 'x',
+    }
+    renderWithProviders(<CompetitorQuotePanel storeSlug="botica" currency="PEN" onAccept={vi.fn()} />)
+    await leer()
+    const casilla = await screen.findByRole('checkbox', { name: /incluir en el pedido · línea 1/i })
+    expect(casilla).not.toBeChecked()
+    expect(casilla).toBeDisabled()
+  })
+
+  it('la presentación se elige en la misma fila y entonces se compara (2026-11-22)', async () => {
+    const VARIANTE = '33333333-3333-4333-8333-333333333333'
+    holder.result = {
+      data: {
+        lineas: [
+          line({
+            confianza: 'variante',
+            sku_propuesto: null,
+            coincidencia: { ...product(LEJIA, 'LEJ', 'Lejía'), kind: 'variant' as const, sku: null },
+            presentaciones: [{ variant_id: VARIANTE, sku: 'LEJ-5', name: '5 L' }],
+          }),
+        ],
+        notas: null,
+        cotizacion: { moneda: 'PEN', incluye_igv: false },
+      },
+      motivo: null,
+      interactionId: 'x',
+    }
+    holder.quote = quoteOf([priced(LEJIA, '10.00')])
+    const onAccept = vi.fn()
+    renderWithProviders(<CompetitorQuotePanel storeSlug="botica" currency="PEN" onAccept={onAccept} />)
+    await leer()
+
+    // Sin enlace a la ficha: un desplegable en la propia fila.
+    expect(screen.queryByRole('link', { name: /elegir presentación/i })).not.toBeInTheDocument()
+    await userEvent.click(await screen.findByRole('combobox', { name: /presentación de lejía/i }))
+    await userEvent.click(within(screen.getByRole('listbox')).getByRole('option', { name: /5 L · LEJ-5/ }))
+
+    expect(screen.getByRole('checkbox', { name: /incluir en el pedido · línea 1/i })).toBeChecked()
+    expect(await screen.findByText(/con nosotros ahorras/i)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /pasar 1 líneas al pedido/i }))
+    expect(onAccept).toHaveBeenCalledWith([{ sku: 'LEJ-5', quantity: 10 }])
   })
 })
