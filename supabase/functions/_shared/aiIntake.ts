@@ -238,6 +238,73 @@ export interface LineaPropuesta {
   readonly alternativas: readonly ProductoPropuesto[]
 }
 
+/**
+ * 2026-11-22 · Un código leído que el verificador del pedido rápido
+ * (`resolve_order_lines_for_slug`) reconoce como SKU de esta tienda, sea de un
+ * producto o de una PRESENTACIÓN. Antes solo se comparaba con el SKU del
+ * producto principal y «QS-282484» (Consiv 18 mg, una variante de QSV-CONSIV)
+ * salía «No encontramos este producto en la tienda».
+ */
+export interface CodigoResuelto {
+  readonly product_id: string
+  readonly slug: string
+  readonly name: string
+  readonly variant: boolean
+}
+
+/** Las líneas `ok` del verificador, por SKU en minúsculas. */
+export function leerResolucion(data: unknown): Map<string, CodigoResuelto> {
+  const salida = new Map<string, CodigoResuelto>()
+  const lineas = (data as { lines?: unknown } | null)?.lines
+  if (!Array.isArray(lineas)) return salida
+  for (const l of lineas as Array<Record<string, unknown>>) {
+    if (l?.status !== 'ok' || typeof l.sku !== 'string' || typeof l.product_id !== 'string') continue
+    salida.set(l.sku.toLowerCase(), {
+      product_id: l.product_id,
+      slug: typeof l.slug === 'string' ? l.slug : '',
+      name: typeof l.name === 'string' && l.name ? l.name : l.sku,
+      variant: typeof l.variant_id === 'string',
+    })
+  }
+  return salida
+}
+
+/** La propuesta de una línea cuyo código es un SKU de la tienda. */
+export function propuestaPorCodigo(p: LineaPropuesta, sku: string, r: CodigoResuelto): LineaPropuesta {
+  return {
+    ...p,
+    confianza: 'codigo',
+    sku_propuesto: sku,
+    coincidencia: {
+      product_id: r.product_id,
+      slug: r.slug,
+      name: r.name,
+      // De una presentación, el SKU elegido es el de la variante, no el del maestro.
+      sku: r.variant ? null : sku,
+      kind: r.variant ? 'variant' : 'simple',
+      brand_name: null,
+      in_stock: true,
+    },
+    alternativas: p.alternativas.filter((a) => a.product_id !== r.product_id),
+  }
+}
+
+/**
+ * 2026-11-22 · Segundo intento por texto: la primera palabra con letras de 4+
+ * caracteres. En una línea de cotización el nombre comercial abre la línea
+ * («Consiv 18 mg Tab. Rec. x30») y lo que sigue son abreviaturas que el
+ * buscador —que exige todas las palabras— no encuentra.
+ */
+export function palabraPrincipal(consulta: string): string | null {
+  const palabra = consulta.split(/\s+/).find((w) => /^\p{L}[\p{L}-]{3,}$/u.test(w))
+  return palabra && palabra !== consulta ? palabra : null
+}
+
+/** ¿La línea apunta a un producto con variantes cuya presentación hay que ofrecer? */
+export function conPresentaciones(p: LineaPropuesta): boolean {
+  return Boolean(p.coincidencia) && (p.confianza === 'variante' || p.coincidencia?.kind === 'variant')
+}
+
 /** Una presentación (variante) elegible en la misma fila de la revisión. */
 export interface Presentacion {
   readonly variant_id: string
@@ -307,7 +374,12 @@ export function proponerLinea(
    * no, la línea se resuelve por su texto como cualquier otra. Antes salía
    * marcada con «No encontramos este producto en la tienda».
    */
-  opciones: { codigoAjeno?: boolean } = {},
+  /**
+   * `porPalabra`: los resultados salieron del segundo intento con una sola
+   * palabra (`palabraPrincipal`). Una coincidencia así es una pista: nunca
+   * `probable`, para que la persona la confirme.
+   */
+  opciones: { codigoAjeno?: boolean; porPalabra?: boolean } = {},
 ): LineaPropuesta {
   const items = busqueda.items.filter((hit) => hit.kind !== 'bundle' || hit.sku)
   const base = {
@@ -350,7 +422,8 @@ export function proponerLinea(
   }
 
   // 3 · Coincidencia de texto real y letra legible: probable. Si no, dudosa.
-  const confianza: Confianza = busqueda.mode === 'fts' && linea.legible ? 'probable' : 'dudosa'
+  const confianza: Confianza =
+    busqueda.mode === 'fts' && linea.legible && !opciones.porPalabra ? 'probable' : 'dudosa'
   return { ...base, confianza, sku_propuesto: primero.sku, coincidencia: aPropuesto(primero), alternativas }
 }
 
