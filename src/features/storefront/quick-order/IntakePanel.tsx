@@ -19,7 +19,6 @@ import {
 import { visuallyHidden } from '@mui/utils'
 import { useMutation } from '@tanstack/react-query'
 import { useRef, useState, type ChangeEvent } from 'react'
-import { Link } from 'react-router-dom'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { Field } from '@/shared/ui/Field'
@@ -35,10 +34,12 @@ import {
   intakeMotivoKey,
   preselected,
   readIntake,
+  resolveChoice,
   type Confidence,
   type IntakeFileIssue,
   type IntakeLine,
 } from './intake'
+import { PresentationPicker } from './PresentationPicker'
 
 /** Lo que se le pasa al pedido rápido: SKU y cantidad, como una fila tecleada. */
 export interface IntakeAcceptedLine {
@@ -136,8 +137,8 @@ export function IntakePanel({
     const productIds = choices.flatMap((choice, index) => {
       const line = lines[index]
       if (!choice.checked || !choice.sku || !line) return []
-      const match = [line.coincidencia, ...line.alternativas].find((p) => p?.sku === choice.sku)
-      return match ? [match.product_id] : []
+      const match = resolveChoice(line, choice.sku)
+      return match ? [match.product.product_id] : []
     })
     markAiAttribution(storeSlug, productIds, 'intake')
     onAccept(ready.map(({ sku, quantity }) => ({ sku, quantity })))
@@ -261,9 +262,12 @@ export function IntakePanel({
                         </TableCell>
                         <TableCell sx={{ minWidth: 220 }}>
                           {line.confianza === 'variante' && line.coincidencia ? (
-                            <Button size="small" component={Link} to={`/s/${storeSlug}/product/${line.coincidencia.slug}`}>
-                              {t('store.intake.review.chooseVariant').replace('{name}', line.coincidencia.name)}
-                            </Button>
+                            <PresentationPicker
+                              storeSlug={storeSlug}
+                              line={line}
+                              value={choice.sku}
+                              onChange={(sku) => update(index, { sku, checked: sku !== null })}
+                            />
                           ) : options.length > 0 ? (
                             <SelectField
                               size="small"

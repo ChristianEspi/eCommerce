@@ -2785,6 +2785,8 @@ export const es = {
     'store.intake.review.product': 'Producto de la tienda',
     'store.intake.review.lineLabel': 'línea {n}',
     'store.intake.review.chooseVariant': 'Elegir presentación de {name}',
+    'store.intake.review.presentation': 'Presentación de {name}',
+    'store.intake.review.pickPresentation': 'Elige una presentación',
     'store.intake.review.codeOnly': 'Código {sku}: se confirma al validar',
     'store.intake.review.noMatch': 'No encontramos este producto en la tienda',
     'store.intake.review.accept': 'Pasar {count} líneas al pedido',

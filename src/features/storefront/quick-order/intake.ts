@@ -38,6 +38,14 @@ const productSchema = z.object({
 })
 export type IntakeProduct = z.infer<typeof productSchema>
 
+/** 2026-11-22 · Presentación (variante) elegible en la misma fila. */
+const presentationSchema = z.object({
+  variant_id: z.string().uuid(),
+  sku: z.string().min(1),
+  name: z.string().min(1),
+})
+export type IntakePresentation = z.infer<typeof presentationSchema>
+
 const lineSchema = z.object({
   indice: z.number().int().min(0),
   texto: z.string(),
@@ -52,6 +60,8 @@ const lineSchema = z.object({
   alternativas: z.array(productSchema).max(3),
   /** Solo en «Mejora esta cotización»: precio unitario del OTRO proveedor. */
   precio_competencia: z.number().positive().nullable().optional(),
+  /** Solo en líneas `variante`: sus presentaciones con SKU. Vacío = elegir en la ficha. */
+  presentaciones: z.array(presentationSchema).max(20).optional().default([]),
 })
 export type IntakeLine = z.infer<typeof lineSchema>
 
@@ -134,4 +144,20 @@ export async function readIntake(input: {
  */
 export function preselected(line: IntakeLine): boolean {
   return Boolean(line.sku_propuesto) && (line.confianza === 'codigo' || line.confianza === 'probable')
+}
+
+/**
+ * El producto y la variante del SKU elegido en una línea: la coincidencia, una
+ * alternativa o una de las presentaciones de la coincidencia. `null` si ese
+ * SKU no es de ninguno de ellos (un código leído que se valida después).
+ */
+export function resolveChoice(
+  line: IntakeLine,
+  sku: string | null,
+): { product: IntakeProduct; variantId: string | null } | null {
+  if (!sku) return null
+  const presentation = line.coincidencia ? line.presentaciones.find((p) => p.sku === sku) : undefined
+  if (presentation && line.coincidencia) return { product: line.coincidencia, variantId: presentation.variant_id }
+  const product = [line.coincidencia, ...line.alternativas].find((p) => p?.sku === sku && p.kind !== 'variant')
+  return product ? { product, variantId: null } : null
 }

@@ -238,6 +238,40 @@ export interface LineaPropuesta {
   readonly alternativas: readonly ProductoPropuesto[]
 }
 
+/** Una presentación (variante) elegible en la misma fila de la revisión. */
+export interface Presentacion {
+  readonly variant_id: string
+  readonly sku: string
+  readonly name: string
+}
+
+/** Tope de presentaciones por producto en la revisión. */
+export const INTAKE_MAX_PRESENTACIONES = 20
+
+export interface FilaVariante {
+  readonly id: string
+  readonly product_id: string
+  readonly sku: string | null
+  readonly name: string | null
+}
+
+/**
+ * Las variantes activas agrupadas por producto, en el orden recibido. Una
+ * variante sin SKU no se puede pedir por el pedido rápido y se omite.
+ */
+export function agruparPresentaciones(filas: readonly FilaVariante[]): Map<string, Presentacion[]> {
+  const porProducto = new Map<string, Presentacion[]>()
+  for (const fila of filas) {
+    const sku = fila.sku?.trim()
+    if (!sku) continue
+    const lista = porProducto.get(fila.product_id) ?? []
+    if (lista.length >= INTAKE_MAX_PRESENTACIONES) continue
+    lista.push({ variant_id: fila.id, sku: sku.slice(0, 64), name: (fila.name ?? sku).slice(0, 80) })
+    porProducto.set(fila.product_id, lista)
+  }
+  return porProducto
+}
+
 function aPropuesto(hit: HitCatalogo): ProductoPropuesto {
   return {
     product_id: hit.product_id,
@@ -263,7 +297,18 @@ export function consultaDeLinea(linea: LineaLeida): string {
  * Decide la propuesta de una línea con lo que devolvió el buscador. Pura y
  * determinista: misma línea y mismos resultados, misma propuesta.
  */
-export function proponerLinea(indice: number, linea: LineaLeida, busqueda: ResultadoBusqueda): LineaPropuesta {
+export function proponerLinea(
+  indice: number,
+  linea: LineaLeida,
+  busqueda: ResultadoBusqueda,
+  /**
+   * 2026-11-22 · En la cotización de OTRO proveedor el código impreso es el
+   * SUYO, no un SKU de esta tienda. Solo vale si coincide con uno nuestro; si
+   * no, la línea se resuelve por su texto como cualquier otra. Antes salía
+   * marcada con «No encontramos este producto en la tienda».
+   */
+  opciones: { codigoAjeno?: boolean } = {},
+): LineaPropuesta {
   const items = busqueda.items.filter((hit) => hit.kind !== 'bundle' || hit.sku)
   const base = {
     indice,
@@ -276,8 +321,10 @@ export function proponerLinea(indice: number, linea: LineaLeida, busqueda: Resul
   }
 
   // 1 · El documento traía un código que coincide con un resultado: es ese.
-  if (linea.sku) {
-    const exacto = items.find((hit) => hit.sku && hit.sku.toLowerCase() === linea.sku!.toLowerCase())
+  const exacto = linea.sku
+    ? items.find((hit) => hit.sku && hit.sku.toLowerCase() === linea.sku!.toLowerCase())
+    : undefined
+  if (linea.sku && (!opciones.codigoAjeno || exacto)) {
     const alternativas = items.filter((hit) => hit !== exacto).slice(0, INTAKE_ALTERNATIVAS).map(aPropuesto)
     // Con o sin resultado del buscador, el código leído va al pedido rápido:
     // allí se valida contra la tienda (SKU no publicado, surtido…) con su motivo.

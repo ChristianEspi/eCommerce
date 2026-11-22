@@ -34,6 +34,7 @@ const product = (sku: string, name: string) => ({
 
 const line = (over: Partial<IntakeLine>): IntakeLine => ({
   indice: 0,
+  presentaciones: [],
   texto: 'Donecil 10 mg',
   cantidad: 3,
   cantidad_supuesta: false,
