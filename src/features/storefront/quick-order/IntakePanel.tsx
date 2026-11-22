@@ -41,6 +41,7 @@ import {
   type IntakeLine,
 } from './intake'
 import { PresentationPicker } from './PresentationPicker'
+import { SubstituteNote } from './SubstituteNote'
 
 /** Lo que se le pasa al pedido rápido: SKU y cantidad, como una fila tecleada. */
 export interface IntakeAcceptedLine {
@@ -262,6 +263,7 @@ export function IntakePanel({
                           </Stack>
                         </TableCell>
                         <TableCell sx={{ minWidth: 220 }}>
+                          {line.sustituto && <SubstituteNote componente={line.sustituto.componente} />}
                           {offersPresentation(line) ? (
                             <PresentationPicker
                               storeSlug={storeSlug}
@@ -274,9 +276,16 @@ export function IntakePanel({
                               size="small"
                               label={t('store.intake.review.product')}
                               value={choice.sku ?? ''}
-                              onChange={(event) => update(index, { sku: event.target.value || null })}
+                              onChange={(event) =>
+                                update(index, {
+                                  sku: event.target.value || null,
+                                  // Una alternativa elegida a propósito entra marcada.
+                                  ...(line.sustituto ? { checked: Boolean(event.target.value) } : {}),
+                                })
+                              }
                               fullWidth
                             >
+                              {line.sustituto && <MenuItem value="">{t('store.intake.review.pickSubstitute')}</MenuItem>}
                               {options.map((p) => (
                                 <MenuItem key={p.product_id} value={p.sku ?? ''}>
                                   {p.name}

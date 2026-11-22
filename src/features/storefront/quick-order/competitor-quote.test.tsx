@@ -233,6 +233,37 @@ describe('CompetitorQuotePanel', () => {
     expect(casilla).toBeDisabled()
   })
 
+  it('sin el producto, ofrece alternativas por componente y la elegida entra marcada (2026-11-22)', async () => {
+    holder.result = {
+      data: {
+        lineas: [
+          line({
+            texto: 'Amoxidal Duo 875',
+            confianza: 'ninguna',
+            sku_propuesto: null,
+            coincidencia: null,
+            alternativas: [product(LEJIA, 'AMX-500', 'Amoxicilina 500 mg')],
+            sustituto: { componente: 'amoxicilina' },
+          }),
+        ],
+        notas: null,
+        cotizacion: { moneda: 'PEN', incluye_igv: false },
+      },
+      motivo: null,
+      interactionId: 'x',
+    }
+    holder.quote = quoteOf([priced(LEJIA, '10.00')])
+    renderWithProviders(<CompetitorQuotePanel storeSlug="botica" currency="PEN" onAccept={vi.fn()} />)
+    await leer()
+
+    expect(await screen.findByText(/alternativas con el mismo componente \(amoxicilina\)/i)).toBeInTheDocument()
+    const casilla = screen.getByRole('checkbox', { name: /incluir en el pedido · línea 1/i })
+    expect(casilla).not.toBeChecked()
+    await userEvent.click(screen.getByRole('combobox'))
+    await userEvent.click(within(screen.getByRole('listbox')).getByRole('option', { name: /Amoxicilina 500 mg · AMX-500/ }))
+    expect(casilla).toBeChecked()
+  })
+
   it('la presentación se elige en la misma fila y entonces se compara (2026-11-22)', async () => {
     const VARIANTE = '33333333-3333-4333-8333-333333333333'
     holder.result = {
