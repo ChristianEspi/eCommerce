@@ -49,6 +49,7 @@ import {
   fileToBase64,
   intakeMotivoKey,
   preselected,
+  offersPresentation,
   readIntake,
   resolveChoice,
   type IntakeFileIssue,
@@ -386,7 +387,7 @@ export function CompetitorQuotePanel({
                           </Stack>
                         </TableCell>
                         <TableCell sx={{ minWidth: 200 }}>
-                          {line.confianza === 'variante' && line.coincidencia ? (
+                          {offersPresentation(line) ? (
                             <PresentationPicker
                               storeSlug={storeSlug}
                               line={line}

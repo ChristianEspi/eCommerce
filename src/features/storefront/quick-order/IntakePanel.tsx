@@ -33,6 +33,7 @@ import {
   fileToBase64,
   intakeMotivoKey,
   preselected,
+  offersPresentation,
   readIntake,
   resolveChoice,
   type Confidence,
@@ -261,7 +262,7 @@ export function IntakePanel({
                           </Stack>
                         </TableCell>
                         <TableCell sx={{ minWidth: 220 }}>
-                          {line.confianza === 'variante' && line.coincidencia ? (
+                          {offersPresentation(line) ? (
                             <PresentationPicker
                               storeSlug={storeSlug}
                               line={line}

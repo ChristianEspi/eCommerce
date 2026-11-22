@@ -15,7 +15,11 @@ import { join } from 'node:path'
 import {
   ESQUEMA_INTAKE,
   agruparPresentaciones,
+  conPresentaciones,
   consultaDeLinea,
+  leerResolucion,
+  palabraPrincipal,
+  propuestaPorCodigo,
   limpiarTexto,
   proponerLinea,
   revisarIntake,
@@ -201,6 +205,31 @@ describe('el producto lo decide el catálogo, sin modelo', () => {
     expect(nuestro).toMatchObject({ confianza: 'codigo', sku_propuesto: 'DON-10' })
   })
 
+  it('un código que es SKU de una presentación apunta al producto con variantes (2026-11-22)', () => {
+    // «QS-282484» es Consiv 18 mg, presentación de QSV-CONSIV.
+    const resueltos = leerResolucion({
+      lines: [
+        { sku: 'QS-282484', status: 'ok', product_id: '11111111-1111-4111-8111-111111111111', variant_id: '22222222-2222-4222-8222-222222222222', slug: 'consiv', name: 'Consiv Tableta Recubierta Caja 30 un' },
+        { sku: 'CJA-77', status: 'rejected', reason: 'SKU_NO_ENCONTRADO' },
+      ],
+    })
+    expect(resueltos.has('cja-77')).toBe(false)
+    const r = resueltos.get('qs-282484')!
+    const porTexto = proponerLinea(0, leida({ sku: 'QS-282484' }), { mode: 'empty', items: [] }, { codigoAjeno: true })
+    const p = propuestaPorCodigo(porTexto, 'QS-282484', r)
+    expect(p).toMatchObject({ confianza: 'codigo', sku_propuesto: 'QS-282484' })
+    expect(p.coincidencia).toMatchObject({ kind: 'variant', sku: null, name: 'Consiv Tableta Recubierta Caja 30 un' })
+    expect(conPresentaciones(p)).toBe(true)
+  })
+
+  it('si el texto completo no encuentra nada, se reintenta con el nombre comercial y nunca es «probable»', () => {
+    expect(palabraPrincipal('Consiv 18 mg Tab. Rec. x30')).toBe('Consiv')
+    expect(palabraPrincipal('18 mg x30')).toBeNull()
+    expect(palabraPrincipal('Consiv')).toBeNull()
+    const p = proponerLinea(0, leida(), { mode: 'fts', items: [hit({})] }, { porPalabra: true })
+    expect(p.confianza).toBe('dudosa')
+  })
+
   it('las presentaciones se agrupan por producto y sin SKU no se ofrecen', () => {
     const p1 = '11111111-1111-4111-8111-111111111111'
     const porProducto = agruparPresentaciones([
@@ -216,8 +245,26 @@ describe('el producto lo decide el catálogo, sin modelo', () => {
 
   it('order-intake trata el código de la cotización como ajeno y trae las presentaciones', () => {
     const src = readFileSync(join(process.cwd(), 'supabase', 'functions', 'order-intake', 'index.ts'), 'utf8')
-    expect(src).toMatch(/proponerLinea\([^)]*\{ codigoAjeno: esCotizacion \}\)/)
+    expect(src).toMatch(/proponerLinea\([^)]*\{ codigoAjeno: esCotizacion, porPalabra \}\)/)
+    // El código se verifica con el mismo verificador del pedido rápido.
+    expect(src).toMatch(/rpc\('resolve_order_lines_for_slug'/)
     expect(src).toMatch(/from\('product_variants'\)[\s\S]*?\.in\('product_id', conVariantes\)/)
+    // 2026-11-22 · Se desplegó usándolos SIN importarlos y la lectura daba 500.
+    const imports = src.slice(0, src.indexOf("from '../_shared/aiIntake.ts'"))
+    for (const nombre of [
+      'INTAKE_MAX_PRESENTACIONES',
+      'agruparPresentaciones',
+      'conPresentaciones',
+      'leerResolucion',
+      'palabraPrincipal',
+      'propuestaPorCodigo',
+      'type CodigoResuelto',
+      'type FilaVariante',
+      'type LineaLeida',
+      'type Presentacion',
+    ]) {
+      expect(imports).toContain(nombre)
+    }
   })
 
   it('las alternativas son del buscador y como mucho tres', () => {

@@ -49,19 +49,29 @@ import { resumenAdjuntos, validarAdjunto, type AdjuntoIA } from '../_shared/aiAt
 import {
   ESQUEMA_COTIZACION,
   ESQUEMA_INTAKE,
+  INTAKE_MAX_PRESENTACIONES,
   INTAKE_MAX_TEXTO,
   SISTEMA_COTIZACION,
   SISTEMA_INTAKE,
+  agruparPresentaciones,
+  conPresentaciones,
   consultaDeLinea,
+  leerResolucion,
+  palabraPrincipal,
+  propuestaPorCodigo,
+  type CodigoResuelto,
+  type LineaLeida,
   proponerLinea,
   resumenIntake,
   revisarCotizacion,
   revisarIntake,
   type CotizacionRevisada,
+  type FilaVariante,
   type HitCatalogo,
   type LecturaRevisada,
   type LineaLeidaCotizacion,
   type LineaPropuesta,
+  type Presentacion,
   type RespuestaModeloCotizacion,
   type RespuestaModeloIntake,
   type ResultadoBusqueda,
@@ -254,14 +264,46 @@ const handler = serveJson(
     }
 
     const leidas = lectura.data.lineas
+
+    /**
+     * 2026-11-22 · Los códigos leídos, verificados con el MISMO verificador del
+     * pedido rápido, que reconoce también el SKU de una presentación. Una sola
+     * llamada con la sesión del comprador: aplica su surtido y su tienda. Si
+     * falla, cada línea sigue su camino por texto.
+     */
+    const codigosLeidos = [...new Set(leidas.flatMap((l) => (l.sku ? [l.sku] : [])))].slice(0, 100)
+    let resueltos = new Map<string, CodigoResuelto>()
+    if (codigosLeidos.length > 0) {
+      const { data, error } = await catalogo.rpc('resolve_order_lines_for_slug', {
+        p_store_slug: storeSlug,
+        p_lines: codigosLeidos.map((sku) => ({ sku, quantity: 1 })),
+      })
+      if (error) logger.warn('intake.codes_failed', { original_code: errorCode(error) })
+      else resueltos = leerResolucion(data)
+    }
+
+    /** Texto completo y, si no encuentra nada, el nombre comercial solo. */
+    async function buscarLinea(linea: LineaLeida): Promise<{ busqueda: ResultadoBusqueda; porPalabra: boolean }> {
+      const consulta = consultaDeLinea(linea) || linea.sku || ''
+      const busqueda = await buscar(consulta)
+      if (busqueda.items.length > 0 && busqueda.mode !== 'empty') return { busqueda, porPalabra: false }
+      const palabra = palabraPrincipal(consulta)
+      if (!palabra) return { busqueda, porPalabra: false }
+      const segunda = await buscar(palabra)
+      return segunda.mode === 'fts' && segunda.items.length > 0
+        ? { busqueda: segunda, porPalabra: true }
+        : { busqueda, porPalabra: false }
+    }
+
     const propuestas: Array<LineaPropuesta & { precio_competencia?: number | null; presentaciones?: Presentacion[] }> = []
     for (let i = 0; i < leidas.length; i += TANDA) {
       const tanda = leidas.slice(i, i + TANDA)
-      const resultados = await Promise.all(
-        tanda.map((linea) => buscar(consultaDeLinea(linea) || linea.sku || '')),
-      )
+      const resultados = await Promise.all(tanda.map((linea) => buscarLinea(linea)))
       tanda.forEach((linea, j) => {
-        const propuesta = proponerLinea(i + j, linea, resultados[j], { codigoAjeno: esCotizacion })
+        const { busqueda, porPalabra } = resultados[j]
+        const porTexto = proponerLinea(i + j, linea, busqueda, { codigoAjeno: esCotizacion, porPalabra })
+        const codigo = linea.sku ? resueltos.get(linea.sku.toLowerCase()) : undefined
+        const propuesta = codigo && linea.sku ? propuestaPorCodigo(porTexto, linea.sku, codigo) : porTexto
         // En cotización, cada línea lleva el precio que puso el OTRO proveedor.
         propuestas.push(
           esCotizacion
@@ -282,7 +324,7 @@ const handler = serveJson(
      */
     const conVariantes = [
       ...new Set(
-        propuestas.flatMap((p) => (p.confianza === 'variante' && p.coincidencia ? [p.coincidencia.product_id] : [])),
+        propuestas.flatMap((p) => (conPresentaciones(p) ? [p.coincidencia!.product_id] : [])),
       ),
     ]
     if (conVariantes.length > 0) {
@@ -301,8 +343,8 @@ const handler = serveJson(
         const porProducto = agruparPresentaciones((filas ?? []) as FilaVariante[])
         for (let k = 0; k < propuestas.length; k++) {
           const p = propuestas[k]
-          if (p.confianza !== 'variante' || !p.coincidencia) continue
-          propuestas[k] = { ...p, presentaciones: porProducto.get(p.coincidencia.product_id) ?? [] }
+          if (!conPresentaciones(p)) continue
+          propuestas[k] = { ...p, presentaciones: porProducto.get(p.coincidencia!.product_id) ?? [] }
         }
       }
     }

@@ -147,6 +147,15 @@ export function preselected(line: IntakeLine): boolean {
 }
 
 /**
+ * ¿La fila ofrece elegir presentación? Una línea `variante`, o un código leído
+ * que resultó ser el SKU de una presentación (2026-11-22): entonces el
+ * desplegable sale con esa presentación ya elegida y se puede cambiar.
+ */
+export function offersPresentation(line: IntakeLine): boolean {
+  return Boolean(line.coincidencia) && (line.confianza === 'variante' || line.coincidencia?.kind === 'variant')
+}
+
+/**
  * El producto y la variante del SKU elegido en una línea: la coincidencia, una
  * alternativa o una de las presentaciones de la coincidencia. `null` si ese
  * SKU no es de ninguno de ellos (un código leído que se valida después).
