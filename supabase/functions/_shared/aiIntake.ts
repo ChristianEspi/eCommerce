@@ -255,7 +255,7 @@ export interface LineaPropuesta {
   readonly coincidencia: ProductoPropuesto | null
   readonly alternativas: readonly ProductoPropuesto[]
   /** 2026-11-22 · Las alternativas son por componente: la tienda no tiene lo pedido. */
-  readonly sustituto?: { readonly componente: string } | null
+  readonly sustituto?: { readonly componente: string; readonly sinAlternativas?: boolean } | null
 }
 
 /**
@@ -454,10 +454,11 @@ export function proponerLinea(
  * (`fts`): un parecido por letras de un componente no es un sustituto.
  */
 export function ofrecerSustitutos(p: LineaPropuesta, componente: string, busqueda: ResultadoBusqueda): LineaPropuesta {
-  if (p.confianza !== 'ninguna' || busqueda.mode !== 'fts') return p
-  const candidatos = busqueda.items.filter((hit) => hit.kind !== 'bundle' || hit.sku)
+  if (p.confianza !== 'ninguna') return p
+  const candidatos = busqueda.mode === 'fts' ? busqueda.items.filter((hit) => hit.kind !== 'bundle' || hit.sku) : []
   const items = preferirPorNombre(candidatos, componente).slice(0, INTAKE_ALTERNATIVAS)
-  if (items.length === 0) return p
+  // Se buscó y no hay: se DICE qué se buscó, para que no parezca que no se intentó.
+  if (items.length === 0) return { ...p, sustituto: { componente, sinAlternativas: true } }
   return { ...p, alternativas: items.map(aPropuesto), sustituto: { componente } }
 }
 

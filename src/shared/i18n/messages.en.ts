@@ -3316,6 +3316,7 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.intake.review.pickPresentation': 'Choose a presentation',
     'store.intake.review.substitute': 'We don\'t have it. Alternatives with the same component ({component}); check they suit you.',
     'store.intake.review.pickSubstitute': 'Choose an alternative',
+    'store.intake.review.noSubstitute': 'We don\'t have it, and there are no alternatives with the same component ({component}).',
     'store.intake.review.codeOnly': 'Code {sku}: confirmed when validating',
     'store.intake.review.noMatch': 'We could not find this product in the store',
     'store.intake.review.accept': 'Move {count} lines to the order',

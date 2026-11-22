@@ -2789,6 +2789,7 @@ export const es = {
     'store.intake.review.pickPresentation': 'Elige una presentación',
     'store.intake.review.substitute': 'No lo tenemos. Alternativas con el mismo componente ({component}); confirma que te sirvan.',
     'store.intake.review.pickSubstitute': 'Elige una alternativa',
+    'store.intake.review.noSubstitute': 'No lo tenemos, y tampoco hay alternativas con el mismo componente ({component}).',
     'store.intake.review.codeOnly': 'Código {sku}: se confirma al validar',
     'store.intake.review.noMatch': 'No encontramos este producto en la tienda',
     'store.intake.review.accept': 'Pasar {count} líneas al pedido',

@@ -76,6 +76,32 @@ describe('preselección y archivo', () => {
 })
 
 describe('IntakePanel', () => {
+  it('sin coincidencia ni alternativas dice qué componente buscó (2026-11-22)', async () => {
+    holder.result = {
+      data: {
+        lineas: [
+          line({
+            texto: 'Amoxidal Duo 875',
+            confianza: 'ninguna',
+            sku_propuesto: null,
+            coincidencia: null,
+            sustituto: { componente: 'amoxicilina ácido clavulánico', sinAlternativas: true },
+          }),
+        ],
+        notas: null,
+      },
+      motivo: null,
+      interactionId: 'x',
+    }
+    renderWithProviders(<IntakePanel storeSlug="botica" onAccept={vi.fn()} />)
+    await userEvent.type(screen.getByRole('textbox', { name: /escribe tu pedido/i }), '5 amoxidal duo')
+    await userEvent.click(screen.getByRole('button', { name: /leer pedido/i }))
+    expect(
+      await screen.findByText('No lo tenemos, y tampoco hay alternativas con el mismo componente (amoxicilina ácido clavulánico).'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('No encontramos este producto en la tienda')).not.toBeInTheDocument()
+  })
+
   it('lo dudoso empieza sin marcar y solo lo marcado pasa, con SKU y cantidad', async () => {
     holder.result = {
       data: {

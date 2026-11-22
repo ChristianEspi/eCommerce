@@ -247,7 +247,10 @@ describe('el producto lo decide el catálogo, sin modelo', () => {
     expect(p).toMatchObject({ confianza: 'ninguna', sku_propuesto: null, sustituto: { componente: 'amoxicilina' } })
     expect(p.alternativas.map((a) => a.sku)).toEqual(['AMX-500'])
     // Un parecido por letras no es un sustituto; y lo que sí coincidió no se toca.
-    expect(ofrecerSustitutos(ninguna, 'amoxicilina', { mode: 'fuzzy', items: [hit({})] })).toBe(ninguna)
+    expect(ofrecerSustitutos(ninguna, 'amoxicilina', { mode: 'fuzzy', items: [hit({})] })).toMatchObject({
+      alternativas: [],
+      sustituto: { componente: 'amoxicilina', sinAlternativas: true },
+    })
     const probable = proponerLinea(0, leida(), { mode: 'fts', items: [hit({})] })
     expect(ofrecerSustitutos(probable, 'x', { mode: 'fts', items: [hit({ sku: 'OTRO' })] })).toBe(probable)
   })
