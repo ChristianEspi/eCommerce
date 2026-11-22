@@ -14,9 +14,10 @@ el recorrido SaaS P00–P17 queda cerrado)
 ## IA visible: asistente conversacional, copiloto y sustitutos (2026-11-22, a pedido del operador)
 
 Commits locales en `dev`: `dd4aea0` (chat) · `ef700ac` (copiloto) · `6b8b820` (sustitutos).
-**Nada aplicado ni desplegado en QAS todavía**: 2 migraciones (`20261122100000_ai_chat`,
-`20261122110000_ai_copilot_trend_lapsed`) y las funciones `shopping-chat` (nueva, `verify_jwt = true`),
-`copilot` y `order-intake` esperan la orden del operador.
+**Aplicado en QAS el 2026-11-22** (a pedido del operador): migraciones `20261122100000_ai_chat` y
+`20261122110000_ai_copilot_trend_lapsed` (API de gestión, sin registrar como las previas; `anon` sin EXECUTE
+verificado) y funciones `shopping-chat` (nueva, `verify_jwt = true`), `copilot` y `order-intake`. Humo con
+`prueba.b2b@miquimica.demo`: crédito, repetir pedido (EC-20261119-00056) y sustitutos responden 200 con frase.
 
 | # | Qué | Dónde |
 |---|---|---|
@@ -26,7 +27,7 @@ Commits locales en `dev`: `dd4aea0` (chat) · `ef700ac` (copiloto) · `6b8b820` 
 | 4 | **WhatsApp**: propuesta enviada al buzón (`2026-11-22-ecommerce-002`). Sin endpoint hasta respuesta de GMAO. | `docs/propuestas/2026-11-19-canal-whatsapp-comercio.md` |
 | 5 | **Sustitutos por componente**: el modelo anota el componente principal al leer pedido/cotización; sin coincidencia, `order-intake` ofrece hasta 3 alternativas con ese componente, sin marcar. | `aiIntake.ts` (`ofrecerSustitutos`) |
 
-Pendiente: aplicar las 2 migraciones y desplegar las 3 funciones en QAS; respuesta de GMAO a
+Pendiente: respuesta de GMAO a
 `ecommerce-002`; la propuesta MCP sigue sin enviar.
 
 ## Facturación electrónica Perú con Nubefact, fases 1–5 (2026-11-20)
