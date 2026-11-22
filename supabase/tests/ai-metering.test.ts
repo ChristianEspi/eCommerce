@@ -461,6 +461,9 @@ describe('la puerta que PostgREST ve', () => {
       // 2026-11-19 · Anotar lo que llegó al carrito con ayuda de la IA. Exige
       // sesión; tienda por slug activo; solo productos publicados en ella.
       'ai_attribution_mark',
+      // 2026-11-22 · Freno por comprador del asistente conversacional (60/h).
+      // Exige sesión; no consume cuota (eso lo hace `ai_consume_for_store`).
+      'ai_chat_check',
       // Fase 08: cobranza (cartera o cliente). INVOKER, roles de `credit` +
       // `credit.management`; solo lectura.
       'ai_collections_facts',

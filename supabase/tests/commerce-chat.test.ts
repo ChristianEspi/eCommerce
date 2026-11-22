@@ -1,0 +1,225 @@
+// @vitest-environment node
+/**
+ * Asistente de compra conversacional (2026-11-22).
+ *
+ * Lo que se fija:
+ *  · el plan del modelo se valida contra una lista cerrada; lo dudoso es responder;
+ *  · repetir un pedido aplica SOLO los cambios dichos y lo demás queda igual;
+ *  · un carrito propuesto usa las reglas de la lectura de pedidos (código nuestro
+ *    manda, presentaciones a elegir, nombre comercial de segundo intento);
+ *  · lo que ve el modelo para redactar no lleva importes;
+ *  · el freno por comprador en la base.
+ */
+import type { PGlite } from '@electric-sql/pglite'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { asRole, createTestDatabase, TENANT_A } from './harness'
+import {
+  aplicarCambios,
+  ejecutarChat,
+  nombreCoincide,
+  proponerCarrito,
+  validarPlanChat,
+  type PuertosChat,
+} from '../functions/_shared/commerceChat.ts'
+import type { HitCatalogo, ResultadoBusqueda } from '../functions/_shared/aiIntake.ts'
+
+const CONSIV = '11111111-1111-4111-8111-111111111111'
+const FANTER = '22222222-2222-4222-8222-222222222222'
+const BLOQ = '33333333-3333-4333-8333-333333333333'
+
+const hit = (o: Partial<HitCatalogo>): HitCatalogo => ({
+  product_id: BLOQ,
+  slug: 'bloqueador',
+  name: 'Bloqueador Solar FPS 50',
+  sku: 'QS-514574',
+  kind: 'simple',
+  brand_name: 'Eucerin',
+  in_stock: true,
+  ...o,
+})
+
+function puertos(over: Partial<PuertosChat> = {}): PuertosChat & { busquedas: string[] } {
+  const busquedas: string[] = []
+  const catalogo: Record<string, ResultadoBusqueda> = {
+    bloqueador: { mode: 'fts', items: [hit({})] },
+    consiv: { mode: 'fts', items: [hit({ product_id: CONSIV, slug: 'consiv', name: 'Consiv Tableta Recubierta Caja 30 un', sku: null, kind: 'variant' })] },
+    metilfenidato: { mode: 'fts', items: [hit({ product_id: CONSIV, slug: 'consiv', name: 'Consiv Tableta Recubierta Caja 30 un', sku: null, kind: 'variant' })] },
+  }
+  return {
+    busquedas,
+    async buscar(consulta) {
+      busquedas.push(consulta)
+      return catalogo[consulta.toLowerCase()] ?? { mode: 'empty', items: [] }
+    },
+    async pedidos() {
+      return [
+        { order_id: 'o2', order_number: 'EC-2', status: 'paid', payment_status: 'paid', fulfillment_status: 'in_progress', placed_at: '2026-11-20T10:00:00Z', total: '300.00', currency: 'PEN' },
+        { order_id: 'o1', order_number: 'EC-1', status: 'delivered', payment_status: 'paid', fulfillment_status: 'fulfilled', placed_at: '2026-10-20T10:00:00Z', total: '100.00', currency: 'PEN' },
+      ]
+    },
+    async detallePedido(id) {
+      return id === 'o2'
+        ? [
+            { sku: 'QS-282484', nombre: 'Consiv Tableta Recubierta Caja 30 un · 18 mg', cantidad: 2 },
+            { sku: 'QS-295212', nombre: 'Fanter 10 mg Comprimidos Recubiertos · Caja x 15', cantidad: 1 },
+          ]
+        : []
+    },
+    async credito() {
+      return { cuenta: 'Distribuidora Prueba SAC', limite: '10000.00', disponible: '7500.00', saldo: '2500.00', vencido: '0', moneda: 'PEN', proximo: { order_number: 'EC-2', due_at: '2026-12-20', total: '300.00', days_overdue: 0 } }
+    },
+    async resolverCodigos(skus) {
+      const m = new Map()
+      if (skus.includes('QS-282484')) m.set('qs-282484', { product_id: CONSIV, slug: 'consiv', name: 'Consiv Tableta Recubierta Caja 30 un', variant: true })
+      if (skus.includes('QS-295212')) m.set('qs-295212', { product_id: FANTER, slug: 'fanter', name: 'Fanter 10 mg Comprimidos Recubiertos', variant: true })
+      return m
+    },
+    async presentaciones(ids) {
+      const m = new Map()
+      if (ids.includes(CONSIV)) m.set(CONSIV, [{ variant_id: 'a1111111-1111-4111-8111-111111111111', sku: 'QS-282484', name: '18 mg' }])
+      if (ids.includes(FANTER)) m.set(FANTER, [{ variant_id: 'a2222222-1111-4111-8111-111111111111', sku: 'QS-295212', name: 'Caja x 15' }])
+      return m
+    },
+    ...over,
+  }
+}
+
+describe('el plan del modelo', () => {
+  it('lista cerrada: lo desconocido o incompleto es responder', () => {
+    expect(validarPlanChat({ herramienta: 'borrar_todo' })).toEqual({ herramienta: 'responder' })
+    expect(validarPlanChat({ herramienta: 'buscar_productos', consulta: 'x' })).toEqual({ herramienta: 'responder' })
+    expect(validarPlanChat({ herramienta: 'armar_pedido', items: [] })).toEqual({ herramienta: 'responder' })
+  })
+
+  it('un número de pedido inventado o mal formado se descarta (queda «el más reciente»)', () => {
+    expect(validarPlanChat({ herramienta: 'estado_pedido', numero_pedido: "1'; drop" })).toEqual({ herramienta: 'estado_pedido', numero: null })
+    expect(validarPlanChat({ herramienta: 'estado_pedido', numero_pedido: 'EC-20261121-00061' })).toEqual({ herramienta: 'estado_pedido', numero: 'EC-20261121-00061' })
+  })
+
+  it('cantidades fuera de rango se descartan; 0 solo vale al repetir (quitar)', () => {
+    const items = [{ producto: 'Consiv', cantidad: 0 }, { producto: 'Fanter', cantidad: 3 }, { producto: 'X', cantidad: 2 }, { producto: 'Lejía', cantidad: 100000 }]
+    expect(validarPlanChat({ herramienta: 'repetir_pedido', items })).toMatchObject({ cambios: [{ producto: 'Consiv', cantidad: 0 }, { producto: 'Fanter', cantidad: 3 }] })
+    expect(validarPlanChat({ herramienta: 'armar_pedido', items })).toMatchObject({ items: [{ producto: 'Fanter', cantidad: 3 }] })
+  })
+})
+
+describe('repetir un pedido con cambios', () => {
+  it('coincide por palabras, sin tildes', () => {
+    expect(nombreCoincide('Consiv Tableta Recubierta · 18 mg', 'consiv')).toBe(true)
+    expect(nombreCoincide('Lejía Tradicional 5 L', 'lejia concentrada')).toBe(false)
+    expect(nombreCoincide('Lejía Tradicional 5 L', 'lejia tradicional')).toBe(true)
+  })
+
+  it('cambia la cantidad, quita y añade; lo no dicho queda igual', () => {
+    const r = aplicarCambios(
+      [
+        { sku: 'A', nombre: 'Consiv 18 mg', cantidad: 2 },
+        { sku: 'B', nombre: 'Fanter 10 mg', cantidad: 1 },
+      ],
+      [{ producto: 'Consiv', cantidad: 4 }, { producto: 'Fanter', cantidad: 0 }, { producto: 'Bloqueador', cantidad: 1 }, { producto: 'Nabila', cantidad: 0 }],
+    )
+    expect(r.lineas).toEqual([
+      { texto: 'Consiv 18 mg', cantidad: 4, sku: 'A' },
+      { texto: 'Bloqueador', cantidad: 1, sku: null },
+    ])
+    expect(r.avisos).toEqual(['NO_ESTABA:Nabila'])
+  })
+
+  it('propone el carrito desde el último pedido, con la presentación ya elegida por su código', async () => {
+    const p = puertos()
+    const r = await ejecutarChat({ herramienta: 'repetir_pedido', numero: null, cambios: [{ producto: 'Fanter', cantidad: 0 }] }, p)
+    expect(r.datos.tipo).toBe('carrito')
+    if (r.datos.tipo !== 'carrito') return
+    expect(r.datos.origen).toBe('EC-2')
+    expect(r.datos.lineas).toHaveLength(1)
+    expect(r.datos.lineas[0]).toMatchObject({ confianza: 'codigo', sku_propuesto: 'QS-282484', cantidad: 2 })
+    expect(r.datos.lineas[0]!.presentaciones.map((x) => x.sku)).toEqual(['QS-282484'])
+    expect(r.paraModelo).not.toMatch(/300|100\.00/)
+  })
+
+  it('sin pedidos anteriores lo dice, sin inventar', async () => {
+    const r = await ejecutarChat({ herramienta: 'repetir_pedido', numero: 'EC-999', cambios: [] }, puertos())
+    expect(r.datos).toEqual({ tipo: 'carrito', origen: null, lineas: [], avisos: ['SIN_PEDIDO'] })
+  })
+})
+
+describe('armar un pedido dictado', () => {
+  it('busca cada producto; si la frase no casa, prueba con el nombre comercial (sin marcar)', async () => {
+    const p = puertos()
+    const lineas = await proponerCarrito([{ texto: 'Consiv 18 mg tab rec', cantidad: 3, sku: null }, { texto: 'bloqueador', cantidad: 1, sku: null }], p)
+    expect(p.busquedas).toEqual(expect.arrayContaining(['Consiv 18 mg tab rec', 'Consiv', 'bloqueador']))
+    expect(lineas[0]).toMatchObject({ confianza: 'variante', sku_propuesto: null })
+    expect(lineas[0]!.presentaciones).toHaveLength(1)
+    expect(lineas[1]).toMatchObject({ confianza: 'probable', sku_propuesto: 'QS-514574' })
+  })
+})
+
+describe('pedidos y crédito', () => {
+  it('estado de un pedido: el pedido es el del comprador; otro número no existe', async () => {
+    const r = await ejecutarChat({ herramienta: 'estado_pedido', numero: 'ec-1' }, puertos())
+    expect(r.datos).toMatchObject({ tipo: 'pedido', pedido: { order_number: 'EC-1' } })
+    const otro = await ejecutarChat({ herramienta: 'estado_pedido', numero: 'EC-404' }, puertos())
+    expect(otro.datos).toEqual({ tipo: 'pedido', pedido: null })
+  })
+
+  it('el crédito se pinta con cifras; el modelo solo ve si hay vencido', async () => {
+    const r = await ejecutarChat({ herramienta: 'mi_credito' }, puertos())
+    expect(r.datos).toMatchObject({ tipo: 'credito', credito: { disponible: '7500.00' } })
+    expect(r.paraModelo).not.toMatch(/7500|2500|10000/)
+    expect(JSON.parse(r.paraModelo)).toMatchObject({ tiene_linea: true, tiene_vencido: false })
+  })
+})
+
+describe('sustitutos por principio activo', () => {
+  it('busca por el principio activo y deja fuera el producto pedido', async () => {
+    const p = puertos()
+    const r = await ejecutarChat({ herramienta: 'sustitutos', producto: 'Concerta', principioActivo: 'metilfenidato' }, p)
+    expect(p.busquedas).toEqual(['metilfenidato'])
+    expect(r.datos).toMatchObject({ tipo: 'sustitutos', principio_activo: 'metilfenidato', product_ids: [CONSIV] })
+    expect(r.productosPermitidos).toEqual([CONSIV])
+  })
+})
+
+describe('ai_chat_check: sesión y freno por comprador', () => {
+  let db: PGlite
+  const COMPRADOR = { sub: '0b000000-0000-4000-8000-00000000c101', role: 'authenticated', email: 'compra@cliente.pe' }
+
+  beforeAll(async () => {
+    db = await createTestDatabase()
+    await db.query(`select public.bootstrap_tenant($1, $2, $3, $4, $5, $6, $7, 'Tienda', 'PEN')`, [
+      TENANT_A.organizationId,
+      TENANT_A.companyId,
+      TENANT_A.slug,
+      TENANT_A.slug,
+      TENANT_A.adminEmail,
+      TENANT_A.ownerId,
+      TENANT_A.storeSlug,
+    ])
+    await db.query(`update public.stores set status = 'active'`)
+  })
+
+  afterAll(async () => {
+    await db?.close()
+  })
+
+  async function revisar(claims: Record<string, unknown> | null, slug = TENANT_A.storeSlug) {
+    return asRole(db, claims ? 'authenticated' : 'anon', (claims ?? null) as never, async () => {
+      const r = await db.query<{ r: Record<string, unknown> }>(`select public.ai_chat_check($1) as r`, [slug])
+      return r.rows[0]?.r
+    })
+  }
+
+  it('anónimo no puede ni llamarla', async () => {
+    await expect(revisar(null)).rejects.toThrow(/permission denied/i)
+  })
+
+  it('tienda desconocida ⇒ no disponible', async () => {
+    expect(await revisar(COMPRADOR, 'no-existe')).toEqual({ allowed: false, reason: 'TIENDA_NO_DISPONIBLE' })
+  })
+
+  it('60 por hora y por comprador; a otro no le afecta', async () => {
+    for (let i = 0; i < 60; i++) expect(await revisar(COMPRADOR)).toEqual({ allowed: true })
+    expect(await revisar(COMPRADOR)).toEqual({ allowed: false, reason: 'RATE_LIMITED' })
+    expect(await revisar({ ...COMPRADOR, sub: '0b000000-0000-4000-8000-00000000c102' })).toEqual({ allowed: true })
+  })
+})

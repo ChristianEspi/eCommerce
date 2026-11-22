@@ -46,7 +46,7 @@ const presentationSchema = z.object({
 })
 export type IntakePresentation = z.infer<typeof presentationSchema>
 
-const lineSchema = z.object({
+export const intakeLineSchema = z.object({
   indice: z.number().int().min(0),
   texto: z.string(),
   cantidad: z.number().int().min(1).max(9999),
@@ -63,10 +63,10 @@ const lineSchema = z.object({
   /** Solo en líneas `variante`: sus presentaciones con SKU. Vacío = elegir en la ficha. */
   presentaciones: z.array(presentationSchema).max(20).optional().default([]),
 })
-export type IntakeLine = z.infer<typeof lineSchema>
+export type IntakeLine = z.infer<typeof intakeLineSchema>
 
 export const intakeDataSchema = z.object({
-  lineas: z.array(lineSchema).max(60),
+  lineas: z.array(intakeLineSchema).max(60),
   notas: z.string().nullable(),
   /** Solo en «Mejora esta cotización»: moneda y si los precios llevan IGV. */
   cotizacion: z
