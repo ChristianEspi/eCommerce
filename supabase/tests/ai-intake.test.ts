@@ -218,6 +218,11 @@ describe('el producto lo decide el catálogo, sin modelo', () => {
     const src = readFileSync(join(process.cwd(), 'supabase', 'functions', 'order-intake', 'index.ts'), 'utf8')
     expect(src).toMatch(/proponerLinea\([^)]*\{ codigoAjeno: esCotizacion \}\)/)
     expect(src).toMatch(/from\('product_variants'\)[\s\S]*?\.in\('product_id', conVariantes\)/)
+    // 2026-11-22 · Se desplegó usándolos SIN importarlos y la lectura daba 500.
+    const imports = src.slice(0, src.indexOf("from '../_shared/aiIntake.ts'"))
+    for (const nombre of ['INTAKE_MAX_PRESENTACIONES', 'agruparPresentaciones', 'type FilaVariante', 'type Presentacion']) {
+      expect(imports).toContain(nombre)
+    }
   })
 
   it('las alternativas son del buscador y como mucho tres', () => {
