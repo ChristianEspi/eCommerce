@@ -472,9 +472,14 @@ describe('la puerta que PostgREST ve', () => {
       // Fase 11: herramientas del Copilot. `ai_copilot_tools` describe qué
       // herramientas tiene quien llama (rol + módulo); productos, ficha y
       // ventas son datasets INVOKER + STABLE con su propio guard.
+      // 2026-11-22 · Clientes que dejaron de comprar: DEFINER con guard (rol de
+      // ventas + sales.force + sociedad del JWT; el vendedor, su cartera).
+      'ai_copilot_lapsed_customers',
       'ai_copilot_product',
       'ai_copilot_products',
       'ai_copilot_sales_facts',
+      // 2026-11-22 · Venta diaria para dibujar. INVOKER, insights + analytics.basic.
+      'ai_copilot_sales_trend',
       'ai_copilot_tools',
       // Fase 06: el resumen 360 del cliente y el dataset de la visita.
       // INVOKER, roles de su funcionalidad + cartera del vendedor + crédito

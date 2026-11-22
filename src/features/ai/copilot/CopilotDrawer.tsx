@@ -44,6 +44,7 @@ import {
   type CopilotToolStatus,
 } from './copilot'
 import { useCopilot, type CopilotMessage } from './copilot-context'
+import { CopilotTrendChart } from './CopilotTrendChart'
 
 const TITLE_ID = 'ebim-copilot-title'
 
@@ -191,6 +192,10 @@ function AssistantMessage({
           ))}
         </Box>
       )}
+      {answer.charts.map((c, i) => (
+        <CopilotTrendChart key={i} chart={c} />
+      ))}
+      {answer.draft && <DraftCard draft={answer.draft} answer={answer} />}
       {answer.links.length > 0 && (
         <Stack spacing={0.75}>
           {answer.links.map((l) => (
@@ -211,6 +216,48 @@ function AssistantMessage({
       )}
       <AiFeedbackButtons interactionId={result.interactionId} />
     </Stack>
+  )
+}
+
+/**
+ * Borrador de correo (2026-11-22). Las cifras y los nombres llegan como
+ * marcadores y se pintan con el dato de la base, igual que la respuesta. El
+ * Copilot no envía nada: «Copiar» deja el texto ya resuelto en el
+ * portapapeles y la persona lo revisa y lo manda desde su correo.
+ */
+function DraftCard({ draft, answer }: { draft: NonNullable<CopilotAnswer['draft']>; answer: CopilotAnswer }) {
+  const { t, locale } = useI18n()
+  const [copiado, setCopiado] = useState(false)
+  const plano = (texto: string) =>
+    renderAnalystText(texto, markerContextOf(answer), locale, { days: t('copilot.days') })
+      .map((p) => p.text)
+      .join('')
+
+  async function copiar() {
+    try {
+      await navigator.clipboard.writeText(`${plano(draft.subject)}\n\n${plano(draft.body)}`)
+      setCopiado(true)
+    } catch {
+      setCopiado(false)
+    }
+  }
+
+  return (
+    <Box data-copilot-draft sx={{ border: '1px dashed var(--border)', borderRadius: 2, p: 1.25 }}>
+      <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: 'var(--muted)', mb: 0.5 }}>{t('copilot.draft.title')}</Typography>
+      <Typography sx={{ fontSize: 13, fontWeight: 800, mb: 0.75 }}>
+        <CopilotText text={draft.subject} answer={answer} />
+      </Typography>
+      <Typography sx={{ fontSize: 13, lineHeight: 1.55, whiteSpace: 'pre-line' }}>
+        <CopilotText text={draft.body} answer={answer} />
+      </Typography>
+      <Stack direction="row" spacing={1} sx={{ mt: 1, alignItems: 'center' }}>
+        <Button size="small" variant="outlined" onClick={() => void copiar()}>
+          {copiado ? t('copilot.draft.copied') : t('copilot.draft.copy')}
+        </Button>
+        <Typography sx={{ fontSize: 11.5, color: 'var(--muted)' }}>{t('copilot.draft.note')}</Typography>
+      </Stack>
+    </Box>
   )
 }
 
