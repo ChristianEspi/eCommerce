@@ -41,6 +41,19 @@ const creditSchema = z.object({
 })
 export type ChatCredit = z.infer<typeof creditSchema>
 
+/** Una presentación comparada: precio y precio por unidad calculados en el servidor. */
+const compareRowSchema = z.object({
+  variant_id: z.string(),
+  nombre: z.string(),
+  en_stock: z.boolean(),
+  precio: z.string().nullable(),
+  moneda: z.string(),
+  contenido: z.object({ cantidad: z.number().positive(), unidad: z.enum(['un', 'ml', 'g']) }).nullable(),
+  por_unidad: z.string().nullable(),
+  mejor: z.boolean(),
+})
+export type ChatCompareRow = z.infer<typeof compareRowSchema>
+
 export const chatDataSchema = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('productos'), product_ids: z.array(z.string().uuid()), consulta: z.string() }),
   z.object({ tipo: z.literal('pedidos'), pedidos: z.array(orderSchema) }),
@@ -71,6 +84,11 @@ export const chatDataSchema = z.discriminatedUnion('tipo', [
       }),
     ),
     lineas: z.array(intakeLineSchema),
+  }),
+  z.object({
+    tipo: z.literal('ficha'),
+    product_id: z.string().uuid().nullable(),
+    comparacion: z.array(compareRowSchema),
   }),
   z.object({ tipo: z.literal('ninguno') }),
 ])

@@ -50,6 +50,7 @@ export const HERRAMIENTAS_CHAT = [
   'armar_pedido',
   'sustitutos',
   'reponer',
+  'sobre_producto',
   'responder',
 ] as const
 export type HerramientaChat = (typeof HERRAMIENTAS_CHAT)[number]
@@ -72,6 +73,7 @@ export type PlanChat =
   | { readonly herramienta: 'armar_pedido'; readonly items: readonly ItemPedido[] }
   | { readonly herramienta: 'sustitutos'; readonly producto: string; readonly principioActivo: string }
   | { readonly herramienta: 'reponer' }
+  | { readonly herramienta: 'sobre_producto'; readonly producto: string }
   | { readonly herramienta: 'responder' }
 
 export interface PlanChatCrudo {
@@ -136,6 +138,10 @@ export function validarPlanChat(crudo: PlanChatCrudo): PlanChat {
     }
     case 'reponer':
       return { herramienta: 'reponer' }
+    case 'sobre_producto': {
+      const producto = texto(crudo.consulta, 80)
+      return producto.length >= 2 ? { herramienta: 'sobre_producto', producto } : { herramienta: 'responder' }
+    }
     default:
       return { herramienta: 'responder' }
   }
@@ -151,6 +157,7 @@ export const SISTEMA_PLAN_CHAT = [
   '- armar_pedido: dicta productos para pedir. items = {producto, cantidad} (cantidad 1 si no la dice).',
   '- sustitutos: un producto no está, no tiene stock o pide una alternativa. consulta = el producto que busca; principio_activo = su principio activo SOLO si lo conoces con certeza; si es una combinación, TODOS sus componentes sin conectores («amoxicilina ácido clavulánico»), porque una alternativa con solo uno no es equivalente (si no lo sabes, vacío).',
   '- reponer: pregunta qué le toca reponer, qué se le está acabando o pide «lo de siempre» / su pedido habitual. Sin campos.',
+  '- sobre_producto: pregunta por UN producto concreto: qué contiene, ingredientes, características, especificaciones, sus presentaciones o cuál presentación le conviene más (por ejemplo «¿la caja x100 o la x30?»). consulta = ese producto, sin la pregunta.',
   '- responder: saludo, agradecimiento, fuera de tema o falta información.',
   'Nunca inventes números de pedido. Rellena solo los campos de la herramienta elegida; los demás vacíos.',
 ].join('\n')
@@ -237,8 +244,140 @@ export function leerReposicion(data: unknown): ItemReposicion[] {
   }).slice(0, MAX_ITEMS_CHAT)
 }
 
+/** Una presentación de la ficha, con el precio que le toca a ESTE comprador. */
+export interface PresentacionFicha {
+  readonly variant_id: string
+  readonly nombre: string
+  readonly en_stock: boolean
+  /** Precio unitario cotizado con su sesión (lista B2B incluida); null si no se pudo cotizar. */
+  readonly precio: string | null
+  readonly moneda: string
+}
+
+/** Lo publicado de UN producto: lo único con lo que el chat puede contestar sobre él. */
+export interface FichaProducto {
+  readonly product_id: string
+  readonly nombre: string
+  readonly marca: string | null
+  readonly descripcion: string | null
+  readonly destacados: readonly string[]
+  readonly especificaciones: ReadonlyArray<{ readonly etiqueta: string; readonly valor: string }>
+  readonly presentaciones: readonly PresentacionFicha[]
+}
+
+export type UnidadContenido = 'un' | 'ml' | 'g'
+
+export interface Contenido {
+  readonly cantidad: number
+  readonly unidad: UnidadContenido
+}
+
+/** Una fila de la comparación. Las cifras las calcula el código, nunca el modelo. */
+export interface FilaComparacion {
+  readonly variant_id: string
+  readonly nombre: string
+  readonly en_stock: boolean
+  readonly precio: string | null
+  readonly moneda: string
+  readonly contenido: Contenido | null
+  /** Precio por unidad (un), por 100 ml o por 100 g, con dos decimales; null si no se compara. */
+  readonly por_unidad: string | null
+  /** La más barata por unidad entre las comparables (solo si no todas cuestan lo mismo). */
+  readonly mejor: boolean
+}
+
+const UNIDADES_CONTEO =
+  'un|und|unid|unids|unidades|tab|tabs|tabletas?|comp|comprimidos?|cap|caps|capsulas?|sobres?|amp|ampollas?|piezas?|pzs?|rollos?|pares|viales?|grageas?'
+/** Tras el número, una medida: entonces no es un conteo («x 500 ml», «caja 10 mg»). */
+const NO_ES_CONTEO = '(?!\\s*(?:mg|mcg|ml|l|lt|g|gr|kg)\\b)'
+const RE_CONTEO = new RegExp(`\\b(\\d{1,5})\\s*(?:${UNIDADES_CONTEO})\\b`)
+const RE_POR = new RegExp(`\\b(?:x|por)\\s*(\\d{1,5})\\b${NO_ES_CONTEO}`)
+const RE_ENVASE = new RegExp(`\\b(?:caja|frasco|blister|pack|paquete|bolsa)\\s*(?:de\\s*)?(\\d{1,5})\\b${NO_ES_CONTEO}`)
+// Tras normalizar, «1,5 L» es «1 5 l»: el segundo grupo es el decimal.
+const RE_VOLUMEN = /\b(\d{1,5})(?: (\d{1,3}))?\s*(ml|l|lt|litros?)\b/
+const RE_MASA = /\b(\d{1,5})(?: (\d{1,3}))?\s*(g|gr|grs|gramos?|kg)\b/
+
+function decimal(entero: string, fraccion: string | undefined): number {
+  return Number(fraccion ? `${entero}.${fraccion}` : entero)
+}
+
+/**
+ * Cuánto trae una presentación, leído de su nombre: «Caja x100», «30 un»,
+ * «500 ml», «1 L», «250 g». Los miligramos NO son contenido (son la dosis de
+ * cada tableta): «500 mg Caja x30» trae 30. Si no se lee, null y no se compara.
+ */
+export function contenidoDePresentacion(nombre: string): Contenido | null {
+  const n = normalizar(nombre)
+  const conteo = n.match(RE_CONTEO) ?? n.match(RE_POR) ?? n.match(RE_ENVASE)
+  if (conteo) {
+    const cantidad = Number(conteo[1])
+    if (cantidad > 0) return { cantidad, unidad: 'un' }
+  }
+  const volumen = n.match(RE_VOLUMEN)
+  if (volumen) {
+    const valor = decimal(volumen[1]!, volumen[2])
+    if (valor > 0) return { cantidad: volumen[3] === 'ml' ? valor : valor * 1000, unidad: 'ml' }
+  }
+  const masa = n.match(RE_MASA)
+  if (masa) {
+    const valor = decimal(masa[1]!, masa[2])
+    if (valor > 0) return { cantidad: masa[3] === 'kg' ? valor * 1000 : valor, unidad: 'g' }
+  }
+  return null
+}
+
+/** Por unidad para «un»; por 100 ml / 100 g para líquidos y pesos. */
+const BASE: Record<UnidadContenido, number> = { un: 1, ml: 100, g: 100 }
+
+/**
+ * Compara las presentaciones de un producto por precio por unidad. Solo entran
+ * las que tienen precio y contenido de la unidad más frecuente (no se compara
+ * una caja con un frasco); la «mejor» es la de menor precio por unidad, y no
+ * hay mejor si todas empatan.
+ */
+export function compararPresentaciones(presentaciones: readonly PresentacionFicha[]): FilaComparacion[] {
+  const filas = presentaciones.map((p) => ({
+    p,
+    contenido: contenidoDePresentacion(p.nombre),
+    precio: p.precio === null ? Number.NaN : Number(p.precio),
+  }))
+  const cuenta = new Map<UnidadContenido, number>()
+  for (const f of filas) {
+    if (f.contenido && Number.isFinite(f.precio) && f.precio > 0) {
+      cuenta.set(f.contenido.unidad, (cuenta.get(f.contenido.unidad) ?? 0) + 1)
+    }
+  }
+  const [unidad, comparables] = [...cuenta.entries()].sort((a, b) => b[1] - a[1])[0] ?? [null, 0]
+  const porUnidad = filas.map((f) =>
+    unidad && comparables >= 2 && f.contenido?.unidad === unidad && Number.isFinite(f.precio) && f.precio > 0
+      ? (f.precio / f.contenido.cantidad) * BASE[unidad]
+      : null,
+  )
+  const centesimas = porUnidad.map((v) => (v === null ? null : Math.round(v * 10000)))
+  const valores = centesimas.filter((v): v is number => v !== null)
+  const minimo = valores.length >= 2 && new Set(valores).size > 1 ? Math.min(...valores) : null
+  return filas.map((f, i) => ({
+    variant_id: f.p.variant_id,
+    nombre: f.p.nombre,
+    en_stock: f.p.en_stock,
+    precio: f.p.precio,
+    moneda: f.p.moneda,
+    contenido: f.contenido,
+    por_unidad: porUnidad[i] == null ? null : porUnidad[i]!.toFixed(2),
+    mejor: minimo !== null && centesimas[i] === minimo,
+  }))
+}
+
+function contenidoLegible(c: Contenido | null): string | null {
+  if (!c) return null
+  return c.unidad === 'un' ? `${c.cantidad} unidades` : `${c.cantidad} ${c.unidad}`
+}
+
+const MAX_DESCRIPCION_MODELO = 1500
+
 export interface PuertosChat {
   reposicion(): Promise<readonly ItemReposicion[]>
+  ficha(productId: string): Promise<FichaProducto | null>
   buscar(consulta: string, soloConStock: boolean): Promise<ResultadoBusqueda>
   pedidos(): Promise<readonly PedidoResumen[]>
   detallePedido(orderId: string): Promise<readonly LineaDePedido[]>
@@ -258,6 +397,7 @@ export type DatosChat =
   | { readonly tipo: 'carrito'; readonly origen: string | null; readonly lineas: readonly LineaCarrito[]; readonly avisos: readonly string[] }
   | { readonly tipo: 'sustitutos'; readonly producto: string; readonly principio_activo: string | null; readonly product_ids: readonly string[] }
   | { readonly tipo: 'reposicion'; readonly items: readonly ItemReposicion[]; readonly lineas: readonly LineaCarrito[] }
+  | { readonly tipo: 'ficha'; readonly product_id: string | null; readonly comparacion: readonly FilaComparacion[] }
   | { readonly tipo: 'ninguno' }
 
 export interface ResultadoChat {
@@ -492,6 +632,41 @@ export async function ejecutarChat(plan: PlanChat, puertos: PuertosChat): Promis
         productosPermitidos: [],
       }
     }
+    case 'sobre_producto': {
+      // El producto lo elige el buscador de la tienda, no el modelo; la
+      // respuesta sale SOLO de su ficha publicada.
+      const r = await puertos.buscar(plan.producto, false)
+      const encontrado = r.mode === 'fts' || r.mode === 'fuzzy' ? r.items[0] : undefined
+      const ficha = encontrado ? await puertos.ficha(encontrado.product_id) : null
+      if (!ficha) {
+        return {
+          datos: { tipo: 'ficha', product_id: null, comparacion: [] },
+          paraModelo: '(no se encontró ese producto publicado en esta tienda)',
+          productosPermitidos: [],
+        }
+      }
+      const comparacion = compararPresentaciones(ficha.presentaciones)
+      const comparables = comparacion.filter((c) => c.por_unidad !== null).length
+      return {
+        datos: { tipo: 'ficha', product_id: ficha.product_id, comparacion },
+        paraModelo: JSON.stringify({
+          product_id: ficha.product_id,
+          producto: ficha.nombre,
+          marca: ficha.marca,
+          descripcion: ficha.descripcion ? ficha.descripcion.slice(0, MAX_DESCRIPCION_MODELO) : null,
+          destacados: ficha.destacados.slice(0, 10),
+          especificaciones: ficha.especificaciones.slice(0, 20),
+          presentaciones: comparacion.map((c) => ({
+            nombre: c.nombre,
+            con_stock: c.en_stock,
+            contenido: contenidoLegible(c.contenido),
+            mas_conveniente_por_unidad: c.mejor,
+          })),
+          comparacion_posible: comparables >= 2,
+        }),
+        productosPermitidos: [ficha.product_id],
+      }
+    }
     case 'responder':
       return { datos: { tipo: 'ninguno' }, paraModelo: '(sin datos)', productosPermitidos: [] }
   }
@@ -505,6 +680,7 @@ export const SISTEMA_RESPUESTA_CHAT = [
   'Eres el asistente de compra de una tienda online y conversas con un cliente con sesión. Responde en su idioma, cálido y directo, en tres frases como máximo, con lo que dicen los datos.',
   'La pantalla muestra aparte los productos, pedidos, el crédito y el carrito propuesto con sus precios y cifras: NO escribas precios, importes, saldos, descuentos ni cantidades de stock.',
   'Si es una reposición, di que es según cada cuánto suele comprar (dias_restantes negativo = ya le tocaba) y que revise las cantidades.',
+  'Si es una ficha de producto, contesta SOLO con lo que dicen descripcion, destacados y especificaciones; si la ficha no lo dice, dilo y sugiere consultarlo con la tienda. Para elegir presentación usa mas_conveniente_por_unidad (la pantalla muestra el precio por unidad); si comparacion_posible es falso, di que no se puede comparar por unidad. No digas para qué sirve un medicamento.',
   'Si propones un carrito, dilo y pide que lo revise y lo confirme con el botón; menciona las líneas sin coincidencia o donde debe elegir presentación.',
   'Si ofreces alternativas por componente principal, di que comparten ese componente y que confirme que le sirvan (con un profesional si es un medicamento). Nunca digas para qué sirve un medicamento, dosis, síntomas ni recomiendes uno por una dolencia.',
   'Si los datos no responden la pregunta, dilo y sugiere cómo seguir. product_ids: SOLO identificadores product_id que aparezcan en los datos; si los datos no traen product_id (pedidos, crédito, carrito), lista vacía. Nunca nombres.',

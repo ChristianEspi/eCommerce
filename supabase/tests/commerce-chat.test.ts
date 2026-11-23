@@ -15,6 +15,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { asRole, createTestDatabase, TENANT_A } from './harness'
 import {
   aplicarCambios,
+  compararPresentaciones,
+  contenidoDePresentacion,
   ejecutarChat,
   leerReposicion,
   nombreCoincide,
@@ -70,6 +72,21 @@ function puertos(over: Partial<PuertosChat> = {}): PuertosChat & { busquedas: st
     },
     async reposicion() {
       return [{ sku: 'QS-282484', nombre: 'Consiv Tableta Recubierta Caja 30 un · 18 mg', cantidad: 2, compras: 4, cada_dias: 15, dias_restantes: -1 }]
+    },
+    async ficha(id) {
+      if (id !== CONSIV) return null
+      return {
+        product_id: CONSIV,
+        nombre: 'Consiv Tableta Recubierta',
+        marca: 'Medifarma',
+        descripcion: 'Metilfenidato. Tableta de liberación prolongada.',
+        destacados: ['Registro sanitario vigente'],
+        especificaciones: [{ etiqueta: 'Forma', valor: 'Tableta' }],
+        presentaciones: [
+          { variant_id: 'v30', nombre: '18 mg · Caja 30 un', en_stock: true, precio: '90.00', moneda: 'PEN' },
+          { variant_id: 'v100', nombre: '18 mg · Caja x100', en_stock: true, precio: '250.00', moneda: 'PEN' },
+        ],
+      }
     },
     async credito() {
       return { cuenta: 'Distribuidora Prueba SAC', limite: '10000.00', disponible: '7500.00', saldo: '2500.00', vencido: '0', moneda: 'PEN', proximo: { order_number: 'EC-2', due_at: '2026-12-20', total: '300.00', days_overdue: 0 } }
@@ -216,6 +233,61 @@ describe('sustitutos por principio activo', () => {
     expect(p.busquedas).toEqual(['metilfenidato'])
     expect(r.datos).toMatchObject({ tipo: 'sustitutos', principio_activo: 'metilfenidato', product_ids: [CONSIV] })
     expect(r.productosPermitidos).toEqual([CONSIV])
+  })
+})
+
+describe('preguntas sobre un producto y comparar presentaciones (2026-11-22)', () => {
+  it('el plan pide el producto; sin él es responder', () => {
+    expect(validarPlanChat({ herramienta: 'sobre_producto', consulta: 'Consiv' })).toEqual({ herramienta: 'sobre_producto', producto: 'Consiv' })
+    expect(validarPlanChat({ herramienta: 'sobre_producto', consulta: '' })).toEqual({ herramienta: 'responder' })
+  })
+
+  it('lee el contenido del nombre; los mg son dosis, no contenido', () => {
+    expect(contenidoDePresentacion('Eutebrol Duo 14mg / 10 mg Tableta Caja 30 un')).toEqual({ cantidad: 30, unidad: 'un' })
+    expect(contenidoDePresentacion('Amoxicilina 500 mg Caja x100')).toEqual({ cantidad: 100, unidad: 'un' })
+    expect(contenidoDePresentacion('Fanter 10 mg · Caja x 15')).toEqual({ cantidad: 15, unidad: 'un' })
+    expect(contenidoDePresentacion('Pedialyte 500 ml · Uva')).toEqual({ cantidad: 500, unidad: 'ml' })
+    expect(contenidoDePresentacion('Lejía 1,5 L')).toEqual({ cantidad: 1500, unidad: 'ml' })
+    expect(contenidoDePresentacion('Crema 2 kg')).toEqual({ cantidad: 2000, unidad: 'g' })
+    expect(contenidoDePresentacion('Consiv 18 mg')).toBeNull()
+    expect(contenidoDePresentacion('Talla M')).toBeNull()
+  })
+
+  it('el precio por unidad lo calcula el código; empate o sin datos: no hay mejor', () => {
+    const base = { en_stock: true, moneda: 'PEN' }
+    const r = compararPresentaciones([
+      { ...base, variant_id: 'a', nombre: 'Caja 30 un', precio: '90.00' },
+      { ...base, variant_id: 'b', nombre: 'Caja x100', precio: '250.00' },
+      { ...base, variant_id: 'c', nombre: 'Frasco 120 ml', precio: '20.00' },
+    ])
+    expect(r.map((x) => [x.por_unidad, x.mejor])).toEqual([['3.00', false], ['2.50', true], [null, false]])
+    const empate = compararPresentaciones([
+      { ...base, variant_id: 'a', nombre: '500 ml · Uva', precio: '5.00' },
+      { ...base, variant_id: 'b', nombre: '500 ml · Fresa', precio: '5.00' },
+    ])
+    expect(empate.map((x) => [x.por_unidad, x.mejor])).toEqual([['1.00', false], ['1.00', false]])
+    const sinPrecio = compararPresentaciones([
+      { ...base, variant_id: 'a', nombre: 'Caja 30 un', precio: null },
+      { ...base, variant_id: 'b', nombre: 'Caja x100', precio: '250.00' },
+    ])
+    expect(sinPrecio.every((x) => x.por_unidad === null && !x.mejor)).toBe(true)
+  })
+
+  it('contesta desde la ficha del producto que encontró el buscador; el modelo no ve precios', async () => {
+    const r = await ejecutarChat({ herramienta: 'sobre_producto', producto: 'Consiv' }, puertos())
+    expect(r.datos).toMatchObject({ tipo: 'ficha', product_id: CONSIV })
+    if (r.datos.tipo !== 'ficha') return
+    expect(r.datos.comparacion.map((c) => c.mejor)).toEqual([false, true])
+    const modelo = JSON.parse(r.paraModelo)
+    expect(modelo).toMatchObject({ producto: 'Consiv Tableta Recubierta', comparacion_posible: true, presentaciones: [{ contenido: '30 unidades' }, { mas_conveniente_por_unidad: true }] })
+    expect(r.paraModelo).not.toMatch(/90|250|2.50|3.00/)
+    expect(r.productosPermitidos).toEqual([CONSIV])
+  })
+
+  it('producto que no está: ficha vacía y el modelo lo sabe', async () => {
+    const r = await ejecutarChat({ herramienta: 'sobre_producto', producto: 'Nabila' }, puertos())
+    expect(r.datos).toEqual({ tipo: 'ficha', product_id: null, comparacion: [] })
+    expect(r.paraModelo).toMatch(/no se encontró/)
   })
 })
 
