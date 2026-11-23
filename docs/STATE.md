@@ -13,8 +13,11 @@ el recorrido SaaS P00–P17 queda cerrado)
 
 ## IA: lo pendiente, completo (2026-11-22, a pedido del operador)
 
-Commits locales en `dev` (`83dd9c1`…`07fd780`). **Sin aplicar en QAS** todavía: migraciones `20261122130000`–`20261122170000`
-y funciones `shopping-chat` y `order-intake`. Ya existían y no se rehicieron: cobranza asistida (`credit-assistant`),
+Commits locales en `dev` (`83dd9c1`…`07fd780`). **Aplicado en QAS el 2026-11-22**: migraciones `20261122130000`–`20261122170000`
+(API de gestión; `anon` sin EXECUTE verificado; disparador `domain_events_quote_requested_notify` creado) y funciones `shopping-chat` y
+`order-intake`. Humo con `prueba.b2b@`: reponer (nombre limpio), mi_carrito, estado_pedido con entregas y opiniones → 200 con frase;
+Eutebrol → datos sin frase (candado de salud) y sin comparación (dosis distintas). `catalog_cleanup_rows` con el owner de miquimica: 438
+productos (109 sin foto, 3 sin descripción, 6 sin categoría, 24 sin atributos). El front nuevo requiere subir `dev`/`qas`. Ya existían y no se rehicieron: cobranza asistida (`credit-assistant`),
 alertas proactivas (`ecommerce-ai-digest`), análisis de reseñas, vigilancia y «Hoy deberías revisar».
 
 | # | Qué | Dónde |
