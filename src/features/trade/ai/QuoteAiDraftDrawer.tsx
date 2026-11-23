@@ -29,6 +29,7 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 're
 import { AiFeedbackButtons } from '@/features/ai/AiFeedbackButtons'
 import { useAiFeature } from '@/features/ai/hooks'
 import { useCustomerOptions } from '@/features/customers/hooks'
+import { useProductSearch } from '@/features/pricing/hooks'
 import { MarkerText, MotivoNotice } from '@/features/orders/ai/parts'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
@@ -65,7 +66,29 @@ import {
 } from './useQuotesAi'
 
 /** Ejemplos de instrucción (se escriben en el campo; no gastan nada). */
-const EXAMPLES = ['example1', 'example2'] as const
+/**
+ * Ejemplos con datos REALES de la sociedad: el primer cliente empresa (o el
+ * primero que haya) y productos publicados en la tienda. Así, pulsar un
+ * ejemplo y pedir «Interpretar» resuelve de verdad. Sin datos, no hay
+ * ejemplos: nunca nombres inventados que parezcan clientes del tenant.
+ */
+function buildExamples(
+  t: (key: MessageKey) => string,
+  customers: readonly { name: string; kind: string }[],
+  products: readonly { sku: string }[],
+): string[] {
+  const empresas = customers.filter((c) => c.kind === 'company')
+  const a = (empresas[0] ?? customers[0])?.name
+  const b = (empresas[1] ?? customers.find((c) => c.name !== a))?.name ?? a
+  // Por SKU: es la referencia que se usa en B2B y la que resuelve exacta.
+  const p1 = products[0]?.sku
+  const p2 = products[1]?.sku ?? p1
+  const p3 = products[2]?.sku ?? p1
+  if (!a || !p1 || !p2) return []
+  const fill = (key: MessageKey, customer: string, x: string, y: string) =>
+    t(key).replace('{customer}', customer).replace('{product1}', x).replace('{product2}', y)
+  return [fill('aiQuotes.example1', a, p1, p2), fill('aiQuotes.example2', b!, p3!, p3!)]
+}
 
 /** Red caída ≠ asistente que respondió con error: cada uno con su mensaje. */
 function aiErrorKey(error: unknown): MessageKey {
@@ -161,6 +184,12 @@ export function QuoteAiDraftDrawer({
   const suggest = useAssortmentSuggestions(locale)
 
   const customers = useCustomerOptions({ term: customerSearch, enabled: open })
+  const exampleCustomers = useCustomerOptions({ term: '', enabled: open && canAsk })
+  const exampleProducts = useProductSearch(storeId, '', open && canAsk)
+  const examples = useMemo(
+    () => buildExamples(t, exampleCustomers.data ?? [], exampleProducts.data ?? []),
+    [t, exampleCustomers.data, exampleProducts.data],
+  )
   const customerOptions = useMemo<PickerOption[]>(
     () => (customers.data ?? []).map((c) => ({ id: c.id, primary: c.name, secondary: c.code })),
     [customers.data],
@@ -300,17 +329,20 @@ export function QuoteAiDraftDrawer({
           {canAsk && (
             <Box component="form" onSubmit={interpret} noValidate>
               <Stack spacing={1}>
-                <Stack direction="row" useFlexGap spacing={1} sx={{ flexWrap: 'wrap' }} role="group" aria-label={t('aiQuotes.examples')}>
-                  {EXAMPLES.map((id) => (
-                    <Chip
-                      key={id}
-                      variant="outlined"
-                      clickable
-                      label={t(`aiQuotes.${id}` as MessageKey)}
-                      onClick={() => setInstruction(t(`aiQuotes.${id}` as MessageKey))}
-                    />
-                  ))}
-                </Stack>
+                {examples.length > 0 && (
+                  <Stack direction="row" useFlexGap spacing={1} sx={{ flexWrap: 'wrap' }} role="group" aria-label={t('aiQuotes.examples')}>
+                    {examples.map((text) => (
+                      <Chip
+                        key={text}
+                        variant="outlined"
+                        clickable
+                        label={text}
+                        onClick={() => setInstruction(text)}
+                        sx={{ maxWidth: '100%', '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' } }}
+                      />
+                    ))}
+                  </Stack>
+                )}
                 <Field
                   multiline
                   minRows={3}

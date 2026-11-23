@@ -6488,10 +6488,8 @@ export const en: Readonly<Record<MessageKey, string>> = {
   'aiQuotes.instruction.tooLong': 'Maximum 600 characters.',
   'aiQuotes.instruction.run': 'Interpret with AI',
   'aiQuotes.examples': 'Instruction examples',
-  'aiQuotes.example1':
-    'Quote Bodega San Juan 20 boxes of reference A-100 and 10 of B-200, valid 30 days',
-  'aiQuotes.example2':
-    'Quote for Distribuidora Central: 12 units from the last order, deliver to the warehouse',
+  'aiQuotes.example1': 'Quote {customer} 20 units of reference {product1} and 10 of {product2}, valid 30 days',
+  'aiQuotes.example2': 'Quote for {customer}: 12 units of reference {product1}, deliver to the warehouse',
   'aiQuotes.costHint': 'Each interpretation uses one AI unit. Calculating prices is free.',
   'aiQuotes.interpreting': 'Interpreting the instruction…',
   'aiQuotes.networkError': 'The assistant could not be reached. Check your internet connection and retry, or pick the customer and products manually.',

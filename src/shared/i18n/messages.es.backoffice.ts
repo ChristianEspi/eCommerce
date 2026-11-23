@@ -2022,10 +2022,8 @@ export const esBackoffice = {
   'aiQuotes.instruction.tooLong': 'Máximo 600 caracteres.',
   'aiQuotes.instruction.run': 'Interpretar con IA',
   'aiQuotes.examples': 'Ejemplos de instrucción',
-  'aiQuotes.example1':
-    'Cotiza a Bodega San Juan 20 cajas de la referencia A-100 y 10 de la B-200, válida 30 días',
-  'aiQuotes.example2':
-    'Cotización para Distribuidora Central: 12 unidades del último pedido, entrega en almacén',
+  'aiQuotes.example1': 'Cotiza a {customer} 20 unidades de la referencia {product1} y 10 de la {product2}, válida 30 días',
+  'aiQuotes.example2': 'Cotización para {customer}: 12 unidades de la referencia {product1}, entrega en almacén',
   'aiQuotes.costHint': 'Cada interpretación gasta una unidad de IA. Calcular precios no gasta.',
   'aiQuotes.interpreting': 'Interpretando la instrucción…',
   'aiQuotes.networkError': 'No se pudo contactar con el asistente. Revisa tu conexión a internet y reintenta, o elige cliente y productos a mano.',
