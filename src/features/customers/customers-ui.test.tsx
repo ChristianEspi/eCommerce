@@ -144,7 +144,7 @@ function backend(options: { entitlements?: string[]; rpc?: Record<string, () => 
   })
 }
 
-function renderCustomers(fake: FakeSupabase) {
+function renderCustomers(fake: FakeSupabase, route?: string) {
   holder.client = fake
   return renderWithProviders(
     <TenantProvider>
@@ -154,7 +154,7 @@ function renderCustomers(fake: FakeSupabase) {
         </CapabilityGate>
       </CapabilitiesProvider>
     </TenantProvider>,
-    { session: fake.state.session },
+    { session: fake.state.session, ...(route ? { route } : {}) },
   )
 }
 
@@ -267,6 +267,28 @@ describe('Clientes — la pantalla', () => {
 
     await user.click(screen.getByRole('button', { name: 'Editar: Acme' }))
     expect(await screen.findByText('Con cuenta B2B')).toBeInTheDocument()
+  })
+})
+
+/**
+ * 2026-11-22 · `?cliente=<id>` abre la ficha de ESE cliente. Es el destino del
+ * Copilot y de los análisis IA: antes dejaban en la lista y había que buscar.
+ */
+describe('Clientes — enlace directo a una ficha', () => {
+  it('con ?cliente=<id> abre su ficha aunque no se haya buscado', async () => {
+    renderCustomers(backend(), `/app/customers?cliente=${ANA}`)
+    expect(await screen.findByRole('dialog', { name: 'Ana Torres' })).toBeInTheDocument()
+  })
+
+  it('con un id que no existe (u otro tenant) no abre nada y lo dice', async () => {
+    renderCustomers(backend(), '/app/customers?cliente=77777777-7777-4777-8777-7777777777ff')
+    expect(await screen.findByText('No encontramos ese registro.')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('un valor que no es un id no llega a consultar', async () => {
+    renderCustomers(backend(), '/app/customers?cliente=drop-table')
+    expect(await screen.findByText('No encontramos ese registro.')).toBeInTheDocument()
   })
 })
 

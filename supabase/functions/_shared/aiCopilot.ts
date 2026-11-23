@@ -564,6 +564,11 @@ export interface EntidadCopilot {
   readonly module: CopilotLinkModule | null
   /** Solo pedidos: el front abre `/app/orders?order=<id>` (la RLS decide). */
   readonly order_id: string | null
+  /**
+   * Solo clientes (2026-11-22): el front abre `/app/customers?cliente=<id>`,
+   * la ficha de ESE cliente y no la lista entera. La RLS decide si se ve.
+   */
+  readonly customer_id?: string | null
 }
 
 export type Hecho = string | boolean | readonly string[]
@@ -860,7 +865,7 @@ function adaptarInventario(raw: unknown, p: string, a: Acumulador): boolean {
   return true
 }
 
-function adaptarCliente(raw: unknown, p: string, a: Acumulador): boolean {
+function adaptarCliente(raw: unknown, p: string, a: Acumulador, customerId: string): boolean {
   const h = hechosDeCliente(raw)
   if (!h) return false
   copiarMetricas(a, p, h.metrics)
@@ -872,6 +877,7 @@ function adaptarCliente(raw: unknown, p: string, a: Acumulador): boolean {
       label: e.label,
       module: e.kind === 'customer' ? 'customers' : e.kind === 'order' && orderId ? 'orders' : null,
       order_id: orderId,
+      customer_id: e.kind === 'customer' ? customerId : null,
     })
   }
   hecho(a, p, 'customer.kind', h.customer.kind)
@@ -954,7 +960,8 @@ function adaptarInactivos(raw: unknown, p: string, a: Acumulador) {
     const label = texto(t?.name)
     if (!t || !label) return
     const ref = `C${i + 1}`
-    entidad(a, p, ref, { kind: 'customer', label, module: 'customers', order_id: null })
+    const customerId = typeof t.customer_id === 'string' && UUID.test(t.customer_id) ? t.customer_id : null
+    entidad(a, p, ref, { kind: 'customer', label, module: 'customers', order_id: null, customer_id: customerId })
     cuenta(a, p, `${ref}.days_since`, t.days_since, 'days')
     cuenta(a, p, `${ref}.orders`, t.orders_count)
   })
@@ -1006,7 +1013,7 @@ export function adaptarResultado(
       forma = adaptarInventario(salida.raw, prefix, a)
       break
     case 'customer_summary':
-      forma = adaptarCliente(salida.raw, prefix, a)
+      forma = adaptarCliente(salida.raw, prefix, a, llamada.customer_id)
       break
   }
   if (!forma) return { ...vacio, status: 'error' }
@@ -1247,6 +1254,7 @@ export interface EnlaceCopilot {
   readonly label: string
   readonly module: CopilotLinkModule
   readonly order_id: string | null
+  readonly customer_id: string | null
 }
 
 export interface CopilotRespuesta {
@@ -1360,7 +1368,14 @@ export function revisarCopilot(o: Orquestado): Revision<CopilotRespuesta> {
       continue
     }
     vistos.add(ref)
-    links.push({ ref, kind: e.kind, label: e.label, module: e.module, order_id: e.order_id })
+    links.push({
+      ref,
+      kind: e.kind,
+      label: e.label,
+      module: e.module,
+      order_id: e.order_id,
+      customer_id: e.customer_id ?? null,
+    })
   }
   const follow_ups: string[] = []
   for (const f of r.follow_ups.slice(0, 3)) {

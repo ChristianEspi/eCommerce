@@ -228,6 +228,9 @@ export interface MarkerContext {
  * entidad (desde `entities`). Un marcador desconocido se pinta como «—»: el
  * servidor ya los filtró, pero lo que cruza la red se vuelve a mirar.
  */
+/** La palabra «días»/«days» justo detrás de un marcador de días (sin el espacio que la sigue). */
+const DAYS_UNIT_AFTER = /^\s*(?:d[ií]as?|days?)(?![\p{L}\p{N}])/iu
+
 export function renderAnalystText(
   text: string,
   context: MarkerContext,
@@ -247,6 +250,13 @@ export function renderAnalystText(
     else if (entity) parts.push({ type: 'entity', ref: key, text: entity.label })
     else parts.push({ type: 'text', text: '—' })
     last = index + match[0].length
+    // Una cifra en días ya se pinta con su unidad («60 días»). El modelo suele
+    // escribirla otra vez detrás del marcador —«{{T1.days}} días»— y salía
+    // «60 días días» (2026-11-22). La unidad repetida se come aquí, una vez.
+    if (metric?.kind === 'days') {
+      const repetida = DAYS_UNIT_AFTER.exec(text.slice(last))
+      if (repetida) last += repetida[0].length
+    }
   }
   if (last < text.length) parts.push({ type: 'text', text: text.slice(last) })
   return parts

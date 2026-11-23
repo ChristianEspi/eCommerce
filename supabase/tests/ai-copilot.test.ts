@@ -474,7 +474,10 @@ describe('orquestación', () => {
     expect(revisado.ok).toBe(true)
     const v = (revisado as { value: CopilotRespuesta }).value
     expect(v.kind).toBe('answer')
-    expect(v.links).toEqual([{ ref: 'T1.O1', kind: 'order', label: 'A-3', module: 'orders', order_id: null }])
+    // `customer_id` (2026-11-22) solo lo llevan los clientes; un pedido, null.
+    expect(v.links).toEqual([
+      { ref: 'T1.O1', kind: 'order', label: 'A-3', module: 'orders', order_id: null, customer_id: null },
+    ])
     expect(v.metrics['T1.sales.gross_delta_pct']).toBeDefined()
   })
 
