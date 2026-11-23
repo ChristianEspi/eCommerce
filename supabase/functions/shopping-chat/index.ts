@@ -38,6 +38,7 @@ import {
   SISTEMA_PLAN_CHAT,
   SISTEMA_RESPUESTA_CHAT,
   ejecutarChat,
+  leerMiCarrito,
   leerReposicion,
   leerSeguimiento,
   numerosDePedido,
@@ -281,6 +282,14 @@ const handler = serveJson(
             moneda: typeof v.currency === 'string' ? v.currency : moneda,
           })),
         } satisfies FichaProducto
+      },
+      async carrito() {
+        const { data, error } = await usuario.rpc('my_cart_summary', { p_store_slug: storeSlug })
+        if (error) {
+          logger.warn('chat.cart_failed', { original_code: errorCode(error) })
+          return leerMiCarrito(null)
+        }
+        return leerMiCarrito(data)
       },
       async seguimiento(orderId) {
         const { data, error } = await usuario.rpc('my_order_tracking', { p_store_slug: storeSlug, p_order_id: orderId })

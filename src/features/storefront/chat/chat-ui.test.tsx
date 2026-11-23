@@ -251,4 +251,32 @@ describe('ChatPanel', () => {
     const linea = document.querySelector('[data-chat-deliveries]') as HTMLElement
     expect(linea.textContent).toMatch(/Reparto · En camino · prometido para el .*19.* · 3 días de retraso · último aviso: .* · intentos de entrega fallidos: 1/)
   })
+
+  it('mi carrito: qué bajó de precio y qué no tiene stock, con las cifras del servidor (2026-11-22)', async () => {
+    holder.replies.push({
+      herramienta: 'mi_carrito',
+      datos: {
+        tipo: 'mi_carrito',
+        carrito: {
+          moneda: 'PEN',
+          dias_sin_tocar: 3,
+          lineas: [
+            { product_id: CONSIV, nombre: 'Bloqueador Solar FPS 50', cantidad: 2, precio_antes: '50.00', precio_hoy: '45.00', en_stock: true },
+            { product_id: CONSIV, nombre: 'Consiv 18 mg', cantidad: 1, precio_antes: '90.00', precio_hoy: '90.00', en_stock: false },
+          ],
+        },
+      },
+      respuesta: 'Te quedó pendiente tu carrito: el bloqueador bajó de precio.',
+      product_ids: [],
+      motivo: null,
+    } satisfies ChatReply)
+    const cart = pintar()
+    await escribir('que tengo en mi carrito')
+    expect(await screen.findByText('Tu carrito')).toBeInTheDocument()
+    expect(screen.getByText(/Bajó de precio \(antes .*50[.,]00\)/)).toBeInTheDocument()
+    expect(screen.getByText('Sin stock')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Ir a pagar' })).toHaveAttribute('href', '/s/botica/checkout')
+    await userEvent.click(screen.getByRole('button', { name: /ver carrito|abrir carrito/i }))
+    expect(cart.openCart).toHaveBeenCalled()
+  })
 })

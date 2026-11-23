@@ -188,6 +188,8 @@ describe('shopping-chat: conversación con sesión (2026-11-22)', () => {
       'my_account_statement',
       'my_business_order_detail',
       'my_business_orders',
+      // 2026-11-22 · el carrito activo propio, sin escribir.
+      'my_cart_summary',
       'my_consumer_order_detail',
       'my_consumer_orders',
       // 2026-11-22 · reposición: lectura del historial del comprador, sin escritura.

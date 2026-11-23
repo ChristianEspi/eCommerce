@@ -53,6 +53,7 @@ export const HERRAMIENTAS_CHAT = [
   'sustitutos',
   'reponer',
   'sobre_producto',
+  'mi_carrito',
   'responder',
 ] as const
 export type HerramientaChat = (typeof HERRAMIENTAS_CHAT)[number]
@@ -76,6 +77,7 @@ export type PlanChat =
   | { readonly herramienta: 'sustitutos'; readonly producto: string; readonly principioActivo: string }
   | { readonly herramienta: 'reponer' }
   | { readonly herramienta: 'sobre_producto'; readonly producto: string }
+  | { readonly herramienta: 'mi_carrito' }
   | { readonly herramienta: 'responder' }
 
 export interface PlanChatCrudo {
@@ -140,6 +142,8 @@ export function validarPlanChat(crudo: PlanChatCrudo): PlanChat {
     }
     case 'reponer':
       return { herramienta: 'reponer' }
+    case 'mi_carrito':
+      return { herramienta: 'mi_carrito' }
     case 'sobre_producto': {
       const producto = texto(crudo.consulta, 80)
       return producto.length >= 2 ? { herramienta: 'sobre_producto', producto } : { herramienta: 'responder' }
@@ -160,6 +164,7 @@ export const SISTEMA_PLAN_CHAT = [
   '- sustitutos: un producto no está, no tiene stock o pide una alternativa. consulta = el producto que busca; principio_activo = su principio activo SOLO si lo conoces con certeza; si es una combinación, TODOS sus componentes sin conectores («amoxicilina ácido clavulánico»), porque una alternativa con solo uno no es equivalente (si no lo sabes, vacío).',
   '- reponer: pregunta qué le toca reponer, qué se le está acabando o pide «lo de siempre» / su pedido habitual. Sin campos.',
   '- sobre_producto: pregunta por UN producto concreto: qué contiene, ingredientes, características, especificaciones, sus presentaciones o cuál presentación le conviene más (por ejemplo «¿la caja x100 o la x30?»). consulta = ese producto, sin la pregunta.',
+  '- mi_carrito: pregunta qué tiene en su carrito, si le faltó terminar una compra o si algo del carrito cambió de precio. Sin campos.',
   '- responder: saludo, agradecimiento, fuera de tema o falta información.',
   'Nunca inventes números de pedido. Rellena solo los campos de la herramienta elegida; los demás vacíos.',
 ].join('\n')
@@ -238,6 +243,46 @@ export function leerSeguimiento(data: unknown): EntregaPedido[] {
       intentos_fallidos: Number.isInteger(intentos) && intentos > 0 ? intentos : 0,
     }]
   }).slice(0, 5)
+}
+
+/** Una línea del carrito activo del comprador (`my_cart_summary`). */
+export interface LineaMiCarrito {
+  readonly product_id: string
+  readonly nombre: string
+  readonly cantidad: number
+  readonly precio_antes: string | null
+  readonly precio_hoy: string | null
+  readonly en_stock: boolean
+}
+
+export interface MiCarrito {
+  readonly lineas: readonly LineaMiCarrito[]
+  readonly moneda: string
+  readonly dias_sin_tocar: number | null
+}
+
+export function leerMiCarrito(data: unknown): MiCarrito {
+  const d = (data ?? {}) as { lineas?: unknown; moneda?: unknown; dias_sin_tocar?: unknown }
+  const lineas = (Array.isArray(d.lineas) ? (d.lineas as Array<Record<string, unknown>>) : []).flatMap((l): LineaMiCarrito[] => {
+    const cantidad = Number(l.cantidad)
+    if (typeof l.product_id !== 'string' || typeof l.nombre !== 'string' || !Number.isInteger(cantidad) || cantidad < 1) return []
+    const precio = (v: unknown) => (typeof v === 'string' && Number.isFinite(Number(v)) ? v : null)
+    return [{ product_id: l.product_id, nombre: l.nombre.slice(0, 200), cantidad, precio_antes: precio(l.precio_antes), precio_hoy: precio(l.precio_hoy), en_stock: l.en_stock === true }]
+  })
+  const dias = Number(d.dias_sin_tocar)
+  return {
+    lineas: lineas.slice(0, 50),
+    moneda: typeof d.moneda === 'string' ? d.moneda : 'PEN',
+    dias_sin_tocar: d.dias_sin_tocar == null || !Number.isInteger(dias) ? null : Math.max(0, dias),
+  }
+}
+
+/** «bajo» / «subio» / «igual» / null (sin precio de antes o de hoy). Solo el sentido, nunca la cifra. */
+export function cambioDePrecio(l: LineaMiCarrito): 'bajo' | 'subio' | 'igual' | null {
+  if (l.precio_antes === null || l.precio_hoy === null) return null
+  const antes = Math.round(Number(l.precio_antes) * 100)
+  const hoy = Math.round(Number(l.precio_hoy) * 100)
+  return hoy < antes ? 'bajo' : hoy > antes ? 'subio' : 'igual'
 }
 
 export interface CreditoComprador {
@@ -474,6 +519,7 @@ export interface PuertosChat {
   detallePedido(orderId: string): Promise<readonly LineaDePedido[]>
   credito(): Promise<CreditoComprador | null>
   seguimiento(orderId: string): Promise<readonly EntregaPedido[]>
+  carrito(): Promise<MiCarrito>
   resolverCodigos(skus: readonly string[]): Promise<Map<string, CodigoResuelto>>
   presentaciones(productIds: readonly string[]): Promise<Map<string, Presentacion[]>>
 }
@@ -489,6 +535,7 @@ export type DatosChat =
   | { readonly tipo: 'carrito'; readonly origen: string | null; readonly lineas: readonly LineaCarrito[]; readonly avisos: readonly string[] }
   | { readonly tipo: 'sustitutos'; readonly producto: string; readonly principio_activo: string | null; readonly product_ids: readonly string[] }
   | { readonly tipo: 'reposicion'; readonly items: readonly ItemReposicion[]; readonly lineas: readonly LineaCarrito[] }
+  | { readonly tipo: 'mi_carrito'; readonly carrito: MiCarrito }
   | { readonly tipo: 'ficha'; readonly product_id: string | null; readonly comparacion: readonly FilaComparacion[] }
   | { readonly tipo: 'ninguno' }
 
@@ -787,6 +834,19 @@ export async function ejecutarChat(plan: PlanChat, puertos: PuertosChat): Promis
         productosPermitidos: [ficha.product_id],
       }
     }
+    case 'mi_carrito': {
+      const carrito = await puertos.carrito()
+      return {
+        datos: { tipo: 'mi_carrito', carrito },
+        paraModelo: carrito.lineas.length > 0
+          ? JSON.stringify({
+              dias_sin_tocar: carrito.dias_sin_tocar,
+              lineas: carrito.lineas.map((l) => ({ producto: l.nombre, cantidad: l.cantidad, precio: cambioDePrecio(l), con_stock: l.en_stock })),
+            })
+          : '(su carrito está vacío; puede repetir un pedido o dictar lo que necesita)',
+        productosPermitidos: [],
+      }
+    }
     case 'responder':
       return { datos: { tipo: 'ninguno' }, paraModelo: '(sin datos)', productosPermitidos: [] }
   }
@@ -800,6 +860,7 @@ export const SISTEMA_RESPUESTA_CHAT = [
   'Eres el asistente de compra de una tienda online y conversas con un cliente con sesión. Responde en su idioma, cálido y directo, en tres frases como máximo, con lo que dicen los datos.',
   'La pantalla muestra aparte los productos, pedidos, el crédito y el carrito propuesto con sus precios y cifras: NO escribas precios, importes, saldos, descuentos ni cantidades de stock.',
   'Si es el estado de un pedido con entregas: di en qué estado va y la fecha prometida; si dias_retraso > 0, di que va con retraso y explícalo SOLO con el estado y el último evento del operador (por ejemplo un intento de entrega fallido); nunca inventes causas, plazos nuevos ni compensaciones, y sugiere escribir a la tienda si necesita más detalle.',
+  'Si es su carrito: di cuántos productos tiene y, si dias_sin_tocar es mayor que cero, que le quedó pendiente; menciona por nombre los que bajaron («bajo») o subieron («subio») de precio y los que ya no tienen stock, sin cifras, y que lo confirme en el carrito.',
   'Si es una reposición, di que es según cada cuánto suele comprar (dias_restantes negativo = ya le tocaba) y que revise las cantidades.',
   'Si es una ficha de producto, contesta SOLO con lo que dicen descripcion, destacados y especificaciones: composición, ingredientes, contenido, formato y características. NO repitas frases de la ficha sobre para qué sirve, a quién ayuda, qué alivia, previene o trata, ni indicaciones o modo de uso; si preguntan eso, di que lo consulte con un profesional. Si la ficha no trae el dato, dilo y sugiere consultarlo con la tienda.',
   'Para elegir presentación usa mas_conveniente_por_unidad y di «la más conveniente por unidad» (nunca «más barata» ni «más económica»; la pantalla muestra los precios). Si ninguna es más conveniente, di que cuestan lo mismo por unidad; si comparacion_posible es falso, di que no se pueden comparar por unidad.',

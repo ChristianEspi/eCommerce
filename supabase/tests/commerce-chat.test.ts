@@ -21,6 +21,7 @@ import {
   hermanosPorContenido,
   nombreSinContenido,
   ejecutarChat,
+  leerMiCarrito,
   leerReposicion,
   leerSeguimiento,
   nombreCoincide,
@@ -99,6 +100,16 @@ function puertos(over: Partial<PuertosChat> = {}): PuertosChat & { busquedas: st
         presentaciones: [
           { variant_id: 'v30', nombre: '18 mg · Caja 30 un', en_stock: true, precio: '90.00', moneda: 'PEN' },
           { variant_id: 'v100', nombre: '18 mg · Caja x100', en_stock: true, precio: '250.00', moneda: 'PEN' },
+        ],
+      }
+    },
+    async carrito() {
+      return {
+        moneda: 'PEN',
+        dias_sin_tocar: 3,
+        lineas: [
+          { product_id: BLOQ, nombre: 'Bloqueador Solar FPS 50', cantidad: 2, precio_antes: '50.00', precio_hoy: '45.00', en_stock: true },
+          { product_id: CONSIV, nombre: 'Consiv 18 mg', cantidad: 1, precio_antes: '90.00', precio_hoy: '90.00', en_stock: false },
         ],
       }
     },
@@ -349,6 +360,28 @@ describe('preguntas sobre un producto y comparar presentaciones (2026-11-22)', (
     const r = await ejecutarChat({ herramienta: 'sobre_producto', producto: 'Nabila' }, puertos())
     expect(r.datos).toEqual({ tipo: 'ficha', product_id: null, comparacion: [] })
     expect(r.paraModelo).toMatch(/no se encontró/)
+  })
+})
+
+describe('mi carrito en el chat (2026-11-22)', () => {
+  it('el modelo sabe qué bajó y qué no tiene stock, sin cifras; la pantalla lleva los precios', async () => {
+    expect(validarPlanChat({ herramienta: 'mi_carrito' })).toEqual({ herramienta: 'mi_carrito' })
+    const r = await ejecutarChat({ herramienta: 'mi_carrito' }, puertos())
+    expect(r.datos).toMatchObject({ tipo: 'mi_carrito', carrito: { dias_sin_tocar: 3 } })
+    expect(JSON.parse(r.paraModelo)).toEqual({
+      dias_sin_tocar: 3,
+      lineas: [
+        { producto: 'Bloqueador Solar FPS 50', cantidad: 2, precio: 'bajo', con_stock: true },
+        { producto: 'Consiv 18 mg', cantidad: 1, precio: 'igual', con_stock: false },
+      ],
+    })
+    expect(r.paraModelo).not.toMatch(/45|50.00|90/)
+  })
+
+  it('leerMiCarrito descarta lo mal formado; carrito vacío lo dice', async () => {
+    expect(leerMiCarrito({ lineas: [{ product_id: 'x', nombre: 'Uno', cantidad: 0 }], moneda: 'PEN', dias_sin_tocar: null })).toEqual({ lineas: [], moneda: 'PEN', dias_sin_tocar: null })
+    const r = await ejecutarChat({ herramienta: 'mi_carrito' }, puertos({ carrito: async () => leerMiCarrito(null) }))
+    expect(r.paraModelo).toMatch(/vacío/)
   })
 })
 

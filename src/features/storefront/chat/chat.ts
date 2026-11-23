@@ -66,6 +66,17 @@ const compareRowSchema = z.object({
 })
 export type ChatCompareRow = z.infer<typeof compareRowSchema>
 
+/** 2026-11-22 · Una línea del carrito activo: precio al añadir y de hoy, del servidor. */
+const myCartLineSchema = z.object({
+  product_id: z.string(),
+  nombre: z.string(),
+  cantidad: z.number().int().positive(),
+  precio_antes: z.string().nullable(),
+  precio_hoy: z.string().nullable(),
+  en_stock: z.boolean(),
+})
+export type ChatMyCartLine = z.infer<typeof myCartLineSchema>
+
 export const chatDataSchema = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('productos'), product_ids: z.array(z.string().uuid()), consulta: z.string() }),
   z.object({ tipo: z.literal('pedidos'), pedidos: z.array(orderSchema) }),
@@ -96,6 +107,14 @@ export const chatDataSchema = z.discriminatedUnion('tipo', [
       }),
     ),
     lineas: z.array(intakeLineSchema),
+  }),
+  z.object({
+    tipo: z.literal('mi_carrito'),
+    carrito: z.object({
+      lineas: z.array(myCartLineSchema),
+      moneda: z.string(),
+      dias_sin_tocar: z.number().int().nonnegative().nullable(),
+    }),
   }),
   z.object({
     tipo: z.literal('ficha'),

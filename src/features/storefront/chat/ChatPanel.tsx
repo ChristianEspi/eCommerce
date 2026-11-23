@@ -30,10 +30,10 @@ import type { CartImportResult } from '../quick-order/importToCart'
 import { offersPresentation, preselected, resolveChoice, type IntakeLine } from '../quick-order/intake'
 import { PresentationPicker } from '../quick-order/PresentationPicker'
 import { restockNote } from '../restockText'
-import { CHAT_MAX_TEXT, ChatError, sendChat, type ChatCompareRow, type ChatCredit, type ChatData, type ChatDelivery, type ChatOrder, type ChatReply, type ChatTurn } from './chat'
+import { CHAT_MAX_TEXT, ChatError, sendChat, type ChatCompareRow, type ChatCredit, type ChatData, type ChatDelivery, type ChatMyCartLine, type ChatOrder, type ChatReply, type ChatTurn } from './chat'
 
 /** Lo que se puede pedir sin saber qué pedir. */
-const EJEMPLOS = ['store.chat.example.1', 'store.chat.example.5', 'store.chat.example.2', 'store.chat.example.3', 'store.chat.example.4', 'store.chat.example.6'] as const
+const EJEMPLOS = ['store.chat.example.1', 'store.chat.example.5', 'store.chat.example.2', 'store.chat.example.3', 'store.chat.example.4', 'store.chat.example.6', 'store.chat.example.7'] as const
 
 interface Mensaje extends ChatTurn {
   readonly id: number
@@ -234,6 +234,12 @@ function ChatDataView({ datos, storeSlug, storeId }: { datos: ChatData; storeSlu
       ) : (
         <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>{t('store.restock.empty')}</Typography>
       )
+    case 'mi_carrito':
+      return datos.carrito.lineas.length > 0 ? (
+        <ChatMyCart lines={datos.carrito.lineas} currency={datos.carrito.moneda} storeSlug={storeSlug} />
+      ) : (
+        <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>{t('store.chat.myCart.empty')}</Typography>
+      )
     case 'ficha':
       return datos.product_id ? (
         <Stack sx={{ gap: 1 }}>
@@ -246,6 +252,67 @@ function ChatDataView({ datos, storeSlug, storeId }: { datos: ChatData; storeSlu
     case 'ninguno':
       return null
   }
+}
+
+/** El sentido del cambio de precio; la cifra la pinta la tarjeta. */
+function cambio(l: ChatMyCartLine): 'down' | 'up' | null {
+  if (l.precio_antes === null || l.precio_hoy === null) return null
+  const antes = Math.round(Number(l.precio_antes) * 100)
+  const hoy = Math.round(Number(l.precio_hoy) * 100)
+  return hoy < antes ? 'down' : hoy > antes ? 'up' : null
+}
+
+/**
+ * El carrito activo (2026-11-22): qué hay, qué bajó o subió desde que lo
+ * añadió y qué ya no tiene stock. Las cifras son del servidor; el carrito real
+ * sigue siendo el de siempre y el checkout vuelve a cotizar.
+ */
+function ChatMyCart({ lines, currency, storeSlug }: { lines: readonly ChatMyCartLine[]; currency: string; storeSlug: string }) {
+  const { t, locale } = useI18n()
+  const cart = useContext(CartContext)
+  return (
+    <Box sx={CARD_SX} data-chat-my-cart>
+      <Typography sx={{ fontWeight: 800, fontSize: TS.body, mb: 1 }}>{t('store.chat.myCart.title')}</Typography>
+      <Stack sx={{ gap: 0.75 }}>
+        {lines.map((l) => {
+          const c = cambio(l)
+          return (
+            <Stack key={l.product_id + l.nombre} direction="row" sx={{ justifyContent: 'space-between', gap: 1 }} data-chat-my-cart-line>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography sx={{ fontSize: TS.body, fontWeight: 600, overflowWrap: 'anywhere' }}>
+                  {l.nombre} × {l.cantidad}
+                </Typography>
+                <Stack direction="row" sx={{ gap: 0.5, flexWrap: 'wrap' }}>
+                  {c && (
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      label={t(c === 'down' ? 'store.chat.myCart.down' : 'store.chat.myCart.up').replace(
+                        '{before}',
+                        formatMoneyOrDash(l.precio_antes, currency, locale),
+                      )}
+                    />
+                  )}
+                  {!l.en_stock && <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>{t('store.chat.compare.outOfStock')}</Typography>}
+                </Stack>
+              </Box>
+              <Typography sx={{ fontSize: TS.body, fontWeight: 700, flexShrink: 0 }}>
+                {formatMoneyOrDash(l.precio_hoy ?? l.precio_antes, currency, locale)}
+              </Typography>
+            </Stack>
+          )
+        })}
+      </Stack>
+      <Stack direction="row" sx={{ gap: 1, mt: 1.5, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+        <Button size="small" onClick={() => cart?.openCart()} disabled={!cart}>
+          {t('store.chat.cart.open')}
+        </Button>
+        <Button size="small" variant="contained" component={Link} to={`/s/${storeSlug}/checkout`}>
+          {t('store.chat.myCart.checkout')}
+        </Button>
+      </Stack>
+    </Box>
+  )
 }
 
 const POR_UNIDAD: Record<'un' | 'ml' | 'g', MessageKey> = {
