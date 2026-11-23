@@ -39,6 +39,7 @@ import { StatusChip } from '@/shared/ui/StatusChip'
 import { useFeedback } from '@/shared/ui/feedback-context'
 import { Field } from '@/shared/ui/Field'
 import { TradeError } from '../errors'
+import { errorKind } from '@/domain/errors'
 import {
   MAX_ASSORTMENT_QUESTION,
   MAX_DRAFT_LINES,
@@ -65,6 +66,11 @@ import {
 
 /** Ejemplos de instrucción (se escriben en el campo; no gastan nada). */
 const EXAMPLES = ['example1', 'example2'] as const
+
+/** Red caída ≠ asistente que respondió con error: cada uno con su mensaje. */
+function aiErrorKey(error: unknown): MessageKey {
+  return errorKind(error) === 'unavailable' ? 'aiQuotes.networkError' : 'aiQuotes.serverError'
+}
 
 interface ChosenCustomer {
   readonly id: string
@@ -347,7 +353,7 @@ export function QuoteAiDraftDrawer({
                   </Button>
                 }
               >
-                {t('aiQuotes.networkError')}
+                {t(aiErrorKey(draft.error))}
               </Alert>
             )}
             {!draft.isPending && result?.motivo && <MotivoNotice motivo={result.motivo} onRetry={() => interpret()} />}
@@ -848,7 +854,7 @@ function AssortmentBlock({
 
       <Box aria-live="polite" aria-busy={suggest.isPending}>
         {suggest.isPending && <Skeleton variant="rounded" height={96} />}
-        {!suggest.isPending && suggest.isError && <Alert severity="error">{t('aiQuotes.networkError')}</Alert>}
+        {!suggest.isPending && suggest.isError && <Alert severity="error">{t(aiErrorKey(suggest.error))}</Alert>}
         {!suggest.isPending && ai?.motivo && <MotivoNotice motivo={ai.motivo} onRetry={run} />}
         {!suggest.isPending && data && (
           <Stack spacing={1}>
