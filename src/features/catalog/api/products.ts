@@ -24,6 +24,7 @@ import {
 import { PRODUCT_IMAGES_BUCKET } from './images'
 import { buildTextSearchFilter } from '@/shared/lib/search'
 import { catalogClient } from './client'
+import { cleanupRowSchema, type CleanupRow } from '../cleanup'
 import { catalogErrorFromDb, catalogErrorFromInvoke } from './errors'
 
 export { CATALOG_PRODUCT_FUNCTION, PRODUCT_USAGE_RPC }
@@ -432,4 +433,15 @@ export async function updateProductDescription(productId: string, description: s
   })
   if (error) throw await catalogErrorFromInvoke(error)
   if (!data?.data?.id) throw await catalogErrorFromInvoke(null)
+}
+
+/**
+ * Limpieza del catálogo (2026-11-22): lo mínimo de cada producto no archivado
+ * de la tienda para `analizarCatalogo`. Lee con la RLS de quien mira.
+ */
+export async function fetchCatalogCleanupRows(storeId: string | null): Promise<CleanupRow[]> {
+  if (!storeId) return []
+  const { data, error } = await catalogClient().rpc('catalog_cleanup_rows', { p_store_id: storeId })
+  if (error) throw catalogErrorFromDb(error)
+  return cleanupRowSchema.array().parse(data ?? [])
 }

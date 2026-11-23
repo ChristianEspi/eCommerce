@@ -51,6 +51,7 @@ import type { ProductKind, ProductMaster, ProductStatus } from './types'
 import { CategoryPicker } from './CategoryPicker'
 import { BulkImagesAction } from './bulkImages/BulkImagesAction'
 import { BulkCopyAction } from './BulkCopyAction'
+import { CatalogCleanupAction } from './CatalogCleanupAction'
 import { CatalogImportAction } from './import/CatalogImportAction'
 import { useCategories } from './useCategories'
 import { useBrands } from './pim/hooks'
@@ -346,6 +347,14 @@ export function ProductsPage() {
                 scope={{ organizationId: tenant.organization_id, companyId: activeCompanyId, storeId }}
               />
             )}
+            <CatalogCleanupAction
+              storeId={storeId}
+              onSearch={(texto) => {
+                setStatus('all')
+                setPage(0)
+                setBorrador((actual) => ({ ...actual, search: texto }))
+              }}
+            />
             {canWrite && (
               <BulkCopyAction
                 companyId={activeCompanyId}
