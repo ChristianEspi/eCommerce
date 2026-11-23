@@ -33,6 +33,7 @@ import {
   Menu,
 } from '@mui/material'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useDebouncedValue } from '@/shared/lib/useDebouncedValue'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -51,6 +52,7 @@ import {
   type ProductStatusFilter,
 } from './api/products'
 import { CatalogError } from './api/errors'
+import { fetchProductMaster } from './api/products'
 import { ProductDrawer } from './ProductDrawer'
 import { downloadWorkbook } from '@/shared/lib/excel'
 import { productsBook } from './exportExcel'
@@ -185,6 +187,43 @@ export function ProductsPage() {
     product: null,
   })
   const [deleteTarget, setDeleteTarget] = useState<ProductMaster | null>(null)
+
+  /**
+   * `?producto=<id>` abre la ficha de ese producto (2026-11-22).
+   *
+   * Los análisis de IA y los avisos señalan un producto concreto; llevar al
+   * listado y que la persona lo busque era perderla por el camino. Se carga por
+   * id —puede no estar en la página en curso— y RLS decide si se ve: de otro
+   * tenant o borrado, no se abre nada y se avisa.
+   */
+  const [params, setParams] = useSearchParams()
+  const productoPedido = params.get('producto')
+  useEffect(() => {
+    if (!productoPedido) return
+    let vigente = true
+    fetchProductMaster(productoPedido)
+      .then((product) => {
+        if (!vigente) return
+        if (product) setDrawer({ open: true, product })
+        else notify(t('catalog.linkNotFound'), 'warning')
+      })
+      .catch(() => {
+        if (vigente) notify(t('catalog.linkNotFound'), 'warning')
+      })
+    return () => {
+      vigente = false
+    }
+    // Solo cuando cambia el enlace: `notify` y `t` no son motivo para reabrir.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productoPedido])
+  const cerrarFicha = () => {
+    setDrawer({ open: false, product: null })
+    if (productoPedido) {
+      const siguiente = new URLSearchParams(params)
+      siguiente.delete('producto')
+      setParams(siguiente, { replace: true })
+    }
+  }
 
   const storeId = activeStore?.id ?? null
 
@@ -733,7 +772,7 @@ export function ProductsPage() {
         storeName={activeStore?.name ?? ''}
         currency={activeStore?.currency ?? 'PEN'}
         canWrite={canWrite}
-        onClose={() => setDrawer({ open: false, product: null })}
+        onClose={cerrarFicha}
       />
 
       <ConfirmDeleteDialog

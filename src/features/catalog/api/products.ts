@@ -180,6 +180,24 @@ export async function fetchProducts({
   }
 }
 
+/**
+ * Un maestro por id, para abrir su ficha desde un enlace (2026-11-22).
+ *
+ * Los análisis de IA y los avisos señalan un producto concreto: con
+ * `/app/products?producto=<id>` la ficha se abre sola en vez de dejar a la
+ * persona buscándolo. `null` si no existe o RLS no lo deja ver (otro tenant).
+ */
+export async function fetchProductMaster(id: string): Promise<ProductMaster | null> {
+  const supabase = catalogClient()
+  const { data, error } = await supabase
+    .from(ADMIN_PRODUCT_MASTERS_VIEW)
+    .select(MASTER_SELECT)
+    .eq('id', id)
+    .maybeSingle()
+  if (error) throw catalogErrorFromDb(error)
+  return data ? productMasterSchema.parse(data) : null
+}
+
 /** Tope de candidatos: el máximo de filas que PostgREST devuelve de una vez. */
 export const PRODUCT_CANDIDATES_LIMIT = 1000
 

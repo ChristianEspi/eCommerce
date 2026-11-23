@@ -1230,6 +1230,7 @@ export const es = {
     'catalog.categories.parent': 'Cuelga de',
     'catalog.categories.parentNone': 'Nada: es una categoría principal',
     'catalog.categories.parentHelp': 'Hasta tres niveles. Lo que cuelga de una categoría también sale al abrirla en la tienda.',
+    'catalog.linkNotFound': 'Ese producto ya no existe o no es de esta sociedad.',
     'catalog.error.name': 'Escribe entre 2 y 240 caracteres',
     'catalog.error.slug': 'Usa minúsculas, números y guiones (3 a 62 caracteres)',
     'catalog.error.sku': 'El SKU es obligatorio (hasta 64 caracteres)',

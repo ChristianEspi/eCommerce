@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useLocation } from 'react-router-dom'
 import { renderWithProviders } from '@/test/render'
 import {
   COMPANY_A,
@@ -264,5 +265,47 @@ describe('Análisis IA de inventario', () => {
     expect(await screen.findByText('El sistema no detecta productos con riesgo, exceso ni movimientos atípicos.')).toBeInTheDocument()
     expect(screen.getByText('Sin señales del sistema no hay nada que interpretar.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Analiza el inventario' })).not.toBeInTheDocument()
+  })
+})
+
+/** Lo que el router tiene en `?search`: lo que la revisión deja puesto. */
+function SearchProbe() {
+  const { search } = useLocation()
+  return <output data-testid="search">{search}</output>
+}
+
+describe('cada fila lleva a SU producto (2026-11-22)', () => {
+  function renderConRuta() {
+    const client = backend({})
+    holder.client = client
+    renderWithProviders(
+      <TenantProvider>
+        <CapabilitiesProvider>
+          <InventoryAiSection />
+          <SearchProbe />
+        </CapabilitiesProvider>
+      </TenantProvider>,
+      { session: makeSession() },
+    )
+  }
+
+  it('agrupa por lo que toca hacer: reponer antes que exceso', async () => {
+    renderConRuta()
+    const reponer = await screen.findByRole('heading', { name: /Reponer/ })
+    const exceso = screen.getByRole('heading', { name: /Exceso e inmovilizado/ })
+    expect(reponer.compareDocumentPosition(exceso) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('el nombre abre la ficha del producto en Catálogo', async () => {
+    renderConRuta()
+    const enlace = await screen.findByRole('link', { name: 'Jabón de glicerina' })
+    expect(enlace).toHaveAttribute('href', `/app/products?producto=${P1}`)
+  })
+
+  it('«Revisar exceso» abre Existencias filtrada por el SKU de esa fila', async () => {
+    renderConRuta()
+    await userEvent.click(await screen.findByRole('button', { name: 'Revisar exceso' }))
+    expect(screen.getByTestId('search')).toHaveTextContent('?buscar=CHAMP')
+    expect(window.location.hash).toBe('#existencias')
   })
 })
