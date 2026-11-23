@@ -419,3 +419,29 @@ export async function deleteAssortmentAssignment(id: string): Promise<void> {
   const { error } = await client().from(ASSORTMENT_ASSIGNMENTS_TABLE).delete().eq('id', id)
   if (error) throw tradeErrorFromDb(error)
 }
+
+/**
+ * Cambia el precio de UNA línea (contrapropuesta, 2026-11-22) y recalcula la
+ * cabecera. Mismo orden que `addQuoteItem`: la línea primero. El impuesto de la
+ * línea se recalcula con SU tasa guardada, si la tiene.
+ */
+export async function updateQuoteItemPrice(input: {
+  id: string
+  quoteId: string
+  quantity: string
+  unitPrice: string
+  taxRate: string | null
+}): Promise<void> {
+  const total = lineTotal(input.quantity, input.unitPrice)
+  const tasa = input.taxRate === null ? null : Number(input.taxRate)
+  const { error } = await client()
+    .from(QUOTE_ITEMS_TABLE)
+    .update({
+      unit_price: input.unitPrice,
+      line_total: total,
+      ...(tasa !== null && Number.isFinite(tasa) ? { tax_amount: (Math.round(Number(total) * tasa * 100) / 100).toFixed(2) } : {}),
+    })
+    .eq('id', input.id)
+  if (error) throw tradeErrorFromDb(error)
+  await recalcQuoteTotals(input.quoteId)
+}
