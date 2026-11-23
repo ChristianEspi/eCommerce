@@ -179,7 +179,7 @@ export function ChatPanel({ storeSlug, storeId }: { storeSlug: string; storeId: 
 }
 
 function ChatDataView({ datos, storeSlug, storeId }: { datos: ChatData; storeSlug: string; storeId: string | null }) {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   switch (datos.tipo) {
     case 'productos':
       return datos.product_ids.length > 0 ? (
@@ -244,6 +244,16 @@ function ChatDataView({ datos, storeSlug, storeId }: { datos: ChatData; storeSlu
       return datos.product_id ? (
         <Stack sx={{ gap: 1 }}>
           <ChatProducts ids={[datos.product_id]} storeSlug={storeSlug} storeId={storeId} />
+          {datos.resenas && (
+            <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }} data-chat-reviews>
+              {t('store.chat.reviews')
+                .replace(
+                  '{average}',
+                  datos.resenas.promedio ? Number(datos.resenas.promedio).toLocaleString(locale, { maximumFractionDigits: 1 }) : '—',
+                )
+                .replace('{count}', String(datos.resenas.total))}
+            </Typography>
+          )}
           {datos.comparacion.length > 1 && <ChatCompareCard rows={datos.comparacion} />}
         </Stack>
       ) : (

@@ -3851,6 +3851,7 @@ export const es = {
     'store.chat.example.4': 'Busca una alternativa a un producto agotado',
     'store.chat.example.5': '¿Qué me toca reponer?',
     'store.chat.restock.title': 'Para reponer',
+    'store.chat.reviews': '★ {average} · {count} opiniones de clientes',
     'store.chat.myCart.title': 'Tu carrito',
     'store.chat.myCart.empty': 'Tu carrito está vacío.',
     'store.chat.myCart.down': 'Bajó de precio (antes {before})',

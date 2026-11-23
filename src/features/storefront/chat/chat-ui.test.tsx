@@ -209,6 +209,7 @@ describe('ChatPanel', () => {
       datos: {
         tipo: 'ficha',
         product_id: CONSIV,
+        resenas: { total: 2, promedio: '4.50' },
         comparacion: [
           { variant_id: 'v30', nombre: 'Caja 30 un', en_stock: true, precio: '90.00', moneda: 'PEN', contenido: { cantidad: 30, unidad: 'un' }, por_unidad: '3.00', mejor: false },
           { variant_id: 'v100', nombre: 'Caja x100', en_stock: false, precio: '250.00', moneda: 'PEN', contenido: { cantidad: 100, unidad: 'un' }, por_unidad: '2.50', mejor: true },
@@ -222,6 +223,7 @@ describe('ChatPanel', () => {
     await escribir('me conviene la caja x100 o la de 30')
 
     expect(await screen.findByText('Comparar presentaciones')).toBeInTheDocument()
+    expect(screen.getByText(/★ 4[.,]5 · 2 opiniones de clientes/)).toBeInTheDocument()
     const mejor = document.querySelector('[data-chat-compare-row="v100"]') as HTMLElement
     expect(within(mejor).getByText('Más conveniente')).toBeInTheDocument()
     expect(within(mejor).getByText('Sin stock')).toBeInTheDocument()

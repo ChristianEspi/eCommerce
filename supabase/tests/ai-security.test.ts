@@ -199,6 +199,7 @@ describe('shopping-chat: conversación con sesión (2026-11-22)', () => {
       // 2026-11-22 · ficha en el chat: cotización con la sesión y ficha pública, solo lectura.
       'price_quote_for_slug',
       'product_detail_for_slug',
+      'product_reviews_for_slug',
       'resolve_order_lines_for_slug',
     ])
     expect(src).not.toMatch(/\.(insert|update|upsert|delete)\(/)

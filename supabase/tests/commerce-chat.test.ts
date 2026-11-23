@@ -101,6 +101,7 @@ function puertos(over: Partial<PuertosChat> = {}): PuertosChat & { busquedas: st
           { variant_id: 'v30', nombre: '18 mg · Caja 30 un', en_stock: true, precio: '90.00', moneda: 'PEN' },
           { variant_id: 'v100', nombre: '18 mg · Caja x100', en_stock: true, precio: '250.00', moneda: 'PEN' },
         ],
+        resenas: { total: 2, promedio: '4.50', textos: ['Llegó rápido y bien embalado.', 'Me ayuda a concentrarme. Buen precio.'] },
       }
     },
     async carrito() {
@@ -332,6 +333,9 @@ describe('preguntas sobre un producto y comparar presentaciones (2026-11-22)', (
     expect(modelo).toMatchObject({ producto: 'Consiv Tableta Recubierta', comparacion_posible: true, presentaciones: [{ contenido: '30 unidades' }, { mas_conveniente_por_unidad: true }] })
     expect(r.paraModelo).not.toMatch(/90|250|2.50|3.00/)
     expect(r.productosPermitidos).toEqual([CONSIV])
+    // Opiniones: total y media a la pantalla; al modelo, los textos sin afirmaciones de salud.
+    expect(r.datos).toMatchObject({ resenas: { total: 2, promedio: '4.50' } })
+    expect(modelo.opiniones).toEqual({ total: 2, promedio: '4.50', textos: ['Llegó rápido y bien embalado.', 'Buen precio.'] })
   })
 
   it('la descripción que ve el modelo va sin afirmaciones de salud ni frases repetidas', () => {
@@ -358,7 +362,7 @@ describe('preguntas sobre un producto y comparar presentaciones (2026-11-22)', (
 
   it('producto que no está: ficha vacía y el modelo lo sabe', async () => {
     const r = await ejecutarChat({ herramienta: 'sobre_producto', producto: 'Nabila' }, puertos())
-    expect(r.datos).toEqual({ tipo: 'ficha', product_id: null, comparacion: [] })
+    expect(r.datos).toEqual({ tipo: 'ficha', product_id: null, comparacion: [], resenas: null })
     expect(r.paraModelo).toMatch(/no se encontró/)
   })
 })

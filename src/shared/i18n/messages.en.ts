@@ -5033,6 +5033,7 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.chat.example.4': 'Find an alternative to an out-of-stock product',
     'store.chat.example.5': 'What do I need to restock?',
     'store.chat.restock.title': 'To restock',
+    'store.chat.reviews': '★ {average} · {count} customer reviews',
     'store.chat.myCart.title': 'Your cart',
     'store.chat.myCart.empty': 'Your cart is empty.',
     'store.chat.myCart.down': 'Price dropped (was {before})',

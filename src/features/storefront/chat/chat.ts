@@ -120,6 +120,7 @@ export const chatDataSchema = z.discriminatedUnion('tipo', [
     tipo: z.literal('ficha'),
     product_id: z.string().uuid().nullable(),
     comparacion: z.array(compareRowSchema),
+    resenas: z.object({ total: z.number().int().positive(), promedio: z.string().nullable() }).nullable().default(null),
   }),
   z.object({ tipo: z.literal('ninguno') }),
 ])

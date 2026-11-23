@@ -222,7 +222,7 @@ const handler = serveJson(
         const { data: tienda } = await catalogo.from('public_stores').select('store_id').eq('slug', storeSlug).maybeSingle()
         const storeId = (tienda as { store_id?: unknown } | null)?.store_id
         if (typeof storeId !== 'string') return null
-        const [producto, variantes, detalle] = await Promise.all([
+        const [producto, variantes, detalle, opiniones] = await Promise.all([
           catalogo
             .from('public_products')
             .select('product_id, name, brand_name, description, currency')
@@ -238,6 +238,7 @@ const handler = serveJson(
             .order('name')
             .limit(INTAKE_MAX_PRESENTACIONES),
           catalogo.rpc('product_detail_for_slug', { p_store_slug: storeSlug, p_product_id: productId }),
+          catalogo.rpc('product_reviews_for_slug', { p_store_slug: storeSlug, p_product_id: productId, p_page: 1, p_page_size: 8 }),
         ])
         if (producto.error) {
           logger.warn('chat.product_failed', { original_code: errorCode(producto.error) })
@@ -267,6 +268,20 @@ const handler = serveJson(
           typeof e.label === 'string' && typeof e.value === 'string' && e.value ? [{ etiqueta: e.label, valor: e.value }] : [],
         )
         const moneda = typeof p.currency === 'string' ? p.currency : 'PEN'
+        const op = (opiniones.error ? null : opiniones.data) as { summary?: { count?: unknown; average?: unknown }; reviews?: unknown } | null
+        const totalOpiniones = Number(op?.summary?.count ?? 0)
+        const resenas =
+          Number.isInteger(totalOpiniones) && totalOpiniones > 0
+            ? {
+                total: totalOpiniones,
+                promedio: typeof op?.summary?.average === 'string' ? op.summary.average : null,
+                // Texto de clientes: saneado (sin correos ni teléfonos) y delimitado como dato al redactar.
+                textos: ((Array.isArray(op?.reviews) ? op.reviews : []) as Array<Record<string, unknown>>).flatMap((r) => {
+                  const cuerpo = typeof r.body === 'string' ? sanitizeTextForModel(r.body, 400) : null
+                  return cuerpo ? [cuerpo] : []
+                }),
+              }
+            : null
         return {
           product_id: productId,
           nombre: p.name,
@@ -281,6 +296,7 @@ const handler = serveJson(
             precio: precios.get(String(v.variant_id)) ?? null,
             moneda: typeof v.currency === 'string' ? v.currency : moneda,
           })),
+          resenas,
         } satisfies FichaProducto
       },
       async carrito() {
