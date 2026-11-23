@@ -33,6 +33,7 @@ vi.mock('./chat', async (importOriginal) => {
 vi.mock('../quick-order/api', () => ({ resolveOrderLines: holder.resolve }))
 vi.mock('../quick-order/importToCart', () => ({ importIntoCart: holder.importCart }))
 vi.mock('../aiAttribution', () => ({ markAiAttribution: vi.fn() }))
+vi.mock('../api', async (importOriginal) => ({ ...(await importOriginal<typeof import('../api')>()), fetchPublicProductsByIds: vi.fn(async () => []) }))
 
 const { ChatPanel } = await import('./ChatPanel')
 const { CartContext } = await import('../cart/cart-context')
@@ -200,5 +201,33 @@ describe('ChatPanel', () => {
     expect(screen.getByText('Sueles pedirlo cada 15 días · te tocaba hace 2 días')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /añadir 1 al carrito/i }))
     expect(holder.resolve).toHaveBeenCalledWith({ storeSlug: 'botica', lines: [{ row: 1, sku: 'QS-514574', quantity: 4 }] })
+  })
+
+  it('ficha: compara presentaciones con las cifras del servidor y marca la más conveniente', async () => {
+    holder.replies.push({
+      herramienta: 'sobre_producto',
+      datos: {
+        tipo: 'ficha',
+        product_id: CONSIV,
+        comparacion: [
+          { variant_id: 'v30', nombre: 'Caja 30 un', en_stock: true, precio: '90.00', moneda: 'PEN', contenido: { cantidad: 30, unidad: 'un' }, por_unidad: '3.00', mejor: false },
+          { variant_id: 'v100', nombre: 'Caja x100', en_stock: false, precio: '250.00', moneda: 'PEN', contenido: { cantidad: 100, unidad: 'un' }, por_unidad: '2.50', mejor: true },
+        ],
+      },
+      respuesta: 'La caja x100 sale más conveniente por unidad, aunque ahora no tiene stock.',
+      product_ids: [CONSIV],
+      motivo: null,
+    } satisfies ChatReply)
+    pintar()
+    await escribir('me conviene la caja x100 o la de 30')
+
+    expect(await screen.findByText('Comparar presentaciones')).toBeInTheDocument()
+    const mejor = document.querySelector('[data-chat-compare-row="v100"]') as HTMLElement
+    expect(within(mejor).getByText('Más conveniente')).toBeInTheDocument()
+    expect(within(mejor).getByText('Sin stock')).toBeInTheDocument()
+    expect(within(mejor).getByText(/Por unidad: .*2[.,]50/)).toBeInTheDocument()
+    const otra = document.querySelector('[data-chat-compare-row="v30"]') as HTMLElement
+    expect(within(otra).queryByText('Más conveniente')).toBeNull()
+    expect(within(otra).getByText(/90[.,]00/)).toBeInTheDocument()
   })
 })

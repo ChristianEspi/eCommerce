@@ -43,6 +43,7 @@ import {
   taparNumeros,
   validarPlanChat,
   type CreditoComprador,
+  type FichaProducto,
   type LineaDePedido,
   type PedidoResumen,
   type PlanChat,
@@ -211,6 +212,74 @@ const handler = serveJson(
           return []
         }
         return leerReposicion(data)
+      },
+      async ficha(productId) {
+        // Lo publicado, con el cliente ANÓNIMO (lo mismo que ve la ficha de la
+        // vitrina); el precio, cotizado con la sesión del comprador, que es el
+        // que le toca a él (lista B2B incluida). El alcance lo fija el slug.
+        const { data: tienda } = await catalogo.from('public_stores').select('store_id').eq('slug', storeSlug).maybeSingle()
+        const storeId = (tienda as { store_id?: unknown } | null)?.store_id
+        if (typeof storeId !== 'string') return null
+        const [producto, variantes, detalle] = await Promise.all([
+          catalogo
+            .from('public_products')
+            .select('product_id, name, brand_name, description, currency')
+            .eq('store_id', storeId)
+            .eq('product_id', productId)
+            .maybeSingle(),
+          catalogo
+            .from('public_product_variants')
+            .select('variant_id, name, in_stock, currency, position')
+            .eq('store_id', storeId)
+            .eq('product_id', productId)
+            .order('position')
+            .order('name')
+            .limit(INTAKE_MAX_PRESENTACIONES),
+          catalogo.rpc('product_detail_for_slug', { p_store_slug: storeSlug, p_product_id: productId }),
+        ])
+        if (producto.error) {
+          logger.warn('chat.product_failed', { original_code: errorCode(producto.error) })
+          return null
+        }
+        const p = producto.data as Record<string, unknown> | null
+        if (!p || typeof p.name !== 'string') return null
+        const filas = (variantes.error ? [] : (variantes.data ?? [])) as Array<Record<string, unknown>>
+        const vs = filas.filter((v) => typeof v.variant_id === 'string' && typeof v.name === 'string')
+
+        const precios = new Map<string, string>()
+        if (vs.length > 1) {
+          const { data: cotizacion, error } = await usuario.rpc('price_quote_for_slug', {
+            p_store_slug: storeSlug,
+            p_items: vs.map((v) => ({ product_id: productId, variant_id: v.variant_id, quantity: 1 })),
+          })
+          if (error) logger.warn('chat.quote_failed', { original_code: errorCode(error) })
+          const lineas = ((cotizacion as { lines?: unknown } | null)?.lines ?? []) as Array<Record<string, unknown>>
+          for (const l of Array.isArray(lineas) ? lineas : []) {
+            if (typeof l.variant_id === 'string' && typeof l.unit_price === 'string') precios.set(l.variant_id, l.unit_price)
+          }
+        }
+
+        const extra = (detalle.error ? null : detalle.data) as { highlights?: unknown; specs?: unknown } | null
+        const destacados = Array.isArray(extra?.highlights) ? extra.highlights.filter((h): h is string => typeof h === 'string') : []
+        const especificaciones = (Array.isArray(extra?.specs) ? (extra.specs as Array<Record<string, unknown>>) : []).flatMap((e) =>
+          typeof e.label === 'string' && typeof e.value === 'string' && e.value ? [{ etiqueta: e.label, valor: e.value }] : [],
+        )
+        const moneda = typeof p.currency === 'string' ? p.currency : 'PEN'
+        return {
+          product_id: productId,
+          nombre: p.name,
+          marca: typeof p.brand_name === 'string' ? p.brand_name : null,
+          descripcion: typeof p.description === 'string' && p.description.trim() ? (sanitizeTextForModel(p.description, 1500) ?? null) : null,
+          destacados,
+          especificaciones,
+          presentaciones: vs.map((v) => ({
+            variant_id: String(v.variant_id),
+            nombre: String(v.name),
+            en_stock: v.in_stock === true,
+            precio: precios.get(String(v.variant_id)) ?? null,
+            moneda: typeof v.currency === 'string' ? v.currency : moneda,
+          })),
+        } satisfies FichaProducto
       },
       async credito() {
         const { data, error } = await usuario.rpc('my_account_statement', { p_store_slug: storeSlug })

@@ -30,10 +30,10 @@ import type { CartImportResult } from '../quick-order/importToCart'
 import { offersPresentation, preselected, resolveChoice, type IntakeLine } from '../quick-order/intake'
 import { PresentationPicker } from '../quick-order/PresentationPicker'
 import { restockNote } from '../restockText'
-import { CHAT_MAX_TEXT, ChatError, sendChat, type ChatCredit, type ChatData, type ChatOrder, type ChatReply, type ChatTurn } from './chat'
+import { CHAT_MAX_TEXT, ChatError, sendChat, type ChatCompareRow, type ChatCredit, type ChatData, type ChatOrder, type ChatReply, type ChatTurn } from './chat'
 
 /** Lo que se puede pedir sin saber qué pedir. */
-const EJEMPLOS = ['store.chat.example.1', 'store.chat.example.5', 'store.chat.example.2', 'store.chat.example.3', 'store.chat.example.4'] as const
+const EJEMPLOS = ['store.chat.example.1', 'store.chat.example.5', 'store.chat.example.2', 'store.chat.example.3', 'store.chat.example.4', 'store.chat.example.6'] as const
 
 interface Mensaje extends ChatTurn {
   readonly id: number
@@ -234,9 +234,70 @@ function ChatDataView({ datos, storeSlug, storeId }: { datos: ChatData; storeSlu
       ) : (
         <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>{t('store.restock.empty')}</Typography>
       )
+    case 'ficha':
+      return datos.product_id ? (
+        <Stack sx={{ gap: 1 }}>
+          <ChatProducts ids={[datos.product_id]} storeSlug={storeSlug} storeId={storeId} />
+          {datos.comparacion.length > 1 && <ChatCompareCard rows={datos.comparacion} />}
+        </Stack>
+      ) : (
+        <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>{t('store.chat.noProduct')}</Typography>
+      )
     case 'ninguno':
       return null
   }
+}
+
+const POR_UNIDAD: Record<'un' | 'ml' | 'g', MessageKey> = {
+  un: 'store.chat.compare.perUnit',
+  ml: 'store.chat.compare.per100ml',
+  g: 'store.chat.compare.per100g',
+}
+
+/**
+ * Presentaciones de un producto con su precio por unidad. Las cifras vienen del
+ * servidor (cotización con la sesión del comprador); aquí solo se formatean.
+ */
+function ChatCompareCard({ rows }: { rows: readonly ChatCompareRow[] }) {
+  const { t, locale } = useI18n()
+  const comparables = rows.filter((r) => r.por_unidad !== null).length >= 2
+  return (
+    <Box sx={CARD_SX} data-chat-compare>
+      <Typography sx={{ fontWeight: 800, fontSize: TS.body, mb: 1 }}>{t('store.chat.compare.title')}</Typography>
+      <Stack component="ul" sx={{ gap: 1, m: 0, p: 0, listStyle: 'none' }}>
+        {rows.map((r) => (
+          <Box
+            component="li"
+            key={r.variant_id}
+            data-chat-compare-row={r.variant_id}
+            data-best={r.mejor || undefined}
+            sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, alignItems: 'flex-start' }}
+          >
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ fontSize: TS.body, fontWeight: 600, overflowWrap: 'anywhere' }}>{r.nombre}</Typography>
+              <Stack direction="row" sx={{ gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
+                {r.mejor && <Chip size="small" color="primary" label={t('store.chat.compare.best')} />}
+                {!r.en_stock && (
+                  <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>{t('store.chat.compare.outOfStock')}</Typography>
+                )}
+              </Stack>
+            </Box>
+            <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+              <Typography sx={{ fontSize: TS.body, fontWeight: 700 }}>{formatMoneyOrDash(r.precio, r.moneda, locale)}</Typography>
+              {r.por_unidad !== null && r.contenido && (
+                <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>
+                  {t(POR_UNIDAD[r.contenido.unidad])}: {formatMoneyOrDash(r.por_unidad, r.moneda, locale)}
+                </Typography>
+              )}
+            </Box>
+          </Box>
+        ))}
+      </Stack>
+      <Typography sx={{ fontSize: TS.label, color: 'var(--muted)', mt: 1 }}>
+        {t(comparables ? 'store.chat.compare.note' : 'store.chat.compare.notComparable')}
+      </Typography>
+    </Box>
+  )
 }
 
 function ChatProducts({ ids, storeSlug, storeId }: { ids: readonly string[]; storeSlug: string; storeId: string | null }) {

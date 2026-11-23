@@ -11,10 +11,26 @@ el recorrido SaaS P00–P17 queda cerrado)
 > (`claude-saas-opus/config/phases.json`), que se identifica siempre como «P0x-SaaS». No son la misma
 > serie: el P12 histórico es el framework de integraciones; el P12-SaaS es fulfillment y devoluciones.
 
+## Chat: preguntas sobre un producto y comparar presentaciones (2026-11-22)
+
+`af090fe` + ajuste de candados. **Aplicado en QAS el 2026-11-22**: `shopping-chat` desplegado (sin migración). Humo con `prueba.b2b@`: «¿Qué contiene el Pedialyte?» y «¿qué presentación de Pedialyte me conviene?» → 200 con frase; Eutebrol → datos sin frase (candado de salud, esperado: su ficha nombra la enfermedad).
+
+- La descripción que ve el modelo va SIN las frases que el candado de salud rechazaría y sin repetidas (`descripcionParaModelo`); la vitrina muestra la ficha completa.
+
+- Herramienta `sobre_producto`: el buscador de la tienda elige el producto (no el modelo); la respuesta sale SOLO de su ficha
+  publicada (`public_products`, `product_detail_for_slug`: descripción, destacados, especificaciones). Si la ficha no lo dice, lo dice.
+- Comparar presentaciones: el contenido se lee del nombre («Caja x100», «30 un», «500 ml», «1,5 L»; los mg son dosis, no
+  contenido), el precio es el de la cotización con la sesión del comprador (`price_quote_for_slug`, lista B2B incluida) y el
+  precio por unidad / 100 ml / 100 g lo calcula el código. El modelo solo ve qué presentación es la más conveniente, sin cifras;
+  la vitrina pinta la tabla («Comparar presentaciones»). Sin contenido legible o con empate, no hay «mejor».
+- Pedidos de prueba `PRUEBA-REPO-01..08` cargados en QAS (clones con fecha pasada de pedidos de `prueba.b2b@`/`prueba.b2c@`
+  miquimica) para ver la reposición; borrar cuando ya no hagan falta.
+
 ## Reposición predictiva y fichas en lote (2026-11-22, a pedido del operador)
 
-Commit local en `dev`. **Sin aplicar en QAS**: falta la migración `20261122120000_my_replenishment` y
-desplegar `shopping-chat`; la web sale con la promoción a `qas`.
+`34e66d3`, promovido a `qas` (`d0a939c`). **Aplicado en QAS el 2026-11-22**: migración
+`20261122120000_my_replenishment` (API de gestión; `anon` sin EXECUTE verificado) y `shopping-chat`. Humo:
+«¿Qué me toca reponer?» → herramienta `reponer`, 200; `prueba.b2b@` aún sin ritmo (todo comprado el 19-nov).
 
 | # | Qué | Dónde |
 |---|---|---|
