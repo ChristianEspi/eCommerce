@@ -1,4 +1,5 @@
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded'
+import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded'
 import {
   Alert,
   Box,
@@ -208,36 +209,46 @@ export function ProductAiAssistant({
       sx={{ borderColor: 'var(--accent)' }}
     >
       <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-        <Stack
-          direction={{ xs: 'column', sm: 'row' }}
-          spacing={1}
-          sx={{ alignItems: { xs: 'stretch', sm: 'center' }, justifyContent: 'space-between' }}
-        >
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-            <AutoAwesomeRoundedIcon fontSize="small" sx={{ color: 'var(--accent-deep)' }} aria-hidden />
-            <Typography id="ai-pim-title" component="h3" sx={{ fontSize: 15, fontWeight: 800 }}>
+        {/* 2026-11-22 · Cabecera en UNA línea (icono, título, IA) y debajo qué
+            hace; los botones en su propia fila. En el cajón del producto, título
+            y botones en la misma fila partían «Asistente de ficha» en dos y el
+            botón del documento en otras dos. */}
+        <Stack spacing={0.5}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
+            <AutoAwesomeRoundedIcon fontSize="small" sx={{ color: 'var(--accent-deep)', flexShrink: 0 }} aria-hidden />
+            <Typography
+              id="ai-pim-title"
+              component="h3"
+              sx={{ fontSize: 15, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+            >
               {t('aiPim.title')}
             </Typography>
-            <Chip size="small" label={t('aiPim.badge')} variant="outlined" />
+            <Chip size="small" label={t('aiPim.badge')} color="primary" variant="outlined" sx={{ flexShrink: 0 }} />
           </Stack>
+          <Typography sx={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.5 }}>{t('aiPim.notice')}</Typography>
+        </Stack>
+
+        <Stack direction="row" useFlexGap spacing={1} sx={{ flexWrap: 'wrap' }}>
           <Button
             size="small"
-            variant="outlined"
+            variant="contained"
             onClick={() => void pedir()}
             disabled={pidiendo || disabled || bloqueado}
-            startIcon={pidiendo ? <CircularProgress size={14} color="inherit" /> : undefined}
-            sx={{ textTransform: 'none', fontWeight: 700 }}
+            startIcon={pidiendo ? <CircularProgress size={14} color="inherit" /> : <AutoAwesomeRoundedIcon fontSize="small" />}
+            sx={{ textTransform: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}
           >
             {pidiendo ? t('aiPim.generating') : resultado ? t('aiPim.regenerate') : t('aiPim.generate')}
           </Button>
           <Button
             size="small"
-            variant="text"
+            variant="outlined"
             component="label"
             disabled={pidiendo || disabled || bloqueado}
-            sx={{ textTransform: 'none', fontWeight: 700 }}
+            startIcon={<UploadFileRoundedIcon fontSize="small" />}
+            title={t('aiPim.document.button')}
+            sx={{ textTransform: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}
           >
-            {t('aiPim.document.button')}
+            {t('aiPim.document.short')}
             <input
               type="file"
               hidden
@@ -265,8 +276,6 @@ export function ProductAiAssistant({
             </Typography>
           </Box>
         )}
-
-        <Typography sx={{ fontSize: 12.5, color: 'var(--muted)' }}>{t('aiPim.notice')}</Typography>
 
         {availability === 'not_entitled' && <Alert severity="info">{t('ai.motivo.sin_contratar')}</Alert>}
         {availability === 'quota_exhausted' && <Alert severity="info">{t('ai.motivo.sin_cuota')}</Alert>}
