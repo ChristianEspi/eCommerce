@@ -1469,6 +1469,7 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'common.none': 'Unassigned',
     'nav.categories': 'Categories',
     'catalog.products.new': 'New product',
+    'catalog.products.more': 'More actions',
     'catalog.products.create': 'Create product',
     'catalog.products.edit': 'Edit product',
     'catalog.products.emptySearch': 'No product matches your search',

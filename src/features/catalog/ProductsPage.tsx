@@ -6,6 +6,11 @@ import { TablePager } from '@/shared/ui/TablePager'
 import { StatusChip } from '@/shared/ui/StatusChip'
 import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded'
 import StorefrontRoundedIcon from '@mui/icons-material/StorefrontRounded'
+import AddPhotoAlternateRoundedIcon from '@mui/icons-material/AddPhotoAlternateRounded'
+import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded'
+import FactCheckRoundedIcon from '@mui/icons-material/FactCheckRounded'
+import FileDownloadRoundedIcon from '@mui/icons-material/FileDownloadRounded'
+import FileUploadRoundedIcon from '@mui/icons-material/FileUploadRounded'
 import {
   Box,
   Button,
@@ -23,6 +28,9 @@ import {
   Typography,
   MenuItem,
   LinearProgress,
+  ListItemIcon,
+  ListItemText,
+  Menu,
 } from '@mui/material'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useTenant } from '@/features/tenant/tenant-context'
@@ -164,6 +172,14 @@ export function ProductsPage() {
    */
   const [borrador, setBorrador] = useState<Filtros>(SIN_FILTROS)
   const [aplicados, setAplicados] = useState<Filtros>(SIN_FILTROS)
+  const [masAncla, setMasAncla] = useState<HTMLElement | null>(null)
+  const masAbierto = masAncla !== null
+  const cerrarMas = () => setMasAncla(null)
+  const [dialogo, setDialogo] = useState<'import' | 'images' | 'cleanup' | null>(null)
+  const abrirDialogo = (d: 'import' | 'images' | 'cleanup') => {
+    cerrarMas()
+    setDialogo(d)
+  }
   const [drawer, setDrawer] = useState<{ open: boolean; product: ProductMaster | null }>({
     open: false,
     product: null,
@@ -330,21 +346,75 @@ export function ProductsPage() {
         subtitle={tenant?.name ? `${tenant.name} · ${t('catalog.products.subtitle')}` : t('catalog.products.subtitle')}
         actions={
           <>
+            {/* Lo de todos los días a la vista; lo ocasional, en «Más acciones». */}
             <Button
               variant="outlined"
-              disabled={list.length === 0}
-              onClick={() =>
-                void downloadWorkbook(productsBook(list, t), t).catch(() =>
-                  notify(t('excel.error.download'), 'error'),
-                )
-              }
+              endIcon={<ExpandMoreRoundedIcon />}
+              aria-haspopup="menu"
+              aria-expanded={masAbierto ? 'true' : undefined}
+              aria-controls={masAbierto ? 'products-more-menu' : undefined}
+              onClick={(e) => setMasAncla(e.currentTarget)}
             >
-              {t('common.export')}
+              {t('catalog.products.more')}
             </Button>
-            {canWrite && <CatalogImportAction kind="products" storeId={activeStore?.id ?? null} />}
+            <Menu
+              id="products-more-menu"
+              anchorEl={masAncla}
+              open={masAbierto}
+              onClose={cerrarMas}
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+              transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            >
+              <MenuItem
+                disabled={list.length === 0}
+                onClick={() => {
+                  cerrarMas()
+                  void downloadWorkbook(productsBook(list, t), t).catch(() => notify(t('excel.error.download'), 'error'))
+                }}
+              >
+                <ListItemIcon>
+                  <FileDownloadRoundedIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>{t('common.export')}</ListItemText>
+              </MenuItem>
+              {canWrite && (
+                <MenuItem onClick={() => abrirDialogo('import')}>
+                  <ListItemIcon>
+                    <FileUploadRoundedIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText>{t('catalogImport.action')}</ListItemText>
+                </MenuItem>
+              )}
+              {canWrite && (
+                <MenuItem onClick={() => abrirDialogo('images')}>
+                  <ListItemIcon>
+                    <AddPhotoAlternateRoundedIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText>{t('bulkImages.action')}</ListItemText>
+                </MenuItem>
+              )}
+              <MenuItem disabled={!storeId} onClick={() => abrirDialogo('cleanup')}>
+                <ListItemIcon>
+                  <FactCheckRoundedIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>{t('catalogCleanup.action')}</ListItemText>
+              </MenuItem>
+            </Menu>
+            {/* Los diálogos del menú viven fuera de él: un menú abierto
+                captura el teclado y se comería lo que se escribe dentro. */}
+            {canWrite && (
+              <CatalogImportAction
+                kind="products"
+                storeId={activeStore?.id ?? null}
+                open={dialogo === 'import'}
+                onClose={() => setDialogo(null)}
+              />
+            )}
             {canWrite && (
               <BulkImagesAction
                 scope={{ organizationId: tenant.organization_id, companyId: activeCompanyId, storeId }}
+                open={dialogo === 'images'}
+                onClose={() => setDialogo(null)}
               />
             )}
             <CatalogCleanupAction
@@ -354,6 +424,8 @@ export function ProductsPage() {
                 setPage(0)
                 setBorrador((actual) => ({ ...actual, search: texto }))
               }}
+              open={dialogo === 'cleanup'}
+              onClose={() => setDialogo(null)}
             />
             {canWrite && (
               <BulkCopyAction

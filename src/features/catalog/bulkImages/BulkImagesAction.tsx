@@ -105,15 +105,34 @@ export interface BulkImagesScope {
   storeId: string
 }
 
-export function BulkImagesAction({ scope }: { scope: BulkImagesScope }) {
+export function BulkImagesAction({
+  scope,
+  open: controlado,
+  onClose,
+}: {
+  scope: BulkImagesScope
+  /** Modo controlado (p. ej. desde un menú): sin botón propio, abre con `open`. */
+  open?: boolean
+  onClose?: () => void
+}) {
   const { t } = useI18n()
   const [open, setOpen] = useState(false)
   return (
     <>
-      <Button variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon />} onClick={() => setOpen(true)}>
-        {t('bulkImages.action')}
-      </Button>
-      {open && <BulkImagesDialog scope={scope} onClose={() => setOpen(false)} />}
+      {controlado === undefined && (
+        <Button variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon />} onClick={() => setOpen(true)}>
+          {t('bulkImages.action')}
+        </Button>
+      )}
+      {(controlado ?? open) && (
+        <BulkImagesDialog
+          scope={scope}
+          onClose={() => {
+            setOpen(false)
+            onClose?.()
+          }}
+        />
+      )}
     </>
   )
 }

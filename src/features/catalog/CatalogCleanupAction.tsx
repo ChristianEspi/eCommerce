@@ -38,9 +38,25 @@ const MAX_FILAS = 60
  * raro. La detección es por reglas (`cleanup.ts`); nada se corrige solo: cada
  * fila lleva al producto en la lista con «Ver».
  */
-export function CatalogCleanupAction({ storeId, onSearch }: { storeId: string | null; onSearch: (texto: string) => void }) {
+export function CatalogCleanupAction({
+  storeId,
+  onSearch,
+  open: controlado,
+  onClose,
+}: {
+  storeId: string | null
+  onSearch: (texto: string) => void
+  /** Modo controlado (p. ej. desde un menú): sin botón propio, abre con `open`. */
+  open?: boolean
+  onClose?: () => void
+}) {
   const { t } = useI18n()
-  const [abierto, setAbierto] = useState(false)
+  const [abiertoPropio, setAbiertoPropio] = useState(false)
+  const abierto = controlado ?? abiertoPropio
+  const setAbierto = (valor: boolean) => {
+    setAbiertoPropio(valor)
+    if (!valor) onClose?.()
+  }
   const [seccion, setSeccion] = useState<Seccion>('duplicados')
 
   const query = useQuery({
@@ -99,9 +115,11 @@ export function CatalogCleanupAction({ storeId, onSearch }: { storeId: string | 
 
   return (
     <>
-      <Button variant="outlined" startIcon={<FactCheckRoundedIcon />} onClick={() => setAbierto(true)} disabled={!storeId}>
-        {t('catalogCleanup.action')}
-      </Button>
+      {controlado === undefined && (
+        <Button variant="outlined" startIcon={<FactCheckRoundedIcon />} onClick={() => setAbierto(true)} disabled={!storeId}>
+          {t('catalogCleanup.action')}
+        </Button>
+      )}
       <Dialog open={abierto} onClose={() => setAbierto(false)} fullWidth maxWidth="md" aria-labelledby="catalog-cleanup-title">
         <DialogTitle id="catalog-cleanup-title">{t('catalogCleanup.title')}</DialogTitle>
         <DialogContent dividers>

@@ -90,20 +90,36 @@ function specsOf(kind: CatalogImportKind): readonly SheetSpec[] {
 export function CatalogImportAction({
   kind,
   storeId,
+  open: controlado,
+  onClose,
 }: {
   kind: CatalogImportKind
   /** Tienda activa. El catálogo avanzado es de la empresa y no la necesita. */
   storeId?: string | null
+  /** Modo controlado (p. ej. desde un menú): sin botón propio, abre con `open`. */
+  open?: boolean
+  onClose?: () => void
 }) {
   const { t } = useI18n()
   const [open, setOpen] = useState(false)
 
   return (
     <>
-      <Button variant="outlined" startIcon={<FileUploadRoundedIcon />} onClick={() => setOpen(true)}>
-        {t('catalogImport.action')}
-      </Button>
-      {open && <CatalogImportDialog kind={kind} storeId={storeId ?? null} onClose={() => setOpen(false)} />}
+      {controlado === undefined && (
+        <Button variant="outlined" startIcon={<FileUploadRoundedIcon />} onClick={() => setOpen(true)}>
+          {t('catalogImport.action')}
+        </Button>
+      )}
+      {(controlado ?? open) && (
+        <CatalogImportDialog
+          kind={kind}
+          storeId={storeId ?? null}
+          onClose={() => {
+            setOpen(false)
+            onClose?.()
+          }}
+        />
+      )}
     </>
   )
 }

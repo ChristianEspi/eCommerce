@@ -1127,6 +1127,7 @@ export const es = {
     'common.optional': 'Opcional',
     'common.none': 'Sin asignar',
     'catalog.products.new': 'Nuevo producto',
+    'catalog.products.more': 'Más acciones',
     'catalog.products.create': 'Crear producto',
     'catalog.products.edit': 'Editar producto',
     'catalog.products.emptySearch': 'Ningún producto coincide con tu búsqueda',
