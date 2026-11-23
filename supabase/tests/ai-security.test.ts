@@ -191,6 +191,8 @@ describe('shopping-chat: conversación con sesión (2026-11-22)', () => {
       'my_consumer_order_detail',
       'my_consumer_orders',
       // 2026-11-22 · reposición: lectura del historial del comprador, sin escritura.
+      // 2026-11-22 · seguimiento del pedido propio: estados y fechas, sin dirección ni guía.
+      'my_order_tracking',
       'my_replenishment',
       // 2026-11-22 · ficha en el chat: cotización con la sesión y ficha pública, solo lectura.
       'price_quote_for_slug',

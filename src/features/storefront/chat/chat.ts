@@ -28,6 +28,18 @@ const orderSchema = z.object({
 })
 export type ChatOrder = z.infer<typeof orderSchema>
 
+/** 2026-11-22 · Una entrega del pedido: estados y fechas de `my_order_tracking`, sin dirección ni guía. */
+const deliverySchema = z.object({
+  metodo: z.string().nullable(),
+  estado: z.string(),
+  prometido_hasta: z.string().nullable(),
+  entregado: z.string().nullable(),
+  dias_retraso: z.number().int().nonnegative(),
+  ultimo_evento: z.object({ estado: z.string(), fecha: z.string() }).nullable(),
+  intentos_fallidos: z.number().int().nonnegative(),
+})
+export type ChatDelivery = z.infer<typeof deliverySchema>
+
 const creditSchema = z.object({
   cuenta: z.string(),
   limite: z.string().nullable(),
@@ -57,7 +69,7 @@ export type ChatCompareRow = z.infer<typeof compareRowSchema>
 export const chatDataSchema = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('productos'), product_ids: z.array(z.string().uuid()), consulta: z.string() }),
   z.object({ tipo: z.literal('pedidos'), pedidos: z.array(orderSchema) }),
-  z.object({ tipo: z.literal('pedido'), pedido: orderSchema.nullable() }),
+  z.object({ tipo: z.literal('pedido'), pedido: orderSchema.nullable(), entregas: z.array(deliverySchema).default([]) }),
   z.object({ tipo: z.literal('credito'), credito: creditSchema.nullable() }),
   z.object({
     tipo: z.literal('carrito'),

@@ -30,7 +30,7 @@ import type { CartImportResult } from '../quick-order/importToCart'
 import { offersPresentation, preselected, resolveChoice, type IntakeLine } from '../quick-order/intake'
 import { PresentationPicker } from '../quick-order/PresentationPicker'
 import { restockNote } from '../restockText'
-import { CHAT_MAX_TEXT, ChatError, sendChat, type ChatCompareRow, type ChatCredit, type ChatData, type ChatOrder, type ChatReply, type ChatTurn } from './chat'
+import { CHAT_MAX_TEXT, ChatError, sendChat, type ChatCompareRow, type ChatCredit, type ChatData, type ChatDelivery, type ChatOrder, type ChatReply, type ChatTurn } from './chat'
 
 /** Lo que se puede pedir sin saber qué pedir. */
 const EJEMPLOS = ['store.chat.example.1', 'store.chat.example.5', 'store.chat.example.2', 'store.chat.example.3', 'store.chat.example.4', 'store.chat.example.6'] as const
@@ -214,7 +214,7 @@ function ChatDataView({ datos, storeSlug, storeId }: { datos: ChatData; storeSlu
         <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>{t('store.chat.noOrders')}</Typography>
       )
     case 'pedido':
-      return datos.pedido ? <ChatOrderCard order={datos.pedido} storeSlug={storeSlug} /> : null
+      return datos.pedido ? <ChatOrderCard order={datos.pedido} deliveries={datos.entregas} storeSlug={storeSlug} /> : null
     case 'credito':
       return datos.credito ? <ChatCreditCard credit={datos.credito} storeSlug={storeSlug} /> : null
     case 'carrito':
@@ -330,9 +330,28 @@ function camel(value: string): string {
   return value.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
 }
 
+/** «Reparto · En camino · prometido 19 nov · 3 días de retraso · último aviso: intento de entrega fallido». */
+function deliveryLine(t: (k: MessageKey) => string, locale: 'es' | 'en', d: ChatDelivery): string {
+  const partes = [d.metodo, t(`fulfillment.state.${d.estado}` as MessageKey)]
+  if (d.entregado) partes.push(t('store.chat.delivery.delivered').replace('{date}', formatDate(d.entregado, locale)))
+  else if (d.prometido_hasta) partes.push(t('store.chat.delivery.promised').replace('{date}', formatDate(d.prometido_hasta, locale)))
+  if (d.dias_retraso > 0) partes.push(t('store.chat.delivery.late').replace('{days}', String(d.dias_retraso)))
+  if (d.ultimo_evento && !d.entregado) partes.push(t('store.chat.delivery.lastEvent').replace('{event}', t(`fulfillment.tracking.${d.ultimo_evento.estado}` as MessageKey)))
+  if (d.intentos_fallidos > 0) partes.push(t('store.chat.delivery.attempts').replace('{count}', String(d.intentos_fallidos)))
+  return partes.filter(Boolean).join(' · ')
+}
+
 const CARD_SX = { p: 1.5, border: '1px solid var(--border)', borderRadius: 2, bgcolor: 'var(--card)' } as const
 
-function ChatOrderCard({ order, storeSlug }: { order: ChatOrder; storeSlug: string }) {
+function ChatOrderCard({
+  order,
+  deliveries = [],
+  storeSlug,
+}: {
+  order: ChatOrder
+  deliveries?: readonly ChatDelivery[]
+  storeSlug: string
+}) {
   const { t, locale } = useI18n()
   return (
     <Box sx={CARD_SX} data-chat-order={order.order_number}>
@@ -343,6 +362,15 @@ function ChatOrderCard({ order, storeSlug }: { order: ChatOrder; storeSlug: stri
         </Typography>
       </Stack>
       <Typography sx={{ fontSize: TS.label, color: 'var(--muted)', mb: 0.75 }}>{formatDate(order.placed_at, locale)}</Typography>
+      {deliveries.length > 0 && (
+        <Stack sx={{ gap: 0.5, mb: 0.75 }} data-chat-deliveries>
+          {deliveries.map((d, i) => (
+            <Typography key={i} sx={{ fontSize: TS.label, color: d.dias_retraso > 0 ? 'var(--text)' : 'var(--muted)', fontWeight: d.dias_retraso > 0 ? 700 : 400 }}>
+              {deliveryLine(t, locale, d)}
+            </Typography>
+          ))}
+        </Stack>
+      )}
       <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 0.5, alignItems: 'center' }}>
         <EstadoChip valor={order.status} clave="orders.status" />
         <EstadoChip valor={order.payment_status} clave="orders.payment" />

@@ -208,6 +208,38 @@ export interface LineaDePedido {
   readonly cantidad: number
 }
 
+/** Una entrega del pedido según `my_order_tracking`: estados y fechas, sin dirección ni guía. */
+export interface EntregaPedido {
+  readonly metodo: string | null
+  readonly estado: string
+  readonly prometido_hasta: string | null
+  readonly entregado: string | null
+  readonly dias_retraso: number
+  readonly ultimo_evento: { readonly estado: string; readonly fecha: string } | null
+  readonly intentos_fallidos: number
+}
+
+/** De la respuesta de `my_order_tracking` a entregas tipadas; lo que no encaja se descarta. */
+export function leerSeguimiento(data: unknown): EntregaPedido[] {
+  const entregas = (data as { entregas?: unknown } | null)?.entregas
+  if (!Array.isArray(entregas)) return []
+  return (entregas as Array<Record<string, unknown>>).flatMap((e): EntregaPedido[] => {
+    if (typeof e.estado !== 'string') return []
+    const ev = e.ultimo_evento as { estado?: unknown; fecha?: unknown } | null
+    const dias = Number(e.dias_retraso)
+    const intentos = Number(e.intentos_fallidos)
+    return [{
+      metodo: typeof e.metodo === 'string' ? e.metodo.slice(0, 80) : null,
+      estado: e.estado,
+      prometido_hasta: typeof e.prometido_hasta === 'string' ? e.prometido_hasta : null,
+      entregado: typeof e.entregado === 'string' ? e.entregado : null,
+      dias_retraso: Number.isInteger(dias) && dias > 0 ? dias : 0,
+      ultimo_evento: ev && typeof ev.estado === 'string' && typeof ev.fecha === 'string' ? { estado: ev.estado, fecha: ev.fecha } : null,
+      intentos_fallidos: Number.isInteger(intentos) && intentos > 0 ? intentos : 0,
+    }]
+  }).slice(0, 5)
+}
+
 export interface CreditoComprador {
   readonly cuenta: string
   readonly limite: string | null
@@ -441,6 +473,7 @@ export interface PuertosChat {
   pedidos(): Promise<readonly PedidoResumen[]>
   detallePedido(orderId: string): Promise<readonly LineaDePedido[]>
   credito(): Promise<CreditoComprador | null>
+  seguimiento(orderId: string): Promise<readonly EntregaPedido[]>
   resolverCodigos(skus: readonly string[]): Promise<Map<string, CodigoResuelto>>
   presentaciones(productIds: readonly string[]): Promise<Map<string, Presentacion[]>>
 }
@@ -451,7 +484,7 @@ export type LineaCarrito = LineaPropuesta & { readonly presentaciones: readonly 
 export type DatosChat =
   | { readonly tipo: 'productos'; readonly product_ids: readonly string[]; readonly consulta: string }
   | { readonly tipo: 'pedidos'; readonly pedidos: readonly PedidoResumen[] }
-  | { readonly tipo: 'pedido'; readonly pedido: PedidoResumen | null }
+  | { readonly tipo: 'pedido'; readonly pedido: PedidoResumen | null; readonly entregas: readonly EntregaPedido[] }
   | { readonly tipo: 'credito'; readonly credito: CreditoComprador | null }
   | { readonly tipo: 'carrito'; readonly origen: string | null; readonly lineas: readonly LineaCarrito[]; readonly avisos: readonly string[] }
   | { readonly tipo: 'sustitutos'; readonly producto: string; readonly principio_activo: string | null; readonly product_ids: readonly string[] }
@@ -601,9 +634,23 @@ export async function ejecutarChat(plan: PlanChat, puertos: PuertosChat): Promis
       const pedido = plan.numero
         ? (pedidos.find((p) => p.order_number.toLowerCase() === plan.numero!.toLowerCase()) ?? null)
         : (pedidos[0] ?? null)
+      const entregas = pedido ? await puertos.seguimiento(pedido.order_id) : []
       return {
-        datos: { tipo: 'pedido', pedido },
-        paraModelo: pedido ? JSON.stringify(resumenPedido(pedido)) : '(no hay ningún pedido tuyo con ese número)',
+        datos: { tipo: 'pedido', pedido, entregas },
+        paraModelo: pedido
+          ? JSON.stringify({
+              ...resumenPedido(pedido),
+              entregas: entregas.map((e) => ({
+                metodo: e.metodo,
+                estado: e.estado,
+                prometido_hasta: e.prometido_hasta,
+                entregado: e.entregado,
+                dias_retraso: e.dias_retraso,
+                ultimo_evento_del_operador: e.ultimo_evento,
+                intentos_de_entrega_fallidos: e.intentos_fallidos,
+              })),
+            })
+          : '(no hay ningún pedido tuyo con ese número)',
         productosPermitidos: [],
       }
     }
@@ -752,6 +799,7 @@ export async function ejecutarChat(plan: PlanChat, puertos: PuertosChat): Promis
 export const SISTEMA_RESPUESTA_CHAT = [
   'Eres el asistente de compra de una tienda online y conversas con un cliente con sesión. Responde en su idioma, cálido y directo, en tres frases como máximo, con lo que dicen los datos.',
   'La pantalla muestra aparte los productos, pedidos, el crédito y el carrito propuesto con sus precios y cifras: NO escribas precios, importes, saldos, descuentos ni cantidades de stock.',
+  'Si es el estado de un pedido con entregas: di en qué estado va y la fecha prometida; si dias_retraso > 0, di que va con retraso y explícalo SOLO con el estado y el último evento del operador (por ejemplo un intento de entrega fallido); nunca inventes causas, plazos nuevos ni compensaciones, y sugiere escribir a la tienda si necesita más detalle.',
   'Si es una reposición, di que es según cada cuánto suele comprar (dias_restantes negativo = ya le tocaba) y que revise las cantidades.',
   'Si es una ficha de producto, contesta SOLO con lo que dicen descripcion, destacados y especificaciones: composición, ingredientes, contenido, formato y características. NO repitas frases de la ficha sobre para qué sirve, a quién ayuda, qué alivia, previene o trata, ni indicaciones o modo de uso; si preguntan eso, di que lo consulte con un profesional. Si la ficha no trae el dato, dilo y sugiere consultarlo con la tienda.',
   'Para elegir presentación usa mas_conveniente_por_unidad y di «la más conveniente por unidad» (nunca «más barata» ni «más económica»; la pantalla muestra los precios). Si ninguna es más conveniente, di que cuestan lo mismo por unidad; si comparacion_posible es falso, di que no se pueden comparar por unidad.',

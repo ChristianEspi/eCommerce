@@ -22,6 +22,7 @@ import {
   nombreSinContenido,
   ejecutarChat,
   leerReposicion,
+  leerSeguimiento,
   nombreCoincide,
   numerosDePedido,
   taparNumeros,
@@ -100,6 +101,11 @@ function puertos(over: Partial<PuertosChat> = {}): PuertosChat & { busquedas: st
           { variant_id: 'v100', nombre: '18 mg · Caja x100', en_stock: true, precio: '250.00', moneda: 'PEN' },
         ],
       }
+    },
+    async seguimiento(id) {
+      return id === 'o1'
+        ? [{ metodo: 'Reparto', estado: 'in_transit', prometido_hasta: '2026-11-19', entregado: null, dias_retraso: 3, ultimo_evento: { estado: 'delivery_attempted', fecha: '2026-11-21' }, intentos_fallidos: 1 }]
+        : []
     },
     async precios(ids) {
       return new Map(ids.map((id, i) => [id, { precio: i === 0 ? '12.00' : '50.00', moneda: 'PEN' }]))
@@ -198,7 +204,24 @@ describe('pedidos y crédito', () => {
     const r = await ejecutarChat({ herramienta: 'estado_pedido', numero: 'ec-1' }, puertos())
     expect(r.datos).toMatchObject({ tipo: 'pedido', pedido: { order_number: 'EC-1' } })
     const otro = await ejecutarChat({ herramienta: 'estado_pedido', numero: 'EC-404' }, puertos())
-    expect(otro.datos).toEqual({ tipo: 'pedido', pedido: null })
+    expect(otro.datos).toEqual({ tipo: 'pedido', pedido: null, entregas: [] })
+  })
+
+  it('un pedido con retraso: el modelo ve estado, fecha prometida, días y último evento (2026-11-22)', async () => {
+    const r = await ejecutarChat({ herramienta: 'estado_pedido', numero: 'EC-1' }, puertos())
+    expect(r.datos).toMatchObject({ tipo: 'pedido', entregas: [{ dias_retraso: 3, intentos_fallidos: 1 }] })
+    expect(JSON.parse(r.paraModelo)).toMatchObject({
+      numero: 'EC-1',
+      entregas: [{ estado: 'in_transit', dias_retraso: 3, ultimo_evento_del_operador: { estado: 'delivery_attempted' }, intentos_de_entrega_fallidos: 1 }],
+    })
+    expect(r.paraModelo).not.toMatch(/100.00/)
+  })
+
+  it('leerSeguimiento descarta lo mal formado y no inventa retrasos', () => {
+    expect(leerSeguimiento({ entregas: [{ estado: 'pending', dias_retraso: -2, intentos_fallidos: 'x' }, { sin: 'estado' }] })).toEqual([
+      { metodo: null, estado: 'pending', prometido_hasta: null, entregado: null, dias_retraso: 0, ultimo_evento: null, intentos_fallidos: 0 },
+    ])
+    expect(leerSeguimiento(null)).toEqual([])
   })
 
   it('el crédito se pinta con cifras; el modelo solo ve si hay vencido', async () => {

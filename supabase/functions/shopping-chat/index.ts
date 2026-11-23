@@ -39,6 +39,7 @@ import {
   SISTEMA_RESPUESTA_CHAT,
   ejecutarChat,
   leerReposicion,
+  leerSeguimiento,
   numerosDePedido,
   taparNumeros,
   validarPlanChat,
@@ -280,6 +281,14 @@ const handler = serveJson(
             moneda: typeof v.currency === 'string' ? v.currency : moneda,
           })),
         } satisfies FichaProducto
+      },
+      async seguimiento(orderId) {
+        const { data, error } = await usuario.rpc('my_order_tracking', { p_store_slug: storeSlug, p_order_id: orderId })
+        if (error) {
+          logger.warn('chat.tracking_failed', { original_code: errorCode(error) })
+          return []
+        }
+        return leerSeguimiento(data)
       },
       async precios(productIds) {
         const salida = new Map<string, { precio: string; moneda: string }>()

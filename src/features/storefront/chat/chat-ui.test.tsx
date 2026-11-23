@@ -230,4 +230,25 @@ describe('ChatPanel', () => {
     expect(within(otra).queryByText('Más conveniente')).toBeNull()
     expect(within(otra).getByText(/90[.,]00/)).toBeInTheDocument()
   })
+
+  it('estado de pedido: cada entrega con su estado, fecha prometida y retraso (2026-11-22)', async () => {
+    holder.replies.push({
+      herramienta: 'estado_pedido',
+      datos: {
+        tipo: 'pedido',
+        pedido: { order_id: 'o1', order_number: 'EC-1', status: 'paid', payment_status: 'paid', fulfillment_status: 'in_progress', placed_at: '2026-11-15T10:00:00Z', total: '100.00', currency: 'PEN' },
+        entregas: [
+          { metodo: 'Reparto', estado: 'in_transit', prometido_hasta: '2026-11-19', entregado: null, dias_retraso: 3, ultimo_evento: { estado: 'delivery_attempted', fecha: '2026-11-21' }, intentos_fallidos: 1 },
+        ],
+      },
+      respuesta: 'Tu pedido va con retraso: hubo un intento de entrega fallido.',
+      product_ids: [],
+      motivo: null,
+    } satisfies ChatReply)
+    pintar()
+    await escribir('donde esta mi pedido')
+    expect(await screen.findByText('Tu pedido va con retraso: hubo un intento de entrega fallido.')).toBeInTheDocument()
+    const linea = document.querySelector('[data-chat-deliveries]') as HTMLElement
+    expect(linea.textContent).toMatch(/Reparto · En camino · prometido para el .*19.* · 3 días de retraso · último aviso: .* · intentos de entrega fallidos: 1/)
+  })
 })
