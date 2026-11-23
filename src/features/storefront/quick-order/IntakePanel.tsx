@@ -24,6 +24,7 @@ import type { MessageKey } from '@/shared/i18n/messages'
 import { Field } from '@/shared/ui/Field'
 import { SelectField } from '@/shared/ui/SelectField'
 import { TS } from '@/theme/tokens'
+import { rememberPurchaseOrder } from '../purchaseOrderMemory'
 import { markAiAttribution } from '../aiAttribution'
 import {
   INTAKE_ACCEPT,
@@ -143,6 +144,7 @@ export function IntakePanel({
       return match ? [match.product.product_id] : []
     })
     markAiAttribution(storeSlug, productIds, 'intake')
+    rememberPurchaseOrder(storeSlug, read.data?.data?.orden_compra)
     onAccept(ready.map(({ sku, quantity }) => ({ sku, quantity })))
   }
 
@@ -217,6 +219,11 @@ export function IntakePanel({
               {t('store.intake.review.title')}
             </Typography>
             <Alert severity="info">{t('store.intake.review.hint')}</Alert>
+            {read.data?.data?.orden_compra && (
+              <Alert severity="info" data-intake-po>
+                {t('store.intake.purchaseOrder').replace('{number}', read.data.data.orden_compra)}
+              </Alert>
+            )}
             {read.data?.data?.notas && (
               <Alert severity="warning">{read.data.data.notas}</Alert>
             )}

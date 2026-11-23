@@ -3324,6 +3324,7 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'store.intake.busy': 'The AI is busy right now. Try again in a minute.',
     'store.intake.review.title': 'Review what we read',
     'store.intake.review.hint': 'Tick what you want to move to the order. Uncertain lines start unticked. Price, stock and your assortment are confirmed when validating.',
+    'store.intake.purchaseOrder': 'We read your purchase order {number}. We will carry it to checkout so you can confirm it.',
     'store.intake.review.include': 'Include in the order',
     'store.intake.review.read': 'What we read',
     'store.intake.review.product': 'Store product',

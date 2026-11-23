@@ -20,6 +20,7 @@ import {
   consultaDeLinea,
   leerResolucion,
   limpiarComponente,
+  limpiarOrdenCompra,
   ofrecerSustitutos,
   palabraPrincipal,
   preferirPorNombre,
@@ -99,6 +100,7 @@ function respuesta(lineas: Partial<RespuestaModeloIntake['lineas'][number]>[], e
   return {
     es_pedido: true,
     notas: '',
+    orden_compra: '',
     ...extra,
     lineas: lineas.map((l) => ({
       texto: 'Donecil 10 mg',
@@ -432,5 +434,25 @@ describe('lectura de una cotización de la competencia', () => {
     expect(limpiarPrecio(5, false)).toBeNull()
     expect(limpiarPrecio('abc', true)).toBeNull()
     expect(limpiarPrecio(-3, true)).toBeNull()
+  })
+})
+
+describe('número de orden de compra (2026-11-22)', () => {
+  it('se lee si tiene forma de código; RUC, móvil o texto suelto, no', () => {
+    expect(limpiarOrdenCompra(' OC-2026-0045 ')).toBe('OC-2026-0045')
+    expect(limpiarOrdenCompra('4500012345')).toBe('4500012345')
+    expect(limpiarOrdenCompra('20123456789')).toBeNull()
+    expect(limpiarOrdenCompra('987654321')).toBeNull()
+    expect(limpiarOrdenCompra('pendiente')).toBeNull()
+    expect(limpiarOrdenCompra('')).toBeNull()
+    expect(limpiarOrdenCompra('x; drop table')).toBeNull()
+  })
+
+  it('la lectura revisada lo lleva aparte de las líneas', () => {
+    const r = revisarIntake(respuesta([{}], { orden_compra: 'PO 7781' }))
+    expect(r).toMatchObject({ ok: true, value: { ordenCompra: 'PO 7781' } })
+    const sin = revisarIntake(respuesta([{}]))
+    expect(sin).toMatchObject({ ok: true, value: { ordenCompra: null } })
+    expect(ESQUEMA_INTAKE.required).toContain('orden_compra')
   })
 })

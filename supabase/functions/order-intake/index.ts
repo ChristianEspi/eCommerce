@@ -378,6 +378,7 @@ const handler = serveJson(
           data: {
             lineas: propuestas,
             notas: lectura.data.notas,
+            orden_compra: 'ordenCompra' in lectura.data ? lectura.data.ordenCompra : null,
             resumen: resumenIntake(propuestas),
             ...(cotizacion ? { cotizacion } : {}),
           },

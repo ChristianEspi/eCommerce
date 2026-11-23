@@ -2797,6 +2797,7 @@ export const es = {
     'store.intake.busy': 'La IA está saturada en este momento. Vuelve a intentarlo en un minuto.',
     'store.intake.review.title': 'Revisa lo que leímos',
     'store.intake.review.hint': 'Marca lo que quieras pasar al pedido. Lo dudoso empieza sin marcar. El precio, el stock y tu surtido se confirman al validar.',
+    'store.intake.purchaseOrder': 'Leímos tu orden de compra {number}. La llevamos al pago para que la confirmes.',
     'store.intake.review.include': 'Incluir en el pedido',
     'store.intake.review.read': 'Lo que leímos',
     'store.intake.review.product': 'Producto de la tienda',

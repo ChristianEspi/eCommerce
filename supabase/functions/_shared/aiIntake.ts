@@ -45,6 +45,7 @@ export const SISTEMA_INTAKE = [
   '- Si el contenido no es una lista de productos para comprar, devuelve lineas vacía y es_pedido = false.',
   `- Como máximo ${INTAKE_MAX_LINEAS} líneas.`,
   '- notas: una frase corta en el idioma pedido si hay algo que el cliente deba revisar (líneas ilegibles, cantidades no indicadas). Si no, cadena vacía. Sin cifras.',
+  '- orden_compra: el número de la orden de compra del cliente SOLO si el documento lo rotula expresamente («Orden de compra», «OC», «O/C», «PO», «Purchase order») junto a ese código. Si no aparece así, cadena vacía. No es un RUC, un teléfono, una fecha ni un número de factura o de cotización.',
 ].join('\n')
 
 export const ESQUEMA_INTAKE = {
@@ -70,8 +71,9 @@ export const ESQUEMA_INTAKE = {
       },
     },
     notas: { type: 'string', maxLength: 300 },
+    orden_compra: { type: 'string', maxLength: 60 },
   },
-  required: ['es_pedido', 'lineas', 'notas'],
+  required: ['es_pedido', 'lineas', 'notas', 'orden_compra'],
   additionalProperties: false,
 } as const satisfies EsquemaIA
 
@@ -90,6 +92,8 @@ export interface RespuestaModeloIntake {
   es_pedido: boolean
   lineas: LineaModelo[]
   notas: string
+  /** 2026-11-22 · El número de OC rotulado en el documento; vacío si no lo hay. */
+  orden_compra?: string
 }
 
 export interface LineaLeida {
@@ -106,6 +110,24 @@ export interface LineaLeida {
 export interface LecturaRevisada {
   readonly lineas: readonly LineaLeida[]
   readonly notas: string | null
+  /** El número de OC, ya validado; null si no había o tenía mala forma. */
+  readonly ordenCompra: string | null
+}
+
+const ORDEN_COMPRA = /^[A-Za-z0-9][A-Za-z0-9 ._/#-]{0,59}$/
+
+/**
+ * El número de OC que el modelo leyó, con forma de código y no de otra cosa:
+ * tiene que llevar algún dígito, y once dígitos seguidos (un RUC) o un móvil
+ * peruano (9 dígitos empezando por 9) se descartan. El checkout lo trae puesto,
+ * pero la persona lo ve y lo puede cambiar antes de pagar.
+ */
+export function limpiarOrdenCompra(valor: unknown): string | null {
+  const v = String(valor ?? '').replace(/\s+/g, ' ').trim().slice(0, 60)
+  if (!v || !ORDEN_COMPRA.test(v) || !/\d/.test(v)) return null
+  const soloDigitos = v.replace(/\D/g, '')
+  if (soloDigitos === v.replace(/[\s.-]/g, '') && (soloDigitos.length === 11 || /^9\d{8}$/.test(soloDigitos))) return null
+  return v
 }
 
 const SKU = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,59}$/
@@ -196,7 +218,10 @@ export function revisarIntake(
   if (lineas.length === 0) return { ok: false, motivo: 'vacia' }
 
   const notas = limpiarTexto(String(data.notas ?? '')).replace(/\d/g, '').replace(/\s+/g, ' ').trim()
-  return { ok: true, value: { lineas, notas: notas.length >= 3 ? notas.slice(0, 300) : null } }
+  return {
+    ok: true,
+    value: { lineas, notas: notas.length >= 3 ? notas.slice(0, 300) : null, ordenCompra: limpiarOrdenCompra(data.orden_compra) },
+  }
 }
 
 // ---------------------------------------------------------------------------
