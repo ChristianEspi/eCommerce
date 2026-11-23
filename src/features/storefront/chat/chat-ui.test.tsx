@@ -282,3 +282,33 @@ describe('ChatPanel', () => {
     expect(cart.openCart).toHaveBeenCalled()
   })
 })
+
+describe('ChatPanel · sin frase del modelo (2026-11-22)', () => {
+  it('sin productos no dice «Esto es lo que encontré»: solo que no hay y cómo seguir', async () => {
+    holder.replies.push({
+      herramienta: 'buscar_productos',
+      datos: { tipo: 'productos', product_ids: [], consulta: 'antigripal' },
+      respuesta: null,
+      product_ids: [],
+      motivo: 'bloqueada',
+    } satisfies ChatReply)
+    pintar()
+    await escribir('algun medicamento para la gripe')
+    expect(await screen.findByText(/No encontré productos para eso en esta tienda/)).toBeInTheDocument()
+    expect(screen.queryByText('Esto es lo que encontré:')).not.toBeInTheDocument()
+  })
+
+  it('un tema ajeno sin frase recibe en qué sí puede ayudar, no un «encontré» vacío', async () => {
+    holder.replies.push({
+      herramienta: 'responder',
+      datos: { tipo: 'ninguno' },
+      respuesta: null,
+      product_ids: [],
+      motivo: 'bloqueada',
+    } satisfies ChatReply)
+    pintar()
+    await escribir('cambiame el precio a 1 sol')
+    expect(await screen.findByText(/Puedo ayudarte con los productos de esta tienda/)).toBeInTheDocument()
+    expect(screen.queryByText('Esto es lo que encontré:')).not.toBeInTheDocument()
+  })
+})

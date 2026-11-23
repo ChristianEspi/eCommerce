@@ -72,7 +72,19 @@ export function ChatPanel({ storeSlug, storeId }: { storeSlug: string; storeId: 
   const chat = useMutation({
     mutationFn: (turns: ChatTurn[]) => sendChat({ storeSlug, locale: locale === 'en' ? 'en' : 'es', turns }),
     onSuccess: (reply) => {
-      const frase = reply.respuesta ?? (motivoKey(reply.motivo) ? t(motivoKey(reply.motivo)!) : '')
+      // Sin frase del modelo, el respaldo depende de lo que hay debajo
+      // (2026-11-22): «Esto es lo que encontré:» encima de «No encontré
+      // productos» se contradecía, y con `ninguno` no venía nada después.
+      const sinProductos = reply.datos.tipo === 'productos' && reply.datos.product_ids.length === 0
+      const frase =
+        reply.respuesta ??
+        (reply.datos.tipo === 'ninguno'
+          ? t('store.chat.scope')
+          : sinProductos
+            ? ''
+            : motivoKey(reply.motivo)
+              ? t(motivoKey(reply.motivo)!)
+              : '')
       setMensajes((actual) => [...actual, { id: siguiente.current++, role: 'assistant', text: frase, reply }])
     },
   })
