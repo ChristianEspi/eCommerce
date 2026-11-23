@@ -9,8 +9,8 @@ import { renderWithProviders } from '@/test/render'
 
 vi.mock('./api/products', () => ({
   fetchCatalogCleanupRows: vi.fn(async () => [
-    { product_id: '00000000-0000-4000-8000-000000000001', sku: 'LEJ-1', name: 'Lejía 1 L', brand_name: null, kind: 'simple', status: 'published', has_image: true, has_description: true, has_category: true },
-    { product_id: '00000000-0000-4000-8000-000000000002', sku: 'LEJ-5', name: 'Lejía 5 L', brand_name: null, kind: 'simple', status: 'published', has_image: false, has_description: true, has_category: true },
+    { product_id: '00000000-0000-4000-8000-000000000001', sku: 'LEJ-1', name: 'Lejía 1 L', brand_name: null, kind: 'simple', status: 'published', has_image: true, has_description: true, has_category: true, has_attributes: false },
+    { product_id: '00000000-0000-4000-8000-000000000002', sku: 'LEJ-5', name: 'Lejía 5 L', brand_name: null, kind: 'simple', status: 'published', has_image: false, has_description: true, has_category: true, has_attributes: false },
   ]),
 }))
 

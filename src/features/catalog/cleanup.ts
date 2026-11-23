@@ -24,6 +24,7 @@ export const cleanupRowSchema = z.object({
   has_image: z.boolean(),
   has_description: z.boolean(),
   has_category: z.boolean(),
+  has_attributes: z.boolean(),
 })
 export type CleanupRow = z.infer<typeof cleanupRowSchema>
 
@@ -40,6 +41,7 @@ export interface HallazgosLimpieza {
   readonly sinFoto: readonly CleanupRow[]
   readonly sinDescripcion: readonly CleanupRow[]
   readonly sinCategoria: readonly CleanupRow[]
+  readonly sinAtributos: readonly CleanupRow[]
   readonly nombres: ReadonlyArray<{ readonly producto: CleanupRow; readonly problema: ProblemaNombre }>
 }
 
@@ -127,6 +129,7 @@ export function analizarCatalogo(filas: readonly CleanupRow[]): HallazgosLimpiez
     sinFoto: filas.filter((f) => !f.has_image),
     sinDescripcion: filas.filter((f) => !f.has_description),
     sinCategoria: filas.filter((f) => !f.has_category),
+    sinAtributos: filas.filter((f) => !f.has_attributes),
     nombres: filas.flatMap((producto) => {
       const problema = problemaDeNombre(producto.name)
       return problema ? [{ producto, problema }] : []

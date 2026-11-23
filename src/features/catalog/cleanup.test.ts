@@ -12,6 +12,7 @@ const fila = (name: string, extra: Partial<CleanupRow> = {}): CleanupRow => ({
   has_image: true,
   has_description: true,
   has_category: true,
+  has_attributes: true,
   ...extra,
 })
 

@@ -4,6 +4,7 @@ import {
   Box,
   Button,
   Checkbox,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -21,7 +22,13 @@ import type { AiErrorKind } from '@/features/ai/result'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { aEntradaDeAtributo, claveDeMotivoPim, pedirSugerenciasDeFicha, type SugerenciasPim } from './api/copy'
-import { fetchProductsWithoutDescription, updateProductDescription, type ProductoSinFicha } from './api/products'
+import {
+  FICHAS_LOTE_MAX,
+  fetchCatalogCleanupRows,
+  fetchProductsWithoutDescription,
+  updateProductDescription,
+  type ProductoSinFicha,
+} from './api/products'
 import { saveProductAttribute } from './pim/api'
 import { CATALOG_KEY } from './useProducts'
 
@@ -41,6 +48,21 @@ interface Fila {
 }
 
 type Fase = 'pick' | 'working' | 'review' | 'applying' | 'done'
+
+/**
+ * Qué se completa: la DESCRIPCIÓN (con los atributos vacíos de paso) o solo los
+ * ATRIBUTOS de los productos que no tienen ninguno (etiquetado: principio
+ * activo, concentración, forma… los que la sociedad haya definido).
+ */
+type Modo = 'descripcion' | 'atributos'
+
+async function productosSinAtributos(storeId: string): Promise<{ rows: ProductoSinFicha[]; total: number }> {
+  const filas = (await fetchCatalogCleanupRows(storeId)).filter((f) => !f.has_attributes)
+  return {
+    rows: filas.slice(0, FICHAS_LOTE_MAX).map((f) => ({ id: f.product_id, sku: f.sku ?? '', name: f.name, brand_name: f.brand_name })),
+    total: filas.length,
+  }
+}
 
 /**
  * «Completar fichas con IA» (2026-11-22): el asistente de ficha de siempre,
@@ -113,11 +135,12 @@ function BulkCopyDialog({
   const [fase, setFase] = useState<Fase>('pick')
   const [filas, setFilas] = useState<Fila[]>([])
   const [aviso, setAviso] = useState<MessageKey | null>(null)
+  const [modo, setModo] = useState<Modo>('descripcion')
   const parar = useRef(false)
 
   const sinFicha = useQuery({
-    queryKey: [...CATALOG_KEY, 'sin-ficha', companyId, storeId],
-    queryFn: () => fetchProductsWithoutDescription({ companyId, storeId }),
+    queryKey: [...CATALOG_KEY, 'sin-ficha', modo, companyId, storeId],
+    queryFn: () => (modo === 'atributos' ? productosSinAtributos(storeId) : fetchProductsWithoutDescription({ companyId, storeId })),
   })
 
   const candidatos = sinFicha.data?.rows ?? []
@@ -148,8 +171,8 @@ function BulkCopyDialog({
         const producto = cola.shift()!
         actualizar(producto.id, { estado: 'working' })
         try {
-          const r = await pedirSugerenciasDeFicha({ productId: producto.id, storeId, tasks: ['description', 'attributes'], locale })
-          const descripcion = r.suggestions?.description ?? ''
+          const r = await pedirSugerenciasDeFicha({ productId: producto.id, storeId, tasks: modo === 'atributos' ? ['attributes'] : ['description', 'attributes'], locale })
+          const descripcion = modo === 'atributos' ? '' : (r.suggestions?.description ?? '')
           const atributos = r.suggestions?.attributes.length ?? 0
           if (r.motivo === 'sin_cuota') {
             parar.current = true
@@ -157,7 +180,8 @@ function BulkCopyDialog({
           }
           actualizar(producto.id, {
             estado: descripcion || atributos > 0 ? 'ready' : 'empty',
-            sugerencia: r.suggestions,
+            // En modo atributos la descripción ni se muestra: no se va a guardar.
+            sugerencia: modo === 'atributos' && r.suggestions ? { ...r.suggestions, description: null } : r.suggestions,
             motivo: r.motivo,
             descripcion,
             aplicarDescripcion: descripcion.length > 0,
@@ -208,17 +232,29 @@ function BulkCopyDialog({
       <DialogContent dividers>
         {fase === 'pick' && (
           <Stack spacing={2}>
-            <Typography>{t('bulkCopy.intro')}</Typography>
+            <Stack direction="row" spacing={1} role="group" aria-label={t('bulkCopy.mode')}>
+              {(['descripcion', 'atributos'] as const).map((m) => (
+                <Chip
+                  key={m}
+                  label={t(m === 'descripcion' ? 'bulkCopy.mode.description' : 'bulkCopy.mode.attributes')}
+                  color={m === modo ? 'primary' : 'default'}
+                  variant={m === modo ? 'filled' : 'outlined'}
+                  onClick={() => setModo(m)}
+                  aria-pressed={m === modo}
+                />
+              ))}
+            </Stack>
+            <Typography>{t(modo === 'atributos' ? 'bulkCopy.introAttributes' : 'bulkCopy.intro')}</Typography>
             {sinFicha.isPending ? (
               <LinearProgress aria-label={t('common.loading')} />
             ) : sinFicha.isError ? (
               <Alert severity="error">{t('catalog.error.generic')}</Alert>
             ) : candidatos.length === 0 ? (
-              <Alert severity="success">{t('bulkCopy.none')}</Alert>
+              <Alert severity="success">{t(modo === 'atributos' ? 'bulkCopy.noneAttributes' : 'bulkCopy.none')}</Alert>
             ) : (
               <>
                 <Typography sx={{ fontWeight: 700 }}>
-                  {t('bulkCopy.found').replace('{count}', String(sinFicha.data?.total ?? candidatos.length))}
+                  {t(modo === 'atributos' ? 'bulkCopy.foundAttributes' : 'bulkCopy.found').replace('{count}', String(sinFicha.data?.total ?? candidatos.length))}
                 </Typography>
                 <Typography sx={{ color: 'var(--muted)' }}>
                   {(restantes === null ? t('bulkCopy.cost') : t('bulkCopy.costWithBalance'))

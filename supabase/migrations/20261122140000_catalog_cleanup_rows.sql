@@ -23,7 +23,8 @@ returns table (
   status          text,
   has_image       boolean,
   has_description boolean,
-  has_category    boolean
+  has_category    boolean,
+  has_attributes  boolean
 )
 language sql
 stable
@@ -38,7 +39,8 @@ as $fn$
          sp.status::text,
          exists (select 1 from public.product_images i where i.product_id = p.id),
          coalesce(btrim(p.description), '') <> '',
-         sp.category_id is not null
+         sp.category_id is not null,
+         exists (select 1 from public.product_attribute_values v where v.product_id = p.id)
     from public.store_products sp
     join public.products p on p.id = sp.product_id
     left join public.brands b on b.id = p.brand_id

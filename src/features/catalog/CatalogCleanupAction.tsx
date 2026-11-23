@@ -20,8 +20,8 @@ import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/states'
 import { fetchCatalogCleanupRows } from './api/products'
 import { analizarCatalogo, type CleanupRow, type GrupoLimpieza, type ProblemaNombre } from './cleanup'
 
-type Seccion = 'duplicados' | 'tamanos' | 'sinFoto' | 'sinDescripcion' | 'sinCategoria' | 'nombres'
-const SECCIONES: readonly Seccion[] = ['duplicados', 'tamanos', 'sinFoto', 'sinDescripcion', 'sinCategoria', 'nombres']
+type Seccion = 'duplicados' | 'tamanos' | 'sinFoto' | 'sinDescripcion' | 'sinAtributos' | 'sinCategoria' | 'nombres'
+const SECCIONES: readonly Seccion[] = ['duplicados', 'tamanos', 'sinFoto', 'sinDescripcion', 'sinAtributos', 'sinCategoria', 'nombres']
 
 const PROBLEMA: Record<ProblemaNombre, MessageKey> = {
   mayusculas: 'catalogCleanup.name.uppercase',
