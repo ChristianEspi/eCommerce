@@ -24,9 +24,9 @@ type Seccion = 'duplicados' | 'tamanos' | 'sinFoto' | 'sinDescripcion' | 'sinCat
 const SECCIONES: readonly Seccion[] = ['duplicados', 'tamanos', 'sinFoto', 'sinDescripcion', 'sinCategoria', 'nombres']
 
 const PROBLEMA: Record<ProblemaNombre, MessageKey> = {
-  mayusculas: 'catalog.cleanup.name.uppercase',
-  espacios: 'catalog.cleanup.name.spaces',
-  repetido: 'catalog.cleanup.name.repeated',
+  mayusculas: 'catalogCleanup.name.uppercase',
+  espacios: 'catalogCleanup.name.spaces',
+  repetido: 'catalogCleanup.name.repeated',
 }
 
 /** Tope por sección en pantalla: la lista completa sale del buscador. */
@@ -65,8 +65,8 @@ export function CatalogCleanupAction({ storeId, onSearch }: { storeId: string | 
           {[p.sku, p.brand_name, extra].filter(Boolean).join(' · ')}
         </Typography>
       </Box>
-      <Button size="small" onClick={() => ver(p)} aria-label={`${t('catalog.cleanup.view')} · ${p.name}`}>
-        {t('catalog.cleanup.view')}
+      <Button size="small" onClick={() => ver(p)} aria-label={`${t('catalogCleanup.view')} · ${p.name}`}>
+        {t('catalogCleanup.view')}
       </Button>
     </Stack>
   )
@@ -84,7 +84,7 @@ export function CatalogCleanupAction({ storeId, onSearch }: { storeId: string | 
   function contenido() {
     if (!hallazgos) return null
     const vacia = cuenta(seccion) === 0
-    if (vacia) return <EmptyState title={t('catalog.cleanup.cleanTitle')} description={t('catalog.cleanup.clean')} />
+    if (vacia) return <EmptyState title={t('catalogCleanup.cleanTitle')} description={t('catalogCleanup.clean')} />
     switch (seccion) {
       case 'duplicados':
         return grupos(hallazgos.duplicados)
@@ -100,12 +100,12 @@ export function CatalogCleanupAction({ storeId, onSearch }: { storeId: string | 
   return (
     <>
       <Button variant="outlined" startIcon={<FactCheckRoundedIcon />} onClick={() => setAbierto(true)} disabled={!storeId}>
-        {t('catalog.cleanup.action')}
+        {t('catalogCleanup.action')}
       </Button>
       <Dialog open={abierto} onClose={() => setAbierto(false)} fullWidth maxWidth="md" aria-labelledby="catalog-cleanup-title">
-        <DialogTitle id="catalog-cleanup-title">{t('catalog.cleanup.title')}</DialogTitle>
+        <DialogTitle id="catalog-cleanup-title">{t('catalogCleanup.title')}</DialogTitle>
         <DialogContent dividers>
-          <Typography sx={{ color: 'var(--muted)', mb: 1.5 }}>{t('catalog.cleanup.intro')}</Typography>
+          <Typography sx={{ color: 'var(--muted)', mb: 1.5 }}>{t('catalogCleanup.intro')}</Typography>
           {query.isPending ? (
             <LoadingState />
           ) : query.isError ? (
@@ -119,20 +119,20 @@ export function CatalogCleanupAction({ storeId, onSearch }: { storeId: string | 
                 scrollButtons="auto"
                 allowScrollButtonsMobile
                 centered={false}
-                aria-label={t('catalog.cleanup.title')}
+                aria-label={t('catalogCleanup.title')}
                 sx={{ mb: 1.5 }}
               >
                 {SECCIONES.map((s) => (
-                  <Tab key={s} value={s} label={`${t(`catalog.cleanup.tab.${s}` as MessageKey)} (${cuenta(s)})`} />
+                  <Tab key={s} value={s} label={`${t(`catalogCleanup.tab.${s}` as MessageKey)} (${cuenta(s)})`} />
                 ))}
               </Tabs>
               <Alert severity="info" sx={{ mb: 1.5 }}>
-                {t(`catalog.cleanup.hint.${seccion}` as MessageKey)}
+                {t(`catalogCleanup.hint.${seccion}` as MessageKey)}
               </Alert>
               {contenido()}
               {cuenta(seccion) > MAX_FILAS && (
                 <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'var(--muted)' }}>
-                  {t('catalog.cleanup.more').replace('{count}', String(cuenta(seccion) - MAX_FILAS))}
+                  {t('catalogCleanup.more').replace('{count}', String(cuenta(seccion) - MAX_FILAS))}
                 </Typography>
               )}
             </>
