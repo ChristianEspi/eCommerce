@@ -23,6 +23,7 @@
  * Canal-agnóstico: es la base del canal de WhatsApp que espera aprobación de la
  * plataforma (`docs/propuestas/2026-11-19-canal-whatsapp-comercio.md`).
  */
+import { respuestaVitrinaSinSalud } from './ai.ts'
 import type { EsquemaIA } from './aiCore.ts'
 import {
   conPresentaciones,
@@ -375,6 +376,28 @@ function contenidoLegible(c: Contenido | null): string | null {
 
 const MAX_DESCRIPCION_MODELO = 1500
 
+/**
+ * La descripción que ve el modelo: sin las frases que el candado de salud de la
+ * vitrina rechazaría («Indicado para…», «sigue las indicaciones de tu médico»)
+ * y sin repetidas. Lo que no ve, no lo repite: si las viera, las copiaría y la
+ * respuesta entera se bloquearía. La vitrina sigue mostrando la ficha completa.
+ */
+export function descripcionParaModelo(descripcion: string | null): string | null {
+  if (!descripcion) return null
+  const vistas = new Set<string>()
+  const frases = descripcion
+    .split(/(?<=[.!?])\s+/)
+    .map((f) => f.trim())
+    .filter((f) => {
+      const clave = normalizar(f)
+      if (!clave || vistas.has(clave)) return false
+      vistas.add(clave)
+      return respuestaVitrinaSinSalud(f)
+    })
+  const texto = frases.join(' ').slice(0, MAX_DESCRIPCION_MODELO)
+  return texto || null
+}
+
 export interface PuertosChat {
   reposicion(): Promise<readonly ItemReposicion[]>
   ficha(productId: string): Promise<FichaProducto | null>
@@ -653,7 +676,7 @@ export async function ejecutarChat(plan: PlanChat, puertos: PuertosChat): Promis
           product_id: ficha.product_id,
           producto: ficha.nombre,
           marca: ficha.marca,
-          descripcion: ficha.descripcion ? ficha.descripcion.slice(0, MAX_DESCRIPCION_MODELO) : null,
+          descripcion: descripcionParaModelo(ficha.descripcion),
           destacados: ficha.destacados.slice(0, 10),
           especificaciones: ficha.especificaciones.slice(0, 20),
           presentaciones: comparacion.map((c) => ({
@@ -680,7 +703,8 @@ export const SISTEMA_RESPUESTA_CHAT = [
   'Eres el asistente de compra de una tienda online y conversas con un cliente con sesión. Responde en su idioma, cálido y directo, en tres frases como máximo, con lo que dicen los datos.',
   'La pantalla muestra aparte los productos, pedidos, el crédito y el carrito propuesto con sus precios y cifras: NO escribas precios, importes, saldos, descuentos ni cantidades de stock.',
   'Si es una reposición, di que es según cada cuánto suele comprar (dias_restantes negativo = ya le tocaba) y que revise las cantidades.',
-  'Si es una ficha de producto, contesta SOLO con lo que dicen descripcion, destacados y especificaciones; si la ficha no lo dice, dilo y sugiere consultarlo con la tienda. Para elegir presentación usa mas_conveniente_por_unidad (la pantalla muestra el precio por unidad); si comparacion_posible es falso, di que no se puede comparar por unidad. No digas para qué sirve un medicamento.',
+  'Si es una ficha de producto, contesta SOLO con lo que dicen descripcion, destacados y especificaciones: composición, ingredientes, contenido, formato y características. NO repitas frases de la ficha sobre para qué sirve, a quién ayuda, qué alivia, previene o trata, ni indicaciones o modo de uso; si preguntan eso, di que lo consulte con un profesional. Si la ficha no trae el dato, dilo y sugiere consultarlo con la tienda.',
+  'Para elegir presentación usa mas_conveniente_por_unidad y di «la más conveniente por unidad» (nunca «más barata» ni «más económica»; la pantalla muestra los precios). Si ninguna es más conveniente, di que cuestan lo mismo por unidad; si comparacion_posible es falso, di que no se pueden comparar por unidad.',
   'Si propones un carrito, dilo y pide que lo revise y lo confirme con el botón; menciona las líneas sin coincidencia o donde debe elegir presentación.',
   'Si ofreces alternativas por componente principal, di que comparten ese componente y que confirme que le sirvan (con un profesional si es un medicamento). Nunca digas para qué sirve un medicamento, dosis, síntomas ni recomiendes uno por una dolencia.',
   'Si los datos no responden la pregunta, dilo y sugiere cómo seguir. product_ids: SOLO identificadores product_id que aparezcan en los datos; si los datos no traen product_id (pedidos, crédito, carrito), lista vacía. Nunca nombres.',

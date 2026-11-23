@@ -13,7 +13,9 @@ el recorrido SaaS P00–P17 queda cerrado)
 
 ## Chat: preguntas sobre un producto y comparar presentaciones (2026-11-22)
 
-Commit local en `dev`, **sin aplicar en QAS** (solo hace falta desplegar `shopping-chat`; no hay migración).
+`af090fe` + ajuste de candados. **Aplicado en QAS el 2026-11-22**: `shopping-chat` desplegado (sin migración). Humo con `prueba.b2b@`: «¿Qué contiene el Pedialyte?» y «¿qué presentación de Pedialyte me conviene?» → 200 con frase; Eutebrol → datos sin frase (candado de salud, esperado: su ficha nombra la enfermedad).
+
+- La descripción que ve el modelo va SIN las frases que el candado de salud rechazaría y sin repetidas (`descripcionParaModelo`); la vitrina muestra la ficha completa.
 
 - Herramienta `sobre_producto`: el buscador de la tienda elige el producto (no el modelo); la respuesta sale SOLO de su ficha
   publicada (`public_products`, `product_detail_for_slug`: descripción, destacados, especificaciones). Si la ficha no lo dice, lo dice.

@@ -17,6 +17,7 @@ import {
   aplicarCambios,
   compararPresentaciones,
   contenidoDePresentacion,
+  descripcionParaModelo,
   ejecutarChat,
   leerReposicion,
   nombreCoincide,
@@ -282,6 +283,13 @@ describe('preguntas sobre un producto y comparar presentaciones (2026-11-22)', (
     expect(modelo).toMatchObject({ producto: 'Consiv Tableta Recubierta', comparacion_posible: true, presentaciones: [{ contenido: '30 unidades' }, { mas_conveniente_por_unidad: true }] })
     expect(r.paraModelo).not.toMatch(/90|250|2.50|3.00/)
     expect(r.productosPermitidos).toEqual([CONSIV])
+  })
+
+  it('la descripción que ve el modelo va sin afirmaciones de salud ni frases repetidas', () => {
+    const d = 'Pedialyte contiene Electrolitos, del laboratorio Abbott. Indicado para: reposición de agua en diarreas. Se presenta en frasco de 500 ml. Lee el prospecto y sigue las indicaciones de tu médico. Pedialyte contiene Electrolitos, del laboratorio Abbott. Disponible en 2 sabores (Cereza y Manzana).'
+    expect(descripcionParaModelo(d)).toBe('Pedialyte contiene Electrolitos, del laboratorio Abbott. Se presenta en frasco de 500 ml. Disponible en 2 sabores (Cereza y Manzana).')
+    expect(descripcionParaModelo('Indicado para el dolor.')).toBeNull()
+    expect(descripcionParaModelo(null)).toBeNull()
   })
 
   it('producto que no está: ficha vacía y el modelo lo sabe', async () => {
