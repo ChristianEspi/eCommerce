@@ -38,7 +38,9 @@ import {
   SISTEMA_PLAN_CHAT,
   SISTEMA_RESPUESTA_CHAT,
   ejecutarChat,
+  leerMiCarrito,
   leerReposicion,
+  leerSeguimiento,
   numerosDePedido,
   taparNumeros,
   validarPlanChat,
@@ -220,7 +222,7 @@ const handler = serveJson(
         const { data: tienda } = await catalogo.from('public_stores').select('store_id').eq('slug', storeSlug).maybeSingle()
         const storeId = (tienda as { store_id?: unknown } | null)?.store_id
         if (typeof storeId !== 'string') return null
-        const [producto, variantes, detalle] = await Promise.all([
+        const [producto, variantes, detalle, opiniones] = await Promise.all([
           catalogo
             .from('public_products')
             .select('product_id, name, brand_name, description, currency')
@@ -236,6 +238,7 @@ const handler = serveJson(
             .order('name')
             .limit(INTAKE_MAX_PRESENTACIONES),
           catalogo.rpc('product_detail_for_slug', { p_store_slug: storeSlug, p_product_id: productId }),
+          catalogo.rpc('product_reviews_for_slug', { p_store_slug: storeSlug, p_product_id: productId, p_page: 1, p_page_size: 8 }),
         ])
         if (producto.error) {
           logger.warn('chat.product_failed', { original_code: errorCode(producto.error) })
@@ -265,6 +268,20 @@ const handler = serveJson(
           typeof e.label === 'string' && typeof e.value === 'string' && e.value ? [{ etiqueta: e.label, valor: e.value }] : [],
         )
         const moneda = typeof p.currency === 'string' ? p.currency : 'PEN'
+        const op = (opiniones.error ? null : opiniones.data) as { summary?: { count?: unknown; average?: unknown }; reviews?: unknown } | null
+        const totalOpiniones = Number(op?.summary?.count ?? 0)
+        const resenas =
+          Number.isInteger(totalOpiniones) && totalOpiniones > 0
+            ? {
+                total: totalOpiniones,
+                promedio: typeof op?.summary?.average === 'string' ? op.summary.average : null,
+                // Texto de clientes: saneado (sin correos ni teléfonos) y delimitado como dato al redactar.
+                textos: ((Array.isArray(op?.reviews) ? op.reviews : []) as Array<Record<string, unknown>>).flatMap((r) => {
+                  const cuerpo = typeof r.body === 'string' ? sanitizeTextForModel(r.body, 400) : null
+                  return cuerpo ? [cuerpo] : []
+                }),
+              }
+            : null
         return {
           product_id: productId,
           nombre: p.name,
@@ -279,7 +296,42 @@ const handler = serveJson(
             precio: precios.get(String(v.variant_id)) ?? null,
             moneda: typeof v.currency === 'string' ? v.currency : moneda,
           })),
+          resenas,
         } satisfies FichaProducto
+      },
+      async carrito() {
+        const { data, error } = await usuario.rpc('my_cart_summary', { p_store_slug: storeSlug })
+        if (error) {
+          logger.warn('chat.cart_failed', { original_code: errorCode(error) })
+          return leerMiCarrito(null)
+        }
+        return leerMiCarrito(data)
+      },
+      async seguimiento(orderId) {
+        const { data, error } = await usuario.rpc('my_order_tracking', { p_store_slug: storeSlug, p_order_id: orderId })
+        if (error) {
+          logger.warn('chat.tracking_failed', { original_code: errorCode(error) })
+          return []
+        }
+        return leerSeguimiento(data)
+      },
+      async precios(productIds) {
+        const salida = new Map<string, { precio: string; moneda: string }>()
+        if (productIds.length === 0) return salida
+        const { data, error } = await usuario.rpc('price_quote_for_slug', {
+          p_store_slug: storeSlug,
+          p_items: productIds.slice(0, CANDIDATOS).map((id) => ({ product_id: id, quantity: 1 })),
+        })
+        if (error) {
+          logger.warn('chat.quote_failed', { original_code: errorCode(error) })
+          return salida
+        }
+        const cotizacion = data as { lines?: unknown; currency?: unknown } | null
+        const moneda = typeof cotizacion?.currency === 'string' ? cotizacion.currency : 'PEN'
+        for (const l of (Array.isArray(cotizacion?.lines) ? cotizacion.lines : []) as Array<Record<string, unknown>>) {
+          if (typeof l.product_id === 'string' && typeof l.unit_price === 'string') salida.set(l.product_id, { precio: l.unit_price, moneda })
+        }
+        return salida
       },
       async credito() {
         const { data, error } = await usuario.rpc('my_account_statement', { p_store_slug: storeSlug })

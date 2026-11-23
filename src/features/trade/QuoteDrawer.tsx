@@ -26,6 +26,7 @@ import { useFeedback } from '@/shared/ui/feedback-context'
 import { Field } from '@/shared/ui/Field'
 import type { TradeScope } from './api'
 import { TradeError } from './errors'
+import { QuoteCounterOffer } from './QuoteCounterOffer'
 import {
   useAddQuoteItem,
   useQuoteItems,
@@ -420,6 +421,8 @@ export function QuoteDrawer({
                   )}`}
                 </Typography>
               </Stack>
+
+              {puedeEditar && <QuoteCounterOffer quote={quote} items={lineas} />}
 
               {puedeEditar && (
                 <Stack spacing={1.5} sx={{ mt: 2 }}>

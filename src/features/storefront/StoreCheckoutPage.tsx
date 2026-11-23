@@ -84,6 +84,7 @@ import {
 import { useStorefront } from './hooks'
 import { privateMeta } from './seo'
 import { useCheckoutPrefill } from './useCheckoutPrefill'
+import { forgetPurchaseOrder, recallPurchaseOrder } from './purchaseOrderMemory'
 import { GiftCardField } from './GiftCardField'
 
 /**
@@ -187,6 +188,9 @@ export function StoreCheckoutPage() {
   // servidor (el mismo contexto que la barra); sin sesión o sin cuenta, no.
   const { context: contextoComercial } = useCommerceContext(storeSlug, authenticated)
   const ordenDeCompraObligatoria = contextoComercial?.purchase_order_required === true
+  // Si la IA leyó la OC del documento del cliente, el campo se muestra aunque la cuenta no la exija.
+  const ordenDeCompraLeida = useMemo(() => recallPurchaseOrder(storeSlug), [storeSlug])
+  const mostrarOrdenDeCompra = ordenDeCompraObligatoria || ordenDeCompraLeida !== ''
   // Resumen v2 · Lo que dice la tarjeta del medio «crédito»: plazo y disponible.
   const credito = useBuyerCredit(storeSlug)
 
@@ -253,7 +257,8 @@ export function StoreCheckoutPage() {
       deliveryMethodCode: '',
       pickupPointId: '',
       paymentMethodCode: '',
-      purchaseOrderNumber: '',
+      // 2026-11-22 · La OC que la IA leyó en el pedido rápido, para confirmarla.
+      purchaseOrderNumber: ordenDeCompraLeida,
       invoiceType: 'receipt',
       idType: 'dni',
       taxId: '',
@@ -833,6 +838,7 @@ export function StoreCheckoutPage() {
       })
     },
     onSuccess: (order, variables) => {
+      forgetPurchaseOrder(storeSlug)
       // El intento se cierra y el carrito se vacía SOLO cuando el servidor
       // confirmó el pedido. Si se vaciara al enviar, un error de red dejaría al
       // comprador sin carrito y sin pedido.
@@ -1517,9 +1523,9 @@ export function StoreCheckoutPage() {
 
                 {/* Orden de compra y centro de costo, lado a lado. N05 · la OC solo
                     si la cuenta la EXIGE; el centro de costo solo para empresa. */}
-                {(ordenDeCompraObligatoria || contextoComercial) && (
+                {(mostrarOrdenDeCompra || contextoComercial) && (
                 <Box sx={GRILLA_COMPROBANTE}>
-                {ordenDeCompraObligatoria && (
+                {mostrarOrdenDeCompra && (
                   <Field
                     id="checkout-purchase-order"
                     label={t('store.checkout.purchaseOrder')}

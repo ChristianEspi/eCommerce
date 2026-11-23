@@ -102,6 +102,8 @@ describe('textos de los avisos', () => {
       'suggestion.generated', 'order.confirmed', 'order.approval_pending', 'order.approved',
       'order.rejected', 'order.shipped', 'order.delivered', 'business_account.invited',
       'business_account.activated', 'suggestion.sent', 'order_schedule.run_ready',
+      // 2026-11-22 · `ebim.notify_quote_requested`.
+      'quote.requested',
     ]
     expect([...KNOWN_KINDS].sort()).toEqual(DE_LA_BASE.sort())
   })
@@ -112,6 +114,8 @@ describe('textos de los avisos', () => {
       .toBe('Nuevo pedido EC-1 por 10.00 PEN')
     expect(notificationText({ kind: 'member.role_changed', params: { role: 'orders' } }, t))
       .toBe('Tu rol ahora es Pedidos')
+    expect(notificationText({ kind: 'quote.requested', params: { quote_number: 'SOL-1', account_name: 'Botica Sol' } }, t))
+      .toBe('Botica Sol pide cotización SOL-1')
   })
 
   it('un tipo desconocido no enseña su clave técnica', () => {

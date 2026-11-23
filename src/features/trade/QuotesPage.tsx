@@ -15,6 +15,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAiFeature } from '@/features/ai/hooks'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -54,7 +55,9 @@ export function QuotesPage() {
   const { tenant, activeStore, activeCompanyId, status: tenantStatus, can } = useTenant()
   const canWrite = can('orders.write')
 
-  const [search, setSearch] = useState('')
+  // El aviso «pide cotización» enlaza con ?q=<número>: llega ya filtrado.
+  const [params] = useSearchParams()
+  const [search, setSearch] = useState(() => params.get('q')?.slice(0, 60) ?? '')
   const [estado, setEstado] = useState<QuoteStatus | 'all'>('all')
   const [abierta, setAbierta] = useState<Quote | null>(null)
   const [creando, setCreando] = useState(false)

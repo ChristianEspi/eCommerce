@@ -28,6 +28,18 @@ const orderSchema = z.object({
 })
 export type ChatOrder = z.infer<typeof orderSchema>
 
+/** 2026-11-22 · Una entrega del pedido: estados y fechas de `my_order_tracking`, sin dirección ni guía. */
+const deliverySchema = z.object({
+  metodo: z.string().nullable(),
+  estado: z.string(),
+  prometido_hasta: z.string().nullable(),
+  entregado: z.string().nullable(),
+  dias_retraso: z.number().int().nonnegative(),
+  ultimo_evento: z.object({ estado: z.string(), fecha: z.string() }).nullable(),
+  intentos_fallidos: z.number().int().nonnegative(),
+})
+export type ChatDelivery = z.infer<typeof deliverySchema>
+
 const creditSchema = z.object({
   cuenta: z.string(),
   limite: z.string().nullable(),
@@ -54,10 +66,21 @@ const compareRowSchema = z.object({
 })
 export type ChatCompareRow = z.infer<typeof compareRowSchema>
 
+/** 2026-11-22 · Una línea del carrito activo: precio al añadir y de hoy, del servidor. */
+const myCartLineSchema = z.object({
+  product_id: z.string(),
+  nombre: z.string(),
+  cantidad: z.number().int().positive(),
+  precio_antes: z.string().nullable(),
+  precio_hoy: z.string().nullable(),
+  en_stock: z.boolean(),
+})
+export type ChatMyCartLine = z.infer<typeof myCartLineSchema>
+
 export const chatDataSchema = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('productos'), product_ids: z.array(z.string().uuid()), consulta: z.string() }),
   z.object({ tipo: z.literal('pedidos'), pedidos: z.array(orderSchema) }),
-  z.object({ tipo: z.literal('pedido'), pedido: orderSchema.nullable() }),
+  z.object({ tipo: z.literal('pedido'), pedido: orderSchema.nullable(), entregas: z.array(deliverySchema).default([]) }),
   z.object({ tipo: z.literal('credito'), credito: creditSchema.nullable() }),
   z.object({
     tipo: z.literal('carrito'),
@@ -86,9 +109,18 @@ export const chatDataSchema = z.discriminatedUnion('tipo', [
     lineas: z.array(intakeLineSchema),
   }),
   z.object({
+    tipo: z.literal('mi_carrito'),
+    carrito: z.object({
+      lineas: z.array(myCartLineSchema),
+      moneda: z.string(),
+      dias_sin_tocar: z.number().int().nonnegative().nullable(),
+    }),
+  }),
+  z.object({
     tipo: z.literal('ficha'),
     product_id: z.string().uuid().nullable(),
     comparacion: z.array(compareRowSchema),
+    resenas: z.object({ total: z.number().int().positive(), promedio: z.string().nullable() }).nullable().default(null),
   }),
   z.object({ tipo: z.literal('ninguno') }),
 ])

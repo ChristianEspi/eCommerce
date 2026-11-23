@@ -202,4 +202,12 @@ describe('my_replenishment', () => {
     )
     expect(mensaje).toMatch(/permission denied/)
   })
+
+  it('el nombre no repite el producto cuando la etiqueta de la variante ya lo trae', async () => {
+    const label = async (n: string, v: string | null) =>
+      (await svc<{ r: string }>(`select ebim.replenishment_label($1, $2) as r`, [n, v]))[0]!.r
+    expect(await label('Pedialyte 500 ml · Pedialyte 500 ml · Uva', 'Pedialyte 500 ml · Uva')).toBe('Pedialyte 500 ml · Uva')
+    expect(await label('Lejía', '5 L')).toBe('Lejía · 5 L')
+    expect(await label('Lejía', null)).toBe('Lejía')
+  })
 })

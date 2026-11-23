@@ -70,6 +70,8 @@ export type IntakeLine = z.infer<typeof intakeLineSchema>
 export const intakeDataSchema = z.object({
   lineas: z.array(intakeLineSchema).max(60),
   notas: z.string().nullable(),
+  /** 2026-11-22 · Número de OC rotulado en el documento (ya validado en el servidor). */
+  orden_compra: z.string().max(60).nullable().optional(),
   /** Solo en «Mejora esta cotización»: moneda y si los precios llevan IGV. */
   cotizacion: z
     .object({ moneda: z.enum(['PEN', 'USD']).nullable(), incluye_igv: z.boolean().nullable() })

@@ -101,6 +101,8 @@ const CODE_KINDS: Readonly<Record<string, AppErrorKind>> = {
 
   // --- el otro lado --------------------------------------------------------
   BACKEND_NO_DISPONIBLE: 'unavailable',
+  // La petición no llegó a la función (sin red, DNS, CORS): no hubo respuesta.
+  SIN_CONEXION: 'unavailable',
   CIRCUITO_ABIERTO: 'unavailable',
 }
 

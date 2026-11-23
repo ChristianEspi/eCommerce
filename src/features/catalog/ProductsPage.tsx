@@ -6,6 +6,11 @@ import { TablePager } from '@/shared/ui/TablePager'
 import { StatusChip } from '@/shared/ui/StatusChip'
 import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded'
 import StorefrontRoundedIcon from '@mui/icons-material/StorefrontRounded'
+import AddPhotoAlternateRoundedIcon from '@mui/icons-material/AddPhotoAlternateRounded'
+import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded'
+import FactCheckRoundedIcon from '@mui/icons-material/FactCheckRounded'
+import FileDownloadRoundedIcon from '@mui/icons-material/FileDownloadRounded'
+import FileUploadRoundedIcon from '@mui/icons-material/FileUploadRounded'
 import {
   Box,
   Button,
@@ -23,8 +28,12 @@ import {
   Typography,
   MenuItem,
   LinearProgress,
+  ListItemIcon,
+  ListItemText,
+  Menu,
 } from '@mui/material'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useDebouncedValue } from '@/shared/lib/useDebouncedValue'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -43,6 +52,7 @@ import {
   type ProductStatusFilter,
 } from './api/products'
 import { CatalogError } from './api/errors'
+import { fetchProductMaster } from './api/products'
 import { ProductDrawer } from './ProductDrawer'
 import { downloadWorkbook } from '@/shared/lib/excel'
 import { productsBook } from './exportExcel'
@@ -51,6 +61,7 @@ import type { ProductKind, ProductMaster, ProductStatus } from './types'
 import { CategoryPicker } from './CategoryPicker'
 import { BulkImagesAction } from './bulkImages/BulkImagesAction'
 import { BulkCopyAction } from './BulkCopyAction'
+import { CatalogCleanupAction } from './CatalogCleanupAction'
 import { CatalogImportAction } from './import/CatalogImportAction'
 import { useCategories } from './useCategories'
 import { useBrands } from './pim/hooks'
@@ -163,11 +174,56 @@ export function ProductsPage() {
    */
   const [borrador, setBorrador] = useState<Filtros>(SIN_FILTROS)
   const [aplicados, setAplicados] = useState<Filtros>(SIN_FILTROS)
+  const [masAncla, setMasAncla] = useState<HTMLElement | null>(null)
+  const masAbierto = masAncla !== null
+  const cerrarMas = () => setMasAncla(null)
+  const [dialogo, setDialogo] = useState<'import' | 'images' | 'cleanup' | null>(null)
+  const abrirDialogo = (d: 'import' | 'images' | 'cleanup') => {
+    cerrarMas()
+    setDialogo(d)
+  }
   const [drawer, setDrawer] = useState<{ open: boolean; product: ProductMaster | null }>({
     open: false,
     product: null,
   })
   const [deleteTarget, setDeleteTarget] = useState<ProductMaster | null>(null)
+
+  /**
+   * `?producto=<id>` abre la ficha de ese producto (2026-11-22).
+   *
+   * Los análisis de IA y los avisos señalan un producto concreto; llevar al
+   * listado y que la persona lo busque era perderla por el camino. Se carga por
+   * id —puede no estar en la página en curso— y RLS decide si se ve: de otro
+   * tenant o borrado, no se abre nada y se avisa.
+   */
+  const [params, setParams] = useSearchParams()
+  const productoPedido = params.get('producto')
+  useEffect(() => {
+    if (!productoPedido) return
+    let vigente = true
+    fetchProductMaster(productoPedido)
+      .then((product) => {
+        if (!vigente) return
+        if (product) setDrawer({ open: true, product })
+        else notify(t('catalog.linkNotFound'), 'warning')
+      })
+      .catch(() => {
+        if (vigente) notify(t('catalog.linkNotFound'), 'warning')
+      })
+    return () => {
+      vigente = false
+    }
+    // Solo cuando cambia el enlace: `notify` y `t` no son motivo para reabrir.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productoPedido])
+  const cerrarFicha = () => {
+    setDrawer({ open: false, product: null })
+    if (productoPedido) {
+      const siguiente = new URLSearchParams(params)
+      siguiente.delete('producto')
+      setParams(siguiente, { replace: true })
+    }
+  }
 
   const storeId = activeStore?.id ?? null
 
@@ -329,23 +385,87 @@ export function ProductsPage() {
         subtitle={tenant?.name ? `${tenant.name} · ${t('catalog.products.subtitle')}` : t('catalog.products.subtitle')}
         actions={
           <>
+            {/* Lo de todos los días a la vista; lo ocasional, en «Más acciones». */}
             <Button
               variant="outlined"
-              disabled={list.length === 0}
-              onClick={() =>
-                void downloadWorkbook(productsBook(list, t), t).catch(() =>
-                  notify(t('excel.error.download'), 'error'),
-                )
-              }
+              endIcon={<ExpandMoreRoundedIcon />}
+              aria-haspopup="menu"
+              aria-expanded={masAbierto ? 'true' : undefined}
+              aria-controls={masAbierto ? 'products-more-menu' : undefined}
+              onClick={(e) => setMasAncla(e.currentTarget)}
             >
-              {t('common.export')}
+              {t('catalog.products.more')}
             </Button>
-            {canWrite && <CatalogImportAction kind="products" storeId={activeStore?.id ?? null} />}
+            <Menu
+              id="products-more-menu"
+              anchorEl={masAncla}
+              open={masAbierto}
+              onClose={cerrarMas}
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+              transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            >
+              <MenuItem
+                disabled={list.length === 0}
+                onClick={() => {
+                  cerrarMas()
+                  void downloadWorkbook(productsBook(list, t), t).catch(() => notify(t('excel.error.download'), 'error'))
+                }}
+              >
+                <ListItemIcon>
+                  <FileDownloadRoundedIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>{t('common.export')}</ListItemText>
+              </MenuItem>
+              {canWrite && (
+                <MenuItem onClick={() => abrirDialogo('import')}>
+                  <ListItemIcon>
+                    <FileUploadRoundedIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText>{t('catalogImport.action')}</ListItemText>
+                </MenuItem>
+              )}
+              {canWrite && (
+                <MenuItem onClick={() => abrirDialogo('images')}>
+                  <ListItemIcon>
+                    <AddPhotoAlternateRoundedIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText>{t('bulkImages.action')}</ListItemText>
+                </MenuItem>
+              )}
+              <MenuItem disabled={!storeId} onClick={() => abrirDialogo('cleanup')}>
+                <ListItemIcon>
+                  <FactCheckRoundedIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>{t('catalogCleanup.action')}</ListItemText>
+              </MenuItem>
+            </Menu>
+            {/* Los diálogos del menú viven fuera de él: un menú abierto
+                captura el teclado y se comería lo que se escribe dentro. */}
+            {canWrite && (
+              <CatalogImportAction
+                kind="products"
+                storeId={activeStore?.id ?? null}
+                open={dialogo === 'import'}
+                onClose={() => setDialogo(null)}
+              />
+            )}
             {canWrite && (
               <BulkImagesAction
                 scope={{ organizationId: tenant.organization_id, companyId: activeCompanyId, storeId }}
+                open={dialogo === 'images'}
+                onClose={() => setDialogo(null)}
               />
             )}
+            <CatalogCleanupAction
+              storeId={storeId}
+              onSearch={(texto) => {
+                setStatus('all')
+                setPage(0)
+                setBorrador((actual) => ({ ...actual, search: texto }))
+              }}
+              open={dialogo === 'cleanup'}
+              onClose={() => setDialogo(null)}
+            />
             {canWrite && (
               <BulkCopyAction
                 companyId={activeCompanyId}
@@ -652,7 +772,7 @@ export function ProductsPage() {
         storeName={activeStore?.name ?? ''}
         currency={activeStore?.currency ?? 'PEN'}
         canWrite={canWrite}
-        onClose={() => setDrawer({ open: false, product: null })}
+        onClose={cerrarFicha}
       />
 
       <ConfirmDeleteDialog

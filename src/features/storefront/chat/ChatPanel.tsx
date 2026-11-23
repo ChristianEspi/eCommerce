@@ -30,10 +30,10 @@ import type { CartImportResult } from '../quick-order/importToCart'
 import { offersPresentation, preselected, resolveChoice, type IntakeLine } from '../quick-order/intake'
 import { PresentationPicker } from '../quick-order/PresentationPicker'
 import { restockNote } from '../restockText'
-import { CHAT_MAX_TEXT, ChatError, sendChat, type ChatCompareRow, type ChatCredit, type ChatData, type ChatOrder, type ChatReply, type ChatTurn } from './chat'
+import { CHAT_MAX_TEXT, ChatError, sendChat, type ChatCompareRow, type ChatCredit, type ChatData, type ChatDelivery, type ChatMyCartLine, type ChatOrder, type ChatReply, type ChatTurn } from './chat'
 
 /** Lo que se puede pedir sin saber qué pedir. */
-const EJEMPLOS = ['store.chat.example.1', 'store.chat.example.5', 'store.chat.example.2', 'store.chat.example.3', 'store.chat.example.4', 'store.chat.example.6'] as const
+const EJEMPLOS = ['store.chat.example.1', 'store.chat.example.5', 'store.chat.example.2', 'store.chat.example.3', 'store.chat.example.4', 'store.chat.example.6', 'store.chat.example.7'] as const
 
 interface Mensaje extends ChatTurn {
   readonly id: number
@@ -72,7 +72,19 @@ export function ChatPanel({ storeSlug, storeId }: { storeSlug: string; storeId: 
   const chat = useMutation({
     mutationFn: (turns: ChatTurn[]) => sendChat({ storeSlug, locale: locale === 'en' ? 'en' : 'es', turns }),
     onSuccess: (reply) => {
-      const frase = reply.respuesta ?? (motivoKey(reply.motivo) ? t(motivoKey(reply.motivo)!) : '')
+      // Sin frase del modelo, el respaldo depende de lo que hay debajo
+      // (2026-11-22): «Esto es lo que encontré:» encima de «No encontré
+      // productos» se contradecía, y con `ninguno` no venía nada después.
+      const sinProductos = reply.datos.tipo === 'productos' && reply.datos.product_ids.length === 0
+      const frase =
+        reply.respuesta ??
+        (reply.datos.tipo === 'ninguno'
+          ? t('store.chat.scope')
+          : sinProductos
+            ? ''
+            : motivoKey(reply.motivo)
+              ? t(motivoKey(reply.motivo)!)
+              : '')
       setMensajes((actual) => [...actual, { id: siguiente.current++, role: 'assistant', text: frase, reply }])
     },
   })
@@ -179,7 +191,7 @@ export function ChatPanel({ storeSlug, storeId }: { storeSlug: string; storeId: 
 }
 
 function ChatDataView({ datos, storeSlug, storeId }: { datos: ChatData; storeSlug: string; storeId: string | null }) {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   switch (datos.tipo) {
     case 'productos':
       return datos.product_ids.length > 0 ? (
@@ -214,7 +226,7 @@ function ChatDataView({ datos, storeSlug, storeId }: { datos: ChatData; storeSlu
         <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>{t('store.chat.noOrders')}</Typography>
       )
     case 'pedido':
-      return datos.pedido ? <ChatOrderCard order={datos.pedido} storeSlug={storeSlug} /> : null
+      return datos.pedido ? <ChatOrderCard order={datos.pedido} deliveries={datos.entregas} storeSlug={storeSlug} /> : null
     case 'credito':
       return datos.credito ? <ChatCreditCard credit={datos.credito} storeSlug={storeSlug} /> : null
     case 'carrito':
@@ -234,10 +246,26 @@ function ChatDataView({ datos, storeSlug, storeId }: { datos: ChatData; storeSlu
       ) : (
         <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>{t('store.restock.empty')}</Typography>
       )
+    case 'mi_carrito':
+      return datos.carrito.lineas.length > 0 ? (
+        <ChatMyCart lines={datos.carrito.lineas} currency={datos.carrito.moneda} storeSlug={storeSlug} />
+      ) : (
+        <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>{t('store.chat.myCart.empty')}</Typography>
+      )
     case 'ficha':
       return datos.product_id ? (
         <Stack sx={{ gap: 1 }}>
           <ChatProducts ids={[datos.product_id]} storeSlug={storeSlug} storeId={storeId} />
+          {datos.resenas && (
+            <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }} data-chat-reviews>
+              {t('store.chat.reviews')
+                .replace(
+                  '{average}',
+                  datos.resenas.promedio ? Number(datos.resenas.promedio).toLocaleString(locale, { maximumFractionDigits: 1 }) : '—',
+                )
+                .replace('{count}', String(datos.resenas.total))}
+            </Typography>
+          )}
           {datos.comparacion.length > 1 && <ChatCompareCard rows={datos.comparacion} />}
         </Stack>
       ) : (
@@ -246,6 +274,67 @@ function ChatDataView({ datos, storeSlug, storeId }: { datos: ChatData; storeSlu
     case 'ninguno':
       return null
   }
+}
+
+/** El sentido del cambio de precio; la cifra la pinta la tarjeta. */
+function cambio(l: ChatMyCartLine): 'down' | 'up' | null {
+  if (l.precio_antes === null || l.precio_hoy === null) return null
+  const antes = Math.round(Number(l.precio_antes) * 100)
+  const hoy = Math.round(Number(l.precio_hoy) * 100)
+  return hoy < antes ? 'down' : hoy > antes ? 'up' : null
+}
+
+/**
+ * El carrito activo (2026-11-22): qué hay, qué bajó o subió desde que lo
+ * añadió y qué ya no tiene stock. Las cifras son del servidor; el carrito real
+ * sigue siendo el de siempre y el checkout vuelve a cotizar.
+ */
+function ChatMyCart({ lines, currency, storeSlug }: { lines: readonly ChatMyCartLine[]; currency: string; storeSlug: string }) {
+  const { t, locale } = useI18n()
+  const cart = useContext(CartContext)
+  return (
+    <Box sx={CARD_SX} data-chat-my-cart>
+      <Typography sx={{ fontWeight: 800, fontSize: TS.body, mb: 1 }}>{t('store.chat.myCart.title')}</Typography>
+      <Stack sx={{ gap: 0.75 }}>
+        {lines.map((l) => {
+          const c = cambio(l)
+          return (
+            <Stack key={l.product_id + l.nombre} direction="row" sx={{ justifyContent: 'space-between', gap: 1 }} data-chat-my-cart-line>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography sx={{ fontSize: TS.body, fontWeight: 600, overflowWrap: 'anywhere' }}>
+                  {l.nombre} × {l.cantidad}
+                </Typography>
+                <Stack direction="row" sx={{ gap: 0.5, flexWrap: 'wrap' }}>
+                  {c && (
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      label={t(c === 'down' ? 'store.chat.myCart.down' : 'store.chat.myCart.up').replace(
+                        '{before}',
+                        formatMoneyOrDash(l.precio_antes, currency, locale),
+                      )}
+                    />
+                  )}
+                  {!l.en_stock && <Typography sx={{ fontSize: TS.label, color: 'var(--muted)' }}>{t('store.chat.compare.outOfStock')}</Typography>}
+                </Stack>
+              </Box>
+              <Typography sx={{ fontSize: TS.body, fontWeight: 700, flexShrink: 0 }}>
+                {formatMoneyOrDash(l.precio_hoy ?? l.precio_antes, currency, locale)}
+              </Typography>
+            </Stack>
+          )
+        })}
+      </Stack>
+      <Stack direction="row" sx={{ gap: 1, mt: 1.5, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+        <Button size="small" onClick={() => cart?.openCart()} disabled={!cart}>
+          {t('store.chat.cart.open')}
+        </Button>
+        <Button size="small" variant="contained" component={Link} to={`/s/${storeSlug}/checkout`}>
+          {t('store.chat.myCart.checkout')}
+        </Button>
+      </Stack>
+    </Box>
+  )
 }
 
 const POR_UNIDAD: Record<'un' | 'ml' | 'g', MessageKey> = {
@@ -330,9 +419,28 @@ function camel(value: string): string {
   return value.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
 }
 
+/** «Reparto · En camino · prometido 19 nov · 3 días de retraso · último aviso: intento de entrega fallido». */
+function deliveryLine(t: (k: MessageKey) => string, locale: 'es' | 'en', d: ChatDelivery): string {
+  const partes = [d.metodo, t(`fulfillment.state.${d.estado}` as MessageKey)]
+  if (d.entregado) partes.push(t('store.chat.delivery.delivered').replace('{date}', formatDate(d.entregado, locale)))
+  else if (d.prometido_hasta) partes.push(t('store.chat.delivery.promised').replace('{date}', formatDate(d.prometido_hasta, locale)))
+  if (d.dias_retraso > 0) partes.push(t('store.chat.delivery.late').replace('{days}', String(d.dias_retraso)))
+  if (d.ultimo_evento && !d.entregado) partes.push(t('store.chat.delivery.lastEvent').replace('{event}', t(`fulfillment.tracking.${d.ultimo_evento.estado}` as MessageKey)))
+  if (d.intentos_fallidos > 0) partes.push(t('store.chat.delivery.attempts').replace('{count}', String(d.intentos_fallidos)))
+  return partes.filter(Boolean).join(' · ')
+}
+
 const CARD_SX = { p: 1.5, border: '1px solid var(--border)', borderRadius: 2, bgcolor: 'var(--card)' } as const
 
-function ChatOrderCard({ order, storeSlug }: { order: ChatOrder; storeSlug: string }) {
+function ChatOrderCard({
+  order,
+  deliveries = [],
+  storeSlug,
+}: {
+  order: ChatOrder
+  deliveries?: readonly ChatDelivery[]
+  storeSlug: string
+}) {
   const { t, locale } = useI18n()
   return (
     <Box sx={CARD_SX} data-chat-order={order.order_number}>
@@ -343,6 +451,15 @@ function ChatOrderCard({ order, storeSlug }: { order: ChatOrder; storeSlug: stri
         </Typography>
       </Stack>
       <Typography sx={{ fontSize: TS.label, color: 'var(--muted)', mb: 0.75 }}>{formatDate(order.placed_at, locale)}</Typography>
+      {deliveries.length > 0 && (
+        <Stack sx={{ gap: 0.5, mb: 0.75 }} data-chat-deliveries>
+          {deliveries.map((d, i) => (
+            <Typography key={i} sx={{ fontSize: TS.label, color: d.dias_retraso > 0 ? 'var(--text)' : 'var(--muted)', fontWeight: d.dias_retraso > 0 ? 700 : 400 }}>
+              {deliveryLine(t, locale, d)}
+            </Typography>
+          ))}
+        </Stack>
+      )}
       <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 0.5, alignItems: 'center' }}>
         <EstadoChip valor={order.status} clave="orders.status" />
         <EstadoChip valor={order.payment_status} clave="orders.payment" />

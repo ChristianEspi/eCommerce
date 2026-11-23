@@ -24,6 +24,7 @@ import {
 import { PRODUCT_IMAGES_BUCKET } from './images'
 import { buildTextSearchFilter } from '@/shared/lib/search'
 import { catalogClient } from './client'
+import { cleanupRowSchema, type CleanupRow } from '../cleanup'
 import { catalogErrorFromDb, catalogErrorFromInvoke } from './errors'
 
 export { CATALOG_PRODUCT_FUNCTION, PRODUCT_USAGE_RPC }
@@ -177,6 +178,24 @@ export async function fetchProducts({
     rows: productMasterSchema.array().parse(data ?? []),
     total: typeof count === 'number' ? count : (data?.length ?? 0),
   }
+}
+
+/**
+ * Un maestro por id, para abrir su ficha desde un enlace (2026-11-22).
+ *
+ * Los análisis de IA y los avisos señalan un producto concreto: con
+ * `/app/products?producto=<id>` la ficha se abre sola en vez de dejar a la
+ * persona buscándolo. `null` si no existe o RLS no lo deja ver (otro tenant).
+ */
+export async function fetchProductMaster(id: string): Promise<ProductMaster | null> {
+  const supabase = catalogClient()
+  const { data, error } = await supabase
+    .from(ADMIN_PRODUCT_MASTERS_VIEW)
+    .select(MASTER_SELECT)
+    .eq('id', id)
+    .maybeSingle()
+  if (error) throw catalogErrorFromDb(error)
+  return data ? productMasterSchema.parse(data) : null
 }
 
 /** Tope de candidatos: el máximo de filas que PostgREST devuelve de una vez. */
@@ -432,4 +451,15 @@ export async function updateProductDescription(productId: string, description: s
   })
   if (error) throw await catalogErrorFromInvoke(error)
   if (!data?.data?.id) throw await catalogErrorFromInvoke(null)
+}
+
+/**
+ * Limpieza del catálogo (2026-11-22): lo mínimo de cada producto no archivado
+ * de la tienda para `analizarCatalogo`. Lee con la RLS de quien mira.
+ */
+export async function fetchCatalogCleanupRows(storeId: string | null): Promise<CleanupRow[]> {
+  if (!storeId) return []
+  const { data, error } = await catalogClient().rpc('catalog_cleanup_rows', { p_store_id: storeId })
+  if (error) throw catalogErrorFromDb(error)
+  return cleanupRowSchema.array().parse(data ?? [])
 }

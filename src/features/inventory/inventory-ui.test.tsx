@@ -447,3 +447,11 @@ describe('Inventario — gating por lo contratado', () => {
     expect(await screen.findByRole('tab', { name: 'Almacenes' })).toBeInTheDocument()
   })
 })
+
+describe('Existencias desde un enlace (2026-11-22)', () => {
+  it('`?buscar=<sku>#existencias` abre Existencias con el buscador ya puesto', async () => {
+    window.history.replaceState(null, '', '/#existencias')
+    renderInventory(backend(), '/app/inventory?buscar=SILLA-1#existencias')
+    expect(await screen.findByDisplayValue('SILLA-1')).toBeInTheDocument()
+  })
+})

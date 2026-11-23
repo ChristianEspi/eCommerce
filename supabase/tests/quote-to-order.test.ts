@@ -443,6 +443,8 @@ describe('el comprador ve sus cotizaciones', () => {
 
 describe('el comprador pide una cotización', () => {
   it('crea un borrador con precio de referencia del motor, nunca del navegador', async () => {
+    // El aviso solo llega a usuarios de Auth reales: el owner del tenant lo es.
+    await db.query(`insert into auth.users (id, email) values ($1, $2) on conflict do nothing`, [TENANT_A.ownerId, TENANT_A.adminEmail])
     const r = await comoComprador<Row>(
       COMPRADOR,
       `select public.request_quote($1, $2::jsonb, $3, $4) as r`,
@@ -468,6 +470,14 @@ describe('el comprador pide una cotización', () => {
 
     const mias = await comoComprador<Row[]>(COMPRADOR, `select public.my_quotes($1) as r`, [TENANT_A.storeSlug])
     expect(mias.find((q) => q.quote_id === r.quote_id)?.status).toBe('requested')
+
+    // 2026-11-22 · la solicitud avisa en la campana del backoffice, con enlace a la cotización.
+    const avisos = await svc<Row>(
+      `select kind, link, params->>'quote_number' as numero, audience from public.notifications where source_event_id = (select id from public.domain_events where event_type = 'quote.requested' and aggregate_id = $1)`,
+      [r.quote_id],
+    )
+    expect(avisos.length).toBeGreaterThan(0)
+    expect(avisos[0]).toMatchObject({ kind: 'quote.requested', audience: 'backoffice', numero: r.quote_number, link: `/app/quotes?q=${String(r.quote_number)}` })
   })
 
   it('la misma clave es la misma solicitud', async () => {

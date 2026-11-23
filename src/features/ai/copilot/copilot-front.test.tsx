@@ -197,6 +197,17 @@ describe('copias de las listas cerradas', () => {
     expect(linkTarget({ ref: 'T1.P1', kind: 'product', label: 'X', module: 'products', order_id: null })).toBe('/app/products')
   })
 
+  it('enlace a un cliente: abre SU ficha por id, no la lista', () => {
+    const CUSTOMER_ID = '0d6f5c1e-2b7a-4c1d-9e3f-111111111111'
+    expect(
+      linkTarget({ ref: 'T1.C1', kind: 'customer', label: 'Clinica', module: 'customers', order_id: null, customer_id: CUSTOMER_ID }),
+    ).toBe(`/app/customers?cliente=${CUSTOMER_ID}`)
+    // Sin id (servidor anterior), al módulo como antes.
+    expect(linkTarget({ ref: 'T1.C1', kind: 'customer', label: 'Clinica', module: 'customers', order_id: null })).toBe(
+      '/app/customers',
+    )
+  })
+
   it('una respuesta con destino fuera de lista no se pinta', () => {
     const body = answerBody()
     ;(body.data.links as Array<Record<string, unknown>>)[0]!.module = 'settings'

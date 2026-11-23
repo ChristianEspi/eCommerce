@@ -19,7 +19,8 @@ import {
   TableRow,
   Typography,
 } from '@mui/material'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useSegments } from '@/features/pricing/hooks'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -48,6 +49,8 @@ const PAGE_SIZE = 25
  * Un solo buscador general (§8) que consulta al servidor con retardo: escribir
  * «acme» no puede disparar cuatro consultas.
  */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export function CustomersSection() {
   const { t } = useI18n()
   const { notify } = useFeedback()
@@ -63,6 +66,58 @@ export function CustomersSection() {
     customer: null,
   })
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null)
+
+  // 2026-11-22 · `?cliente=<id>` abre la ficha de ESE cliente. Llega desde el
+  // Copilot («Abrir: Clínica San Rafael SAC») y desde los análisis IA: antes
+  // dejaban en la lista y había que buscarlo a mano. Se carga por id —puede no
+  // estar en la página visible— y la RLS decide si es de este tenant: si no
+  // vuelve nada, se avisa y no se abre nada.
+  const [params, setParams] = useSearchParams()
+  const pedido = params.get('cliente')
+  const abierto = useRef<string | null>(null)
+  useEffect(() => {
+    if (!pedido || abierto.current === pedido) return
+    abierto.current = pedido
+    // Sin bandera de «desmontado»: con StrictMode el efecto se monta dos veces
+    // y la segunda sale por la guarda de arriba, así que la respuesta de la
+    // primera es la única. Solo se aplica si sigue siendo el cliente pedido.
+    const vigente = () => abierto.current === pedido
+    const quitar = () =>
+      setParams(
+        (actual) => {
+          const siguiente = new URLSearchParams(actual)
+          siguiente.delete('cliente')
+          return siguiente
+        },
+        { replace: true },
+      )
+    if (!UUID.test(pedido)) {
+      abierto.current = null
+      notify(t('customers.error.notFound'), 'error')
+      quitar()
+      return
+    }
+    fetchCustomer(pedido)
+      .then((customer) => {
+        if (vigente()) setDrawer({ open: true, customer })
+      })
+      .catch(() => {
+        if (!vigente()) return
+        abierto.current = null
+        notify(t('customers.error.notFound'), 'error')
+        quitar()
+      })
+  }, [pedido, notify, t, setParams])
+
+  const cerrarCajon = () => {
+    setDrawer({ open: false, customer: null })
+    abierto.current = null
+    if (params.has('cliente')) {
+      const siguiente = new URLSearchParams(params)
+      siguiente.delete('cliente')
+      setParams(siguiente, { replace: true })
+    }
+  }
 
   const term = useDebouncedValue(search, 300)
 
@@ -233,7 +288,7 @@ export function CustomersSection() {
             ? { organizationId: tenant.organization_id, companyId: activeCompanyId }
             : null
         }
-        onClose={() => setDrawer({ open: false, customer: null })}
+        onClose={cerrarCajon}
         // Antes el alta se quedaba en «Nuevo cliente», sin las pestañas de
         // contactos y direcciones que su propio subtítulo promete.
         onCreated={(id) => {

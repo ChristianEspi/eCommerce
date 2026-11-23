@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '@/test/render'
+import { forgetPurchaseOrder, recallPurchaseOrder } from '../purchaseOrderMemory'
 import { checkIntakeFile, intakeMotivoKey, preselected, type IntakeLine } from './intake'
 
 /**
@@ -131,6 +132,18 @@ describe('IntakePanel', () => {
     expect(screen.getByText('Revisar')).toBeInTheDocument()
     await userEvent.click(accept)
     expect(onAccept).toHaveBeenCalledWith([{ sku: 'DON-10', quantity: 3 }])
+  })
+
+  it('la OC leída del documento se muestra y queda para el pago (2026-11-22)', async () => {
+    holder.result = { data: { lineas: [line({ indice: 0 })], notas: null, orden_compra: 'OC-2026-0045' }, motivo: null, interactionId: 'x' }
+    renderWithProviders(<IntakePanel storeSlug="botica" onAccept={vi.fn()} />)
+    await userEvent.type(screen.getByRole('textbox', { name: /escribe tu pedido/i }), 'OC-2026-0045: 3 donecil')
+    await userEvent.click(screen.getByRole('button', { name: /leer pedido/i }))
+    expect(await screen.findByText(/Leímos tu orden de compra OC-2026-0045/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /pasar 1 líneas al pedido/i }))
+    expect(recallPurchaseOrder('botica')).toBe('OC-2026-0045')
+    forgetPurchaseOrder('botica')
+    expect(recallPurchaseOrder('botica')).toBe('')
   })
 
   it('sin créditos lo dice tal cual y no enseña revisión', async () => {

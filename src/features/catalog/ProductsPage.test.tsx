@@ -1057,3 +1057,29 @@ describe('ProductsPage — eliminacion segura (contrato §4.2)', () => {
     expect(await screen.findByText('Producto eliminado')).toBeInTheDocument()
   })
 })
+
+describe('enlace directo a un producto (2026-11-22)', () => {
+  function renderEn(fake: FakeSupabase, route: string) {
+    holder.client = fake
+    return renderWithProviders(
+      <TenantProvider>
+        <CapabilitiesProvider>
+          <ProductsPage />
+        </CapabilitiesProvider>
+      </TenantProvider>,
+      { session: fake.state.session, route },
+    )
+  }
+
+  it('`?producto=<id>` abre la ficha de ese producto sin buscarlo', async () => {
+    renderEn(backend(), `/app/products?producto=${PRODUCT_ID}`)
+    const drawer = await screen.findByRole('dialog')
+    expect(within(drawer).getByDisplayValue('Silla A')).toBeInTheDocument()
+  })
+
+  it('un id que no existe no abre nada y lo avisa', async () => {
+    renderEn(backend(), '/app/products?producto=99999999-9999-4999-8999-999999999999')
+    expect(await screen.findByText('Ese producto ya no existe o no es de esta sociedad.')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+})

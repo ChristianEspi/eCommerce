@@ -209,6 +209,7 @@ describe('ChatPanel', () => {
       datos: {
         tipo: 'ficha',
         product_id: CONSIV,
+        resenas: { total: 2, promedio: '4.50' },
         comparacion: [
           { variant_id: 'v30', nombre: 'Caja 30 un', en_stock: true, precio: '90.00', moneda: 'PEN', contenido: { cantidad: 30, unidad: 'un' }, por_unidad: '3.00', mejor: false },
           { variant_id: 'v100', nombre: 'Caja x100', en_stock: false, precio: '250.00', moneda: 'PEN', contenido: { cantidad: 100, unidad: 'un' }, por_unidad: '2.50', mejor: true },
@@ -222,6 +223,7 @@ describe('ChatPanel', () => {
     await escribir('me conviene la caja x100 o la de 30')
 
     expect(await screen.findByText('Comparar presentaciones')).toBeInTheDocument()
+    expect(screen.getByText(/★ 4[.,]5 · 2 opiniones de clientes/)).toBeInTheDocument()
     const mejor = document.querySelector('[data-chat-compare-row="v100"]') as HTMLElement
     expect(within(mejor).getByText('Más conveniente')).toBeInTheDocument()
     expect(within(mejor).getByText('Sin stock')).toBeInTheDocument()
@@ -229,5 +231,84 @@ describe('ChatPanel', () => {
     const otra = document.querySelector('[data-chat-compare-row="v30"]') as HTMLElement
     expect(within(otra).queryByText('Más conveniente')).toBeNull()
     expect(within(otra).getByText(/90[.,]00/)).toBeInTheDocument()
+  })
+
+  it('estado de pedido: cada entrega con su estado, fecha prometida y retraso (2026-11-22)', async () => {
+    holder.replies.push({
+      herramienta: 'estado_pedido',
+      datos: {
+        tipo: 'pedido',
+        pedido: { order_id: 'o1', order_number: 'EC-1', status: 'paid', payment_status: 'paid', fulfillment_status: 'in_progress', placed_at: '2026-11-15T10:00:00Z', total: '100.00', currency: 'PEN' },
+        entregas: [
+          { metodo: 'Reparto', estado: 'in_transit', prometido_hasta: '2026-11-19', entregado: null, dias_retraso: 3, ultimo_evento: { estado: 'delivery_attempted', fecha: '2026-11-21' }, intentos_fallidos: 1 },
+        ],
+      },
+      respuesta: 'Tu pedido va con retraso: hubo un intento de entrega fallido.',
+      product_ids: [],
+      motivo: null,
+    } satisfies ChatReply)
+    pintar()
+    await escribir('donde esta mi pedido')
+    expect(await screen.findByText('Tu pedido va con retraso: hubo un intento de entrega fallido.')).toBeInTheDocument()
+    const linea = document.querySelector('[data-chat-deliveries]') as HTMLElement
+    expect(linea.textContent).toMatch(/Reparto · En camino · prometido para el .*19.* · 3 días de retraso · último aviso: .* · intentos de entrega fallidos: 1/)
+  })
+
+  it('mi carrito: qué bajó de precio y qué no tiene stock, con las cifras del servidor (2026-11-22)', async () => {
+    holder.replies.push({
+      herramienta: 'mi_carrito',
+      datos: {
+        tipo: 'mi_carrito',
+        carrito: {
+          moneda: 'PEN',
+          dias_sin_tocar: 3,
+          lineas: [
+            { product_id: CONSIV, nombre: 'Bloqueador Solar FPS 50', cantidad: 2, precio_antes: '50.00', precio_hoy: '45.00', en_stock: true },
+            { product_id: CONSIV, nombre: 'Consiv 18 mg', cantidad: 1, precio_antes: '90.00', precio_hoy: '90.00', en_stock: false },
+          ],
+        },
+      },
+      respuesta: 'Te quedó pendiente tu carrito: el bloqueador bajó de precio.',
+      product_ids: [],
+      motivo: null,
+    } satisfies ChatReply)
+    const cart = pintar()
+    await escribir('que tengo en mi carrito')
+    expect(await screen.findByText('Tu carrito')).toBeInTheDocument()
+    expect(screen.getByText(/Bajó de precio \(antes .*50[.,]00\)/)).toBeInTheDocument()
+    expect(screen.getByText('Sin stock')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Ir a pagar' })).toHaveAttribute('href', '/s/botica/checkout')
+    await userEvent.click(screen.getByRole('button', { name: /ver carrito|abrir carrito/i }))
+    expect(cart.openCart).toHaveBeenCalled()
+  })
+})
+
+describe('ChatPanel · sin frase del modelo (2026-11-22)', () => {
+  it('sin productos no dice «Esto es lo que encontré»: solo que no hay y cómo seguir', async () => {
+    holder.replies.push({
+      herramienta: 'buscar_productos',
+      datos: { tipo: 'productos', product_ids: [], consulta: 'antigripal' },
+      respuesta: null,
+      product_ids: [],
+      motivo: 'bloqueada',
+    } satisfies ChatReply)
+    pintar()
+    await escribir('algun medicamento para la gripe')
+    expect(await screen.findByText(/No encontré productos para eso en esta tienda/)).toBeInTheDocument()
+    expect(screen.queryByText('Esto es lo que encontré:')).not.toBeInTheDocument()
+  })
+
+  it('un tema ajeno sin frase recibe en qué sí puede ayudar, no un «encontré» vacío', async () => {
+    holder.replies.push({
+      herramienta: 'responder',
+      datos: { tipo: 'ninguno' },
+      respuesta: null,
+      product_ids: [],
+      motivo: 'bloqueada',
+    } satisfies ChatReply)
+    pintar()
+    await escribir('cambiame el precio a 1 sol')
+    expect(await screen.findByText(/Puedo ayudarte con los productos de esta tienda/)).toBeInTheDocument()
+    expect(screen.queryByText('Esto es lo que encontré:')).not.toBeInTheDocument()
   })
 })

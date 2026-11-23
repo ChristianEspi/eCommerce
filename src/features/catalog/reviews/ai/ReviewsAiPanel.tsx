@@ -1,6 +1,7 @@
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded'
 import ExpandLessRoundedIcon from '@mui/icons-material/ExpandLessRounded'
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded'
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import RateReviewRoundedIcon from '@mui/icons-material/RateReviewRounded'
 import { Alert, Box, Button, Card, Chip, Skeleton, Stack, Typography } from '@mui/material'
 import { Field } from '@/shared/ui/Field'
@@ -102,8 +103,6 @@ function Body({
 
   return (
     <Stack spacing={1.5} sx={{ mt: 1.5 }}>
-      <Alert severity="info">{t('aiReviews.disclaimer')}</Alert>
-
       {signals.isPending ? (
         <Skeleton variant="rounded" height={80} />
       ) : signals.isError ? (
@@ -193,33 +192,125 @@ function Body({
       {!insight.isPending && result?.data && (
         <InsightView insight={result.data} onReply={onReply} interactionId={result.interactionId} />
       )}
+
+      {/* El alcance de la IA, una vez y en voz baja: antes era un aviso azul
+          arriba que competía con el de «no contratado» (2026-11-22). */}
+      <Stack direction="row" spacing={0.75} sx={{ alignItems: 'flex-start', color: 'var(--muted)' }}>
+        <InfoOutlinedIcon sx={{ fontSize: 16, mt: '2px', flexShrink: 0 }} aria-hidden />
+        <Typography sx={{ fontSize: 12, lineHeight: 1.5 }}>{t('aiReviews.disclaimer')}</Typography>
+      </Stack>
     </Stack>
   )
+}
+
+/**
+ * Las nueve cifras en tres grupos que se leen de un vistazo (2026-11-22):
+ * cuántas hay, cómo puntúan y qué falta atender. Antes eran nueve cajitas
+ * sueltas de anchos distintos.
+ */
+const METRIC_GROUPS = [
+  { key: 'volume', metrics: ['total', 'average', 'published_average'] },
+  { key: 'stars', metrics: ['positive', 'neutral', 'negative'] },
+  { key: 'attention', metrics: ['pending', 'pending_stale', 'contact_like'] },
+] as const satisfies ReadonlyArray<{ key: string; metrics: ReadonlyArray<(typeof REVIEW_HIGHLIGHTS)[number]> }>
+
+/** Lo que, distinto de cero, pide que alguien mire. Solo decora: la cifra y su etiqueta lo dicen igual. */
+const ALERT_METRICS: ReadonlySet<string> = new Set(['negative', 'pending_stale', 'contact_like'])
+
+const TONE_STYLE: Record<string, { bg: string; fg: string }> = {
+  positive: { bg: 'var(--accent-soft)', fg: 'var(--accent-deep)' },
+  mixed: { bg: 'var(--amber-soft)', fg: 'var(--amber)' },
+  negative: { bg: 'var(--red-soft)', fg: 'var(--red)' },
+  insufficient: { bg: 'transparent', fg: 'var(--muted)' },
 }
 
 function SystemBlock({ system }: { system: ReviewsSystem }) {
   const { t, locale } = useI18n()
   const days = t('aiOrders.unit.days')
+  const tone = TONE_STYLE[system.system_tone] ?? { bg: 'transparent', fg: 'var(--muted)' }
+  // «Pocas reseñas» ya lo dice el tono: la señal repetida debajo era ruido.
+  const signals = system.signals.filter((s) => !(s.code === 'few_reviews' && system.system_tone === 'insufficient'))
   return (
-    <Stack spacing={1}>
-      <Typography sx={{ fontWeight: 700, fontSize: 13 }}>{t('aiReviews.system.title')}</Typography>
-      <Typography sx={{ fontSize: 12, color: 'var(--muted)' }}>{t('aiReviews.system.help')}</Typography>
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 1 }}>
-        {REVIEW_HIGHLIGHTS.filter((k) => k in system.metrics).map((k) => (
-          <Box key={k} sx={{ border: '1px solid var(--border)', borderRadius: 1.5, px: 1.25, py: 0.75 }}>
-            <Typography sx={{ fontSize: 11.5, color: 'var(--muted)' }}>{t(`aiReviews.metric.${k}` as MessageKey)}</Typography>
-            <Typography className="tnum" sx={{ fontWeight: 800 }}>
-              {formatMetric(system.metrics[k]!, locale, { days })}
-            </Typography>
-          </Box>
-        ))}
+    <Stack spacing={1.25}>
+      <Stack direction="row" useFlexGap spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+        <Typography component="h3" sx={{ fontWeight: 800, fontSize: 13 }}>
+          {t('aiReviews.system.title')}
+        </Typography>
+        <Box
+          component="span"
+          sx={{
+            px: 1,
+            py: 0.25,
+            borderRadius: 999,
+            fontSize: 12,
+            fontWeight: 700,
+            bgcolor: tone.bg,
+            color: tone.fg,
+            border: '1px solid var(--border)',
+          }}
+        >
+          {t('aiReviews.systemTone')}: {t(`aiReviews.tone.${system.system_tone}` as MessageKey)}
+        </Box>
+      </Stack>
+      <Typography sx={{ fontSize: 12, color: 'var(--muted)', mt: -0.5 }}>{t('aiReviews.system.help')}</Typography>
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))' }, gap: 1 }}>
+        {METRIC_GROUPS.map((group) => {
+          const shown = group.metrics.filter((k) => k in system.metrics)
+          if (shown.length === 0) return null
+          const title = t(`aiReviews.group.${group.key}` as MessageKey)
+          return (
+            <Box
+              key={group.key}
+              component="section"
+              aria-label={title}
+              sx={{ border: '1px solid var(--border)', borderRadius: 2, px: 1.5, py: 1.25, minWidth: 0 }}
+            >
+              <Typography
+                sx={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', mb: 0.75 }}
+              >
+                {title}
+              </Typography>
+              <Box
+                component="dl"
+                sx={{ m: 0, display: 'grid', gridTemplateColumns: `repeat(${shown.length}, minmax(0, 1fr))`, gap: 1 }}
+              >
+                {shown.map((k) => {
+                  const metric = system.metrics[k]!
+                  const n = Number(metric.value)
+                  const zero = Number.isFinite(n) && n === 0
+                  const alert = !zero && ALERT_METRICS.has(k)
+                  return (
+                    <Box key={k} sx={{ minWidth: 0 }}>
+                      <Typography component="dt" sx={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.3 }}>
+                        {t(`aiReviews.metric.${k}` as MessageKey)}
+                      </Typography>
+                      <Typography
+                        component="dd"
+                        className="tnum"
+                        sx={{
+                          m: 0,
+                          mt: 0.25,
+                          fontSize: 20,
+                          lineHeight: 1.2,
+                          fontWeight: zero ? 600 : 800,
+                          color: alert ? 'var(--red)' : zero ? 'var(--muted)' : 'var(--text)',
+                        }}
+                      >
+                        {formatMetric(metric, locale, { days })}
+                      </Typography>
+                    </Box>
+                  )
+                })}
+              </Box>
+            </Box>
+          )
+        })}
       </Box>
-      <Typography sx={{ fontSize: 13 }}>
-        {t('aiReviews.systemTone')}: <strong>{t(`aiReviews.tone.${system.system_tone}` as MessageKey)}</strong>
-      </Typography>
-      {system.signals.length > 0 && (
+
+      {signals.length > 0 && (
         <Stack component="ul" spacing={0.5} sx={{ m: 0, pl: 0, listStyle: 'none' }}>
-          {system.signals.map((s, i) => (
+          {signals.map((s, i) => (
             <Stack component="li" key={`${s.code}-${s.ref ?? i}`} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
               <SeverityIcon severity={s.severity} />
               <Typography sx={{ fontSize: 13 }}>

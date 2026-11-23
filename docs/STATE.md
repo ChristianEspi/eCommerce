@@ -11,6 +11,27 @@ el recorrido SaaS P00–P17 queda cerrado)
 > (`claude-saas-opus/config/phases.json`), que se identifica siempre como «P0x-SaaS». No son la misma
 > serie: el P12 histórico es el framework de integraciones; el P12-SaaS es fulfillment y devoluciones.
 
+## IA: lo pendiente, completo (2026-11-22, a pedido del operador)
+
+Commits locales en `dev` (`83dd9c1`…`07fd780`). **Aplicado en QAS el 2026-11-22**: migraciones `20261122130000`–`20261122170000`
+(API de gestión; `anon` sin EXECUTE verificado; disparador `domain_events_quote_requested_notify` creado) y funciones `shopping-chat` y
+`order-intake`. Humo con `prueba.b2b@`: reponer (nombre limpio), mi_carrito, estado_pedido con entregas y opiniones → 200 con frase;
+Eutebrol → datos sin frase (candado de salud) y sin comparación (dosis distintas). `catalog_cleanup_rows` con el owner de miquimica: 438
+productos (109 sin foto, 3 sin descripción, 6 sin categoría, 24 sin atributos). El front nuevo requiere subir `dev`/`qas`. Ya existían y no se rehicieron: cobranza asistida (`credit-assistant`),
+alertas proactivas (`ecommerce-ai-digest`), análisis de reseñas, vigilancia y «Hoy deberías revisar».
+
+| # | Qué | Dónde |
+|---|---|---|
+| 1 | **Reposición sin nombre repetido**: `ebim.replenishment_label` añade la etiqueta de la variante solo si falta y quita tramos repetidos. | `20261122130000_my_replenishment_label` |
+| 2 | **Comparar tamaños sueltos** en el chat: sin variantes, compara los hermanos del buscador (mismo nombre salvo el contenido y misma marca; los mg siguen separando). | `commerceChat.ts` (`hermanosPorContenido`) |
+| 3 | **Revisar catálogo** (Productos): duplicados, tamaños sueltos, sin foto/descripción/atributos/categoría y nombres raros. Reglas en TS puro; `catalog_cleanup_rows` (invoker, sin precios). Nada se corrige solo. | `CatalogCleanupAction.tsx`, `cleanup.ts` |
+| 4 | **Etiquetado en lote**: «Completar fichas con IA» → modo «Atributos», solo productos sin atributos, tarea `attributes`. | `BulkCopyAction.tsx` |
+| 5 | **Cotizaciones**: `quote.requested` avisa en la campana (owner/admin/pedidos + vendedor asignado) con enlace `/app/quotes?q=`. Contrapropuesta en el cajón: iguala el precio de la competencia leído por la IA sin bajar del descuento máximo que fija el vendedor (no hay coste en la base). | `20261122150000_quote_requested_notify`, `QuoteCounterOffer.tsx` |
+| 6 | **OC del cliente**: `order-intake` lee el número de OC solo si está rotulado y lo valida; el checkout lo trae puesto (sessionStorage por pestaña) y lo muestra aunque la cuenta no exija OC. | `aiIntake.ts`, `purchaseOrderMemory.ts` |
+| 7 | **Retraso de entrega en el chat**: `my_order_tracking` (definer con guard) da estado, fecha prometida, días de retraso, último estado del operador e intentos; sin dirección, guía ni texto del operador. | `20261122160000_my_order_tracking` |
+| 8 | **Carrito en el chat**: `my_cart_summary` (definer, no escribe) y herramienta `mi_carrito`: qué quedó pendiente, qué bajó/subió y qué no tiene stock. | `20261122170000_my_cart_summary` |
+| 9 | **Opiniones en la ficha del chat**: total y media en pantalla; el modelo resume hasta 8 textos saneados y sin frases de salud. | `commerceChat.ts`, `shopping-chat` |
+
 ## Chat: preguntas sobre un producto y comparar presentaciones (2026-11-22)
 
 `af090fe` + ajuste de candados. **Aplicado en QAS el 2026-11-22**: `shopping-chat` desplegado (sin migración). Humo con `prueba.b2b@`: «¿Qué contiene el Pedialyte?» y «¿qué presentación de Pedialyte me conviene?» → 200 con frase; Eutebrol → datos sin frase (candado de salud, esperado: su ficha nombra la enfermedad).

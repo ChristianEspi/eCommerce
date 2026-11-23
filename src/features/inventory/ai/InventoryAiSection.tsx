@@ -9,11 +9,13 @@ import {
   CardContent,
   Chip,
   Divider,
+  Link,
   Skeleton,
   Stack,
   Typography,
 } from '@mui/material'
 import { useState, type FormEvent } from 'react'
+import { Link as RouterLink, useNavigate } from 'react-router-dom'
 import { formatMetric } from '@/features/admin/dashboard/aiAnalyst'
 import { AiFeedbackButtons } from '@/features/ai/AiFeedbackButtons'
 import { useAiFeature } from '@/features/ai/hooks'
@@ -28,6 +30,8 @@ import { T } from '@/theme/tokens'
 import {
   MAX_INVENTORY_QUESTION,
   type InventoryAiContext,
+  type InventoryAiReview,
+  type InventoryAiSeverity,
   type InventoryAiSignal,
   type InventoryInsight,
   type InventoryReview,
@@ -50,12 +54,34 @@ function SectionTitle({ id, children }: { id?: string; children: string }) {
   )
 }
 
-/** Lleva a la pestaña donde se revisa: NO ajusta, no reserva, no compra. */
-function ReviewButton({ review, variant = 'outlined' }: { review: InventoryReview; variant?: 'outlined' | 'contained' }) {
+/** El producto que señala una fila: a dónde lleva cada enlace. */
+interface Target {
+  productId: string
+  sku: string | null
+  name: string
+}
+
+/**
+ * Lleva a la pestaña donde se revisa, ya filtrada por ESE producto
+ * (2026-11-22). Antes solo cambiaba de pestaña y la persona tenía que volver a
+ * buscar el producto que acababa de leer. NO ajusta, no reserva, no compra.
+ */
+function ReviewButton({
+  review,
+  target,
+  variant = 'outlined',
+}: {
+  review: InventoryReview
+  target: Target
+  variant?: 'outlined' | 'contained'
+}) {
   const { t } = useI18n()
+  const navigate = useNavigate()
   if (!review.tab) {
     return review.kind === 'none' ? null : (
-      <Typography sx={{ fontSize: 12.5, color: 'var(--muted)' }}>{t(`aiInventory.review.${review.kind}` as MessageKey)}</Typography>
+      <Typography sx={{ fontSize: 12.5, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+        {t(`aiInventory.review.${review.kind}` as MessageKey)}
+      </Typography>
     )
   }
   const tab = review.tab
@@ -64,15 +90,42 @@ function ReviewButton({ review, variant = 'outlined' }: { review: InventoryRevie
       size="small"
       variant={variant}
       endIcon={<ArrowForwardRoundedIcon />}
-      sx={{ alignSelf: 'flex-start' }}
+      sx={{ alignSelf: { xs: 'flex-start', sm: 'center' }, flexShrink: 0, whiteSpace: 'nowrap' }}
       title={t('aiInventory.reviewHint')}
       onClick={() => {
+        // Existencias se abre filtrada por el SKU (o el nombre, si no tiene).
         // SectionTabs escucha `hashchange`: cambiar el hash ES cambiar de pestaña.
+        if (tab === 'existencias') {
+          navigate({ search: `?buscar=${encodeURIComponent(target.sku ?? target.name)}` })
+        }
         window.location.hash = tab
       }}
     >
       {t(`aiInventory.review.${review.kind}` as MessageKey)}
     </Button>
+  )
+}
+
+/** El nombre del producto, enlazado a su ficha en Catálogo. */
+function ProductName({ target }: { target: Target }) {
+  const { t } = useI18n()
+  return (
+    <Stack direction="row" useFlexGap spacing={0.75} sx={{ alignItems: 'baseline', flexWrap: 'wrap', minWidth: 0 }}>
+      <Link
+        component={RouterLink}
+        to={`/app/products?producto=${target.productId}`}
+        title={t('aiInventory.openProduct')}
+        underline="hover"
+        sx={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)', '&:hover': { color: 'var(--accent-deep)' } }}
+      >
+        {target.name}
+      </Link>
+      {target.sku && (
+        <Typography component="span" className="tnum" sx={{ fontSize: 11.5, color: 'var(--muted)' }}>
+          {target.sku}
+        </Typography>
+      )}
+    </Stack>
   )
 }
 
@@ -107,7 +160,7 @@ function LiquidationProposal({ storeId, items }: { storeId: string; items: Inven
   if (candidatos.length === 0 || !can('store.manage')) return null
   return (
     <>
-      <Button size="small" variant="outlined" sx={{ alignSelf: 'flex-start', mt: 1.5 }} onClick={() => setOpen(true)}>
+      <Button size="small" variant="text" onClick={() => setOpen(true)}>
         {t('aiActions.propose.fromInventory').replace('{count}', String(Math.min(candidatos.length, 50)))}
       </Button>
       {open && (
@@ -123,51 +176,113 @@ function LiquidationProposal({ storeId, items }: { storeId: string; items: Inven
   )
 }
 
-/** CÁLCULO DEL SISTEMA: señales y cifras de la base, sin IA. */
-function SystemBlock({ system }: { system: InventorySystem }) {
+/** Qué hay que hacer con cada producto: así se agrupa la lista del sistema. */
+const GROUPS = ['replenish', 'excess', 'movement', 'watch'] as const
+type Group = (typeof GROUPS)[number]
+const GROUP_OF: Readonly<Record<InventoryAiReview, Group>> = {
+  review_replenishment: 'replenish',
+  review_reorder_point: 'replenish',
+  review_excess: 'excess',
+  review_stagnant: 'excess',
+  review_movement: 'movement',
+  review_sync: 'watch',
+  monitor: 'watch',
+  none: 'watch',
+}
+const SEVERITY_ORDER: Readonly<Record<InventoryAiSeverity, number>> = { high: 0, medium: 1, low: 2 }
+
+/**
+ * CÁLCULO DEL SISTEMA: señales y cifras de la base, sin IA.
+ *
+ * 2026-11-22 · Agrupado por lo que toca hacer (reponer, exceso, movimientos,
+ * vigilar) y, dentro, de más a menos grave. Antes era una lista corrida en el
+ * orden en que llegaba: la reposición urgente podía quedar debajo de diez
+ * excesos. Cada fila: nombre enlazado a la ficha, cifras en una línea y la
+ * revisión a la derecha, que abre Existencias ya filtrada por ese producto.
+ */
+function SystemBlock({ system, storeId }: { system: InventorySystem; storeId: string }) {
   const { t, locale } = useI18n()
   if (system.items.length === 0) {
     return <Typography sx={{ fontSize: 13 }}>{t('aiInventory.system.none')}</Typography>
   }
   const labels = { days: t('aiOrders.unit.days') }
+  const grupos = GROUPS.map((g) => ({
+    group: g,
+    items: system.items
+      .filter((i) => GROUP_OF[i.system_review.kind] === g)
+      .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]),
+  })).filter((g) => g.items.length > 0)
+
   return (
-    <Stack component="ul" spacing={1.5} sx={{ m: 0, p: 0, listStyle: 'none' }}>
-      {system.items.map((item) => (
-        <Stack
-          component="li"
-          key={item.ref}
-          direction={{ xs: 'column', sm: 'row' }}
-          spacing={1.25}
-          sx={{ alignItems: { sm: 'flex-start' }, borderBottom: '1px solid var(--border)', pb: 1.25 }}
-        >
-          <SeverityIcon severity={item.severity} />
-          <Stack spacing={0.5} sx={{ minWidth: 0, flex: 1 }}>
-            <Typography sx={{ fontSize: 13.5, fontWeight: 700 }}>
-              {item.name}{' '}
-              {item.sku && (
-                <Box component="span" sx={{ fontSize: 11.5, color: 'var(--muted)', fontWeight: 400 }}>
-                  {item.sku}
-                </Box>
-              )}
+    <Stack spacing={2.5}>
+      {grupos.map(({ group, items }) => (
+        <Box component="section" key={group} aria-labelledby={`ai-inv-group-${group}`}>
+          <Stack
+            direction="row"
+            useFlexGap
+            spacing={1}
+            sx={{ alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between', mb: 1 }}
+          >
+            <Typography
+              id={`ai-inv-group-${group}`}
+              component="h4"
+              sx={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)' }}
+            >
+              {t(`aiInventory.group.${group}` as MessageKey)}{' '}
+              <Box component="span" className="tnum" sx={{ color: 'var(--text)' }}>
+                · {items.length}
+              </Box>
             </Typography>
-            <SignalChips signals={item.signals} />
-            <Stack direction="row" useFlexGap spacing={1.5} sx={{ flexWrap: 'wrap' }}>
-              {FIGURES.map((f) => {
-                const metric = system.metrics[`${item.ref}_${f}`]
-                if (!metric) return null
-                return (
-                  <Typography key={f} sx={{ fontSize: 12, color: 'var(--muted)' }}>
-                    {t(`aiInventory.figure.${f}` as MessageKey)}:{' '}
-                    <Box component="strong" className="tnum" sx={{ color: 'var(--text)' }}>
-                      {formatMetric(metric, locale, labels)}
-                    </Box>
-                  </Typography>
-                )
-              })}
-            </Stack>
+            {group === 'excess' && <LiquidationProposal storeId={storeId} items={items} />}
           </Stack>
-          <ReviewButton review={item.system_review} />
-        </Stack>
+          <Box
+            component="ul"
+            sx={{ m: 0, p: 0, listStyle: 'none', border: '1px solid var(--border)', borderRadius: 2, overflow: 'hidden' }}
+          >
+            {items.map((item, index) => {
+              const target = { productId: item.product_id, sku: item.sku, name: item.name }
+              return (
+                <Box
+                  component="li"
+                  key={item.ref}
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: 'auto 1fr', sm: 'auto 1fr auto' },
+                    columnGap: 1.5,
+                    rowGap: 1,
+                    alignItems: 'center',
+                    px: 1.5,
+                    py: 1.25,
+                    borderTop: index === 0 ? 'none' : '1px solid var(--border)',
+                  }}
+                >
+                  <SeverityIcon severity={item.severity} />
+                  <Stack spacing={0.5} sx={{ minWidth: 0 }}>
+                    <ProductName target={target} />
+                    <Stack direction="row" useFlexGap spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                      <SignalChips signals={item.signals} />
+                      {FIGURES.map((f) => {
+                        const metric = system.metrics[`${item.ref}_${f}`]
+                        if (!metric) return null
+                        return (
+                          <Typography key={f} sx={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                            {t(`aiInventory.figure.${f}` as MessageKey)}{' '}
+                            <Box component="strong" className="tnum" sx={{ color: 'var(--text)' }}>
+                              {formatMetric(metric, locale, labels)}
+                            </Box>
+                          </Typography>
+                        )
+                      })}
+                    </Stack>
+                  </Stack>
+                  <Box sx={{ gridColumn: { xs: '2', sm: 'auto' } }}>
+                    <ReviewButton review={item.system_review} target={target} />
+                  </Box>
+                </Box>
+              )
+            })}
+          </Box>
+        </Box>
       ))}
     </Stack>
   )
@@ -203,14 +318,17 @@ function InsightView({ data, context }: { data: InventoryInsight; context: Inven
             <Stack component="li" key={item.ref} direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
               <SeverityIcon severity={item.severity} />
               <Stack spacing={0.5} sx={{ minWidth: 0, flex: 1 }}>
-                <Typography sx={{ fontSize: 13, fontWeight: 700 }}>{item.name}</Typography>
+                <ProductName target={{ productId: item.product_id, sku: item.sku, name: item.name }} />
                 <Typography sx={{ fontSize: 13 }}>
                   <MarkerText text={item.explanation} context={context} />
                 </Typography>
                 {item.overridden && (
                   <Typography sx={{ fontSize: 12, color: 'var(--muted)' }}>{t('aiInventory.overridden')}</Typography>
                 )}
-                <ReviewButton review={item.suggested_review} />
+                <ReviewButton
+                  review={item.suggested_review}
+                  target={{ productId: item.product_id, sku: item.sku, name: item.name }}
+                />
               </Stack>
             </Stack>
           ))}
@@ -285,9 +403,11 @@ export function InventoryAiSection() {
       </Stack>
 
       <Card variant="outlined" component="section" aria-labelledby="ai-inventory-system">
-        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 }, display: 'flex', flexDirection: 'column', gap: 1.25 }}>
-          <SectionTitle id="ai-inventory-system">{t('aiInventory.system.title')}</SectionTitle>
-          <Typography sx={{ fontSize: 12, color: 'var(--muted)' }}>{t('aiInventory.system.help')}</Typography>
+        <CardContent sx={{ p: { xs: 1.5, sm: 2.5 }, '&:last-child': { pb: { xs: 1.5, sm: 2.5 } }, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Stack spacing={0.25}>
+            <SectionTitle id="ai-inventory-system">{t('aiInventory.system.title')}</SectionTitle>
+            <Typography sx={{ fontSize: 12, color: 'var(--muted)' }}>{t('aiInventory.system.help')}</Typography>
+          </Stack>
           <Box aria-live="polite" aria-busy={signals.isPending}>
             {signals.isPending && <Skeleton variant="rounded" height={96} />}
             {signals.isError && (
@@ -302,10 +422,7 @@ export function InventoryAiSection() {
                 {t('aiInventory.system.error')}
               </Alert>
             )}
-            {signals.isSuccess && signals.data && <SystemBlock system={signals.data} />}
-            {signals.isSuccess && signals.data && (
-              <LiquidationProposal storeId={storeId} items={signals.data.items} />
-            )}
+            {signals.isSuccess && signals.data && <SystemBlock system={signals.data} storeId={storeId} />}
             {signals.isSuccess && !signals.data && <Alert severity="warning">{t('aiInventory.system.error')}</Alert>}
           </Box>
         </CardContent>

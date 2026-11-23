@@ -181,7 +181,12 @@ export async function invokeAi(fn: string, body: Record<string, unknown>): Promi
   const supabase = tryGetSupabaseClient()
   if (!supabase) throw new AppError({ boundary: 'ai', code: 'CONFIG_INCOMPLETA' })
   const { data, error } = await supabase.functions.invoke<{ data: unknown }>(fn, { body })
-  if (error) throw new AppError({ boundary: 'ai', code: await codeFromInvokeError(error) })
+  if (error) {
+    // Sin `Response` en el error, la función ni respondió: es la red, no el
+    // asistente. Distinguirlo deja a la pantalla decir la verdad.
+    const responded = (error as { context?: unknown }).context instanceof Response
+    throw new AppError({ boundary: 'ai', code: responded ? await codeFromInvokeError(error) : 'SIN_CONEXION' })
+  }
   const d = data?.data
   return d && typeof d === 'object' && !Array.isArray(d) ? (d as Record<string, unknown>) : null
 }

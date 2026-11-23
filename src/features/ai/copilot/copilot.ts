@@ -299,6 +299,8 @@ const entitySchema = z.object({
   label: z.string().min(1).max(200),
   module: z.enum(COPILOT_LINK_MODULES).nullable(),
   order_id: z.string().uuid().nullable(),
+  /** 2026-11-22 · Solo clientes. Ausente contra un servidor anterior. */
+  customer_id: z.string().uuid().nullable().default(null),
 })
 export type CopilotEntityFact = z.infer<typeof entitySchema>
 
@@ -308,6 +310,8 @@ const linkSchema = z.object({
   label: z.string().min(1).max(200),
   module: z.enum(COPILOT_LINK_MODULES),
   order_id: z.string().uuid().nullable(),
+  /** 2026-11-22 · Solo clientes: abre SU ficha. Ausente contra un servidor anterior. */
+  customer_id: z.string().uuid().nullable().default(null),
 })
 export type CopilotLink = z.infer<typeof linkSchema>
 
@@ -352,10 +356,18 @@ export function markerContextOf(answer: CopilotAnswer): MarkerContext {
   return { metrics: answer.metrics, entities: answer.entities }
 }
 
-/** Destino de un enlace. Un pedido se abre por id (la RLS decide si se ve). */
-export function linkTarget(link: CopilotLink): string {
+/**
+ * Destino de un enlace. Un pedido o un cliente se abren por id —su ficha, no
+ * la lista donde habría que buscarlo—; la RLS decide si se ve.
+ */
+export function linkTarget(
+  link: Omit<CopilotLink, 'customer_id'> & { readonly customer_id?: string | null },
+): string {
   const base = COPILOT_LINK_ROUTES[link.module]
   if (link.module === 'orders' && link.order_id) return `${base}?order=${encodeURIComponent(link.order_id)}`
+  if (link.module === 'customers' && link.customer_id) {
+    return `${base}?cliente=${encodeURIComponent(link.customer_id)}`
+  }
   return base
 }
 

@@ -22,6 +22,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -80,7 +81,14 @@ export function LevelsSection() {
   const { activeStore, can } = useTenant()
   const canWrite = can('catalog.write')
 
-  const [search, setSearch] = useState('')
+  // `?buscar=<sku>#existencias` (2026-11-22): el análisis IA lleva al producto
+  // que señala con la lista ya filtrada, no a todo el inventario.
+  const [params] = useSearchParams()
+  const buscarPedido = params.get('buscar')
+  const [search, setSearch] = useState(buscarPedido ?? '')
+  useEffect(() => {
+    if (buscarPedido) setSearch(buscarPedido)
+  }, [buscarPedido])
   const [warehouseId, setWarehouseId] = useState<string>('')
   const [movementOpen, setMovementOpen] = useState(false)
   const [policyFor, setPolicyFor] = useState<LevelRow | null>(null)

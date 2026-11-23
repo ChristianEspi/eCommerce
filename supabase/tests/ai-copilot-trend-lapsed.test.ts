@@ -259,6 +259,44 @@ describe('plan de las herramientas nuevas', () => {
   })
 })
 
+/**
+ * 2026-11-22 · «Abrir: Clínica San Rafael SAC» llevaba a la lista de clientes y
+ * había que buscarlo. El enlace lleva ahora el id del cliente para abrir SU ficha.
+ */
+describe('inactivos: el enlace abre la ficha del cliente', () => {
+  const CLIENTE = '0a000000-0000-4000-8000-0000000000c1'
+  const raw = {
+    days: 60,
+    scope: 'all',
+    customers: [
+      { customer_id: CLIENTE, name: 'Clinica San Rafael SAC', days_since: 69, orders_count: 1 },
+      { customer_id: 'no-es-un-id', name: 'Otro', days_since: 70, orders_count: 2 },
+    ],
+  }
+
+  it('la entidad y el enlace llevan el id; un id que no es uuid no viaja', () => {
+    const resultado = adaptarResultado({ tool: 'lapsed_customers', text: null, days: 60 }, { ok: true, raw }, 0)
+    expect(resultado.entities['T1.C1']).toMatchObject({ kind: 'customer', module: 'customers', customer_id: CLIENTE })
+    expect(resultado.entities['T1.C2']?.customer_id).toBeNull()
+    const r = revisarCopilot({
+      plan: { intent: 'data', directAnswer: '', calls: [{ tool: 'lapsed_customers', text: null, days: 60 }], discarded: 0 },
+      resultados: [resultado],
+      respuesta: {
+        answerable: true,
+        answer: '{{T1.C1}} lleva {{T1.C1.days_since}} sin comprar.',
+        highlights: [],
+        links: ['T1.C1'],
+        follow_ups: [],
+      },
+    })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.value.links).toEqual([
+      { ref: 'T1.C1', kind: 'customer', label: 'Clinica San Rafael SAC', module: 'customers', order_id: null, customer_id: CLIENTE },
+    ])
+  })
+})
+
 describe('tendencia: el sistema suma, el modelo no', () => {
   const raw = {
     days: 7,

@@ -33,6 +33,8 @@ const KIND_KEY: Record<string, MessageKey> = {
   'suggestion.sent': 'notifications.kind.suggestionSent',
   // Cierre 4: lo genera `ebim.run_order_schedules`, no el reparto de eventos.
   'order_schedule.run_ready': 'notifications.kind.orderScheduleReady',
+  // 2026-11-22: lo genera `ebim.notify_quote_requested` (vitrina: pedir cotización o mejor precio).
+  'quote.requested': 'notifications.kind.quoteRequested',
 }
 
 export const KNOWN_KINDS = Object.freeze(Object.keys(KIND_KEY))
@@ -61,6 +63,7 @@ export function notificationText(
 
   return t(key)
     .replace('{order_number}', valor('order_number'))
+    .replace('{quote_number}', valor('quote_number'))
     .replace('{grand_total}', valor('grand_total'))
     .replace('{currency}', valor('currency'))
     .replace('{account_name}', valor('account_name'))

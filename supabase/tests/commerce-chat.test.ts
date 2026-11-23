@@ -18,8 +18,12 @@ import {
   compararPresentaciones,
   contenidoDePresentacion,
   descripcionParaModelo,
+  hermanosPorContenido,
+  nombreSinContenido,
   ejecutarChat,
+  leerMiCarrito,
   leerReposicion,
+  leerSeguimiento,
   nombreCoincide,
   numerosDePedido,
   taparNumeros,
@@ -48,6 +52,15 @@ function puertos(over: Partial<PuertosChat> = {}): PuertosChat & { busquedas: st
   const busquedas: string[] = []
   const catalogo: Record<string, ResultadoBusqueda> = {
     bloqueador: { mode: 'fts', items: [hit({})] },
+    lejia: {
+      mode: 'fts',
+      items: [
+        hit({ product_id: 'l1', name: 'Lejía Tradicional 1 L', brand_name: 'Clorox' }),
+        hit({ product_id: 'l5', name: 'Lejía Tradicional 5 L', brand_name: 'Clorox' }),
+        hit({ product_id: 'lg', name: 'Lejía Tradicional Gel 1 L', brand_name: 'Clorox' }),
+        hit({ product_id: 'lo', name: 'Lejía Tradicional 5 L', brand_name: 'Otra' }),
+      ],
+    },
     consiv: { mode: 'fts', items: [hit({ product_id: CONSIV, slug: 'consiv', name: 'Consiv Tableta Recubierta Caja 30 un', sku: null, kind: 'variant' })] },
     metilfenidato: { mode: 'fts', items: [hit({ product_id: CONSIV, slug: 'consiv', name: 'Consiv Tableta Recubierta Caja 30 un', sku: null, kind: 'variant' })] },
   }
@@ -75,6 +88,7 @@ function puertos(over: Partial<PuertosChat> = {}): PuertosChat & { busquedas: st
       return [{ sku: 'QS-282484', nombre: 'Consiv Tableta Recubierta Caja 30 un · 18 mg', cantidad: 2, compras: 4, cada_dias: 15, dias_restantes: -1 }]
     },
     async ficha(id) {
+      if (id === 'l1') return { product_id: 'l1', nombre: 'Lejía Tradicional 1 L', marca: 'Clorox', descripcion: null, destacados: [], especificaciones: [], presentaciones: [] }
       if (id !== CONSIV) return null
       return {
         product_id: CONSIV,
@@ -87,7 +101,26 @@ function puertos(over: Partial<PuertosChat> = {}): PuertosChat & { busquedas: st
           { variant_id: 'v30', nombre: '18 mg · Caja 30 un', en_stock: true, precio: '90.00', moneda: 'PEN' },
           { variant_id: 'v100', nombre: '18 mg · Caja x100', en_stock: true, precio: '250.00', moneda: 'PEN' },
         ],
+        resenas: { total: 2, promedio: '4.50', textos: ['Llegó rápido y bien embalado.', 'Me ayuda a concentrarme. Buen precio.'] },
       }
+    },
+    async carrito() {
+      return {
+        moneda: 'PEN',
+        dias_sin_tocar: 3,
+        lineas: [
+          { product_id: BLOQ, nombre: 'Bloqueador Solar FPS 50', cantidad: 2, precio_antes: '50.00', precio_hoy: '45.00', en_stock: true },
+          { product_id: CONSIV, nombre: 'Consiv 18 mg', cantidad: 1, precio_antes: '90.00', precio_hoy: '90.00', en_stock: false },
+        ],
+      }
+    },
+    async seguimiento(id) {
+      return id === 'o1'
+        ? [{ metodo: 'Reparto', estado: 'in_transit', prometido_hasta: '2026-11-19', entregado: null, dias_retraso: 3, ultimo_evento: { estado: 'delivery_attempted', fecha: '2026-11-21' }, intentos_fallidos: 1 }]
+        : []
+    },
+    async precios(ids) {
+      return new Map(ids.map((id, i) => [id, { precio: i === 0 ? '12.00' : '50.00', moneda: 'PEN' }]))
     },
     async credito() {
       return { cuenta: 'Distribuidora Prueba SAC', limite: '10000.00', disponible: '7500.00', saldo: '2500.00', vencido: '0', moneda: 'PEN', proximo: { order_number: 'EC-2', due_at: '2026-12-20', total: '300.00', days_overdue: 0 } }
@@ -183,7 +216,24 @@ describe('pedidos y crédito', () => {
     const r = await ejecutarChat({ herramienta: 'estado_pedido', numero: 'ec-1' }, puertos())
     expect(r.datos).toMatchObject({ tipo: 'pedido', pedido: { order_number: 'EC-1' } })
     const otro = await ejecutarChat({ herramienta: 'estado_pedido', numero: 'EC-404' }, puertos())
-    expect(otro.datos).toEqual({ tipo: 'pedido', pedido: null })
+    expect(otro.datos).toEqual({ tipo: 'pedido', pedido: null, entregas: [] })
+  })
+
+  it('un pedido con retraso: el modelo ve estado, fecha prometida, días y último evento (2026-11-22)', async () => {
+    const r = await ejecutarChat({ herramienta: 'estado_pedido', numero: 'EC-1' }, puertos())
+    expect(r.datos).toMatchObject({ tipo: 'pedido', entregas: [{ dias_retraso: 3, intentos_fallidos: 1 }] })
+    expect(JSON.parse(r.paraModelo)).toMatchObject({
+      numero: 'EC-1',
+      entregas: [{ estado: 'in_transit', dias_retraso: 3, ultimo_evento_del_operador: { estado: 'delivery_attempted' }, intentos_de_entrega_fallidos: 1 }],
+    })
+    expect(r.paraModelo).not.toMatch(/100.00/)
+  })
+
+  it('leerSeguimiento descarta lo mal formado y no inventa retrasos', () => {
+    expect(leerSeguimiento({ entregas: [{ estado: 'pending', dias_retraso: -2, intentos_fallidos: 'x' }, { sin: 'estado' }] })).toEqual([
+      { metodo: null, estado: 'pending', prometido_hasta: null, entregado: null, dias_retraso: 0, ultimo_evento: null, intentos_fallidos: 0 },
+    ])
+    expect(leerSeguimiento(null)).toEqual([])
   })
 
   it('el crédito se pinta con cifras; el modelo solo ve si hay vencido', async () => {
@@ -283,6 +333,9 @@ describe('preguntas sobre un producto y comparar presentaciones (2026-11-22)', (
     expect(modelo).toMatchObject({ producto: 'Consiv Tableta Recubierta', comparacion_posible: true, presentaciones: [{ contenido: '30 unidades' }, { mas_conveniente_por_unidad: true }] })
     expect(r.paraModelo).not.toMatch(/90|250|2.50|3.00/)
     expect(r.productosPermitidos).toEqual([CONSIV])
+    // Opiniones: total y media a la pantalla; al modelo, los textos sin afirmaciones de salud.
+    expect(r.datos).toMatchObject({ resenas: { total: 2, promedio: '4.50' } })
+    expect(modelo.opiniones).toEqual({ total: 2, promedio: '4.50', textos: ['Llegó rápido y bien embalado.', 'Buen precio.'] })
   })
 
   it('la descripción que ve el modelo va sin afirmaciones de salud ni frases repetidas', () => {
@@ -292,10 +345,47 @@ describe('preguntas sobre un producto y comparar presentaciones (2026-11-22)', (
     expect(descripcionParaModelo(null)).toBeNull()
   })
 
+  it('tamaños cargados como productos sueltos: se comparan los hermanos, no otra marca ni otra dosis', async () => {
+    expect(nombreSinContenido('Lejía Tradicional Caja x 5 L')).toBe(nombreSinContenido('Lejía Tradicional 1 L'))
+    expect(nombreSinContenido('Eutebrol Duo 14mg / 10 mg Tableta Caja 30 un')).not.toBe(nombreSinContenido('Eutebrol Tableta Caja 30 un'))
+    const base = hit({ product_id: 'a', name: 'Amoxil 500 mg Caja x 30', brand_name: null })
+    const otros = [base, hit({ product_id: 'b', name: 'Amoxil 500 mg Caja x 100', brand_name: null }), hit({ product_id: 'c', name: 'Amoxil 250 mg Caja x 100', brand_name: null })]
+    expect(hermanosPorContenido(base, otros).map((h) => h.product_id)).toEqual(['a', 'b'])
+
+    const r = await ejecutarChat({ herramienta: 'sobre_producto', producto: 'lejia' }, puertos())
+    if (r.datos.tipo !== 'ficha') throw new Error('tipo')
+    expect(r.datos.comparacion.map((c) => [c.variant_id, c.por_unidad, c.mejor])).toEqual([
+      ['l1', '1.20', false],
+      ['l5', '1.00', true],
+    ])
+  })
+
   it('producto que no está: ficha vacía y el modelo lo sabe', async () => {
     const r = await ejecutarChat({ herramienta: 'sobre_producto', producto: 'Nabila' }, puertos())
-    expect(r.datos).toEqual({ tipo: 'ficha', product_id: null, comparacion: [] })
+    expect(r.datos).toEqual({ tipo: 'ficha', product_id: null, comparacion: [], resenas: null })
     expect(r.paraModelo).toMatch(/no se encontró/)
+  })
+})
+
+describe('mi carrito en el chat (2026-11-22)', () => {
+  it('el modelo sabe qué bajó y qué no tiene stock, sin cifras; la pantalla lleva los precios', async () => {
+    expect(validarPlanChat({ herramienta: 'mi_carrito' })).toEqual({ herramienta: 'mi_carrito' })
+    const r = await ejecutarChat({ herramienta: 'mi_carrito' }, puertos())
+    expect(r.datos).toMatchObject({ tipo: 'mi_carrito', carrito: { dias_sin_tocar: 3 } })
+    expect(JSON.parse(r.paraModelo)).toEqual({
+      dias_sin_tocar: 3,
+      lineas: [
+        { producto: 'Bloqueador Solar FPS 50', cantidad: 2, precio: 'bajo', con_stock: true },
+        { producto: 'Consiv 18 mg', cantidad: 1, precio: 'igual', con_stock: false },
+      ],
+    })
+    expect(r.paraModelo).not.toMatch(/45|50.00|90/)
+  })
+
+  it('leerMiCarrito descarta lo mal formado; carrito vacío lo dice', async () => {
+    expect(leerMiCarrito({ lineas: [{ product_id: 'x', nombre: 'Uno', cantidad: 0 }], moneda: 'PEN', dias_sin_tocar: null })).toEqual({ lineas: [], moneda: 'PEN', dias_sin_tocar: null })
+    const r = await ejecutarChat({ herramienta: 'mi_carrito' }, puertos({ carrito: async () => leerMiCarrito(null) }))
+    expect(r.paraModelo).toMatch(/vacío/)
   })
 })
 

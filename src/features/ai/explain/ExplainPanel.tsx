@@ -1,5 +1,9 @@
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded'
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded'
+import CalculateOutlinedIcon from '@mui/icons-material/CalculateOutlined'
+import CheckCircleOutlineRoundedIcon from '@mui/icons-material/CheckCircleOutlineRounded'
+import PersonOutlineRoundedIcon from '@mui/icons-material/PersonOutlineRounded'
+import { AppIcon } from '@/shared/ui/AppIcon'
 import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded'
 import EditNoteRoundedIcon from '@mui/icons-material/EditNoteRounded'
 import SendRoundedIcon from '@mui/icons-material/SendRounded'
@@ -60,6 +64,41 @@ function tr(t: Translate, key: string, fallback: string): string {
 // CÁLCULO DEL SISTEMA
 // ---------------------------------------------------------------------------
 
+/** Tonos suaves por severidad (texto + icono siempre acompañan al color). */
+const SEVERITY_SOFT: Record<'high' | 'medium' | 'low', { bg: string; bar: string }> = {
+  high: { bg: 'var(--red-soft)', bar: 'var(--red)' },
+  medium: { bg: 'var(--amber-soft)', bar: 'var(--amber)' },
+  low: { bg: 'var(--blue-soft)', bar: 'var(--blue)' },
+}
+
+/**
+ * Tono de una cifra del sistema. Solo decora: la cifra y su etiqueta dicen lo
+ * mismo sin color. Cero ⇒ apagada; una cifra «de alerta» distinta de cero ⇒
+ * ámbar o rojo según la gravedad que su nombre declara.
+ */
+const METRIC_DANGER = /(over_90|blocked|dead|failed|failure)/
+const METRIC_WARNING = /(overdue|61_90|31_60|1_30|unapplied|late|stuck|error|incident|watch|due_soon|pending)/
+type MetricTone = 'hero' | 'danger' | 'warning' | 'zero' | 'plain'
+
+function metricTone(key: string, value: unknown, kind: string, index: number): MetricTone {
+  const n = typeof value === 'number' ? value : Number(value)
+  const isZero = kind !== 'datetime' && Number.isFinite(n) && n === 0
+  if (index === 0 && !isZero) return 'hero'
+  if (isZero) return 'zero'
+  const suffix = metricSuffix(key)
+  if (METRIC_DANGER.test(suffix)) return 'danger'
+  if (METRIC_WARNING.test(suffix)) return 'warning'
+  return 'plain'
+}
+
+const METRIC_STYLE: Record<MetricTone, { bg: string; bar: string; fg: string }> = {
+  hero: { bg: 'var(--accent-soft)', bar: 'var(--accent)', fg: 'var(--accent-deep)' },
+  danger: { bg: 'var(--red-soft)', bar: 'var(--red)', fg: 'var(--red)' },
+  warning: { bg: 'var(--amber-soft)', bar: 'var(--amber)', fg: 'var(--amber)' },
+  zero: { bg: 'transparent', bar: 'var(--border)', fg: 'var(--muted)' },
+  plain: { bg: 'var(--card)', bar: 'var(--border)', fg: 'var(--text)' },
+}
+
 function MetricGrid({ keys, context, ns }: { keys: readonly string[]; context: ExplainContext; ns: ExplainNamespace }) {
   const { t, locale } = useI18n()
   const shown = keys.filter((k) => context.metrics[k])
@@ -67,18 +106,69 @@ function MetricGrid({ keys, context, ns }: { keys: readonly string[]; context: E
   return (
     <Box
       component="dl"
-      sx={{ m: 0, display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(3, 1fr)' }, gap: 1 }}
+      sx={{
+        m: 0,
+        display: 'grid',
+        gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(auto-fill, minmax(170px, 1fr))' },
+        gap: 1,
+      }}
     >
-      {shown.map((k) => (
-        <Box key={k} sx={{ p: 1, border: '1px solid var(--border)', borderRadius: 1.5, minWidth: 0 }}>
-          <Typography component="dt" sx={{ fontSize: 11, color: 'var(--muted)' }}>
-            {tr(t, `${ns}.metric.${metricSuffix(k)}`, metricSuffix(k))}
-          </Typography>
-          <Typography component="dd" className="tnum" sx={{ m: 0, fontSize: 15, fontWeight: 800 }}>
-            {formatMetric(context.metrics[k]!, locale, { days: t('aiOrders.unit.days') })}
-          </Typography>
-        </Box>
-      ))}
+      {shown.map((k, i) => {
+        const metric = context.metrics[k]!
+        const tone = metricTone(k, metric.value, metric.kind, i)
+        const style = METRIC_STYLE[tone]
+        const hero = tone === 'hero'
+        return (
+          <Box
+            key={k}
+            sx={{
+              position: 'relative',
+              overflow: 'hidden',
+              minWidth: 0,
+              px: 1.5,
+              py: hero ? 1.5 : 1.1,
+              pl: 2,
+              borderRadius: 2,
+              bgcolor: style.bg,
+              border: '1px solid',
+              borderColor: tone === 'zero' ? 'var(--border)' : 'transparent',
+              borderStyle: tone === 'zero' ? 'dashed' : 'solid',
+              gridColumn: hero ? 'span 2' : undefined,
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: 4,
+                bgcolor: style.bar,
+              },
+            }}
+          >
+            <Typography
+              component="dt"
+              sx={{ fontSize: 11.5, fontWeight: 600, color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+            >
+              {tr(t, `${ns}.metric.${metricSuffix(k)}`, metricSuffix(k))}
+            </Typography>
+            <Typography
+              component="dd"
+              className="tnum"
+              sx={{
+                m: 0,
+                mt: 0.25,
+                fontSize: hero ? 26 : 18,
+                lineHeight: 1.2,
+                fontWeight: tone === 'zero' ? 600 : 800,
+                color: style.fg,
+                overflowWrap: 'anywhere',
+              }}
+            >
+              {formatMetric(metric, locale, { days: t('aiOrders.unit.days') })}
+            </Typography>
+          </Box>
+        )
+      })}
     </Box>
   )
 }
@@ -94,22 +184,40 @@ function SignalList({
 }) {
   const { t } = useI18n()
   if (signals.length === 0) {
-    return <Typography sx={{ fontSize: 13, color: 'var(--muted)' }}>{t('aiExplain.system.noSignals')}</Typography>
+    return (
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{ alignItems: 'center', p: 1.25, borderRadius: 2, bgcolor: 'var(--accent-soft)', color: 'var(--accent-deep)' }}
+      >
+        <CheckCircleOutlineRoundedIcon fontSize="small" />
+        <Typography sx={{ fontSize: 13, fontWeight: 600 }}>{t('aiExplain.system.noSignals')}</Typography>
+      </Stack>
+    )
   }
   return (
-    <Stack component="ul" spacing={0.75} sx={{ m: 0, p: 0, listStyle: 'none' }}>
+    <Box
+      component="ul"
+      sx={{ m: 0, p: 0, listStyle: 'none', display: 'grid', gap: 0.75, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' } }}
+    >
       {signals.map((s) => (
-        <Stack component="li" key={`${s.code}-${s.ref ?? ''}`} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+        <Stack
+          component="li"
+          key={`${s.code}-${s.ref ?? ''}`}
+          direction="row"
+          spacing={1.25}
+          sx={{ alignItems: 'center', p: 1, pr: 1.5, borderRadius: 2, bgcolor: SEVERITY_SOFT[s.severity].bg, minWidth: 0 }}
+        >
           <SeverityIcon severity={s.severity} />
-          <Typography sx={{ fontSize: 13 }}>
+          <Typography sx={{ fontSize: 13, fontWeight: 600, minWidth: 0 }}>
             {tr(t, `${ns}.signal.${s.code}`, s.code)}
             {s.ref && context.entities[s.ref] ? (
-              <Box component="span" sx={{ color: 'var(--muted)' }}>{` · ${context.entities[s.ref]!.label}`}</Box>
+              <Box component="span" sx={{ color: 'var(--muted)', fontWeight: 500 }}>{` · ${context.entities[s.ref]!.label}`}</Box>
             ) : null}
           </Typography>
         </Stack>
       ))}
-    </Stack>
+    </Box>
   )
 }
 
@@ -126,28 +234,50 @@ function ItemList({
   if (items.length === 0) return null
   return (
     <AiBlock title={t(`${ns}.items` as MessageKey)}>
-      <Stack component="ul" spacing={1} sx={{ m: 0, p: 0, listStyle: 'none' }}>
+      <Stack component="ul" spacing={0.75} sx={{ m: 0, p: 0, listStyle: 'none' }}>
         {items.map((item) => (
           <Stack
             component="li"
             key={item.ref}
             direction={{ xs: 'column', sm: 'row' }}
             spacing={1}
-            sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between', borderBottom: '1px solid var(--border)', pb: 1 }}
+            sx={{
+              alignItems: { sm: 'center' },
+              justifyContent: 'space-between',
+              p: 1.25,
+              pl: 1.5,
+              borderRadius: 2,
+              border: '1px solid var(--border)',
+              borderLeft: `4px solid ${SEVERITY_SOFT[item.severity].bar}`,
+              bgcolor: 'var(--card)',
+              transition: 'box-shadow .15s ease, border-color .15s ease',
+              '&:hover': { boxShadow: '0 2px 10px rgba(0,0,0,.06)' },
+            }}
           >
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start', minWidth: 0 }}>
+            <Stack direction="row" spacing={1.25} sx={{ alignItems: 'flex-start', minWidth: 0 }}>
               <SeverityIcon severity={item.severity} />
               <Stack spacing={0.5} sx={{ minWidth: 0 }}>
-                <Typography sx={{ fontSize: 13, fontWeight: 700 }}>{item.label}</Typography>
+                <Typography sx={{ fontSize: 13.5, fontWeight: 700 }}>{item.label}</Typography>
                 <Stack direction="row" useFlexGap spacing={0.5} sx={{ flexWrap: 'wrap' }}>
                   {item.signals.map((code) => (
-                    <Chip key={code} size="small" variant="outlined" label={tr(t, `${ns}.signal.${code}`, code)} />
+                    <Chip
+                      key={code}
+                      size="small"
+                      label={tr(t, `${ns}.signal.${code}`, code)}
+                      sx={{ bgcolor: 'var(--neutral-soft)', color: 'var(--text)', fontWeight: 600, fontSize: 11.5, height: 22 }}
+                    />
                   ))}
                 </Stack>
               </Stack>
             </Stack>
             {onOpenItem && (
-              <Button size="small" onClick={() => onOpenItem(item)} sx={{ flexShrink: 0, alignSelf: { xs: 'flex-start', sm: 'center' } }}>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<AutoAwesomeRoundedIcon />}
+                onClick={() => onOpenItem(item)}
+                sx={{ flexShrink: 0, alignSelf: { xs: 'flex-start', sm: 'center' }, borderRadius: 99 }}
+              >
                 {t('aiExplain.analyze')}
               </Button>
             )}
@@ -309,33 +439,48 @@ function InsightView({
 }) {
   const { t } = useI18n()
   return (
-    <Stack spacing={1.75}>
+    <Stack spacing={2.25}>
       {data.answer && (
         <AiBlock title={t('aiExplain.section.answer')}>
-          <Typography sx={{ fontSize: 13.5, lineHeight: 1.55 }}>
-            <MarkerText text={data.answer} context={data} />
-          </Typography>
+          <Box
+            sx={{
+              p: 1.75,
+              borderRadius: 2,
+              bgcolor: 'var(--accent-soft)',
+              borderLeft: '4px solid var(--accent)',
+            }}
+          >
+            <Typography sx={{ fontSize: 15, lineHeight: 1.6, color: 'var(--text)' }}>
+              <MarkerText text={data.answer} context={data} />
+            </Typography>
+          </Box>
         </AiBlock>
       )}
       {data.overview && (
         <AiBlock title={t('aiExplain.section.overview')}>
-          <Typography sx={{ fontSize: 13.5, lineHeight: 1.55 }}>
+          <Typography sx={{ fontSize: 14, lineHeight: 1.65, color: 'var(--text)' }}>
             <MarkerText text={data.overview} context={data} />
           </Typography>
         </AiBlock>
       )}
       {data.findings.length > 0 && (
         <AiBlock title={t('aiExplain.section.findings')}>
-          <Stack component="ul" spacing={1} sx={{ m: 0, p: 0, listStyle: 'none' }}>
+          <Stack component="ul" spacing={0.75} sx={{ m: 0, p: 0, listStyle: 'none' }}>
             {data.findings.map((f) => (
-              <Stack component="li" key={`${f.signal}-${f.ref ?? ''}`} direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
+              <Stack
+                component="li"
+                key={`${f.signal}-${f.ref ?? ''}`}
+                direction="row"
+                spacing={1.25}
+                sx={{ alignItems: 'flex-start', p: 1.25, borderRadius: 2, bgcolor: SEVERITY_SOFT[f.severity].bg }}
+              >
                 <SeverityIcon severity={f.severity} />
                 <Stack spacing={0.25} sx={{ minWidth: 0 }}>
-                  <Typography sx={{ fontSize: 12, fontWeight: 700 }}>
+                  <Typography sx={{ fontSize: 12.5, fontWeight: 800 }}>
                     {tr(t, `${ns}.signal.${f.signal}`, f.signal)}
                     {f.ref && data.entities[f.ref] ? ` · ${data.entities[f.ref]!.label}` : ''}
                   </Typography>
-                  <Typography sx={{ fontSize: 13 }}>
+                  <Typography sx={{ fontSize: 13.5, lineHeight: 1.55 }}>
                     <MarkerText text={f.text} context={data} />
                   </Typography>
                 </Stack>
@@ -346,11 +491,38 @@ function InsightView({
       )}
       {data.actions.length > 0 && (
         <AiBlock title={t('aiExplain.section.actions')}>
-          <Typography sx={{ fontSize: 12, color: 'var(--muted)', mb: 1 }}>{t('aiExplain.actions.help')}</Typography>
-          <Stack component="ol" spacing={1.25} sx={{ m: 0, pl: 2.5 }}>
+          <Typography sx={{ fontSize: 12, color: 'var(--muted)', mb: 1.25 }}>{t('aiExplain.actions.help')}</Typography>
+          <Stack component="ol" spacing={1} sx={{ m: 0, p: 0, listStyle: 'none', counterReset: 'paso' }}>
             {data.actions.map((a) => (
-              <Stack component="li" key={`${a.kind}-${a.ref ?? ''}`} spacing={0.5}>
-                <Typography sx={{ fontSize: 13 }}>
+              <Stack
+                component="li"
+                key={`${a.kind}-${a.ref ?? ''}`}
+                spacing={0.75}
+                sx={{
+                  position: 'relative',
+                  counterIncrement: 'paso',
+                  p: 1.25,
+                  pl: 5.5,
+                  borderRadius: 2,
+                  border: '1px solid var(--border)',
+                  '&::before': {
+                    content: 'counter(paso)',
+                    position: 'absolute',
+                    left: 12,
+                    top: 12,
+                    width: 26,
+                    height: 26,
+                    borderRadius: '50%',
+                    display: 'grid',
+                    placeItems: 'center',
+                    fontSize: 12.5,
+                    fontWeight: 800,
+                    bgcolor: 'primary.main',
+                    color: 'primary.contrastText',
+                  },
+                }}
+              >
+                <Typography sx={{ fontSize: 13.5, lineHeight: 1.55 }}>
                   <MarkerText text={a.text} context={data} />
                 </Typography>
                 <ActionButton
@@ -619,23 +791,39 @@ function ExplainPanelBody({
   const result = insight.data?.result
 
   return (
-    <Stack spacing={2}>
-      <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-        <Typography component="h3" sx={{ fontSize: 14, fontWeight: 800 }}>
+    <Stack spacing={2.5}>
+      <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+        <AppIcon tone="accent">
+          <AutoAwesomeRoundedIcon />
+        </AppIcon>
+        <Typography component="h3" sx={{ fontSize: 17, fontWeight: 800 }}>
           {t(`${ns}.title` as MessageKey)}
         </Typography>
-        <Chip size="small" label={t('aiOrders.badge')} color="primary" variant="outlined" />
+        <Chip size="small" label={t('aiOrders.badge')} color="primary" sx={{ fontWeight: 800, height: 22 }} />
       </Stack>
       {header}
 
-      <Card variant="outlined" component="section" aria-labelledby={systemId}>
-        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 }, display: 'flex', flexDirection: 'column', gap: 1.25 }}>
-          <Typography id={systemId} component="h3" sx={{ fontSize: 13, fontWeight: 800 }}>
-            {t('aiExplain.system.title')}
-          </Typography>
-          <Typography sx={{ fontSize: 12, color: 'var(--muted)' }}>{t(`${ns}.system.help` as MessageKey)}</Typography>
+      <Card variant="outlined" component="section" aria-labelledby={systemId} sx={{ borderRadius: 3 }}>
+        <CardContent sx={{ p: { xs: 2, sm: 2.5 }, '&:last-child': { pb: { xs: 2, sm: 2.5 } }, display: 'flex', flexDirection: 'column', gap: 1.75 }}>
+          <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+            <AppIcon tone="neutral" size="sm">
+              <CalculateOutlinedIcon />
+            </AppIcon>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography id={systemId} component="h3" sx={{ fontSize: 14, fontWeight: 800 }}>
+                {t('aiExplain.system.title')}
+              </Typography>
+              <Typography sx={{ fontSize: 12, color: 'var(--muted)' }}>{t(`${ns}.system.help` as MessageKey)}</Typography>
+            </Box>
+          </Stack>
           <Box aria-live="polite" aria-busy={signals.isPending}>
-            {signals.isPending && <Skeleton variant="rounded" height={96} />}
+            {signals.isPending && (
+              <Box sx={{ display: 'grid', gap: 1, gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' } }}>
+                {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+                  <Skeleton key={i} variant="rounded" height={62} />
+                ))}
+              </Box>
+            )}
             {signals.isError && (
               <Alert
                 severity="error"
@@ -656,12 +844,27 @@ function ExplainPanelBody({
         </CardContent>
       </Card>
 
-      <Divider />
-
-      <Stack spacing={1.5} component="section" aria-labelledby={aiId}>
-        <Typography id={aiId} component="h3" sx={{ fontSize: 13, fontWeight: 800 }}>
-          {t('aiExplain.ai.title')}
-        </Typography>
+      <Box
+        component="section"
+        aria-labelledby={aiId}
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          borderRadius: 3,
+          border: '1px solid var(--border)',
+          background: 'linear-gradient(135deg, var(--accent-soft) 0%, var(--card) 70%)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 1.75,
+        }}
+      >
+        <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+          <AppIcon tone="accent" size="sm">
+            <AutoAwesomeRoundedIcon />
+          </AppIcon>
+          <Typography id={aiId} component="h3" sx={{ fontSize: 14, fontWeight: 800 }}>
+            {t('aiExplain.ai.title')}
+          </Typography>
+        </Stack>
 
         {availability === 'not_entitled' && <MotivoNotice motivo="sin_contratar" />}
         {availability === 'quota_exhausted' && <MotivoNotice motivo="sin_cuota" />}
@@ -679,11 +882,18 @@ function ExplainPanelBody({
                   <Chip
                     key={id}
                     label={label}
-                    variant="outlined"
+                    variant={isSummary ? 'filled' : 'outlined'}
+                    color={isSummary ? 'primary' : 'default'}
                     clickable
                     icon={isSummary ? <AutoAwesomeRoundedIcon fontSize="small" /> : undefined}
                     disabled={insight.isPending || (isSummary && nothingToExplain)}
                     onClick={() => run(isSummary ? null : label)}
+                    sx={{
+                      fontWeight: 600,
+                      height: 32,
+                      bgcolor: isSummary ? undefined : 'var(--card)',
+                      '&:hover': isSummary ? undefined : { borderColor: 'var(--accent)', color: 'var(--accent-deep)' },
+                    }}
                   />
                 )
               })}
@@ -741,11 +951,20 @@ function ExplainPanelBody({
             <MotivoNotice motivo={result.motivo} onRetry={asked ? () => run(asked.q) : undefined} />
           )}
           {!insight.isPending && !insight.isError && result?.data && (
-            <Card variant="outlined">
-              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 }, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                {asked?.q && (
-                  <Typography sx={{ fontSize: 12.5, color: 'var(--muted)', fontStyle: 'italic' }}>{asked.q}</Typography>
-                )}
+            <Card variant="outlined" sx={{ borderRadius: 3, boxShadow: '0 4px 18px rgba(0,0,0,.05)' }}>
+              {asked?.q && (
+                <Stack
+                  direction="row"
+                  spacing={1.25}
+                  sx={{ alignItems: 'center', px: { xs: 2, sm: 2.5 }, py: 1.5, bgcolor: 'var(--neutral-soft)', borderBottom: '1px solid var(--border)' }}
+                >
+                  <AppIcon tone="neutral" size="sm">
+                    <PersonOutlineRoundedIcon />
+                  </AppIcon>
+                  <Typography sx={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text)' }}>{asked.q}</Typography>
+                </Stack>
+              )}
+              <CardContent sx={{ p: { xs: 2, sm: 2.5 }, '&:last-child': { pb: 2 }, display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <InsightView
                   data={result.data}
                   ns={ns}
@@ -755,12 +974,13 @@ function ExplainPanelBody({
                   onNavigate={onNavigate}
                   onOpenItem={onOpenItem}
                 />
+                <Divider />
                 <AiFeedbackButtons interactionId={result.interactionId} />
               </CardContent>
             </Card>
           )}
         </Box>
-      </Stack>
+      </Box>
 
       {draft && (availability === 'available' || availability === 'quota_exhausted' || availability === 'not_entitled') && (
         <>
