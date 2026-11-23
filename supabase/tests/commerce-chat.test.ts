@@ -18,6 +18,8 @@ import {
   compararPresentaciones,
   contenidoDePresentacion,
   descripcionParaModelo,
+  hermanosPorContenido,
+  nombreSinContenido,
   ejecutarChat,
   leerReposicion,
   nombreCoincide,
@@ -48,6 +50,15 @@ function puertos(over: Partial<PuertosChat> = {}): PuertosChat & { busquedas: st
   const busquedas: string[] = []
   const catalogo: Record<string, ResultadoBusqueda> = {
     bloqueador: { mode: 'fts', items: [hit({})] },
+    lejia: {
+      mode: 'fts',
+      items: [
+        hit({ product_id: 'l1', name: 'Lejía Tradicional 1 L', brand_name: 'Clorox' }),
+        hit({ product_id: 'l5', name: 'Lejía Tradicional 5 L', brand_name: 'Clorox' }),
+        hit({ product_id: 'lg', name: 'Lejía Tradicional Gel 1 L', brand_name: 'Clorox' }),
+        hit({ product_id: 'lo', name: 'Lejía Tradicional 5 L', brand_name: 'Otra' }),
+      ],
+    },
     consiv: { mode: 'fts', items: [hit({ product_id: CONSIV, slug: 'consiv', name: 'Consiv Tableta Recubierta Caja 30 un', sku: null, kind: 'variant' })] },
     metilfenidato: { mode: 'fts', items: [hit({ product_id: CONSIV, slug: 'consiv', name: 'Consiv Tableta Recubierta Caja 30 un', sku: null, kind: 'variant' })] },
   }
@@ -75,6 +86,7 @@ function puertos(over: Partial<PuertosChat> = {}): PuertosChat & { busquedas: st
       return [{ sku: 'QS-282484', nombre: 'Consiv Tableta Recubierta Caja 30 un · 18 mg', cantidad: 2, compras: 4, cada_dias: 15, dias_restantes: -1 }]
     },
     async ficha(id) {
+      if (id === 'l1') return { product_id: 'l1', nombre: 'Lejía Tradicional 1 L', marca: 'Clorox', descripcion: null, destacados: [], especificaciones: [], presentaciones: [] }
       if (id !== CONSIV) return null
       return {
         product_id: CONSIV,
@@ -88,6 +100,9 @@ function puertos(over: Partial<PuertosChat> = {}): PuertosChat & { busquedas: st
           { variant_id: 'v100', nombre: '18 mg · Caja x100', en_stock: true, precio: '250.00', moneda: 'PEN' },
         ],
       }
+    },
+    async precios(ids) {
+      return new Map(ids.map((id, i) => [id, { precio: i === 0 ? '12.00' : '50.00', moneda: 'PEN' }]))
     },
     async credito() {
       return { cuenta: 'Distribuidora Prueba SAC', limite: '10000.00', disponible: '7500.00', saldo: '2500.00', vencido: '0', moneda: 'PEN', proximo: { order_number: 'EC-2', due_at: '2026-12-20', total: '300.00', days_overdue: 0 } }
@@ -290,6 +305,21 @@ describe('preguntas sobre un producto y comparar presentaciones (2026-11-22)', (
     expect(descripcionParaModelo(d)).toBe('Pedialyte contiene Electrolitos, del laboratorio Abbott. Se presenta en frasco de 500 ml. Disponible en 2 sabores (Cereza y Manzana).')
     expect(descripcionParaModelo('Indicado para el dolor.')).toBeNull()
     expect(descripcionParaModelo(null)).toBeNull()
+  })
+
+  it('tamaños cargados como productos sueltos: se comparan los hermanos, no otra marca ni otra dosis', async () => {
+    expect(nombreSinContenido('Lejía Tradicional Caja x 5 L')).toBe(nombreSinContenido('Lejía Tradicional 1 L'))
+    expect(nombreSinContenido('Eutebrol Duo 14mg / 10 mg Tableta Caja 30 un')).not.toBe(nombreSinContenido('Eutebrol Tableta Caja 30 un'))
+    const base = hit({ product_id: 'a', name: 'Amoxil 500 mg Caja x 30', brand_name: null })
+    const otros = [base, hit({ product_id: 'b', name: 'Amoxil 500 mg Caja x 100', brand_name: null }), hit({ product_id: 'c', name: 'Amoxil 250 mg Caja x 100', brand_name: null })]
+    expect(hermanosPorContenido(base, otros).map((h) => h.product_id)).toEqual(['a', 'b'])
+
+    const r = await ejecutarChat({ herramienta: 'sobre_producto', producto: 'lejia' }, puertos())
+    if (r.datos.tipo !== 'ficha') throw new Error('tipo')
+    expect(r.datos.comparacion.map((c) => [c.variant_id, c.por_unidad, c.mejor])).toEqual([
+      ['l1', '1.20', false],
+      ['l5', '1.00', true],
+    ])
   })
 
   it('producto que no está: ficha vacía y el modelo lo sabe', async () => {

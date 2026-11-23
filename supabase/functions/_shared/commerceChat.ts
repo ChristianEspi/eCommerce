@@ -32,6 +32,7 @@ import {
   proponerLinea,
   propuestaPorCodigo,
   type CodigoResuelto,
+  type HitCatalogo,
   type LineaLeida,
   type LineaPropuesta,
   type Presentacion,
@@ -369,6 +370,39 @@ export function compararPresentaciones(presentaciones: readonly PresentacionFich
   }))
 }
 
+const PALABRAS_ENVASE = /\b(?:caja|frasco|blister|pack|paquete|bolsa|botella|x|por|de)\b/g
+
+/**
+ * El nombre sin lo que dice cuánto trae: «Lejía 1 L» y «Lejía 5 L» son el mismo
+ * producto en dos tamaños; «Eutebrol Duo 14 mg» y «Eutebrol 10 mg» NO (los mg
+ * son la dosis y se quedan en la clave).
+ */
+export function nombreSinContenido(nombre: string): string {
+  let n = normalizar(nombre)
+  for (const re of [RE_CONTEO, RE_POR, RE_ENVASE, RE_VOLUMEN, RE_MASA]) n = n.replace(new RegExp(re.source, 'g'), ' ')
+  return n.replace(PALABRAS_ENVASE, ' ').replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * Cuando el producto no tiene presentaciones como variantes, sus «hermanos» del
+ * buscador: mismo nombre salvo el contenido, misma marca y contenido legible.
+ * Así se comparan los tamaños cargados como productos sueltos.
+ */
+export function hermanosPorContenido(base: HitCatalogo, candidatos: readonly HitCatalogo[]): HitCatalogo[] {
+  const clave = nombreSinContenido(base.name)
+  if (!clave) return []
+  const vistos = new Set<string>()
+  return candidatos.filter((c) => {
+    if (vistos.has(c.product_id)) return false
+    vistos.add(c.product_id)
+    return (
+      nombreSinContenido(c.name) === clave &&
+      (c.brand_name ?? null) === (base.brand_name ?? null) &&
+      contenidoDePresentacion(c.name) !== null
+    )
+  })
+}
+
 function contenidoLegible(c: Contenido | null): string | null {
   if (!c) return null
   return c.unidad === 'un' ? `${c.cantidad} unidades` : `${c.cantidad} ${c.unidad}`
@@ -401,6 +435,8 @@ export function descripcionParaModelo(descripcion: string | null): string | null
 export interface PuertosChat {
   reposicion(): Promise<readonly ItemReposicion[]>
   ficha(productId: string): Promise<FichaProducto | null>
+  /** Precio unitario de cada producto (sin variante) cotizado con la sesión del comprador. */
+  precios(productIds: readonly string[]): Promise<Map<string, { readonly precio: string; readonly moneda: string }>>
   buscar(consulta: string, soloConStock: boolean): Promise<ResultadoBusqueda>
   pedidos(): Promise<readonly PedidoResumen[]>
   detallePedido(orderId: string): Promise<readonly LineaDePedido[]>
@@ -668,7 +704,21 @@ export async function ejecutarChat(plan: PlanChat, puertos: PuertosChat): Promis
           productosPermitidos: [],
         }
       }
-      const comparacion = compararPresentaciones(ficha.presentaciones)
+      let presentaciones = ficha.presentaciones
+      if (presentaciones.length < 2 && encontrado) {
+        const hermanos = hermanosPorContenido(encontrado, r.items)
+        if (hermanos.length >= 2) {
+          const precios = await puertos.precios(hermanos.map((h) => h.product_id))
+          presentaciones = hermanos.map((h) => ({
+            variant_id: h.product_id,
+            nombre: h.name,
+            en_stock: h.in_stock,
+            precio: precios.get(h.product_id)?.precio ?? null,
+            moneda: precios.get(h.product_id)?.moneda ?? 'PEN',
+          }))
+        }
+      }
+      const comparacion = compararPresentaciones(presentaciones)
       const comparables = comparacion.filter((c) => c.por_unidad !== null).length
       return {
         datos: { tipo: 'ficha', product_id: ficha.product_id, comparacion },

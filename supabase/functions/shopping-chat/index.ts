@@ -281,6 +281,24 @@ const handler = serveJson(
           })),
         } satisfies FichaProducto
       },
+      async precios(productIds) {
+        const salida = new Map<string, { precio: string; moneda: string }>()
+        if (productIds.length === 0) return salida
+        const { data, error } = await usuario.rpc('price_quote_for_slug', {
+          p_store_slug: storeSlug,
+          p_items: productIds.slice(0, CANDIDATOS).map((id) => ({ product_id: id, quantity: 1 })),
+        })
+        if (error) {
+          logger.warn('chat.quote_failed', { original_code: errorCode(error) })
+          return salida
+        }
+        const cotizacion = data as { lines?: unknown; currency?: unknown } | null
+        const moneda = typeof cotizacion?.currency === 'string' ? cotizacion.currency : 'PEN'
+        for (const l of (Array.isArray(cotizacion?.lines) ? cotizacion.lines : []) as Array<Record<string, unknown>>) {
+          if (typeof l.product_id === 'string' && typeof l.unit_price === 'string') salida.set(l.product_id, { precio: l.unit_price, moneda })
+        }
+        return salida
+      },
       async credito() {
         const { data, error } = await usuario.rpc('my_account_statement', { p_store_slug: storeSlug })
         if (error) {
