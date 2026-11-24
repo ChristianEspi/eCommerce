@@ -77,6 +77,7 @@ describe('rutas base', () => {
     // Fuerza de ventas y Cobranza.
     expect(paths(admin?.children ?? [], '/app').sort()).toEqual([
       '/app',
+      '/app/ai',
       '/app/ai-actions',
       '/app/analytics',
       '/app/assortments',

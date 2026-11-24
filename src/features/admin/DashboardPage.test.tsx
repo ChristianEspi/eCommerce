@@ -244,10 +244,11 @@ describe('estructura operativa', () => {
 
     const vigilancia = await section('Centro de vigilancia')
     expect(within(vigilancia).getByText('Pedidos sin cobrar')).toBeInTheDocument()
-    // El verbo de la tarea, y a la pantalla donde se hace.
+    // El verbo de la tarea, y a la pantalla donde se hace (2026-11-23: ya en
+    // la pestaña de pendientes, no la lista entera).
     expect(within(vigilancia).getByRole('link', { name: 'Cobrar: Pedidos sin cobrar' })).toHaveAttribute(
       'href',
-      '/app/orders',
+      '/app/orders?estado=pending',
     )
     // El banner de antes decía lo mismo con otra cifra: ya no existe.
     expect(screen.queryByText('Pedidos esperando cobro')).not.toBeInTheDocument()

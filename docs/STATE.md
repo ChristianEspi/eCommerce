@@ -3,13 +3,35 @@
 GUIDELINES_STATUS: VERIFIED (**por lectura directa** en la 2ª pasada de P00-SaaS: contrato v1.15,
 `PROTOCOLO.md`, `BANDEJA.md` y `EBIM-CREW-ROSTER.md`). La unidad montada es `G:`, no `H:`.
 Fuentes: ver `docs/EBIM_GUIDELINES_TRACE.md`.
-Última actualización: 2026-11-22 (reposición predictiva y fichas en lote). Antes: 2026-11-22 (IA visible: chat, copiloto y sustitutos). Antes: 2026-11-20 (correo por MailHub y textos por tienda). Antes: 2026-11-19 (IA diferenciadora, 8 frentes). Antes: 2026-09-26 (Resumen v2 · vitrina B2B). Antes: 2026-08-30 (**P17-SaaS terminada — quality gate final y línea base releaseable**;
+Última actualización: 2026-11-23 (Complementos IA). Antes: 2026-11-22 (reposición predictiva y fichas en lote). Antes: 2026-11-22 (IA visible: chat, copiloto y sustitutos). Antes: 2026-11-20 (correo por MailHub y textos por tienda). Antes: 2026-11-19 (IA diferenciadora, 8 frentes). Antes: 2026-09-26 (Resumen v2 · vitrina B2B). Antes: 2026-08-30 (**P17-SaaS terminada — quality gate final y línea base releaseable**;
 el recorrido SaaS P00–P17 queda cerrado)
 
 > **Dos numeraciones de fase.** Lo que sigue como «P00…P12» es el trabajo histórico de este repo. A
 > partir del 2026-08-27 arranca un segundo recorrido, **P00–P17 de productización SaaS**
 > (`claude-saas-opus/config/phases.json`), que se identifica siempre como «P0x-SaaS». No son la misma
 > serie: el P12 histórico es el framework de integraciones; el P12-SaaS es fulfillment y devoluciones.
+
+## Complementos IA (2026-11-23, a pedido del operador)
+
+Pantalla `/app/ai` (menú Sistema, permiso `tenant.manage`) con cuatro pestañas:
+- **Complementos**: las 19 IA agrupadas (tienda, catálogo, operación, clientes, análisis), cada una con
+  interruptor, estado, qué datos usa y qué roles la usan. Sin interruptor lo que no depende de la
+  empresa: «No incluido en tu plan» (falta la capacidad `ai.*`) o «Requiere contratar su módulo».
+- **Saldo**: cupo del mes (consultas usadas / cupo / quedan). Recargas: texto «pronto», sin cobro.
+- **Consumo**: consultas y tokens por IA desde el 1 del mes (`public.ai_usage_this_month`).
+- **Historial**: quién encendió o apagó cada IA (`audit_log`, `entity_type = 'ai_feature'`).
+
+Servidor (`20261123100000_ai_feature_switches.sql`): tabla `ai_feature_settings` (RLS forzada, solo
+lectura para miembros), escritura única `public.ai_feature_set` (owner/admin, auditada), y
+`ebim.ai_consume_for` / `ebim.ai_entitlement_for` con el interruptor: una IA apagada se deniega con
+`DISABLED` sin gastar cuota, y el saldo trae `states` (`on|off|no_ai|no_module`). Sin fila = encendida:
+aplicar la migración no cambia a nadie. Tests: `supabase/tests/ai-feature-switches.test.ts` (aislamiento
+A/B incluido) y `src/features/ai/addons/AiAddons.test.tsx`.
+
+**Pendiente (decisión del operador / hub):** el COBRO. Propuesta discutida: planes con cupo incluido +
+recargas prepago (Culqi de EBIM, tarjeta y Yape) + factura Nubefact de EBIM; saldo único de suite en el
+hub/MasterAdmin y peso por modelo en vez de «1 consulta = 1». Va al buzón antes de codificar.
+**Migración NO aplicada en QAS** al cerrar esta entrada.
 
 ## IA: lo pendiente, completo (2026-11-22, a pedido del operador)
 
