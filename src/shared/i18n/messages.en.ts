@@ -5310,6 +5310,7 @@ export const en: Readonly<Record<MessageKey, string>> = {
     'nav.integrations': 'Integrations',
     'integrations.title': 'Integrations',
     'integrations.subtitle': 'Connectors, message queue, webhooks and partner API',
+    'integrations.apiGuide': 'API guide',
     'integrations.tab.health': 'Health',
     'integrations.tab.queue': 'Queue',
     'integrations.tab.webhooks': 'Webhooks',

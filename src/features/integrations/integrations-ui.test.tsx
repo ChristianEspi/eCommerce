@@ -313,6 +313,13 @@ describe('Integraciones — la pantalla', () => {
     expect(await screen.findAllByRole('tab')).toHaveLength(5)
   })
 
+  it('enlaza la guía pública de la API, en otra pestaña', async () => {
+    renderPage(backend())
+    const guia = await screen.findByRole('link', { name: /Guía de la API/ })
+    expect(guia).toHaveAttribute('href', '/api')
+    expect(guia).toHaveAttribute('target', '_blank')
+  })
+
   it('un 403 se lee «no tienes permiso», no «no hay datos»', async () => {
     renderPage(backend({ forbidden: true, role: 'viewer' }))
     expect(

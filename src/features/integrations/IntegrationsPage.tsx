@@ -1,6 +1,7 @@
 import HubRoundedIcon from '@mui/icons-material/HubRounded'
+import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded'
 import StorefrontRoundedIcon from '@mui/icons-material/StorefrontRounded'
-import { Card } from '@mui/material'
+import { Button, Card } from '@mui/material'
 import { useMemo } from 'react'
 import { useAiFeature } from '@/features/ai/hooks'
 import { useTenant } from '@/features/tenant/tenant-context'
@@ -96,6 +97,19 @@ export function IntegrationsPage() {
             title={t('integrations.title')}
             subtitle={activeStore?.name ?? t('integrations.subtitle')}
             center={tabs}
+            actions={
+              // La guía pública de la API (`/api`): es la que se manda a quien
+              // integra, así que se abre aparte y sin perder este panel.
+              <Button
+                variant="outlined"
+                href="/api"
+                target="_blank"
+                rel="noopener"
+                startIcon={<MenuBookRoundedIcon />}
+              >
+                {t('integrations.apiGuide')}
+              </Button>
+            }
           />
         )}
       />

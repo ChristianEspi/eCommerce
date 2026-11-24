@@ -4062,6 +4062,7 @@ export const es = {
     'analytics.error.notEntitled': 'La analítica avanzada no está en tu plan.',
     'integrations.title': 'Integraciones',
     'integrations.subtitle': 'Conectores, cola de mensajes, webhooks y API de socio',
+    'integrations.apiGuide': 'Guía de la API',
     'integrations.tab.health': 'Salud',
     'integrations.tab.queue': 'Cola',
     'integrations.tab.webhooks': 'Webhooks',
