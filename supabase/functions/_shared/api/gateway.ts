@@ -425,7 +425,10 @@ export function publicBaseUrl(url: URL, versionMarker: number): string {
   const local = url.hostname === 'localhost' || url.hostname === '127.0.0.1'
   const protocol = local ? url.protocol : 'https:'
   const prefix = versionMarker > 0 ? url.pathname.slice(0, versionMarker) : ''
-  return `${protocol}//${url.host}${prefix}`
+  // Dentro de la plataforma la función recibe `/api/v1/...`: el
+  // `/functions/v1` público lo quita el enrutador antes de llegar aquí.
+  const platform = url.hostname.endsWith('.supabase.co') && !prefix.startsWith('/functions/v1')
+  return `${protocol}//${url.host}${platform ? '/functions/v1' : ''}${prefix}`
 }
 
 /** Las rutas que esta puerta sabe servir. Lo usa el test de contrato. */
