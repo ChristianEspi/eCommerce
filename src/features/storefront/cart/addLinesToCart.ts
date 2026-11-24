@@ -26,7 +26,7 @@ export async function addLinesToCart(
   cart: Pick<CartApi, 'add'>,
   storeId: string,
   lines: readonly LineToAdd[],
-): Promise<{ added: number; skipped: number }> {
+): Promise<{ added: number; skipped: number; needsVariant: number }> {
   const conProducto = lines.filter((line): line is LineToAdd & { product_id: string } => Boolean(line.product_id))
   let skipped = lines.length - conProducto.length
 
@@ -37,6 +37,12 @@ export async function addLinesToCart(
   const porId = new Map(productos.map((p) => [p.product_id, p]))
 
   let added = 0
+  // 2026-11-24 · Líneas guardadas SIN variante de un producto que SÍ las tiene
+  // (p. ej. una cotización antigua de «pedir mejor precio»). Su stock es por
+  // variante, así que sin ella el carrito la rechazaba como «sin stock» y el
+  // comprador leía «ya no están disponibles». Con una sola presentación no hay
+  // nada que decidir y se usa esa; con varias, la elige el comprador en la ficha.
+  let needsVariant = 0
   for (const linea of conProducto) {
     const producto = porId.get(linea.product_id)
     const cantidad = Math.min(MAX_LINE_QUANTITY, Math.max(1, Math.round(Number(linea.quantity))))
@@ -44,9 +50,19 @@ export async function addLinesToCart(
       skipped += 1
       continue
     }
-    const variante = linea.variant_id
+    let variante = linea.variant_id
       ? ((await fetchPublicVariants(linea.product_id)).find((v) => v.variant_id === linea.variant_id) ?? null)
       : null
+    if (!linea.variant_id && producto.variant_count > 0) {
+      const variantes = await fetchPublicVariants(linea.product_id)
+      if (variantes.length === 1) {
+        variante = variantes[0] ?? null
+      } else if (variantes.length > 1) {
+        skipped += 1
+        needsVariant += 1
+        continue
+      }
+    }
     if (linea.variant_id && !variante) {
       skipped += 1
       continue
@@ -54,5 +70,5 @@ export async function addLinesToCart(
     if (await cart.add(producto, cantidad, variante)) added += 1
     else skipped += 1
   }
-  return { added, skipped }
+  return { added, skipped, needsVariant }
 }

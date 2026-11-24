@@ -793,6 +793,7 @@ export const es = {
     'account.quotes.addAgain': 'Llevar al carrito',
     'account.quotes.added': 'Cotización aceptada. Las líneas están en tu carrito con el precio cotizado.',
     'account.quotes.addedPartial': '{added} líneas añadidas; {skipped} ya no están disponibles.',
+    'account.quotes.needsVariant': '{added} líneas añadidas. {n} productos necesitan que elijas su presentación: ábrelos en la tienda y añádelos desde su ficha; el precio cotizado se respeta.',
     'account.quotes.empty': 'Todavía no tienes cotizaciones',
     'account.quotes.emptyBody': 'Puedes pedir una desde tu carrito con «Solicitar cotización».',
     'account.quotes.requestedHint': 'La tienda está preparando el precio. Aparecerá aquí para aceptarla.',

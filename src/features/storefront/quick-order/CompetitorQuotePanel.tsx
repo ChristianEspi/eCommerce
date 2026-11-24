@@ -200,7 +200,9 @@ export function CompetitorQuotePanel({
       const pricier = selected.filter((s) => result.pricier.includes(s.index) && s.product)
       return requestQuote({
         storeSlug,
-        lines: pricier.map((s) => ({ product_id: s.product!.product_id, quantity: s.quantity })),
+        // La variante va SIEMPRE que se eligió una presentación: sin ella el stock
+        // (que es por variante) da 0 y la cotización aceptada no entraba al carrito.
+        lines: pricier.map((s) => ({ product_id: s.product!.product_id, variant_id: s.variantId, quantity: s.quantity })),
         notes: improvementNote({
           header: t('store.compareQuote.requestNote'),
           currency,

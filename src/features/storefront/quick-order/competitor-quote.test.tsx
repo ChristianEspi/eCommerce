@@ -198,7 +198,8 @@ describe('CompetitorQuotePanel', () => {
 
     expect(holder.requestQuote).toHaveBeenCalledTimes(1)
     const pedido = holder.requestQuote.mock.calls[0]![0] as { lines: unknown[]; notes: string }
-    expect(pedido.lines).toEqual([{ product_id: DETERGENTE, quantity: 2 }])
+    // La variante viaja siempre (aquí el SKU es del producto: null).
+    expect(pedido.lines).toEqual([{ product_id: DETERGENTE, variant_id: null, quantity: 2 }])
     expect(pedido.notes).toMatch(/Detergente 15kg × 2: PEN 59\.00/)
     expect(await screen.findByText(/COT-0007/)).toBeInTheDocument()
   })

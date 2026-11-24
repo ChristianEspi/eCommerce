@@ -58,6 +58,11 @@ export function QuotesPage() {
   // El aviso «pide cotización» enlaza con ?q=<número>: llega ya filtrado.
   const [params] = useSearchParams()
   const [search, setSearch] = useState(() => params.get('q')?.slice(0, 60) ?? '')
+  // Otro aviso estando ya en Cotizaciones cambia ?q= sin desmontar la página.
+  const qEnlazada = params.get('q')
+  useEffect(() => {
+    if (qEnlazada) setSearch(qEnlazada.slice(0, 60))
+  }, [qEnlazada])
   const [estado, setEstado] = useState<QuoteStatus | 'all'>('all')
   const [abierta, setAbierta] = useState<Quote | null>(null)
   const [creando, setCreando] = useState(false)

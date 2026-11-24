@@ -39,7 +39,7 @@ const { TenantProvider } = await import('@/features/tenant/TenantProvider')
 const { NotificationBell } = await import('./NotificationBell')
 const { StoreNotificationBell } = await import('./StoreNotificationBell')
 const { MailSettingsSection } = await import('./MailSettingsSection')
-const { KNOWN_KINDS, notificationText } = await import('./text')
+const { KNOWN_KINDS, notificationHref, notificationText } = await import('./text')
 
 const aviso = (over: Record<string, unknown>) => ({
   id: crypto.randomUUID(),
@@ -116,6 +116,22 @@ describe('textos de los avisos', () => {
       .toBe('Tu rol ahora es Pedidos')
     expect(notificationText({ kind: 'quote.requested', params: { quote_number: 'SOL-1', account_name: 'Botica Sol' } }, t))
       .toBe('Botica Sol pide cotización SOL-1')
+  })
+
+  it('todo aviso conocido lleva a algún sitio, aunque se guardara sin enlace (2026-11-24)', () => {
+    const params = {
+      store_slug: 'miquimica', order_number: 'EC-1', order_id: 'o-1', quote_number: 'SOL-1',
+    }
+    for (const kind of KNOWN_KINDS) {
+      const href = notificationHref({ kind, params, link: null })
+      expect(href, kind).toMatch(/^\/(app|s\/miquimica)/)
+    }
+    expect(notificationHref({ kind: 'order.delivered', params, link: null }))
+      .toBe('/s/miquimica/account?pedido=EC-1#pedidos')
+    expect(notificationHref({ kind: 'business_account.activated', params, link: null })).toBe('/s/miquimica/account')
+    // El enlace guardado manda; uno que saldría de la aplicación no se sigue.
+    expect(notificationHref({ kind: 'order.received', params, link: '/app/orders?order=x' })).toBe('/app/orders?order=x')
+    expect(notificationHref({ kind: 'algo.nuevo', params: {}, link: '//evil.example' })).toBeNull()
   })
 
   it('un tipo desconocido no enseña su clave técnica', () => {
@@ -270,6 +286,14 @@ describe('Configuración → Correo', () => {
     expect(await screen.findByText('Correo de prueba enviado. Revisa tu bandeja de entrada.')).toBeInTheDocument()
     // Solo `send`: la función envía a quien pulsa, y ni acepta una dirección.
     expect(fake.state.invocations.at(-1)?.body).toEqual({ send: true })
+  })
+
+  it('configurado sin buzón propio, no nombra el servicio por el que sale', async () => {
+    pintarCorreo(() => ({
+      configured: true, missing: [], sender_email: null, sender_name: null, sent: false, code: null,
+    }))
+    expect(await screen.findByText('El correo está configurado y listo para enviar avisos.')).toBeInTheDocument()
+    expect(screen.queryByText(/MailHub/i)).not.toBeInTheDocument()
   })
 
   it('si Microsoft rechaza el buzón, lo dice con la causa probable', async () => {

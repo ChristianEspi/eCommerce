@@ -34,11 +34,19 @@ vi.mock('@/shared/lib/supabase', () => ({
 const JABON = '0a000000-0000-4000-8000-0000000000e1'
 const CHAMPU = '0a000000-0000-4000-8000-0000000000e2'
 
+// El champú tiene presentaciones solo cuando la prueba lo pide.
+const variantes = vi.hoisted(() => ({ champu: [] as { variant_id: string }[] }))
+
 vi.mock('../api', () => ({
   fetchPublicProductsByIds: vi.fn(async (_store: string, ids: string[]) =>
-    ids.map((id) => ({ product_id: id, store_id: STORE_A, name: id === JABON ? 'Jabón' : 'Champú' })),
+    ids.map((id) => ({
+      product_id: id,
+      store_id: STORE_A,
+      name: id === JABON ? 'Jabón' : 'Champú',
+      variant_count: id === CHAMPU ? variantes.champu.length : 0,
+    })),
   ),
-  fetchPublicVariants: vi.fn(async () => []),
+  fetchPublicVariants: vi.fn(async (id: string) => (id === CHAMPU ? variantes.champu : [])),
   fetchOnlyPublicStore: vi.fn(async () => null),
 }))
 
@@ -88,6 +96,7 @@ function pintarCotizaciones(rpc: Record<string, (args: Record<string, unknown>) 
 
 beforeEach(() => {
   holder.client = null
+  variantes.champu = []
 })
 
 describe('las cotizaciones del comprador', () => {
@@ -122,6 +131,49 @@ describe('las cotizaciones del comprador', () => {
     // Solo el id de la cotización sale del navegador: ni cuenta, ni cliente, ni precio.
     expect(fake.state.rpcCalls.find((c) => c.name === 'accept_quote')?.args).toEqual({ p_quote_id: COT_VIGENTE })
     expect(fake.state.invocations).toEqual([])
+  })
+
+  it('una línea sin presentación de un producto que las tiene pide elegirla, no dice «no disponible» (2026-11-24)', async () => {
+    const user = userEvent.setup()
+    variantes.champu = [{ variant_id: 'v-1' }, { variant_id: 'v-2' }]
+    const { add } = pintarCotizaciones({
+      my_quotes: () => [cotizacion()],
+      accept_quote: () => ({
+        quote_id: COT_VIGENTE,
+        quote_number: 'COT-0101',
+        already_accepted: true,
+        lines: [
+          { product_id: JABON, variant_id: null, uom_code: null, quantity: 10 },
+          { product_id: CHAMPU, variant_id: null, uom_code: null, quantity: 5 },
+        ],
+      }),
+    })
+
+    await user.click(await screen.findByRole('button', { name: 'Aceptar y llevar al carrito' }))
+
+    expect(await screen.findByText(/1 productos necesitan que elijas su presentación/)).toBeInTheDocument()
+    expect(add).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText(/ya no están disponibles/)).not.toBeInTheDocument()
+  })
+
+  it('con UNA sola presentación no hay nada que elegir: entra con ella', async () => {
+    const user = userEvent.setup()
+    variantes.champu = [{ variant_id: 'v-1' }]
+    const { add } = pintarCotizaciones({
+      my_quotes: () => [cotizacion()],
+      accept_quote: () => ({
+        quote_id: COT_VIGENTE,
+        quote_number: 'COT-0101',
+        already_accepted: true,
+        lines: [{ product_id: CHAMPU, variant_id: null, uom_code: null, quantity: 5 }],
+      }),
+    })
+
+    await user.click(await screen.findByRole('button', { name: 'Aceptar y llevar al carrito' }))
+
+    await waitFor(() =>
+      expect(add).toHaveBeenCalledWith(expect.objectContaining({ product_id: CHAMPU }), 5, { variant_id: 'v-1' }),
+    )
   })
 
   it('un doble clic es UNA aceptación', async () => {

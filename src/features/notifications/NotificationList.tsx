@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { formatRelative } from '@/shared/lib/format'
 import type { AppNotification } from './api'
-import { notificationText } from './text'
+import { notificationHref, notificationText } from './text'
 
 /**
  * La lista de avisos, compartida por la campanita y por «Tu cuenta».
@@ -32,13 +32,20 @@ export function NotificationList({
             <ButtonBase
               onClick={() => {
                 onOpen(item)
-                if (item.link && item.link.startsWith('/') && !item.link.startsWith('//')) {
-                  navigate(item.link)
-                }
+                const href = notificationHref(item)
+                if (!href) return
+                navigate(href)
+                // El router cambia la URL con pushState, que NO emite `hashchange`:
+                // sin este aviso, estando ya en «Mi cuenta» la pestaña (#pedidos,
+                // #sugeridos…) no cambiaba y parecía que el aviso no llevaba a nada.
+                if (href.includes('#')) window.dispatchEvent(new HashChangeEvent('hashchange'))
               }}
               sx={{
                 width: '100%',
                 textAlign: 'left',
+                // ButtonBase centra su contenido: sin esto cada aviso quedaba
+                // sangrado según lo largo de su texto (lista «desnivelada»).
+                justifyContent: 'flex-start',
                 alignItems: 'flex-start',
                 gap: 1.25,
                 px: 2,
@@ -57,7 +64,7 @@ export function NotificationList({
                   bgcolor: unread ? 'var(--accent)' : 'transparent',
                 }}
               />
-              <Box sx={{ minWidth: 0 }}>
+              <Box sx={{ minWidth: 0, flex: 1 }}>
                 <Typography variant="body2" sx={{ fontWeight: unread ? 600 : 400 }}>
                   {notificationText(item, t)}
                 </Typography>

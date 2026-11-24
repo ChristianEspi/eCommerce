@@ -82,12 +82,14 @@ export function MyQuotesSection({ storeSlug, storeId }: { storeSlug: string; sto
   const accept = useMutation({
     mutationFn: async (quote: MyQuote) => {
       const accepted = await acceptQuote(quote.quote_id)
-      if (!cart || !storeId) return { added: 0, skipped: accepted.lines.length }
+      if (!cart || !storeId) return { added: 0, skipped: accepted.lines.length, needsVariant: 0 }
       return addLinesToCart(cart, storeId, accepted.lines)
     },
-    onSuccess: ({ added, skipped }) => {
+    onSuccess: ({ added, skipped, needsVariant }) => {
       notify(
-        skipped > 0
+        needsVariant > 0 && needsVariant === skipped
+          ? t('account.quotes.needsVariant').replace('{added}', String(added)).replace('{n}', String(needsVariant))
+          : skipped > 0
           ? t('account.quotes.addedPartial').replace('{added}', String(added)).replace('{skipped}', String(skipped))
           : t('account.quotes.added'),
         skipped > 0 ? 'warning' : 'success',

@@ -72,3 +72,63 @@ export function notificationText(
     .replace('{template_name}', valor('template_name'))
     .replace('{role}', ROLE_KEY[rol] ? t(ROLE_KEY[rol]) : rol)
 }
+
+/** Una ruta interna segura: empieza por `/` y no por `//` (que saldría a otro dominio). */
+function rutaInterna(link: string | null | undefined): link is string {
+  return typeof link === 'string' && link.startsWith('/') && !link.startsWith('//')
+}
+
+/**
+ * A dónde lleva un aviso al pulsarlo (2026-11-24).
+ *
+ * Manda el enlace que guardó la base. Si un aviso antiguo se guardó sin él, se
+ * deduce de su tipo y sus datos, para que TODOS los avisos lleven a algún sitio
+ * en vez de cerrarse sin más. Solo se construyen rutas internas.
+ */
+export function notificationHref(
+  notification: Pick<AppNotification, 'kind' | 'params' | 'link'>,
+): string | null {
+  if (rutaInterna(notification.link)) return notification.link
+
+  const p = notification.params
+  const texto = (name: string) => {
+    const v = p[name]
+    return typeof v === 'string' && v !== '' ? encodeURIComponent(v) : ''
+  }
+  const tienda = texto('store_slug')
+  const cuenta = tienda ? `/s/${tienda}/account` : ''
+
+  switch (notification.kind) {
+    case 'order.received':
+    case 'order.approval_requested':
+    case 'order.payment_failed':
+    case 'return.requested':
+      return texto('order_id') ? `/app/orders?order=${texto('order_id')}` : '/app/orders'
+    case 'quote.requested':
+      return texto('quote_number') ? `/app/quotes?q=${texto('quote_number')}` : '/app/quotes'
+    case 'integration.circuit_opened':
+      return '/app/integrations'
+    case 'member.access_granted':
+    case 'member.role_changed':
+      return '/app'
+    case 'suggestion.generated':
+      return '/app/planning'
+    case 'order.confirmed':
+    case 'order.approval_pending':
+    case 'order.approved':
+    case 'order.rejected':
+    case 'order.shipped':
+    case 'order.delivered':
+      if (!cuenta) return null
+      return texto('order_number') ? `${cuenta}?pedido=${texto('order_number')}#pedidos` : `${cuenta}#pedidos`
+    case 'suggestion.sent':
+      return cuenta ? `${cuenta}#sugeridos` : null
+    case 'order_schedule.run_ready':
+      return cuenta ? `${cuenta}#programados` : null
+    case 'business_account.invited':
+    case 'business_account.activated':
+      return cuenta || null
+    default:
+      return null
+  }
+}
