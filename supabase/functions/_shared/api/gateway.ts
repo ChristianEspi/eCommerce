@@ -256,7 +256,7 @@ export async function handleApiRequest(
   try {
     // --- Documentación: pública y sin token -------------------------------
     if (request.method === 'GET' && pathname === `/${API_VERSION}/openapi.json`) {
-      return { status: 200, body: buildOpenApiDocument(url.origin), headers }
+      return { status: 200, body: buildOpenApiDocument(publicBaseUrl(url, marker)), headers }
     }
 
     // --- Versión ----------------------------------------------------------
@@ -409,6 +409,23 @@ export function stableStringify(value: unknown): string {
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
     .map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`)
   return `{${entries.join(',')}}`
+}
+
+/**
+ * URL base PÚBLICA de la API, la que va en `servers` del OpenAPI.
+ *
+ * Dos trampas de la plataforma (2026-11-24, QAS publicaba
+ * `http://<ref>.supabase.co`): la función recibe la petición en `http` porque
+ * el TLS se termina antes, y `url.origin` pierde el prefijo
+ * `/functions/v1/api`. Un cliente que importaba el contrato (Postman,
+ * Swagger) llamaba a una dirección que no existe. Se conserva el prefijo hasta
+ * `/v1` y se fuerza `https` salvo en local.
+ */
+export function publicBaseUrl(url: URL, versionMarker: number): string {
+  const local = url.hostname === 'localhost' || url.hostname === '127.0.0.1'
+  const protocol = local ? url.protocol : 'https:'
+  const prefix = versionMarker > 0 ? url.pathname.slice(0, versionMarker) : ''
+  return `${protocol}//${url.host}${prefix}`
 }
 
 /** Las rutas que esta puerta sabe servir. Lo usa el test de contrato. */

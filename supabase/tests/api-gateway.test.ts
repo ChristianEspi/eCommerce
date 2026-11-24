@@ -198,6 +198,18 @@ describe('la puerta: version y forma', () => {
     expect((result.body as Record<string, unknown>).openapi).toBe('3.1.0')
   })
 
+  it('el servidor publicado es la URL real: https y con el prefijo de la plataforma', async () => {
+    const { ports } = makePorts()
+    const result = await handleApiRequest(
+      new Request('http://ref.supabase.co/functions/v1/api/v1/openapi.json'),
+      ports,
+      TRACE,
+    )
+    expect((result.body as { servers: unknown }).servers).toEqual([
+      { url: 'https://ref.supabase.co/functions/v1/api' },
+    ])
+  })
+
   it('una version que no se sirve se dice con su propio codigo', async () => {
     const { ports } = makePorts()
     const result = await handleApiRequest(request('/v2/orders'), ports, TRACE)

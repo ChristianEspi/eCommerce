@@ -242,7 +242,12 @@ Un conector se considera **conforme v1** cuando, en QAS y con una credencial con
 7. Sincroniza incrementalmente con `updated_since = server_time` anterior sin perder ni duplicar registros.
 8. Maneja `409 ESTADO_EN_CONFLICTO`, `429` y `5xx` sin bucles infinitos.
 
-La colección Bruno de `scripts/integrations/bruno/` cubre los pasos 1–5 contra QAS.
+Kit de prueba, **generado** desde la tabla de rutas con `npx vite-node scripts/integrations/generate-api-kit.ts`:
+
+- Colección y entorno de Postman: `scripts/integrations/postman/`. Incluyen el token automático, la `Idempotency-Key` por envío y las pruebas de cada respuesta.
+- Contrato `docs/integrations/openapi-v1.json` y su visor `docs/integrations/openapi-v1.html`, que se abre en el navegador sin servidor.
+
+La colección Bruno de `scripts/integrations/bruno/` cubre los mismos pasos.
 
 ---
 

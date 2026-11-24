@@ -15,6 +15,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
 import { TENANT_A, TENANT_B, asRole, claimsFor, createTestDatabase, expectFailure } from './harness.ts'
+import { INTEGRATION_SCHEMAS } from '../functions/_shared/api/integrationSchemas.ts'
+import { API_ROUTES } from '../functions/_shared/api/routes.ts'
 
 type Row = Record<string, unknown>
 interface Report {
@@ -119,6 +121,20 @@ afterAll(async () => {
 })
 
 describe('POST /v1/orders/{number}/status', () => {
+  it('los valores que publica el OpenAPI son los de la base, y el ejemplo los respeta', async () => {
+    const props = INTEGRATION_SCHEMAS.OrderStatusUpdate?.properties as Record<string, { enum: string[] }>
+    const example = API_ROUTES.find((r) => r.operationId === 'updateOrderStatus')?.requestExample ?? {}
+    for (const [field, type] of [
+      ['status', 'order_status'],
+      ['payment_status', 'payment_status'],
+      ['fulfillment_status', 'fulfillment_status'],
+    ] as const) {
+      const [row] = await svc<{ labels: string[] }>(`select enum_range(null::public.${type})::text[] as labels`)
+      expect(props[field]?.enum).toEqual(row?.labels)
+      if (field in example) expect(row?.labels).toContain(example[field])
+    }
+  })
+
   it('cambia pago y entrega con origen `api` y guarda las referencias del ERP', async () => {
     const id = await credential(TENANT_A, ['order.update'])
     const out = await call<Row & { changes: Row }>('api_order_update', '$1, $2, null, $3::jsonb', [

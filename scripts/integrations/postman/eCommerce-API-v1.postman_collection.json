@@ -1,0 +1,702 @@
+{
+  "info": {
+    "name": "eCommerce by EBIM · API v1",
+    "description": "Colección GENERADA desde la tabla de rutas de la API (`scripts/integrations/generate-api-kit.ts`). Contrato: `docs/integrations/CONTRATO_INTEGRACION_v1.md`.\n\n1. Importa también el entorno `eCommerce-QAS` y llena `clientId` y `clientSecret`.\n2. Envía **0 · Inicio › pedir token**.\n3. Prueba el resto. Los lotes van con `dry_run=true` (simulación); desmarca el parámetro para aplicar.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Toda escritura exige Idempotency-Key: una distinta en cada envío.",
+          "// Para probar un reintento, pon la cabecera a mano con un valor fijo.",
+          "if (pm.request.method === \"POST\" && !pm.request.url.toString().includes(\"/oauth/token\") && !pm.request.headers.has(\"Idempotency-Key\")) {",
+          "  pm.request.headers.add({ key: \"Idempotency-Key\", value: \"pm-\" + Date.now() + \"-\" + Math.random().toString(36).slice(2, 10) });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "0 · Inicio",
+      "item": [
+        {
+          "name": "POST /v1/oauth/token — pedir token",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/oauth/token",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "oauth",
+                "token"
+              ]
+            },
+            "description": "OAuth 2.0 `client_credentials`. Guarda el token en `{{token}}` (script de Post-response). Dura una hora: si otra petición da 401, vuelve a enviar esta.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"grant_type\": \"client_credentials\",\n  \"client_id\": \"{{clientId}}\",\n  \"client_secret\": \"{{clientSecret}}\",\n  \"scope\": \"{{scopes}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"token emitido\", () => pm.response.to.have.status(200));",
+                  "pm.environment.set(\"token\", pm.response.json().access_token);",
+                  "console.log(\"scopes concedidos:\", pm.response.json().scope);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /v1/openapi.json — contrato",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/openapi.json",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "openapi.json"
+              ]
+            },
+            "description": "El contrato OpenAPI, público y sin token."
+          }
+        }
+      ]
+    },
+    {
+      "name": "1 · Pedidos",
+      "description": "Leer pedidos, crear uno y devolver su ciclo (estado, pago, entrega) con las referencias del ERP.",
+      "item": [
+        {
+          "name": "GET /v1/orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/orders?store={{store}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "Tamaño de página (1–200, por defecto 50).",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "description": "Cursor de la página siguiente: el `next_cursor` de la respuesta anterior. No se usa `offset` porque insertar filas mientras se pagina duplicaría o saltaría pedidos.",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "Filtra por estado del pedido.",
+                  "disabled": true
+                },
+                {
+                  "key": "store",
+                  "value": "{{store}}",
+                  "description": "Slug de la tienda. Se puede omitir si la sociedad tiene una sola; con varias es obligatorio.",
+                  "disabled": false
+                },
+                {
+                  "key": "updated_since",
+                  "value": "{{updatedSince}}",
+                  "description": "Solo lo modificado desde esta marca (ISO 8601). Usa el `server_time` de tu sincronía anterior, no tu reloj.",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "**Permiso:** `order.read`\n\nPedidos de la tienda, del más reciente al más antiguo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body.server_time) { pm.environment.set(\"updatedSince\", body.server_time); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /v1/orders/{number}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/orders/{{orderNumber}}?store={{store}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "orders",
+                "{{orderNumber}}"
+              ],
+              "query": [
+                {
+                  "key": "store",
+                  "value": "{{store}}",
+                  "description": "Slug de la tienda. Se puede omitir si la sociedad tiene una sola; con varias es obligatorio.",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "**Permiso:** `order.read`\n\nUn pedido por su NÚMERO, que es lo que ve el comercio y el comprador."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body.server_time) { pm.environment.set(\"updatedSince\", body.server_time); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /v1/orders",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/orders",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "orders"
+              ],
+              "query": []
+            },
+            "description": "**Permiso:** `order.create`\n\nAlta de pedido. Las líneas se identifican por SKU; el servidor resuelve el resto.\n\nLleva `Idempotency-Key` (la pone sola el script de la colección).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"store\": \"{{store}}\",\n  \"customer\": {\n    \"email\": \"compras@cliente.test\",\n    \"name\": \"Cliente\",\n    \"phone\": \"+51999999999\"\n  },\n  \"items\": [\n    {\n      \"sku\": \"{{sku}}\",\n      \"quantity\": 2\n    }\n  ],\n  \"notes\": \"Entrega en almacén central\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /v1/orders/{number}/status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/orders/{{orderNumber}}/status?store={{store}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "orders",
+                "{{orderNumber}}",
+                "status"
+              ],
+              "query": [
+                {
+                  "key": "store",
+                  "value": "{{store}}",
+                  "description": "Slug de la tienda. Se puede omitir si la sociedad tiene una sola; con varias es obligatorio.",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "**Permiso:** `order.update`\n\nEl ERP devuelve el ciclo del pedido: estado, pago y entrega, más sus referencias (su número de pedido, su factura, su guía). Un eje que ya está en ese valor se informa como `unchanged`, no como error.\n\nLleva `Idempotency-Key` (la pone sola el script de la colección).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"payment_status\": \"paid\",\n  \"fulfillment_status\": \"in_progress\",\n  \"reason\": \"Facturado en el ERP\",\n  \"external_refs\": [\n    {\n      \"system\": \"sap\",\n      \"type\": \"order\",\n      \"id\": \"4500012345\"\n    },\n    {\n      \"system\": \"sap\",\n      \"type\": \"invoice\",\n      \"id\": \"F001-000123\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 · Catálogo y stock",
+      "description": "Productos por lote, catálogo publicado de la tienda, disponibilidad y saldo por almacén.",
+      "item": [
+        {
+          "name": "POST /v1/catalog/products:batch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/catalog/products:batch?dry_run=true",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "catalog",
+                "products:batch"
+              ],
+              "query": [
+                {
+                  "key": "dry_run",
+                  "value": "true",
+                  "description": "Simula: valida y devuelve el informe sin escribir nada.",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "**Permiso:** `catalog.write`\n\nCrea o actualiza productos en lote: upsert por SKU en el maestro de la sociedad, publicación por tienda y precio de variante por tienda. Todo o nada; con `dry_run=true` valida sin escribir.\n\nLleva `Idempotency-Key` (la pone sola el script de la colección).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"products\": [\n    {\n      \"sku\": \"{{sku}}\",\n      \"gtin\": \"4005800077937\",\n      \"name\": \"Bloqueador Solar FPS 50 150 ml\",\n      \"kind\": \"simple\",\n      \"stock\": 181,\n      \"custom_fields\": {\n        \"codigo_qs\": \"514574\"\n      },\n      \"publications\": [\n        {\n          \"store\": \"{{store}}\",\n          \"status\": \"published\",\n          \"price\": \"111.29\"\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 (aplicado o simulado) o 422 con informe\", () => pm.expect([200, 422]).to.include(pm.response.code));",
+                  "const body = pm.response.json();",
+                  "if (body.rows) { console.log(\"informe\", body); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /v1/products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/products?store={{store}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "Tamaño de página (1–200, por defecto 50).",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "description": "Último SKU de la página anterior.",
+                  "disabled": true
+                },
+                {
+                  "key": "store",
+                  "value": "{{store}}",
+                  "description": "Slug de la tienda. Se puede omitir si la sociedad tiene una sola; con varias es obligatorio.",
+                  "disabled": false
+                },
+                {
+                  "key": "updated_since",
+                  "value": "{{updatedSince}}",
+                  "description": "Solo lo modificado desde esta marca (ISO 8601). Usa el `server_time` de tu sincronía anterior, no tu reloj.",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "**Permiso:** `product.read`\n\nCatálogo de la tienda, publicado o no. Sin existencia: eso es `stock.read`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body.server_time) { pm.environment.set(\"updatedSince\", body.server_time); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /v1/stock/{sku}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/stock/{{sku}}?store={{store}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "stock",
+                "{{sku}}"
+              ],
+              "query": [
+                {
+                  "key": "store",
+                  "value": "{{store}}",
+                  "description": "Slug de la tienda. Se puede omitir si la sociedad tiene una sola; con varias es obligatorio.",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "**Permiso:** `stock.read`\n\nDisponibilidad de un SKU. Sale de la misma autoridad que usa la vitrina y el checkout, así que la API nunca contradice a la tienda."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body.server_time) { pm.environment.set(\"updatedSince\", body.server_time); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /v1/stock:batch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/stock:batch?dry_run=true",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "stock:batch"
+              ],
+              "query": [
+                {
+                  "key": "dry_run",
+                  "value": "true",
+                  "description": "Simula: valida y devuelve el informe sin escribir nada.",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "**Permiso:** `stock.write`\n\nSaldo ABSOLUTO por almacén y SKU. Solo almacenes cuyo sistema de registro es el ERP: el stock que lleva la tienda no lo pisa una integración. Todo o nada.\n\nLleva `Idempotency-Key` (la pone sola el script de la colección).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"sku\": \"{{sku}}\",\n      \"warehouse\": \"{{warehouse}}\",\n      \"on_hand\": 181\n    },\n    {\n      \"sku\": \"{{sku2}}\",\n      \"warehouse\": \"{{warehouse}}\",\n      \"on_hand\": 0\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 (aplicado o simulado) o 422 con informe\", () => pm.expect([200, 422]).to.include(pm.response.code));",
+                  "const body = pm.response.json();",
+                  "if (body.rows) { console.log(\"informe\", body); }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 · Clientes",
+      "description": "Clientes por código, con el código del ERP.",
+      "item": [
+        {
+          "name": "POST /v1/customers:batch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/customers:batch?dry_run=true",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "customers:batch"
+              ],
+              "query": [
+                {
+                  "key": "dry_run",
+                  "value": "true",
+                  "description": "Simula: valida y devuelve el informe sin escribir nada.",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "**Permiso:** `customer.write`\n\nCrea o actualiza clientes por CÓDIGO. Las mismas reglas que la importación por Excel: una celda vacía no borra; todo o nada; `external_id` es el código del cliente en el ERP.\n\nLleva `Idempotency-Key` (la pone sola el script de la colección).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"system\": \"sap\",\n  \"customers\": [\n    {\n      \"code\": \"C-0001\",\n      \"kind\": \"company\",\n      \"name\": \"Clínica San Pablo\",\n      \"tax_id\": \"20100000001\",\n      \"email\": \"compras@clinica.test\",\n      \"external_id\": \"100045\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 (aplicado o simulado) o 422 con informe\", () => pm.expect([200, 422]).to.include(pm.response.code));",
+                  "const body = pm.response.json();",
+                  "if (body.rows) { console.log(\"informe\", body); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /v1/customers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/customers",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "customers"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "Tamaño de página (1–200, por defecto 50).",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "description": "Cursor de la página siguiente.",
+                  "disabled": true
+                },
+                {
+                  "key": "updated_since",
+                  "value": "{{updatedSince}}",
+                  "description": "Solo lo modificado desde esta marca (ISO 8601). Usa el `server_time` de tu sincronía anterior, no tu reloj.",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "**Permiso:** `customer.read`\n\nFicha de clientes de la sociedad. Sin direcciones ni contactos."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body.server_time) { pm.environment.set(\"updatedSince\", body.server_time); }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4 · Precios",
+      "description": "Precios de una lista (la lista se crea en el backoffice, en Precios › Listas).",
+      "item": [
+        {
+          "name": "POST /v1/price-lists/{code}/items:batch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/v1/price-lists/{{priceList}}/items:batch?store={{store}}&dry_run=true",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "price-lists",
+                "{{priceList}}",
+                "items:batch"
+              ],
+              "query": [
+                {
+                  "key": "store",
+                  "value": "{{store}}",
+                  "description": "Slug de la tienda. Se puede omitir si la sociedad tiene una sola; con varias es obligatorio.",
+                  "disabled": false
+                },
+                {
+                  "key": "dry_run",
+                  "value": "true",
+                  "description": "Simula: valida y devuelve el informe sin escribir nada.",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "**Permiso:** `price.write`\n\nPrecios de una lista de la tienda, por SKU y cantidad mínima. `active: false` quita el precio. La lista se crea en el backoffice (Precios); la API la llena. Todo o nada.\n\nLleva `Idempotency-Key` (la pone sola el script de la colección).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"sku\": \"{{sku}}\",\n      \"price\": \"99.90\",\n      \"compare_at_price\": \"111.29\"\n    },\n    {\n      \"sku\": \"{{sku}}\",\n      \"price\": \"95.00\",\n      \"min_quantity\": 12\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 (aplicado o simulado) o 422 con informe\", () => pm.expect([200, 422]).to.include(pm.response.code));",
+                  "const body = pm.response.json();",
+                  "if (body.rows) { console.log(\"informe\", body); }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -44,10 +44,19 @@ export const INTEGRATION_SCHEMAS: Record<string, Record<string, unknown>> = {
     properties: {
       status: {
         type: 'string',
-        description: 'Estado general del pedido (los mismos valores que devuelve `GET /v1/orders`).',
+        enum: ['pending', 'paid', 'fulfilled', 'cancelled', 'refunded'],
+        description: 'Estado general del pedido.',
       },
-      payment_status: { type: 'string', description: 'Estado del pago.' },
-      fulfillment_status: { type: 'string', description: 'Estado de la entrega.' },
+      payment_status: {
+        type: 'string',
+        enum: ['pending', 'authorized', 'paid', 'partially_refunded', 'refunded', 'failed', 'voided'],
+        description: 'Estado del pago.',
+      },
+      fulfillment_status: {
+        type: 'string',
+        enum: ['unfulfilled', 'in_progress', 'partially_fulfilled', 'fulfilled', 'returned', 'cancelled'],
+        description: 'Estado de la entrega.',
+      },
       reason: { type: 'string', maxLength: 1000, description: 'Queda en la línea de tiempo del pedido.' },
       external_refs: {
         type: 'array',

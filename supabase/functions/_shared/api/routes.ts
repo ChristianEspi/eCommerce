@@ -244,9 +244,8 @@ export const API_ROUTES: readonly ApiRoute[] = [
     successStatus: 200,
     requestSchema: 'OrderStatusUpdate',
     requestExample: {
-      status: 'confirmed',
       payment_status: 'paid',
-      fulfillment_status: 'shipped',
+      fulfillment_status: 'in_progress',
       reason: 'Facturado en el ERP',
       external_refs: [
         { system: 'sap', type: 'order', id: '4500012345' },
