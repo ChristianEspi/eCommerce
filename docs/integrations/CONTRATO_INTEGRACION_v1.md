@@ -48,18 +48,21 @@ se conecta a eCommerce. No hay integraciones «a medida» en el producto: un ERP
 
 | Dato | Dueño típico | ERP → eCommerce (push) | eCommerce lee del ERP (pull) | eCommerce → ERP |
 |---|---|---|---|---|
-| Productos / variantes / publicación por tienda | ERP | `POST /v1/catalog/products:batch` | — | `GET /v1/products` |
+| Productos / variantes / presentaciones / publicación por tienda | ERP | `POST /v1/catalog/products:batch` | — | `GET /v1/products`, `GET /v1/products/{sku}` |
 | Stock por almacén | ERP (almacenes con origen ERP) | `POST /v1/stock:batch` | Fuente de lectura *stock* | `GET /v1/stock/{sku}` |
 | Precios por lista | ERP | `POST /v1/price-lists/{code}/items:batch` | Fuente de lectura *precios* | — |
 | Precio base por tienda | ERP o tienda | `catalog/products:batch` (`publications[].price`) | — | `GET /v1/products` |
-| Clientes | ERP | `POST /v1/customers:batch` | — | `GET /v1/customers` |
+| Clientes (ficha, direcciones, contactos, cuenta de empresa y crédito) | ERP | `POST /v1/customers:batch` | — | `GET /v1/customers`, `GET /v1/customers/{code}` |
 | Pedidos (alta) | eCommerce (vitrina) o ERP (venta asistida) | `POST /v1/orders` | — | `GET /v1/orders`, webhooks `order.*` |
 | Estado / pago / entrega del pedido | ERP tras recibir el pedido | `POST /v1/orders/{number}/status` | — | webhooks `order.*_changed` |
-| Referencias del ERP (n.º de pedido, factura, guía) | ERP | `external_refs` en `.../status` | — | `GET /v1/orders/{number}` |
+| Referencias del ERP (n.º de pedido, factura, guía) | ERP | `external_refs` en `POST /v1/orders` y en `.../status` | — | `GET /v1/orders/{number}` |
+| Guía de despacho (transportista, tracking) | ERP / operador logístico | `shipment` en `.../status` | — | `fulfillments[].shipments[]` del pedido |
 | Kits (composición) | ERP o tienda | Excel del backoffice (API: fase siguiente) | — | — |
 
-**Fuera de alcance v1** (se anuncia antes de construir): emisión de comprobante electrónico desde la API, direcciones y
-contactos del cliente por API, lotes asíncronos con `202 + job`, kits por API.
+**Fuera de alcance v1** (se anuncia antes de construir): emisión de comprobante electrónico desde la API, subida de
+IMÁGENES por API (se leen, no se escriben: son binarios del almacenamiento privado del tenant), PRECIO en la línea del
+pedido (lo pone el motor de la tienda: listas de precio, acuerdos y promociones), registrar PAGOS por API (se informa el
+estado con `payment_status` y la referencia en `external_refs`), lotes asíncronos con `202 + job`, kits por API.
 
 ---
 
@@ -197,6 +200,44 @@ Cuerpo: `{ "error": { "code", "message", "status", "correlation_id", "request_id
 
 ---
 
+### 6.5 Campos completos (2026-11-24)
+
+«Todos los campos, tanto lo que envía como lo que recibe». Aditivo: ninguna clave anterior cambió.
+
+**Lo que el ERP recibe** (el mismo objeto en el listado, el detalle y el webhook):
+
+- **Pedido** (`Order`): estados (pedido, pago, entrega, aprobación), origen, impuestos incluidos, totales, OC, notas,
+  fechas de pago/entrega/anulación; **cliente** con código, razón social, documento y tipo, ids del ERP; **cuenta de
+  empresa** con plazo y estado de crédito; **direcciones** de envío y facturación (con `document_type` boleta/factura);
+  **aprobación**; **líneas** con SKU de producto y de variante, presentación y factor, cantidad base, precio, descuento,
+  base imponible, categoría y tasa de impuesto, impuesto, lista y origen del precio, promociones y componentes;
+  **pagos**, **devoluciones de dinero**, **entregas** (método, almacén, ventana, costo, dirección, contacto, líneas) con
+  sus **guías**; **referencias externas**.
+- **Producto** (`Product`): publicación en la tienda (estado, precio, tachado, fecha), descripción, viñetas, GTIN, peso,
+  campos libres, marca, familia, categoría, categoría de impuesto, atributos, **variantes** (con precio por tienda,
+  código de barras, peso, ejes), **presentaciones** (factor, precio, código de barras) e **imágenes** (ruta).
+- **Cliente** (`Customer`): ficha completa, segmento, giro, nivel, frecuencia de visita, geolocalización, ids del ERP,
+  **direcciones**, **contactos** y **cuenta de empresa** (aprobación, OC obligatoria, límite y plazo de crédito, mora).
+- **Stock** (`Stock`): disponible + `unknown`/`backorder`/`source` y el **desglose por almacén** (físico,
+  reservado, disponible, seguridad, punto de reposición, fecha de sincronía).
+
+**Lo que el ERP envía**:
+
+- `POST /v1/orders`: `customer.code` o `customer.external_id` (o `business_account`) para facturar a la cuenta de
+  empresa, `billing_address`, `purchase_order_number`, `delivery.method_code`, `items[].uom_code` y
+  `external_refs`. Una línea con importe se rechaza (`CAMPO_NO_PERMITIDO`).
+- `POST /v1/customers:batch`: `tax_id_type`, `tier`, `business_type`, `visit_frequency`, `geo`,
+  `addresses[]` (upsert por `external_ref`), `contacts[]` (upsert por correo) y `business_account` (condiciones de
+  compra y de crédito; el estado de crédito lo calcula la cobranza). Mismo lote todo-o-nada.
+- `POST /v1/catalog/products:batch`: `highlights`, `shipping_weight`, `units[]` (presentaciones) y, por variante,
+  `shipping_weight` y `custom_fields`.
+- `POST /v1/orders/{number}/status`: `shipment` (guía, transportista, URL, fecha estimada, costo, peso). Requiere que
+  el pedido tenga una entrega (`ENTREGA_INEXISTENTE` si no); reenviar la misma guía no la duplica.
+
+Los esquemas exactos están en `GET /v1/openapi.json` y una prueba fija que coinciden con lo que devuelve la base.
+
+---
+
 ## 7. Eventos (webhooks)
 
 Se configuran en **Integraciones › Webhooks**: URL `https`, eventos suscritos y secreto.
@@ -208,6 +249,10 @@ Se configuran en **Integraciones › Webhooks**: URL `https`, eventos suscritos 
   `order.approval_requested`, `order.approval_decided`, `payment.captured`, `payment.failed`, `fulfillment.created`,
   `fulfillment.state_changed`, `fulfillment.delivered`, `return.requested`, `return.approved`, `return.completed`,
   `quote.requested`, `quote.accepted`, `quote.converted` (comodines `order.*`, `payment.*`, …).
+
+- **Cuerpo:** `data` trae los datos del evento y, si el evento es de un pedido, `data.order` con el **pedido
+  completo** (el mismo objeto que `GET /v1/orders/{number}`, con líneas, cliente, direcciones y entregas). El ERP no
+  necesita volver a llamar para facturar o despachar.
 
 **Bucle de pedido recomendado:** `order.created` (webhook) → el ERP crea su pedido → `POST /v1/orders/{n}/status` con
 `external_refs` → al facturar/despachar, otro `.../status` → eCommerce notifica al comprador.
@@ -262,6 +307,7 @@ La colección Bruno de `scripts/integrations/bruno/` cubre los mismos pasos.
 
 | Fecha | Cambio |
 |---|---|
+| 2026-11-24 | Campos completos (§6.5): pedido, producto, cliente y stock completos en lectura; `GET /v1/products/{sku}` y `GET /v1/customers/{code}`; alta de pedido con cuenta de empresa, facturación, OC, entrega y referencias; clientes con direcciones, contactos y crédito; catálogo con viñetas, peso y presentaciones; guía de despacho; `data.order` en los webhooks. |
 | 2026-11-24 | v1 consolidada: `orders/{number}/status`, `customers:batch`, `stock:batch`, `price-lists/{code}/items:batch`, `updated_since` + `server_time`, scopes `order.update` · `stock.write` · `customer.write` · `price.write`, código `ESTADO_EN_CONFLICTO`. `GET /v1/products` pasa a leer la publicación de la tienda. |
 | 2026-09-21 | `catalog/products:batch` (ver `catalog-ingest.md`). |
 | 2026-08-28 | API empresarial `/v1`: pedidos, productos, stock, clientes; webhooks firmados. |

@@ -29,12 +29,12 @@ const FOLDERS: Array<{ name: string; description: string; ops: string[] }> = [
   {
     name: '2 · Catálogo y stock',
     description: 'Productos por lote, catálogo publicado de la tienda, disponibilidad y saldo por almacén.',
-    ops: ['upsertCatalogProducts', 'listProducts', 'readStock', 'setStock'],
+    ops: ['upsertCatalogProducts', 'listProducts', 'getProduct', 'readStock', 'setStock'],
   },
   {
     name: '3 · Clientes',
     description: 'Clientes por código, con el código del ERP.',
-    ops: ['upsertCustomers', 'listCustomers'],
+    ops: ['upsertCustomers', 'listCustomers', 'getCustomer'],
   },
   {
     name: '4 · Precios',
@@ -52,6 +52,11 @@ const PARAM_VALUE: Record<string, string> = {
   limit: '50',
   dry_run: 'true',
   updated_since: '{{updatedSince}}',
+}
+
+/** El mismo nombre de parámetro con otro significado según la ruta. */
+const PATH_VALUE_BY_ROUTE: Record<string, Record<string, string>> = {
+  getCustomer: { code: '{{customerCode}}' },
 }
 
 /** Parámetros que se dejan activos; el resto va desactivado, listo para marcar. */
@@ -74,7 +79,11 @@ function urlFor(route: ApiRoute) {
     .split('/')
     .filter(Boolean)
     .map((piece) =>
-      piece.startsWith('{') ? (PARAM_VALUE[piece.slice(1, -1)] ?? `:${piece.slice(1, -1)}`) : piece,
+      piece.startsWith('{')
+        ? (PATH_VALUE_BY_ROUTE[route.operationId]?.[piece.slice(1, -1)] ??
+          PARAM_VALUE[piece.slice(1, -1)] ??
+          `:${piece.slice(1, -1)}`)
+        : piece,
     )
   const query = (route.query ?? []).map((param) => ({
     key: param.name,
@@ -231,6 +240,7 @@ const environment = {
     { key: 'sku2', value: '', type: 'default', enabled: true },
     { key: 'warehouse', value: 'ALM-ERP', type: 'default', enabled: true },
     { key: 'priceList', value: 'mayorista', type: 'default', enabled: true },
+    { key: 'customerCode', value: '', type: 'default', enabled: true },
     { key: 'updatedSince', value: '2026-01-01T00:00:00Z', type: 'default', enabled: true },
   ],
   _postman_variable_scope: 'environment',

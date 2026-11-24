@@ -85,7 +85,7 @@
     "/v1/orders": {
       "get": {
         "operationId": "listOrders",
-        "summary": "Pedidos de la tienda, del más reciente al más antiguo.",
+        "summary": "Pedidos de la tienda, del más reciente al más antiguo, COMPLETOS: cliente, cuenta de empresa, direcciones, líneas con impuesto y descuento, pagos, entregas con guía y referencias externas.",
         "security": [
           {
             "bearerAuth": [
@@ -153,7 +153,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Correcto"
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderList"
+                }
+              }
+            }
           },
           "400": {
             "description": "Petición inválida",
@@ -209,7 +216,7 @@
       },
       "post": {
         "operationId": "createOrder",
-        "summary": "Alta de pedido. Las líneas se identifican por SKU; el servidor resuelve el resto.",
+        "summary": "Alta de pedido. Las líneas se identifican por SKU (y presentación); el PRECIO lo pone la tienda. Puede ir a nombre de una cuenta de empresa, con facturación, orden de compra, método de entrega y las referencias del ERP.",
         "security": [
           {
             "bearerAuth": [
@@ -241,7 +248,14 @@
         ],
         "responses": {
           "201": {
-            "description": "Creado"
+            "description": "Creado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
           },
           "400": {
             "description": "Petición inválida",
@@ -309,22 +323,51 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object"
+                "$ref": "#/components/schemas/OrderCreateRequest"
               },
               "example": {
                 "store": "mi-tienda",
                 "customer": {
                   "email": "compras@cliente.test",
-                  "name": "Cliente",
-                  "phone": "+51999999999"
+                  "name": "Ana Compras",
+                  "phone": "+51999999999",
+                  "code": "CLI-900"
                 },
                 "items": [
                   {
                     "sku": "SKU-001",
                     "quantity": 2
+                  },
+                  {
+                    "sku": "SKU-002",
+                    "quantity": 1,
+                    "uom_code": "CJ12"
                   }
                 ],
-                "notes": "Entrega en almacén central"
+                "shipping_address": {
+                  "address": "Av. Argentina 123",
+                  "city": "Lima",
+                  "region": "Lima",
+                  "country": "PE"
+                },
+                "billing_address": {
+                  "legal_name": "Botica Central S.A.C.",
+                  "tax_id": "20123456789",
+                  "id_type": "ruc",
+                  "document_type": "invoice",
+                  "address": "Jr. Lampa 456",
+                  "city": "Lima",
+                  "country": "PE"
+                },
+                "purchase_order_number": "OC-2026-0042",
+                "notes": "Entrega en almacén central",
+                "external_refs": [
+                  {
+                    "system": "sap",
+                    "type": "sales_order",
+                    "id": "4500012345"
+                  }
+                ]
               }
             }
           }
@@ -373,7 +416,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Correcto"
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
           },
           "400": {
             "description": "Petición inválida",
@@ -431,7 +481,7 @@
     "/v1/products": {
       "get": {
         "operationId": "listProducts",
-        "summary": "Catálogo de la tienda, publicado o no. Sin existencia: eso es `stock.read`.",
+        "summary": "Catálogo de la tienda, publicado o no, con la ficha completa: descripción, marca, categoría, atributos, variantes, presentaciones e imágenes. Sin existencia: eso es `stock.read`.",
         "security": [
           {
             "bearerAuth": [
@@ -489,7 +539,118 @@
         ],
         "responses": {
           "200": {
-            "description": "Correcto"
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Petición inválida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, inválido o caducado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "El token no incluye el permiso necesario",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe en esta sociedad",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Límite de tasa superado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/products/{sku}": {
+      "get": {
+        "operationId": "getProduct",
+        "summary": "Un producto por su SKU (o el de una de sus variantes), con la ficha completa.",
+        "security": [
+          {
+            "bearerAuth": [
+              "product.read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sku",
+            "in": "path",
+            "required": true,
+            "description": "SKU del producto o de una variante.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "store",
+            "in": "query",
+            "required": false,
+            "description": "Slug de la tienda. Se puede omitir si la sociedad tiene una sola; con varias es obligatorio.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-correlation-id",
+            "in": "header",
+            "required": false,
+            "description": "Hilo del incidente. Si se envía, se conserva y vuelve en la respuesta; si no, el servidor abre uno y lo devuelve.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            }
           },
           "400": {
             "description": "Petición inválida",
@@ -586,7 +747,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Correcto"
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stock"
+                }
+              }
+            }
           },
           "400": {
             "description": "Petición inválida",
@@ -644,7 +812,7 @@
     "/v1/customers": {
       "get": {
         "operationId": "listCustomers",
-        "summary": "Ficha de clientes de la sociedad. Sin direcciones ni contactos.",
+        "summary": "Clientes de la sociedad con la ficha completa: documento, direcciones, contactos, cuenta de empresa con crédito e ids del ERP.",
         "security": [
           {
             "bearerAuth": [
@@ -694,7 +862,109 @@
         ],
         "responses": {
           "200": {
-            "description": "Correcto"
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Petición inválida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token ausente, inválido o caducado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "El token no incluye el permiso necesario",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe en esta sociedad",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Límite de tasa superado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/customers/{code}": {
+      "get": {
+        "operationId": "getCustomer",
+        "summary": "Un cliente por su código en la tienda o por su código en el ERP.",
+        "security": [
+          {
+            "bearerAuth": [
+              "customer.read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "description": "Código del cliente o id del ERP.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-correlation-id",
+            "in": "header",
+            "required": false,
+            "description": "Hilo del incidente. Si se envía, se conserva y vuelve en la respuesta; si no, el servidor abre uno y lo devuelve.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Customer"
+                }
+              }
+            }
           },
           "400": {
             "description": "Petición inválida",
@@ -901,6 +1171,25 @@
                     "custom_fields": {
                       "codigo_qs": "514574"
                     },
+                    "highlights": [
+                      "Protección UVA/UVB",
+                      "Resistente al agua"
+                    ],
+                    "shipping_weight": 0.18,
+                    "units": [
+                      {
+                        "code": "UND",
+                        "name": "Unidad",
+                        "factor": 1,
+                        "is_base": true
+                      },
+                      {
+                        "code": "CJ12",
+                        "name": "Caja x 12",
+                        "factor": 12,
+                        "price": "1290.00"
+                      }
+                    ],
                     "publications": [
                       {
                         "store": "mi-tienda",
@@ -1054,7 +1343,13 @@
                     "type": "invoice",
                     "id": "F001-000123"
                   }
-                ]
+                ],
+                "shipment": {
+                  "tracking_number": "GR-T001-00012345",
+                  "carrier": "olva",
+                  "tracking_url": "https://tracking.olva.pe/GR-T001-00012345",
+                  "estimated_delivery": "2026-11-30"
+                }
               }
             }
           }
@@ -1211,7 +1506,34 @@
                     "name": "Clínica San Pablo",
                     "tax_id": "20100000001",
                     "email": "compras@clinica.test",
-                    "external_id": "100045"
+                    "external_id": "100045",
+                    "tax_id_type": "ruc",
+                    "tier": "a",
+                    "addresses": [
+                      {
+                        "external_ref": "D-01",
+                        "label": "Almacén central",
+                        "line1": "Av. Argentina 123",
+                        "city": "Lima",
+                        "region": "Lima",
+                        "country": "PE",
+                        "is_shipping": true,
+                        "is_default_shipping": true
+                      }
+                    ],
+                    "contacts": [
+                      {
+                        "name": "Ana Compras",
+                        "email": "ana@clinica.test",
+                        "role_title": "Compras",
+                        "is_primary": true
+                      }
+                    ],
+                    "business_account": {
+                      "credit_limit": "15000.00",
+                      "payment_terms_days": 30,
+                      "purchase_order_required": true
+                    }
                   }
                 ]
               }
@@ -1702,6 +2024,61 @@
             "description": "Datos libres del integrador (p. ej. código del ERP). Se fusionan con los existentes.",
             "additionalProperties": true
           },
+          "highlights": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Viñetas de la ficha (2026-11-24). Reemplaza la lista entera."
+          },
+          "shipping_weight": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Peso de envío en kg."
+          },
+          "units": {
+            "type": "array",
+            "maxItems": 20,
+            "description": "Presentaciones de venta (2026-11-24): unidad, caja, blíster… Upsert por código; una unidad nueva se da de alta en la sociedad.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "code"
+              ],
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,15}$"
+                },
+                "name": {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                "factor": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "description": "Unidades base que contiene. La base vale 1."
+                },
+                "is_base": {
+                  "type": "boolean"
+                },
+                "is_sellable": {
+                  "type": "boolean",
+                  "default": true
+                },
+                "price": {
+                  "type": "string",
+                  "description": "Precio de la presentación (cadena decimal)."
+                },
+                "barcode": {
+                  "type": "string",
+                  "minLength": 4,
+                  "maxLength": 64
+                }
+              }
+            }
+          },
           "variants": {
             "type": "array",
             "maxItems": 50,
@@ -1756,6 +2133,16 @@
           },
           "active": {
             "type": "boolean"
+          },
+          "shipping_weight": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Peso de envío de la variante en kg."
+          },
+          "custom_fields": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Datos libres de la variante. Reemplaza el objeto."
           },
           "prices": {
             "type": "array",
@@ -2098,6 +2485,10 @@
               "$ref": "#/components/schemas/ExternalRef"
             },
             "description": "Upsert por (system, type)."
+          },
+          "shipment": {
+            "$ref": "#/components/schemas/Shipment",
+            "description": "Guía de despacho (2026-11-24). Puede ir sola o junto con los estados."
           }
         }
       },
@@ -2163,6 +2554,68 @@
                 "external_id": {
                   "type": "string",
                   "description": "Código del cliente en el ERP."
+                },
+                "tax_id_type": {
+                  "type": "string",
+                  "enum": [
+                    "ruc",
+                    "dni",
+                    "ce",
+                    "passport"
+                  ]
+                },
+                "tier": {
+                  "type": "string",
+                  "enum": [
+                    "a",
+                    "b",
+                    "c"
+                  ]
+                },
+                "business_type": {
+                  "type": "string",
+                  "description": "Código de un giro de negocio ya creado."
+                },
+                "visit_frequency": {
+                  "type": "string",
+                  "enum": [
+                    "weekly",
+                    "biweekly",
+                    "monthly",
+                    "on_demand"
+                  ]
+                },
+                "geo": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "lat": {
+                      "type": "number"
+                    },
+                    "lng": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "addresses": {
+                  "type": "array",
+                  "maxItems": 50,
+                  "items": {
+                    "$ref": "#/components/schemas/CustomerAddress"
+                  },
+                  "description": "Upsert por external_ref (o etiqueta). Las que no vienen se conservan."
+                },
+                "contacts": {
+                  "type": "array",
+                  "maxItems": 50,
+                  "items": {
+                    "$ref": "#/components/schemas/CustomerContact"
+                  }
+                },
+                "business_account": {
+                  "$ref": "#/components/schemas/BusinessAccount"
                 }
               }
             }
@@ -2350,6 +2803,1812 @@
                 }
               }
             }
+          }
+        }
+      },
+      "OrderItem": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "type": "string",
+            "description": "SKU vendido: el de la variante si la hay, si no el del producto."
+          },
+          "product_sku": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "variant_sku": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "variant_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "variant_attributes": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
+          },
+          "quantity": {
+            "type": "integer"
+          },
+          "uom_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "uom_factor": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "base_quantity": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Cantidad en la unidad base (quantity × factor)."
+          },
+          "unit_price": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^-?\\d+(\\.\\d{2})?$",
+            "description": "Importe como cadena decimal (\"99.90\")."
+          },
+          "discount_amount": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^-?\\d+(\\.\\d{2})?$",
+            "description": "Importe como cadena decimal (\"99.90\")."
+          },
+          "amount_after_discount": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^-?\\d+(\\.\\d{2})?$",
+            "description": "Importe como cadena decimal (\"99.90\")."
+          },
+          "tax_category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tax_rate": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "tax_amount": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^-?\\d+(\\.\\d{2})?$",
+            "description": "Importe como cadena decimal (\"99.90\")."
+          },
+          "tax_inclusive": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "line_total": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^-?\\d+(\\.\\d{2})?$",
+            "description": "Importe como cadena decimal (\"99.90\")."
+          },
+          "price_list": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "price_source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "discounts": {
+            "type": [
+              "array",
+              "object",
+              "null"
+            ],
+            "description": "Promociones aplicadas a la línea."
+          },
+          "components": {
+            "type": [
+              "array",
+              "object",
+              "null"
+            ],
+            "description": "Componentes de un kit."
+          }
+        }
+      },
+      "Order": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "payment_status": {
+            "type": "string"
+          },
+          "fulfillment_status": {
+            "type": "string"
+          },
+          "approval_status": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "description": "Por dónde entró: storefront, backoffice, api…"
+          },
+          "store": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "tax_inclusive": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "subtotal": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^-?\\d+(\\.\\d{2})?$",
+            "description": "Importe como cadena decimal (\"99.90\")."
+          },
+          "tax_total": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^-?\\d+(\\.\\d{2})?$",
+            "description": "Importe como cadena decimal (\"99.90\")."
+          },
+          "shipping_total": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^-?\\d+(\\.\\d{2})?$",
+            "description": "Importe como cadena decimal (\"99.90\")."
+          },
+          "discount_total": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^-?\\d+(\\.\\d{2})?$",
+            "description": "Importe como cadena decimal (\"99.90\")."
+          },
+          "total": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^-?\\d+(\\.\\d{2})?$",
+            "description": "Importe como cadena decimal (\"99.90\")."
+          },
+          "purchase_order_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "correlation_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "placed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "UTC, ISO 8601."
+          },
+          "paid_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "UTC, ISO 8601."
+          },
+          "fulfilled_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "UTC, ISO 8601."
+          },
+          "cancelled_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "UTC, ISO 8601."
+          },
+          "created_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "UTC, ISO 8601."
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "UTC, ISO 8601."
+          },
+          "customer": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "phone": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "kind": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "legal_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "tax_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "tax_id_type": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "external_ids": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "{ sistema: id }"
+              }
+            }
+          },
+          "business_account": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "payment_terms_days": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "credit_status": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "shipping_address": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true,
+            "description": "Dirección tal como se guardó en el pedido: address, city, region, postal_code, country y, en facturación, legal_name, tax_id, id_type y document_type (receipt | invoice)."
+          },
+          "billing_address": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true,
+            "description": "Dirección tal como se guardó en el pedido: address, city, region, postal_code, country y, en facturación, legal_name, tax_id, id_type y document_type (receipt | invoice)."
+          },
+          "approval": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "decided_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "UTC, ISO 8601."
+              },
+              "decided_by": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderItem"
+            }
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "amount": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^-?\\d+(\\.\\d{2})?$",
+                  "description": "Importe como cadena decimal (\"99.90\")."
+                },
+                "amount_refunded": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^-?\\d+(\\.\\d{2})?$",
+                  "description": "Importe como cadena decimal (\"99.90\")."
+                },
+                "currency": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "provider": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reference": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "captured_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time",
+                  "description": "UTC, ISO 8601."
+                },
+                "settlement_reference": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "settled_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time",
+                  "description": "UTC, ISO 8601."
+                }
+              }
+            }
+          },
+          "refunds": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "amount": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^-?\\d+(\\.\\d{2})?$",
+                  "description": "Importe como cadena decimal (\"99.90\")."
+                },
+                "currency": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "provider": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reference": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "completed_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time",
+                  "description": "UTC, ISO 8601."
+                }
+              }
+            }
+          },
+          "fulfillments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sequence": {
+                  "type": "integer"
+                },
+                "state": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "method_code": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "method_name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "strategy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "provider": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "warehouse": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "window_date": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "window_starts": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "window_ends": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "promised_from": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "promised_to": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "shipping_cost": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^-?\\d+(\\.\\d{2})?$",
+                  "description": "Importe como cadena decimal (\"99.90\")."
+                },
+                "weight": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "address": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "additionalProperties": true,
+                  "description": "Dirección tal como se guardó en el pedido: address, city, region, postal_code, country y, en facturación, legal_name, tax_id, id_type y document_type (receipt | invoice)."
+                },
+                "contact_name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "contact_phone": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "shipped_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time",
+                  "description": "UTC, ISO 8601."
+                },
+                "delivered_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time",
+                  "description": "UTC, ISO 8601."
+                },
+                "cancelled_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time",
+                  "description": "UTC, ISO 8601."
+                },
+                "cancel_reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "sku": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "quantity": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                },
+                "shipments": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "state": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "provider": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "service": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "tracking_number": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "tracking_url": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "cost": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "pattern": "^-?\\d+(\\.\\d{2})?$",
+                        "description": "Importe como cadena decimal (\"99.90\")."
+                      },
+                      "weight": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "estimated_delivery": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "shipped_at": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "format": "date-time",
+                        "description": "UTC, ISO 8601."
+                      },
+                      "delivered_at": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "format": "date-time",
+                        "description": "UTC, ISO 8601."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "external_refs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "system": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "url": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "notes": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "OrderList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Order"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "server_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "UTC, ISO 8601."
+          }
+        }
+      },
+      "OrderCreateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "customer",
+          "items"
+        ],
+        "properties": {
+          "store": {
+            "type": "string",
+            "description": "Slug de la tienda; obligatorio si la sociedad tiene varias."
+          },
+          "customer": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "email": {
+                "type": "string",
+                "format": "email"
+              },
+              "name": {
+                "type": "string"
+              },
+              "phone": {
+                "type": "string"
+              },
+              "code": {
+                "type": "string",
+                "description": "Código del cliente en la tienda: el pedido va a nombre de su cuenta de empresa."
+              },
+              "external_id": {
+                "type": "string",
+                "description": "O el código del cliente en el ERP."
+              }
+            }
+          },
+          "business_account": {
+            "type": "string",
+            "description": "Código de la cuenta de empresa (alternativa a customer.code)."
+          },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "description": "Sin importes: el precio lo pone el motor de la tienda (listas de precio, acuerdos, promociones).",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "sku",
+                "quantity"
+              ],
+              "properties": {
+                "sku": {
+                  "type": "string",
+                  "description": "SKU del producto o de la variante."
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "uom_code": {
+                  "type": "string",
+                  "description": "Presentación de venta (caja, blíster…)."
+                }
+              }
+            }
+          },
+          "shipping_address": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true,
+            "description": "Dirección tal como se guardó en el pedido: address, city, region, postal_code, country y, en facturación, legal_name, tax_id, id_type y document_type (receipt | invoice)."
+          },
+          "billing_address": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true,
+            "description": "Datos de facturación. Sin ella se factura en la dirección de envío. Claves habituales: legal_name, tax_id, id_type (ruc|dni|ce|passport), document_type (receipt|invoice), address, city, region, country."
+          },
+          "purchase_order_number": {
+            "type": "string",
+            "maxLength": 60,
+            "description": "Orden de compra del cliente."
+          },
+          "notes": {
+            "type": "string"
+          },
+          "delivery": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Método de entrega elegido: method_code y, si es retiro, pickup_point_id. El costo lo calcula la tienda."
+          },
+          "external_refs": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "$ref": "#/components/schemas/ExternalRef"
+            },
+            "description": "Referencias del documento en el ERP (p. ej. su pedido de venta)."
+          }
+        }
+      },
+      "Product": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "description": "Estado de la publicación en esta tienda."
+          },
+          "currency": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "price": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^-?\\d+(\\.\\d{2})?$",
+            "description": "Importe como cadena decimal (\"99.90\")."
+          },
+          "compare_at_price": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^-?\\d+(\\.\\d{2})?$",
+            "description": "Importe como cadena decimal (\"99.90\")."
+          },
+          "published_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "UTC, ISO 8601."
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "highlights": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "gtin": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "shipping_weight": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "custom_fields": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "created_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "UTC, ISO 8601."
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "UTC, ISO 8601."
+          },
+          "brand": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "family": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "category": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "slug": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "tax_category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "attributes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "unit": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "value": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sku": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "barcode": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "price": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^-?\\d+(\\.\\d{2})?$",
+                  "description": "Importe como cadena decimal (\"99.90\")."
+                },
+                "compare_at_price": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^-?\\d+(\\.\\d{2})?$",
+                  "description": "Importe como cadena decimal (\"99.90\")."
+                },
+                "shipping_weight": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "position": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "is_default": {
+                  "type": "boolean"
+                },
+                "is_active": {
+                  "type": "boolean"
+                },
+                "custom_fields": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "attributes": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "code": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "value": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "label": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "factor": {
+                  "type": "number"
+                },
+                "is_base": {
+                  "type": "boolean"
+                },
+                "is_sellable": {
+                  "type": "boolean"
+                },
+                "price": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^-?\\d+(\\.\\d{2})?$",
+                  "description": "Importe como cadena decimal (\"99.90\")."
+                },
+                "barcode": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "description": "Ruta en el almacenamiento privado de imágenes de la sociedad."
+                },
+                "alt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "position": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "is_primary": {
+                  "type": "boolean"
+                },
+                "variant_sku": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "ProductList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Product"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "server_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "UTC, ISO 8601."
+          }
+        }
+      },
+      "Customer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "legal_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tax_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tax_id_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "segment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "business_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tier": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "visit_frequency": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "geo": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "lat": {
+                "type": "number"
+              },
+              "lng": {
+                "type": "number"
+              }
+            }
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "UTC, ISO 8601."
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "UTC, ISO 8601."
+          },
+          "external_ids": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerAddress"
+            }
+          },
+          "contacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerContact"
+            }
+          },
+          "business_account": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BusinessAccount"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "CustomerList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Customer"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "server_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "UTC, ISO 8601."
+          }
+        }
+      },
+      "CustomerAddress": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "external_ref": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Id de la dirección en el ERP: la clave del upsert."
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Sin external_ref, el upsert es por etiqueta."
+          },
+          "recipient": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "line1": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 240
+          },
+          "line2": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string"
+          },
+          "postal_code": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "default": "PE"
+          },
+          "is_shipping": {
+            "type": "boolean",
+            "default": true
+          },
+          "is_billing": {
+            "type": "boolean",
+            "default": false
+          },
+          "is_default_shipping": {
+            "type": "boolean"
+          },
+          "is_default_billing": {
+            "type": "boolean"
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "verification": {
+            "type": "string",
+            "readOnly": true
+          }
+        }
+      },
+      "CustomerContact": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Clave del upsert; sin correo, el nombre."
+          },
+          "phone": {
+            "type": "string"
+          },
+          "role_title": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "is_primary": {
+            "type": "boolean"
+          },
+          "is_active": {
+            "type": "boolean"
+          }
+        }
+      },
+      "BusinessAccount": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Cuenta de empresa (una por cliente empresa): condiciones de compra y de crédito.",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Solo en el alta; por defecto, el código del cliente."
+          },
+          "name": {
+            "type": "string"
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "requires_approval": {
+            "type": "boolean"
+          },
+          "approval_threshold": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ]
+          },
+          "purchase_order_required": {
+            "type": "boolean"
+          },
+          "credit_limit": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ]
+          },
+          "payment_terms_days": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 365
+          },
+          "credit_watch_after_days": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 365
+          },
+          "credit_block_after_days": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 365
+          },
+          "credit_status": {
+            "type": "string",
+            "readOnly": true,
+            "description": "Lo calcula la cobranza; no se escribe."
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "Stock": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "type": "string"
+          },
+          "available": {
+            "type": "integer"
+          },
+          "in_stock": {
+            "type": "boolean"
+          },
+          "unknown": {
+            "type": "boolean",
+            "description": "El origen (ERP) no contestó: no es «sin stock»."
+          },
+          "backorder": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "UTC, ISO 8601."
+          },
+          "warehouses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "source": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "on_hand": {
+                  "type": "number"
+                },
+                "reserved": {
+                  "type": "number"
+                },
+                "available": {
+                  "type": "number"
+                },
+                "safety_stock": {
+                  "type": "number"
+                },
+                "reorder_point": {
+                  "type": "number"
+                },
+                "allow_backorder": {
+                  "type": "boolean"
+                },
+                "synced_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time",
+                  "description": "UTC, ISO 8601."
+                }
+              }
+            }
+          }
+        }
+      },
+      "Shipment": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tracking_number"
+        ],
+        "description": "Guía de despacho. Se asigna a la primera entrega no cancelada (o a `fulfillment`). Reenviar la misma guía no la duplica.",
+        "properties": {
+          "tracking_number": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "carrier": {
+            "type": "string",
+            "description": "Transportista (olva, shalom, propio…)."
+          },
+          "service": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "tracking_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "estimated_delivery": {
+            "type": "string",
+            "format": "date"
+          },
+          "cost": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0
+          },
+          "fulfillment": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Número de entrega si el pedido tiene varias."
           }
         }
       },

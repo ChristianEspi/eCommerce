@@ -156,7 +156,7 @@
                 }
               ]
             },
-            "description": "**Permiso:** `order.read`\n\nPedidos de la tienda, del más reciente al más antiguo."
+            "description": "**Permiso:** `order.read`\n\nPedidos de la tienda, del más reciente al más antiguo, COMPLETOS: cliente, cuenta de empresa, direcciones, líneas con impuesto y descuento, pagos, entregas con guía y referencias externas."
           },
           "event": [
             {
@@ -233,10 +233,10 @@
               ],
               "query": []
             },
-            "description": "**Permiso:** `order.create`\n\nAlta de pedido. Las líneas se identifican por SKU; el servidor resuelve el resto.\n\nLleva `Idempotency-Key` (la pone sola el script de la colección).",
+            "description": "**Permiso:** `order.create`\n\nAlta de pedido. Las líneas se identifican por SKU (y presentación); el PRECIO lo pone la tienda. Puede ir a nombre de una cuenta de empresa, con facturación, orden de compra, método de entrega y las referencias del ERP.\n\nLleva `Idempotency-Key` (la pone sola el script de la colección).",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"store\": \"{{store}}\",\n  \"customer\": {\n    \"email\": \"compras@cliente.test\",\n    \"name\": \"Cliente\",\n    \"phone\": \"+51999999999\"\n  },\n  \"items\": [\n    {\n      \"sku\": \"{{sku}}\",\n      \"quantity\": 2\n    }\n  ],\n  \"notes\": \"Entrega en almacén central\"\n}",
+              "raw": "{\n  \"store\": \"{{store}}\",\n  \"customer\": {\n    \"email\": \"compras@cliente.test\",\n    \"name\": \"Ana Compras\",\n    \"phone\": \"+51999999999\",\n    \"code\": \"CLI-900\"\n  },\n  \"items\": [\n    {\n      \"sku\": \"{{sku}}\",\n      \"quantity\": 2\n    },\n    {\n      \"sku\": \"SKU-002\",\n      \"quantity\": 1,\n      \"uom_code\": \"CJ12\"\n    }\n  ],\n  \"shipping_address\": {\n    \"address\": \"Av. Argentina 123\",\n    \"city\": \"Lima\",\n    \"region\": \"Lima\",\n    \"country\": \"PE\"\n  },\n  \"billing_address\": {\n    \"legal_name\": \"Botica Central S.A.C.\",\n    \"tax_id\": \"20123456789\",\n    \"id_type\": \"ruc\",\n    \"document_type\": \"invoice\",\n    \"address\": \"Jr. Lampa 456\",\n    \"city\": \"Lima\",\n    \"country\": \"PE\"\n  },\n  \"purchase_order_number\": \"OC-2026-0042\",\n  \"notes\": \"Entrega en almacén central\",\n  \"external_refs\": [\n    {\n      \"system\": \"sap\",\n      \"type\": \"sales_order\",\n      \"id\": \"4500012345\"\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -289,7 +289,7 @@
             "description": "**Permiso:** `order.update`\n\nEl ERP devuelve el ciclo del pedido: estado, pago y entrega, más sus referencias (su número de pedido, su factura, su guía). Un eje que ya está en ese valor se informa como `unchanged`, no como error.\n\nLleva `Idempotency-Key` (la pone sola el script de la colección).",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"payment_status\": \"paid\",\n  \"fulfillment_status\": \"in_progress\",\n  \"reason\": \"Facturado en el ERP\",\n  \"external_refs\": [\n    {\n      \"system\": \"sap\",\n      \"type\": \"order\",\n      \"id\": \"4500012345\"\n    },\n    {\n      \"system\": \"sap\",\n      \"type\": \"invoice\",\n      \"id\": \"F001-000123\"\n    }\n  ]\n}",
+              "raw": "{\n  \"payment_status\": \"paid\",\n  \"fulfillment_status\": \"in_progress\",\n  \"reason\": \"Facturado en el ERP\",\n  \"external_refs\": [\n    {\n      \"system\": \"sap\",\n      \"type\": \"order\",\n      \"id\": \"4500012345\"\n    },\n    {\n      \"system\": \"sap\",\n      \"type\": \"invoice\",\n      \"id\": \"F001-000123\"\n    }\n  ],\n  \"shipment\": {\n    \"tracking_number\": \"GR-T001-00012345\",\n    \"carrier\": \"olva\",\n    \"tracking_url\": \"https://tracking.olva.pe/GR-T001-00012345\",\n    \"estimated_delivery\": \"2026-11-30\"\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -347,7 +347,7 @@
             "description": "**Permiso:** `catalog.write`\n\nCrea o actualiza productos en lote: upsert por SKU en el maestro de la sociedad, publicación por tienda y precio de variante por tienda. Todo o nada; con `dry_run=true` valida sin escribir.\n\nLleva `Idempotency-Key` (la pone sola el script de la colección).",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"products\": [\n    {\n      \"sku\": \"{{sku}}\",\n      \"gtin\": \"4005800077937\",\n      \"name\": \"Bloqueador Solar FPS 50 150 ml\",\n      \"kind\": \"simple\",\n      \"stock\": 181,\n      \"custom_fields\": {\n        \"codigo_qs\": \"514574\"\n      },\n      \"publications\": [\n        {\n          \"store\": \"{{store}}\",\n          \"status\": \"published\",\n          \"price\": \"111.29\"\n        }\n      ]\n    }\n  ]\n}",
+              "raw": "{\n  \"products\": [\n    {\n      \"sku\": \"{{sku}}\",\n      \"gtin\": \"4005800077937\",\n      \"name\": \"Bloqueador Solar FPS 50 150 ml\",\n      \"kind\": \"simple\",\n      \"stock\": 181,\n      \"custom_fields\": {\n        \"codigo_qs\": \"514574\"\n      },\n      \"highlights\": [\n        \"Protección UVA/UVB\",\n        \"Resistente al agua\"\n      ],\n      \"shipping_weight\": 0.18,\n      \"units\": [\n        {\n          \"code\": \"UND\",\n          \"name\": \"Unidad\",\n          \"factor\": 1,\n          \"is_base\": true\n        },\n        {\n          \"code\": \"CJ12\",\n          \"name\": \"Caja x 12\",\n          \"factor\": 12,\n          \"price\": \"1290.00\"\n        }\n      ],\n      \"publications\": [\n        {\n          \"store\": \"{{store}}\",\n          \"status\": \"published\",\n          \"price\": \"111.29\"\n        }\n      ]\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -410,7 +410,47 @@
                 }
               ]
             },
-            "description": "**Permiso:** `product.read`\n\nCatálogo de la tienda, publicado o no. Sin existencia: eso es `stock.read`."
+            "description": "**Permiso:** `product.read`\n\nCatálogo de la tienda, publicado o no, con la ficha completa: descripción, marca, categoría, atributos, variantes, presentaciones e imágenes. Sin existencia: eso es `stock.read`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body.server_time) { pm.environment.set(\"updatedSince\", body.server_time); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /v1/products/{sku}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/products/{{sku}}?store={{store}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "products",
+                "{{sku}}"
+              ],
+              "query": [
+                {
+                  "key": "store",
+                  "value": "{{store}}",
+                  "description": "Slug de la tienda. Se puede omitir si la sociedad tiene una sola; con varias es obligatorio.",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "**Permiso:** `product.read`\n\nUn producto por su SKU (o el de una de sus variantes), con la ficha completa."
           },
           "event": [
             {
@@ -556,7 +596,7 @@
             "description": "**Permiso:** `customer.write`\n\nCrea o actualiza clientes por CÓDIGO. Las mismas reglas que la importación por Excel: una celda vacía no borra; todo o nada; `external_id` es el código del cliente en el ERP.\n\nLleva `Idempotency-Key` (la pone sola el script de la colección).",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"system\": \"sap\",\n  \"customers\": [\n    {\n      \"code\": \"C-0001\",\n      \"kind\": \"company\",\n      \"name\": \"Clínica San Pablo\",\n      \"tax_id\": \"20100000001\",\n      \"email\": \"compras@clinica.test\",\n      \"external_id\": \"100045\"\n    }\n  ]\n}",
+              "raw": "{\n  \"system\": \"sap\",\n  \"customers\": [\n    {\n      \"code\": \"C-0001\",\n      \"kind\": \"company\",\n      \"name\": \"Clínica San Pablo\",\n      \"tax_id\": \"20100000001\",\n      \"email\": \"compras@clinica.test\",\n      \"external_id\": \"100045\",\n      \"tax_id_type\": \"ruc\",\n      \"tier\": \"a\",\n      \"addresses\": [\n        {\n          \"external_ref\": \"D-01\",\n          \"label\": \"Almacén central\",\n          \"line1\": \"Av. Argentina 123\",\n          \"city\": \"Lima\",\n          \"region\": \"Lima\",\n          \"country\": \"PE\",\n          \"is_shipping\": true,\n          \"is_default_shipping\": true\n        }\n      ],\n      \"contacts\": [\n        {\n          \"name\": \"Ana Compras\",\n          \"email\": \"ana@clinica.test\",\n          \"role_title\": \"Compras\",\n          \"is_primary\": true\n        }\n      ],\n      \"business_account\": {\n        \"credit_limit\": \"15000.00\",\n        \"payment_terms_days\": 30,\n        \"purchase_order_required\": true\n      }\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -613,7 +653,40 @@
                 }
               ]
             },
-            "description": "**Permiso:** `customer.read`\n\nFicha de clientes de la sociedad. Sin direcciones ni contactos."
+            "description": "**Permiso:** `customer.read`\n\nClientes de la sociedad con la ficha completa: documento, direcciones, contactos, cuenta de empresa con crédito e ids del ERP."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body.server_time) { pm.environment.set(\"updatedSince\", body.server_time); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /v1/customers/{code}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/v1/customers/{{customerCode}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "v1",
+                "customers",
+                "{{customerCode}}"
+              ],
+              "query": []
+            },
+            "description": "**Permiso:** `customer.read`\n\nUn cliente por su código en la tienda o por su código en el ERP."
           },
           "event": [
             {

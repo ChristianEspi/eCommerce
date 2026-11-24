@@ -127,6 +127,36 @@ export const CATALOG_SCHEMAS: Record<string, Record<string, unknown>> = {
           'Datos libres del integrador (p. ej. código del ERP). Se fusionan con los existentes.',
         additionalProperties: true,
       },
+      highlights: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Viñetas de la ficha (2026-11-24). Reemplaza la lista entera.',
+      },
+      shipping_weight: {
+        type: 'number',
+        minimum: 0,
+        description: 'Peso de envío en kg.',
+      },
+      units: {
+        type: 'array',
+        maxItems: 20,
+        description:
+          'Presentaciones de venta (2026-11-24): unidad, caja, blíster… Upsert por código; una unidad nueva se da de alta en la sociedad.',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['code'],
+          properties: {
+            code: { type: 'string', pattern: '^[A-Za-z0-9][A-Za-z0-9_-]{0,15}$' },
+            name: { type: 'string', maxLength: 80 },
+            factor: { type: 'number', exclusiveMinimum: 0, description: 'Unidades base que contiene. La base vale 1.' },
+            is_base: { type: 'boolean' },
+            is_sellable: { type: 'boolean', default: true },
+            price: { type: 'string', description: 'Precio de la presentación (cadena decimal).' },
+            barcode: { type: 'string', minLength: 4, maxLength: 64 },
+          },
+        },
+      },
       variants: {
         type: 'array',
         maxItems: 50,
@@ -181,6 +211,16 @@ export const CATALOG_SCHEMAS: Record<string, Record<string, unknown>> = {
       },
       active: {
         type: 'boolean',
+      },
+      shipping_weight: {
+        type: 'number',
+        minimum: 0,
+        description: 'Peso de envío de la variante en kg.',
+      },
+      custom_fields: {
+        type: 'object',
+        additionalProperties: true,
+        description: 'Datos libres de la variante. Reemplaza el objeto.',
       },
       prices: {
         type: 'array',

@@ -16,6 +16,7 @@ import { API_ERROR_CODES, API_ERROR_STATUS, API_SCOPES, API_VERSION, IDEMPOTENCY
 import { API_ROUTES, type ApiParam, type ApiRoute } from './routes.ts'
 import { CATALOG_SCHEMAS } from './catalogSchemas.ts'
 import { INTEGRATION_SCHEMAS } from './integrationSchemas.ts'
+import { RESOURCE_SCHEMAS } from './resourceSchemas.ts'
 
 const TYPE_BY_KIND: Record<ApiParam['kind'], Record<string, unknown>> = {
   string: { type: 'string' },
@@ -84,6 +85,13 @@ function operationOf(route: ApiRoute): Record<string, unknown> {
     },
   }
 
+  if (route.method === 'GET' && route.responseSchema) {
+    ;(operation.responses as Record<string, unknown>)['200'] = {
+      description: 'Correcto',
+      content: { 'application/json': { schema: schemaRef(route.responseSchema) } },
+    }
+  }
+
   if (route.method === 'POST') {
     const responses = operation.responses as Record<string, unknown>
     if (route.successStatus === 200) {
@@ -96,7 +104,12 @@ function operationOf(route: ApiRoute): Record<string, unknown> {
         : { description: 'Correcto' }
     } else {
       delete responses['200']
-      responses['201'] = { description: 'Creado' }
+      responses['201'] = route.responseSchema
+        ? {
+            description: 'Creado',
+            content: { 'application/json': { schema: schemaRef(route.responseSchema) } },
+          }
+        : { description: 'Creado' }
     }
     if (route.batchReport) {
       responses['413'] = errorResponse('Lote demasiado grande; envíalo en partes')
@@ -195,6 +208,7 @@ export function buildOpenApiDocument(serverUrl = '/'): Record<string, unknown> {
       schemas: {
         ...CATALOG_SCHEMAS,
         ...INTEGRATION_SCHEMAS,
+        ...RESOURCE_SCHEMAS,
         Error: {
           type: 'object',
           required: ['error'],

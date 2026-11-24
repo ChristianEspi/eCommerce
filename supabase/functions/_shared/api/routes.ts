@@ -100,9 +100,11 @@ export const API_ROUTES: readonly ApiRoute[] = [
     method: 'GET',
     path: '/v1/orders',
     operationId: 'listOrders',
-    summary: 'Pedidos de la tienda, del más reciente al más antiguo.',
+    summary:
+      'Pedidos de la tienda, del más reciente al más antiguo, COMPLETOS: cliente, cuenta de empresa, direcciones, líneas con impuesto y descuento, pagos, entregas con guía y referencias externas.',
     scope: 'order.read',
     rpc: 'api_orders_list',
+    responseSchema: 'OrderList',
     query: [
       LIMIT,
       {
@@ -129,6 +131,7 @@ export const API_ROUTES: readonly ApiRoute[] = [
     summary: 'Un pedido por su NÚMERO, que es lo que ve el comercio y el comprador.',
     scope: 'order.read',
     rpc: 'api_order_get',
+    responseSchema: 'Order',
     pathParams: [
       { name: 'number', kind: 'string', required: true, description: 'Número de pedido.', arg: 'p_number' },
     ],
@@ -138,24 +141,44 @@ export const API_ROUTES: readonly ApiRoute[] = [
     method: 'POST',
     path: '/v1/orders',
     operationId: 'createOrder',
-    summary: 'Alta de pedido. Las líneas se identifican por SKU; el servidor resuelve el resto.',
+    summary:
+      'Alta de pedido. Las líneas se identifican por SKU (y presentación); el PRECIO lo pone la tienda. Puede ir a nombre de una cuenta de empresa, con facturación, orden de compra, método de entrega y las referencias del ERP.',
     scope: 'order.create',
     rpc: 'api_order_create',
     requiresIdempotencyKey: true,
+    requestSchema: 'OrderCreateRequest',
+    responseSchema: 'Order',
     requestExample: {
       store: 'mi-tienda',
-      customer: { email: 'compras@cliente.test', name: 'Cliente', phone: '+51999999999' },
-      items: [{ sku: 'SKU-001', quantity: 2 }],
+      customer: { email: 'compras@cliente.test', name: 'Ana Compras', phone: '+51999999999', code: 'CLI-900' },
+      items: [
+        { sku: 'SKU-001', quantity: 2 },
+        { sku: 'SKU-002', quantity: 1, uom_code: 'CJ12' },
+      ],
+      shipping_address: { address: 'Av. Argentina 123', city: 'Lima', region: 'Lima', country: 'PE' },
+      billing_address: {
+        legal_name: 'Botica Central S.A.C.',
+        tax_id: '20123456789',
+        id_type: 'ruc',
+        document_type: 'invoice',
+        address: 'Jr. Lampa 456',
+        city: 'Lima',
+        country: 'PE',
+      },
+      purchase_order_number: 'OC-2026-0042',
       notes: 'Entrega en almacén central',
+      external_refs: [{ system: 'sap', type: 'sales_order', id: '4500012345' }],
     },
   },
   {
     method: 'GET',
     path: '/v1/products',
     operationId: 'listProducts',
-    summary: 'Catálogo de la tienda, publicado o no. Sin existencia: eso es `stock.read`.',
+    summary:
+      'Catálogo de la tienda, publicado o no, con la ficha completa: descripción, marca, categoría, atributos, variantes, presentaciones e imágenes. Sin existencia: eso es `stock.read`.',
     scope: 'product.read',
     rpc: 'api_products_list',
+    responseSchema: 'ProductList',
     query: [
       LIMIT,
       {
@@ -170,12 +193,26 @@ export const API_ROUTES: readonly ApiRoute[] = [
   },
   {
     method: 'GET',
+    path: '/v1/products/{sku}',
+    operationId: 'getProduct',
+    summary: 'Un producto por su SKU (o el de una de sus variantes), con la ficha completa.',
+    scope: 'product.read',
+    rpc: 'api_product_get',
+    responseSchema: 'Product',
+    pathParams: [
+      { name: 'sku', kind: 'string', required: true, description: 'SKU del producto o de una variante.', arg: 'p_sku' },
+    ],
+    query: [STORE],
+  },
+  {
+    method: 'GET',
     path: '/v1/stock/{sku}',
     operationId: 'readStock',
     summary:
       'Disponibilidad de un SKU. Sale de la misma autoridad que usa la vitrina y el checkout, así que la API nunca contradice a la tienda.',
     scope: 'stock.read',
     rpc: 'api_stock_read',
+    responseSchema: 'Stock',
     pathParams: [
       { name: 'sku', kind: 'string', required: true, description: 'SKU del artículo.', arg: 'p_sku' },
     ],
@@ -185,9 +222,11 @@ export const API_ROUTES: readonly ApiRoute[] = [
     method: 'GET',
     path: '/v1/customers',
     operationId: 'listCustomers',
-    summary: 'Ficha de clientes de la sociedad. Sin direcciones ni contactos.',
+    summary:
+      'Clientes de la sociedad con la ficha completa: documento, direcciones, contactos, cuenta de empresa con crédito e ids del ERP.',
     scope: 'customer.read',
     rpc: 'api_customers_list',
+    responseSchema: 'CustomerList',
     query: [
       LIMIT,
       {
@@ -197,6 +236,18 @@ export const API_ROUTES: readonly ApiRoute[] = [
         arg: 'p_cursor',
       },
       UPDATED_SINCE,
+    ],
+  },
+  {
+    method: 'GET',
+    path: '/v1/customers/{code}',
+    operationId: 'getCustomer',
+    summary: 'Un cliente por su código en la tienda o por su código en el ERP.',
+    scope: 'customer.read',
+    rpc: 'api_customer_get',
+    responseSchema: 'Customer',
+    pathParams: [
+      { name: 'code', kind: 'string', required: true, description: 'Código del cliente o id del ERP.', arg: 'p_code' },
     ],
   },
   {
@@ -223,6 +274,12 @@ export const API_ROUTES: readonly ApiRoute[] = [
           kind: 'simple',
           stock: 181,
           custom_fields: { codigo_qs: '514574' },
+          highlights: ['Protección UVA/UVB', 'Resistente al agua'],
+          shipping_weight: 0.18,
+          units: [
+            { code: 'UND', name: 'Unidad', factor: 1, is_base: true },
+            { code: 'CJ12', name: 'Caja x 12', factor: 12, price: '1290.00' },
+          ],
           publications: [{ store: 'mi-tienda', status: 'published', price: '111.29' }],
         },
       ],
@@ -251,6 +308,12 @@ export const API_ROUTES: readonly ApiRoute[] = [
         { system: 'sap', type: 'order', id: '4500012345' },
         { system: 'sap', type: 'invoice', id: 'F001-000123' },
       ],
+      shipment: {
+        tracking_number: 'GR-T001-00012345',
+        carrier: 'olva',
+        tracking_url: 'https://tracking.olva.pe/GR-T001-00012345',
+        estimated_delivery: '2026-11-30',
+      },
     },
   },
   {
@@ -278,6 +341,22 @@ export const API_ROUTES: readonly ApiRoute[] = [
           tax_id: '20100000001',
           email: 'compras@clinica.test',
           external_id: '100045',
+          tax_id_type: 'ruc',
+          tier: 'a',
+          addresses: [
+            {
+              external_ref: 'D-01',
+              label: 'Almacén central',
+              line1: 'Av. Argentina 123',
+              city: 'Lima',
+              region: 'Lima',
+              country: 'PE',
+              is_shipping: true,
+              is_default_shipping: true,
+            },
+          ],
+          contacts: [{ name: 'Ana Compras', email: 'ana@clinica.test', role_title: 'Compras', is_primary: true }],
+          business_account: { credit_limit: '15000.00', payment_terms_days: 30, purchase_order_required: true },
         },
       ],
     },

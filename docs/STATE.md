@@ -11,6 +11,20 @@ el recorrido SaaS P00–P17 queda cerrado)
 > (`claude-saas-opus/config/phases.json`), que se identifica siempre como «P0x-SaaS». No son la misma
 > serie: el P12 histórico es el framework de integraciones; el P12-SaaS es fulfillment y devoluciones.
 
+## API de integración: campos completos (2026-11-24, a pedido del operador)
+
+«Que la integración tenga todos los campos completos, tanto lo que envía como lo que recibe». Aditivo (contrato v1 §10).
+
+- Migraciones `20261124190000_api_full_fields_read.sql`, `…191000_api_full_fields_write.sql`,
+  `…192000_api_full_fields_catalog.sql`. **Pendiente de aplicar en QAS** y de desplegar la función `api`.
+- Lectura: `ebim.api_order_json` / `api_product_json` / `api_customer_json` completos; stock por almacén;
+  `GET /v1/products/{sku}`, `GET /v1/customers/{code}`; `data.order` en todo webhook de pedido.
+- Escritura: alta de pedido con cuenta de empresa, facturación, OC, entrega y referencias; clientes con direcciones,
+  contactos y crédito; catálogo con viñetas, peso y presentaciones; guía de despacho en `.../status`.
+  `api_order_update` y `api_catalog_upsert` se ENVUELVEN (los originales pasan a `ebim.*_core`, sin grants).
+- Fuera: imágenes por API, precio en la línea del pedido, registrar pagos por API (ver contrato §3).
+- Prueba `supabase/tests/api-full-fields.test.ts`, incluida la paridad OpenAPI ↔ base.
+
 ## Contrato de integración ERP v1 (2026-11-24, a pedido del operador: «fase 1 y 2»)
 
 - **Fase 1 (estándar):** `docs/integrations/CONTRATO_INTEGRACION_v1.md`, con los modos push, pull y eventos, la matriz de

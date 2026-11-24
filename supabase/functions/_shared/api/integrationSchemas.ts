@@ -64,6 +64,10 @@ export const INTEGRATION_SCHEMAS: Record<string, Record<string, unknown>> = {
         items: { $ref: '#/components/schemas/ExternalRef' },
         description: 'Upsert por (system, type).',
       },
+      shipment: {
+        $ref: '#/components/schemas/Shipment',
+        description: 'Guía de despacho (2026-11-24). Puede ir sola o junto con los estados.',
+      },
     },
   },
   CustomerBatchRequest: {
@@ -94,6 +98,27 @@ export const INTEGRATION_SCHEMAS: Record<string, Record<string, unknown>> = {
             is_active: { type: 'boolean' },
             notes: { type: 'string' },
             external_id: { type: 'string', description: 'Código del cliente en el ERP.' },
+            // 2026-11-24 · ficha completa
+            tax_id_type: { type: 'string', enum: ['ruc', 'dni', 'ce', 'passport'] },
+            tier: { type: 'string', enum: ['a', 'b', 'c'] },
+            business_type: { type: 'string', description: 'Código de un giro de negocio ya creado.' },
+            visit_frequency: { type: 'string', enum: ['weekly', 'biweekly', 'monthly', 'on_demand'] },
+            geo: {
+              type: ['object', 'null'],
+              properties: { lat: { type: 'number' }, lng: { type: 'number' } },
+            },
+            addresses: {
+              type: 'array',
+              maxItems: 50,
+              items: { $ref: '#/components/schemas/CustomerAddress' },
+              description: 'Upsert por external_ref (o etiqueta). Las que no vienen se conservan.',
+            },
+            contacts: {
+              type: 'array',
+              maxItems: 50,
+              items: { $ref: '#/components/schemas/CustomerContact' },
+            },
+            business_account: { $ref: '#/components/schemas/BusinessAccount' },
           },
         },
       },
