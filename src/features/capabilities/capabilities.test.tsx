@@ -228,6 +228,8 @@ describe('navegación del backoffice', () => {
     expect(items.map((i) => i.to)).toEqual([
       // Stores + Product Master, fase 02: tener tiendas no es un módulo.
       '/app/stores',
+      // 2026-11-23 · Complementos IA: donde se ve qué IA hay, aun sin ninguna.
+      '/app/ai',
       '/app/settings',
       '/app/operations',
       '/app/integrations',

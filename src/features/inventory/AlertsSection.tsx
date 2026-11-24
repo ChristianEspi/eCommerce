@@ -2,8 +2,12 @@ import { usePagedRows } from '@/shared/ui/usePagedRows'
 import { TablePager } from '@/shared/ui/TablePager'
 import { StatusChip } from '@/shared/ui/StatusChip'
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
+import AddRoundedIcon from '@mui/icons-material/AddRounded'
 import {
+  Button,
   Card,
+  Chip,
+  Link,
   Stack,
   Tab,
   Table,
@@ -14,15 +18,20 @@ import {
   Tabs,
   Typography,
 } from '@mui/material'
-import { useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link as RouterLink, useSearchParams } from 'react-router-dom'
+import { useFeedback } from '@/shared/ui/feedback-context'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { EmptyState, ErrorState } from '@/shared/ui/states'
-import { useInventoryAlerts } from './hooks'
-import { ALERT_KINDS, compareAlerts, formatQuantity, type AlertKind } from './types'
+import { useAdjustInventory, useInventoryAlerts, useTransferInventory } from './hooks'
+import { MovementDrawer, type MovementPreset } from './LevelsSection'
+import { ALERT_KINDS, compareAlerts, formatQuantity, type AlertKind, type InventoryAlert } from './types'
+
+/** Las alertas que se resuelven con un ingreso. Un kit bajo se arma, no se repone. */
+const REPONIBLE: ReadonlySet<AlertKind> = new Set<AlertKind>(['below_reorder', 'negative', 'unmapped'])
 
 /**
  * Los avisos, ordenados por lo que de verdad urge.
@@ -41,18 +50,48 @@ import { ALERT_KINDS, compareAlerts, formatQuantity, type AlertKind } from './ty
  */
 export function AlertsSection() {
   const { t } = useI18n()
-  const { activeStore } = useTenant()
+  const { notify } = useFeedback()
+  const { activeStore, can } = useTenant()
+  const canWrite = can('catalog.write')
   const query = useInventoryAlerts(activeStore?.id ?? null)
+  const adjust = useAdjustInventory()
+  const transfer = useTransferInventory()
+  const [reponer, setReponer] = useState<MovementPreset | null>(null)
 
   // 2026-11-20 · Filtro por tipo. El enlace del centro de vigilancia llega con
   // `?alerta=below_reorder#alertas` y la lista abre ya filtrada: «Reponer» lleva
   // a esos artículos, no al inventario entero.
-  const [params] = useSearchParams()
+  //
+  // 2026-11-23 · `&buscar=<sku>`: si el aviso es de UN artículo, la lista llega
+  // solo con él, y cada fila trae «Reponer» (el ingreso ya rellenado).
+  const [params, setParams] = useSearchParams()
   const pedido = params.get('alerta')
+  const skuPedido = params.get('buscar')?.trim() || null
+  const sku = skuPedido?.toLowerCase() ?? null
   const [kind, setKind] = useState<AlertKind | 'all'>(
     (ALERT_KINDS as readonly string[]).includes(pedido ?? '') ? (pedido as AlertKind) : 'all',
   )
-  const all = useMemo(() => [...(query.data ?? [])].sort(compareAlerts), [query.data])
+  useEffect(() => {
+    if ((ALERT_KINDS as readonly string[]).includes(pedido ?? '')) setKind(pedido as AlertKind)
+  }, [pedido])
+  const all = useMemo(
+    () => [...(query.data ?? [])].filter((a) => !sku || a.sku.toLowerCase() === sku).sort(compareAlerts),
+    [query.data, sku],
+  )
+  function verTodas() {
+    const siguiente = new URLSearchParams(params)
+    siguiente.delete('buscar')
+    setParams(siguiente, { replace: true })
+  }
+  function abrirReposicion(alert: InventoryAlert) {
+    setReponer({
+      product_id: alert.product_id,
+      variant_id: alert.variant_id,
+      warehouse_id: alert.warehouse_id,
+      sku: alert.sku,
+      name: alert.name,
+    })
+  }
   const counts = useMemo(() => {
     const map = new Map<AlertKind, number>()
     for (const a of all) map.set(a.kind, (map.get(a.kind) ?? 0) + 1)
@@ -70,6 +109,16 @@ export function AlertsSection() {
   return (
     <Stack spacing={2}>
       <Typography sx={{ color: 'var(--muted)' }}>{t('inventory.alerts.help')}</Typography>
+      {skuPedido && (
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+          <Chip
+            size="small"
+            label={t('inventory.alerts.onlySku').replace('{sku}', skuPedido)}
+            onDelete={verTodas}
+            sx={{ fontWeight: 700 }}
+          />
+        </Stack>
+      )}
 
       {all.length > 0 && (
         <Tabs
@@ -91,7 +140,7 @@ export function AlertsSection() {
       )}
 
       <Card>
-        {query.isPending && <TableSkeleton columns={4} />}
+        {query.isPending && <TableSkeleton columns={5} />}
         {query.isError && <ErrorState error={query.error} onRetry={() => void query.refetch()} />}
         {isEmpty && (
           <EmptyState
@@ -108,6 +157,7 @@ export function AlertsSection() {
                 <TableCell>SKU</TableCell>
                 <TableCell>{t('inventory.field.warehouse')}</TableCell>
                 <TableCell align="right">{t('inventory.field.available')}</TableCell>
+                <TableCell align="right">{t('common.actions')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -122,7 +172,15 @@ export function AlertsSection() {
                   <TableCell>
                     <Stack>
                       <Typography sx={{ fontWeight: 700, fontSize: 13 }}>{alert.sku}</Typography>
-                      <Typography sx={{ color: 'var(--muted)', fontSize: 12 }}>{alert.name}</Typography>
+                      {/* El nombre abre la ficha del producto: lo que falla se ve y se corrige ahí. */}
+                      <Link
+                        component={RouterLink}
+                        to={`/app/products?producto=${alert.product_id}`}
+                        underline="hover"
+                        sx={{ color: 'var(--muted)', fontSize: 12 }}
+                      >
+                        {alert.name}
+                      </Link>
                       {alert.limiting_component && (
                         <Typography sx={{ color: 'var(--amber)', fontSize: 12 }}>
                           {t('inventory.alert.bundleLimitedBy').replace('{component}', alert.limiting_component)}
@@ -133,6 +191,21 @@ export function AlertsSection() {
                   <TableCell>{alert.warehouse_code ?? '—'}</TableCell>
                   <TableCell align="right">
                     {alert.available_qty == null ? '—' : formatQuantity(alert.available_qty)}
+                  </TableCell>
+                  <TableCell align="right">
+                    {REPONIBLE.has(alert.kind) && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<AddRoundedIcon />}
+                        disabled={!canWrite}
+                        onClick={() => abrirReposicion(alert)}
+                        aria-label={`${t('inventory.alerts.replenish')}: ${alert.sku}${alert.warehouse_code ? ` · ${alert.warehouse_code}` : ''}`}
+                        sx={{ whiteSpace: 'nowrap' }}
+                      >
+                        {t('inventory.alerts.replenish')}
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -151,6 +224,23 @@ export function AlertsSection() {
           />
         )}
       </Card>
+
+      <MovementDrawer
+        open={reponer !== null}
+        preset={reponer}
+        canWrite={canWrite}
+        onClose={() => setReponer(null)}
+        onSubmit={async (values) => {
+          await adjust.mutateAsync(values)
+          notify(t('inventory.toast.moved'))
+          setReponer(null)
+        }}
+        onTransfer={async (values) => {
+          await transfer.mutateAsync(values)
+          notify(t('inventory.toast.moved'))
+          setReponer(null)
+        }}
+      />
     </Stack>
   )
 }

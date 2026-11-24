@@ -21,7 +21,8 @@ import {
   Tabs,
   Typography,
 } from '@mui/material'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { codeLabel, termLabel } from '@/shared/i18n/codeLabels'
 import { formatDateTime } from '@/shared/lib/format'
@@ -59,7 +60,17 @@ function severityColor(severity: string): 'error' | 'warning' | 'default' {
 export function IncidentsSection({ onTrace }: { onTrace: (correlationId: string) => void }) {
   const { t, locale } = useI18n()
   const [status, setStatus] = useState<'open' | 'resolved' | ''>('open')
-  const [term, setTerm] = useState('')
+  // `?codigo=<code>#incidentes` (2026-11-23): el análisis IA lleva a los
+  // incidentes de ESE grupo, no a la lista entera.
+  const [params] = useSearchParams()
+  const codigoPedido = params.get('codigo')
+  const [term, setTerm] = useState(codigoPedido ?? '')
+  useEffect(() => {
+    if (codigoPedido) {
+      setTerm(codigoPedido)
+      setStatus('open')
+    }
+  }, [codigoPedido])
   const debounced = useDebouncedValue(term, 300)
   const [target, setTarget] = useState<Incident | null>(null)
   const [note, setNote] = useState('')

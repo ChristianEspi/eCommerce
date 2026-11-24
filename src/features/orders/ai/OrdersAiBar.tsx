@@ -13,6 +13,7 @@ import {
   Card,
   CardContent,
   Chip,
+  InputAdornment,
   Skeleton,
   Stack,
   TextField,
@@ -26,7 +27,7 @@ import type { MessageKey } from '@/shared/i18n/messages'
 import { formatDate, formatMoney } from '@/shared/lib/format'
 import { AppIcon } from '@/shared/ui/AppIcon'
 import { StatusChip } from '@/shared/ui/StatusChip'
-import { C, SH, T } from '@/theme/tokens'
+import { C, T } from '@/theme/tokens'
 import {
   APPROVAL_LABEL,
   FULFILLMENT_COLOR,
@@ -84,6 +85,11 @@ const INDICATOR_ICON: Record<OrderIndicator, ReactNode> = {
 /**
  * Indicador del listado: conteo del SISTEMA (sin modelo), clicable para ver
  * esos pedidos. En cero pasa a neutro: no hay nada que mirar.
+ *
+ * 2026-11-23 · Rediseño: KPI compacto (ícono pequeño + número + etiqueta) con
+ * radio moderado. La franja lateral de color se cortaba contra el radio de la
+ * píldora y las tarjetas ocupaban media pantalla; el tono ahora va en el ícono
+ * y, al seleccionar, en el fondo y el borde completos.
  */
 function IndicatorCard({
   indicator,
@@ -107,66 +113,57 @@ function IndicatorCard({
       aria-pressed={selected}
       aria-label={`${label}: ${count ?? '—'}`}
       sx={{
-        position: 'relative',
-        overflow: 'hidden',
         width: '100%',
         height: '100%',
-        // En fila: ícono a la izquierda, número y texto al lado. Apilados
-        // dejaban tres cuartos de la tarjeta en blanco (visto 2026-11-13).
         display: 'flex',
-        flexDirection: 'row',
-        alignItems: 'center',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
         justifyContent: 'flex-start',
         textAlign: 'left',
-        gap: 1.5,
-        py: 1.25,
-        px: 1.75,
-        pl: 2,
-        borderRadius: 3,
+        gap: 0.5,
+        px: 1.5,
+        py: 1.1,
+        borderRadius: '12px',
         bgcolor: selected ? tone.soft : C.card,
         border: `1px solid ${selected ? tone.fg : C.line}`,
-        transition: 'border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease',
-        '&::before': {
-          content: '""',
-          position: 'absolute',
-          left: 0,
-          top: 0,
-          bottom: 0,
-          width: 4,
-          bgcolor: tone.fg,
-          opacity: 0.85,
-        },
-        '&:hover': { borderColor: tone.fg, boxShadow: SH.lg, transform: 'translateY(-1px)' },
+        boxShadow: selected ? `inset 0 0 0 1px ${tone.fg}` : 'none',
+        transition: 'border-color 160ms ease, background-color 160ms ease',
+        '&:hover': { borderColor: tone.fg },
         '&.Mui-focusVisible': { outline: `2px solid ${C.accent}`, outlineOffset: 2 },
-        '@media (prefers-reduced-motion: reduce)': { transition: 'none', '&:hover': { transform: 'none' } },
+        '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
       }}
     >
-      <Box
-        aria-hidden
-        sx={{
-          width: 36,
-          height: 36,
-          flexShrink: 0,
-          borderRadius: '50%',
-          display: 'grid',
-          placeItems: 'center',
-          bgcolor: selected ? C.card : tone.soft,
-          color: tone.fg,
-          '& .MuiSvgIcon-root': { fontSize: 18 },
-        }}
-      >
-        {INDICATOR_ICON[indicator]}
-      </Box>
-      <Box sx={{ minWidth: 0 }}>
-        {loading ? (
-          <Skeleton variant="text" width={40} sx={{ fontSize: T.kpiCard }} />
-        ) : (
-          <Typography className="tnum" sx={{ fontSize: T.kpiCard, fontWeight: 800, lineHeight: 1.1, letterSpacing: -0.3 }}>
-            {count ?? '—'}
-          </Typography>
-        )}
-        <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: C.muted, lineHeight: 1.3, mt: 0.25 }}>{label}</Typography>
-      </Box>
+      <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', width: '100%', minWidth: 0 }}>
+        <Box
+          aria-hidden
+          sx={{
+            width: 22,
+            height: 22,
+            flexShrink: 0,
+            borderRadius: '6px',
+            display: 'grid',
+            placeItems: 'center',
+            bgcolor: tone.soft,
+            color: tone.fg,
+            '& .MuiSvgIcon-root': { fontSize: 14 },
+          }}
+        >
+          {INDICATOR_ICON[indicator]}
+        </Box>
+        <Typography noWrap sx={{ fontSize: 12.5, fontWeight: 600, color: C.muted, lineHeight: 1.3, minWidth: 0 }}>
+          {label}
+        </Typography>
+      </Stack>
+      {loading ? (
+        <Skeleton variant="text" width={40} sx={{ fontSize: T.kpiCard }} />
+      ) : (
+        <Typography
+          className="tnum"
+          sx={{ fontSize: T.kpiCard, fontWeight: 800, lineHeight: 1.1, letterSpacing: -0.3, color: count ? tone.fg : C.ink }}
+        >
+          {count ?? '—'}
+        </Typography>
+      )}
     </ButtonBase>
   )
 }
@@ -464,20 +461,26 @@ export function OrdersAiBar({
   const attentionResult = attention.data
 
   return (
-    <Card component="section" aria-labelledby="ai-orders-bar-title" sx={{ borderColor: 'var(--accent)' }}>
-      <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+    <Card component="section" aria-labelledby="ai-orders-bar-title" variant="outlined" sx={{ borderColor: C.line, boxShadow: 'none' }}>
+      <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, '&:last-child': { pb: 2 } }}>
         <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
           <AppIcon tone="accent" size="sm">
             <AutoAwesomeRoundedIcon fontSize="small" />
           </AppIcon>
-          <Stack sx={{ minWidth: 0, flex: 1 }}>
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            spacing={{ xs: 0.25, md: 1.25 }}
+            sx={{ minWidth: 0, flex: 1, alignItems: { md: 'center' } }}
+          >
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexShrink: 0 }}>
               <Typography id="ai-orders-bar-title" component="h2" sx={{ fontSize: T.body, fontWeight: 800 }}>
                 {t('aiOrders.bar.title')}
               </Typography>
-              <Chip size="small" label={t('aiOrders.badge')} color="primary" variant="outlined" />
+              <Chip size="small" label={t('aiOrders.badge')} color="primary" variant="outlined" sx={{ height: 20, fontSize: 11 }} />
             </Stack>
-            <Typography sx={{ fontSize: 12.5, color: 'var(--muted)' }}>{t('aiOrders.bar.description')}</Typography>
+            <Typography noWrap sx={{ fontSize: 12.5, color: 'var(--muted)', minWidth: 0 }}>
+              {t('aiOrders.bar.description')}
+            </Typography>
           </Stack>
           {shown && (
             <Button size="small" startIcon={<CloseRoundedIcon />} onClick={clear} disabled={busy}>
@@ -489,11 +492,11 @@ export function OrdersAiBar({
         {/* Indicadores del SISTEMA: se ven aunque la IA no esté contratada o
             no quede cuota, porque no la usan. */}
         <Stack spacing={1}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap' }} useFlexGap>
-            <Typography component="h3" sx={{ fontSize: T.label, fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'baseline', flexWrap: 'wrap' }} useFlexGap>
+            <Typography component="h3" sx={{ fontSize: 12.5, fontWeight: 700 }}>
               {t('aiOrders.indicators.title')}
             </Typography>
-            <Typography sx={{ fontSize: 11.5, color: C.muted }}>{t('aiOrders.indicators.free')}</Typography>
+            <Typography sx={{ fontSize: 11.5, color: C.muted }}>· {t('aiOrders.indicators.free')}</Typography>
           </Stack>
           {indicators.isError ? (
             <Typography sx={{ fontSize: 12.5, color: C.muted }}>{t('aiOrders.indicators.error')}</Typography>
@@ -501,7 +504,7 @@ export function OrdersAiBar({
             <Box
               role="group"
               aria-label={t('aiOrders.indicators.title')}
-              sx={{ display: 'grid', gap: 1.25, gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' } }}
+              sx={{ display: 'grid', gap: 1, gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'repeat(4, minmax(0, 1fr))' } }}
             >
               {ORDER_INDICATORS.map((key) => (
                 <IndicatorCard
@@ -523,28 +526,42 @@ export function OrdersAiBar({
         {canAsk && (
           <>
             <Box component="form" onSubmit={onSubmit} noValidate>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'flex-start' } }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label={t('aiOrders.search.label')}
-                  placeholder={t('aiOrders.search.placeholder')}
-                  value={question}
-                  onChange={(e) => setQuestion(e.target.value)}
-                  error={tooLong}
-                  helperText={tooLong ? t('aiOrders.ask.tooLong') : undefined}
-                  inputProps={{ maxLength: MAX_ORDER_QUESTION + 50 }}
-                />
-                <Button
-                  type="submit"
-                  variant="contained"
-                  startIcon={<SearchRoundedIcon />}
-                  disabled={busy || !question.trim() || tooLong}
-                  sx={{ flexShrink: 0 }}
-                >
-                  {t('aiOrders.search.send')}
-                </Button>
-              </Stack>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder={t('aiOrders.search.placeholder')}
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                error={tooLong}
+                helperText={tooLong ? t('aiOrders.ask.tooLong') : undefined}
+                inputProps={{ maxLength: MAX_ORDER_QUESTION + 50, 'aria-label': t('aiOrders.search.label') }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <AutoAwesomeRoundedIcon sx={{ fontSize: 18, color: 'var(--accent-deep)' }} />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end" sx={{ mr: -0.75 }}>
+                      <Button
+                        type="submit"
+                        size="small"
+                        variant="contained"
+                        startIcon={<SearchRoundedIcon />}
+                        disabled={busy || !question.trim() || tooLong}
+                        sx={{
+                          borderRadius: '8px',
+                          whiteSpace: 'nowrap',
+                          '&.Mui-disabled': { bgcolor: C.neutralSoft, color: C.muted },
+                        }}
+                      >
+                        {t('aiOrders.search.send')}
+                      </Button>
+                    </InputAdornment>
+                  ),
+                  sx: { borderRadius: '10px', pr: 1 },
+                }}
+              />
             </Box>
           </>
         )}

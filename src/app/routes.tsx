@@ -120,6 +120,9 @@ const OperationsPage = lazyPage(() =>
 const IntegrationsPage = lazyPage(() =>
   import('@/features/integrations/IntegrationsPage').then((m) => ({ default: m.IntegrationsPage })),
 )
+const AiAddonsPage = lazyPage(() =>
+  import('@/features/ai/addons/AiAddonsPage').then((m) => ({ default: m.AiAddonsPage })),
+)
 const DiagnosticsPage = lazyPage(() =>
   import('@/features/capabilities/DiagnosticsPage').then((m) => ({ default: m.DiagnosticsPage })),
 )
@@ -287,6 +290,10 @@ export const routes: RouteObject[] = [
           // Ajustes y diagnóstico NO se gatean por capacidad: son la salida de
           // un tenant sin nada contratado y el sitio donde se ve por qué.
           { path: 'settings', element: withSuspense(<SettingsPage />) },
+          // 2026-11-23 · Complementos IA: sin capacidad, como Ajustes. Es donde
+          // se ve qué IA hay y por qué una no está; gatearla la escondería
+          // justo a quien no tiene ninguna.
+          { path: 'ai', element: withSuspense(<AiAddonsPage />) },
           // Operación NO se gatea por capacidad, igual que Ajustes y
           // Diagnóstico y por la misma razón (P02): quien no puede ver por qué
           // fallan sus cobros acaba llamando por teléfono. Quien decide aquí es

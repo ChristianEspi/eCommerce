@@ -491,6 +491,8 @@ describe('la puerta que PostgREST ve', () => {
       // 2026-11-19 · Resumen diario: configurar por tienda (owner/admin).
       'ai_digest_configure',
       'ai_entitlement',
+      // 2026-11-23 · Complementos IA: la empresa enciende/apaga cada IA.
+      'ai_feature_set',
       'ai_feedback',
       // Fase 08: entregas (tienda o una entrega) sin dirección, contacto ni guía.
       'ai_fulfillment_facts',
@@ -530,6 +532,8 @@ describe('la puerta que PostgREST ve', () => {
       // El desglose por modulo: con UN presupuesto compartido, es lo que
       // responde en que se esta yendo.
       'ai_usage_by_feature',
+      // 2026-11-23 · Consumo del mes por IA (Complementos IA).
+      'ai_usage_this_month',
       // 2026-11-19 · Valor de la IA agregado (owner/admin de la tienda).
       'ai_value_summary',
       'ai_visit_facts',

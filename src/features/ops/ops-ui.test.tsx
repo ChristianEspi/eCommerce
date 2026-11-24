@@ -176,7 +176,7 @@ function backend(options: { forbidden?: boolean; role?: string } = {}): FakeSupa
   })
 }
 
-function renderOps(fake: FakeSupabase) {
+function renderOps(fake: FakeSupabase, route = '/') {
   holder.client = fake
   return renderWithProviders(
     <TenantProvider>
@@ -184,7 +184,7 @@ function renderOps(fake: FakeSupabase) {
         <OperationsPage />
       </CapabilitiesProvider>
     </TenantProvider>,
-    { session: fake.state.session },
+    { session: fake.state.session, route },
   )
 }
 
@@ -257,6 +257,16 @@ describe('Incidentes', () => {
     const celdas = within(fila as HTMLElement)
     expect(celdas.getByText('no quedaban unidades')).toBeInTheDocument()
     expect(celdas.getByText('×3')).toBeInTheDocument()
+  })
+
+  it('`?codigo=` (desde el análisis IA) abre la lista ya filtrada por ese código', async () => {
+    window.history.replaceState(null, '', '#incidentes')
+    const fake = backend()
+    renderOps(fake, '/app/operations?codigo=STOCK_INSUFICIENTE')
+    const [buscador] = await screen.findAllByPlaceholderText(
+      'Busca por código, operación o identificador de rastro',
+    )
+    expect(buscador).toHaveValue('STOCK_INSUFICIENTE')
   })
 
   it('atender EXIGE un motivo antes de llegar al servidor', async () => {

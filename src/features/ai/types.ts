@@ -62,6 +62,13 @@ export const aiEntitlementSchema = z.object({
    * se descartaba y la UI no sabía qué uso estaba contratado (D2).
    */
   features: z.record(z.string(), z.boolean()).optional(),
+  /**
+   * POR QUÉ cada funcionalidad está o no usable (2026-11-23, Complementos IA):
+   * `on`, `off` (la apagó la empresa), `no_ai` (sin la capacidad de IA),
+   * `no_module` (sin el módulo que la aloja). Un valor desconocido se lee como
+   * `no_ai`: nunca como encendida.
+   */
+  states: z.record(z.string(), z.enum(['on', 'off', 'no_ai', 'no_module']).catch('no_ai')).optional(),
 })
 
 export type AiEntitlement = z.infer<typeof aiEntitlementSchema>

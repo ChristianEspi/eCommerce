@@ -2366,6 +2366,7 @@ export const es = {
       'Solo lectura: una sugerencia se acepta o se descarta entera. Editarla borraría de dónde salió la cifra.',
     'planning.forecasts.help':
       'La previsión la produce un modelo, no una persona escribiendo cifras: si se pudiera editar, dejaría de servir para medir el error del modelo.',
+    'planning.forecasts.search': 'Buscar por producto',
     'planning.forecasts.empty': 'Todavía no hay previsiones',
     'planning.forecasts.emptyBody': 'Aparecerán aquí cuando un modelo las genere.',
     'planning.generate.title': 'Generar sugerido',
@@ -2976,6 +2977,8 @@ export const es = {
     'inventory.reservations.release': 'Soltar',
     'inventory.reservations.commit': 'Confirmar salida',
     'inventory.alerts.help': 'Lo que conviene mirar hoy, de lo más urgente a lo menos.',
+    'inventory.alerts.replenish': 'Reponer',
+    'inventory.alerts.onlySku': 'Solo {sku}',
     'inventory.alerts.empty': 'Nada que revisar',
     'inventory.alerts.emptyBody': 'Ningún almacén está por debajo de su umbral ni en descuadre.',
     'inventory.field.code': 'Código',

@@ -279,6 +279,14 @@ export const NAV_ITEMS: NavItem[] = [
     group: 'system',
   },
   {
+    // 2026-11-23 · Encender/apagar cada IA, cupo, consumo e historial.
+    to: '/app/ai',
+    label: 'nav.aiAddons',
+    icon: <AutoAwesomeRoundedIcon fontSize="small" />,
+    permission: 'tenant.manage',
+    group: 'system',
+  },
+  {
     to: '/app/settings',
     label: 'nav.settings',
     icon: <SettingsRoundedIcon fontSize="small" />,

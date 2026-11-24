@@ -36,6 +36,7 @@ export const PLANNING_AI_SIGNALS = [
 export type PlanningAiSignal = (typeof PLANNING_AI_SIGNALS)[number]
 
 export const PLANNING_AI_SEVERITIES = ['high', 'medium', 'low'] as const
+export type PlanningAiSeverity = (typeof PLANNING_AI_SEVERITIES)[number]
 export const PLANNING_PERIOD_PHASES = ['closed', 'current', 'future', 'territory'] as const
 export const PLANNING_SEASONAL_REASONS = ['historial_anual', 'menos_de_un_anio', 'pocos_pedidos', 'sin_ventas_en_el_anio'] as const
 

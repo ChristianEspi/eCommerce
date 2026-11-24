@@ -177,7 +177,8 @@ describe('centro de vigilancia', () => {
     render()
     const dialog = await abrir()
     const ir = within(dialog).getByRole('link', { name: 'Ir a resolverlo: Pedidos sin cobrar' })
-    expect(ir).toHaveAttribute('href', '/app/orders')
+    // 2026-11-23 · Abre Pedidos ya en la pestaña de pendientes, no la lista entera.
+    expect(ir).toHaveAttribute('href', '/app/orders?estado=pending')
   })
 
   it('silenciar manda la clave y la CIFRA con la que se vio el aviso', async () => {

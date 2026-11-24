@@ -256,18 +256,33 @@ export function LevelsSection() {
   )
 }
 
-function MovementDrawer({
+/**
+ * Lo que ya se sabe al abrir el ingreso desde una alerta (2026-11-23): el
+ * artículo, su variante y el almacén. «Reponer» abre el formulario listo para
+ * poner la cantidad, en vez de dejar al operador buscando el producto.
+ */
+export interface MovementPreset {
+  product_id: string
+  variant_id: string | null
+  warehouse_id: string | null
+  sku: string
+  name: string
+}
+
+export function MovementDrawer({
   open,
   canWrite,
   onClose,
   onSubmit,
   onTransfer,
+  preset = null,
 }: {
   open: boolean
   canWrite: boolean
   onClose: () => void
   onSubmit: (values: MovementFormValues) => Promise<void>
   onTransfer: (values: TransferFormValues) => Promise<void>
+  preset?: MovementPreset | null
 }) {
   const { t } = useI18n()
   const { activeStore } = useTenant()
@@ -354,20 +369,36 @@ function MovementDrawer({
     if (!open) return
     setServerError(null)
     setProductTerm('')
-    setPicked(null)
+    setPicked(
+      preset
+        ? {
+            id: preset.product_id,
+            primary: preset.name,
+            secondary: preset.sku,
+            kind: preset.variant_id ? 'variant' : 'simple',
+          }
+        : null,
+    )
     setModo('movement')
-    reset({ warehouse_id: '', product_id: '', variant_id: null, kind: 'receipt', quantity: 1, reason: '' })
-    traslado.reset({
-      from_warehouse_id: '',
-      to_warehouse_id: '',
-      product_id: '',
-      variant_id: null,
+    reset({
+      warehouse_id: preset?.warehouse_id ?? '',
+      product_id: preset?.product_id ?? '',
+      variant_id: preset?.variant_id ?? null,
+      kind: 'receipt',
       quantity: 1,
       reason: '',
     })
-    // `traslado` es estable; solo se reinicia al abrir.
+    traslado.reset({
+      from_warehouse_id: '',
+      to_warehouse_id: preset?.warehouse_id ?? '',
+      product_id: preset?.product_id ?? '',
+      variant_id: preset?.variant_id ?? null,
+      quantity: 1,
+      reason: '',
+    })
+    // `traslado` es estable; solo se reinicia al abrir (o al cambiar de alerta).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, reset])
+  }, [open, reset, preset])
 
   function elegirProducto(id: string, variant: string | null) {
     setValue('product_id', id, { shouldValidate: Boolean(id) })

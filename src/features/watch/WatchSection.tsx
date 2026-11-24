@@ -1,3 +1,4 @@
+import { watchActionHref } from './links'
 import AccountBalanceWalletRoundedIcon from '@mui/icons-material/AccountBalanceWalletRounded'
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded'
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded'
@@ -112,7 +113,7 @@ function WatchRow({ finding, why, last }: { finding: WatchFinding; why: string |
         </Tooltip>
         <Button
           component={RouterLink}
-          to={finding.href}
+          to={watchActionHref(finding)}
           size="small"
           variant={critica ? 'contained' : 'outlined'}
           aria-label={`${cta}: ${title}`}

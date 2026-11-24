@@ -243,6 +243,34 @@ describe('Operaciones — pestaña «Análisis IA»', () => {
     expect(calls(client, 'operations-assistant')).toContainEqual({ mode: 'signals', event_id: EV })
   })
 
+  it('cifras: solo las que no son cero; tiempos humanos; título legible y enlace a Incidentes por código', async () => {
+    const user = userEvent.setup()
+    const system = {
+      ...OPS_COMPANY,
+      metrics: {
+        ...OPS_COMPANY.metrics,
+        stuck_checkouts: { kind: 'count', value: 0 },
+        payments_failed_24h: { kind: 'count', value: 0 },
+        G1_last_seen_minutes: { kind: 'count', value: 110711 },
+      },
+      highlights: ['open_critical', 'new_24h', 'stuck_checkouts', 'payments_failed_24h'],
+      rows: [{ ...OPS_COMPANY.rows[0], metrics: ['G1_open', 'G1_new_24h', 'G1_last_seen_minutes'] }],
+    }
+    render(<OpsAiSection />, {
+      ops: (body) => (body.mode === 'signals' ? { data: null, motivo: null, interaction_id: null, system } : explainBody(system, {})),
+    })
+    expect(await screen.findByText('Críticos')).toBeInTheDocument()
+    // Los ceros no ocupan tarjeta: van juntos en una línea.
+    expect(screen.getByText(/Sin novedad en:.*Compras atascadas/)).toBeInTheDocument()
+    // 110 711 minutos se leen como días, no como minutos crudos.
+    expect(screen.getByText('hace 77 días')).toBeInTheDocument()
+    expect(screen.queryByText(/110/)).toBeNull()
+    // Título legible: tipo traducido + código legible; el código técnico queda aparte.
+    expect(screen.getByText('Integración fallida · Erp rechazo')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Ver incidentes' }))
+    expect(window.location.hash).toBe('#incidentes')
+  })
+
   it('viewer y orders: nada se pinta ni se pide', async () => {
     for (const role of ['viewer', 'orders']) {
       const { client } = render(<OpsAiSection />, { role })
