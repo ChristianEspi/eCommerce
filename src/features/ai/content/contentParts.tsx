@@ -89,7 +89,7 @@ export function SuggestionRow({
     <Box
       sx={{
         border: '1px solid var(--border)',
-        borderRadius: 2,
+        borderRadius: 0.67,
         p: 1.5,
         opacity: decision === 'discarded' ? 0.55 : 1,
       }}

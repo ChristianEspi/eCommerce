@@ -530,7 +530,7 @@ function Comparacion({
     <Box
       role="group"
       aria-labelledby={`${idBase}-label`}
-      sx={{ border: '1px solid var(--border)', borderRadius: 2, p: 1.5 }}
+      sx={{ border: '1px solid var(--border)', borderRadius: 0.67, p: 1.5 }}
     >
       <Typography id={`${idBase}-label`} sx={{ fontSize: 13, fontWeight: 800 }}>
         {etiqueta}

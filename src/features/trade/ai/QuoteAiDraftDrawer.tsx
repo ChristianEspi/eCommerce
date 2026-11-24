@@ -617,7 +617,7 @@ function DraftLineEditor({
         : ('error' as const)
 
   return (
-    <Box sx={{ border: '1px solid var(--border)', borderRadius: 1.5, p: 1.25 }} role="group" aria-label={line.query}>
+    <Box sx={{ border: '1px solid var(--border)', borderRadius: 0.67, p: 1.25 }} role="group" aria-label={line.query}>
       <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.75 }}>
         <Typography sx={{ fontSize: 13, fontWeight: 700, flex: 1, minWidth: 0 }} noWrap title={line.query}>
           «{line.query}»

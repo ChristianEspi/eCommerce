@@ -70,7 +70,7 @@ export function CopilotTrendChart({ chart }: { chart: CopilotChart }) {
   const punto = hover !== null ? chart.current[hover] : null
 
   return (
-    <Box data-copilot-chart sx={{ border: '1px solid var(--border)', borderRadius: 2, p: 1.25, bgcolor: 'var(--card)' }}>
+    <Box data-copilot-chart sx={{ border: '1px solid var(--border)', borderRadius: 0.67, p: 1.25, bgcolor: 'var(--card)' }}>
       <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'baseline', gap: 1, mb: 0.75, flexWrap: 'wrap' }}>
         <Typography sx={{ fontSize: 12.5, fontWeight: 800 }}>
           {t('copilot.chart.title').replace('{days}', String(chart.days)).replace('{measure}', etiquetaMedida)}

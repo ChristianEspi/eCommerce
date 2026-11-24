@@ -100,7 +100,7 @@ function Figures({ system }: { system: ExplainSystem }) {
                   minWidth: 0,
                   px: 1.5,
                   py: 1,
-                  borderRadius: 2,
+                  borderRadius: 0.67,
                   border: '1px solid var(--border)',
                   borderLeft: `4px solid ${danger ? 'var(--red)' : warning ? 'var(--amber)' : 'var(--border)'}`,
                   bgcolor: 'var(--card)',
@@ -156,7 +156,7 @@ function CompanySignals({ system }: { system: ExplainSystem }) {
                 gap: 0.75,
                 px: 1.25,
                 py: 0.5,
-                borderRadius: 99,
+                borderRadius: 0.67,
                 fontSize: 12.5,
                 fontWeight: 700,
                 bgcolor: high ? 'var(--red-soft)' : s.severity === 'medium' ? 'var(--amber-soft)' : 'var(--blue-soft)',
@@ -265,7 +265,7 @@ function IncidentRow({
             variant="outlined"
             startIcon={<AutoAwesomeRoundedIcon />}
             onClick={() => onOpenItem(item)}
-            sx={{ borderRadius: 99, whiteSpace: 'nowrap' }}
+            sx={{ whiteSpace: 'nowrap' }}
           >
             {t('aiExplain.analyze')}
           </Button>
@@ -326,7 +326,7 @@ export function OpsSystemView({
             <GroupTitle id={`ai-ops-${status}`} count={lista.length}>
               {t(`aiOps.groupBy.${status}` as MessageKey)}
             </GroupTitle>
-            <Box component="ul" sx={{ m: 0, p: 0, listStyle: 'none', border: '1px solid var(--border)', borderRadius: 2, overflow: 'hidden' }}>
+            <Box component="ul" sx={{ m: 0, p: 0, listStyle: 'none', border: '1px solid var(--border)', borderRadius: 0.67, overflow: 'hidden' }}>
               {lista.map((row, index) => (
                 <IncidentRow
                   key={row.ref ?? row.label}

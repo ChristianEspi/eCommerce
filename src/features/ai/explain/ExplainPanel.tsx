@@ -99,80 +99,118 @@ const METRIC_STYLE: Record<MetricTone, { bg: string; bar: string; fg: string }> 
   plain: { bg: 'var(--card)', bar: 'var(--border)', fg: 'var(--text)' },
 }
 
+/** Cifra numérica de una métrica (null si es fecha o no es número). */
+function metricNumber(metric: ExplainContext['metrics'][string] | undefined): number | null {
+  if (!metric || metric.kind === 'datetime') return null
+  const n = typeof metric.value === 'number' ? metric.value : Number(metric.value)
+  return Number.isFinite(n) ? n : null
+}
+
+/** Título de grupo: mayúsculas pequeñas + cuántos hay. */
+function GroupTitle({ id, title, count }: { id: string; title: string; count?: number }) {
+  return (
+    <Typography
+      id={id}
+      component="h4"
+      sx={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', mb: 1 }}
+    >
+      {title}
+      {count !== undefined && (
+        <Box component="span" className="tnum" sx={{ color: 'var(--text)' }}>
+          {` · ${count}`}
+        </Box>
+      )}
+    </Typography>
+  )
+}
+
+/**
+ * Cifras del sistema (2026-11-24). Antes: una tarjeta por cifra, la mayoría en
+ * cero, ocupando dos filas para decir «nada». Ahora: tarjetas SOLO para lo que
+ * no es cero (se reparten el ancho) y los ceros en una línea «Sin novedad en».
+ */
 function MetricGrid({ keys, context, ns }: { keys: readonly string[]; context: ExplainContext; ns: ExplainNamespace }) {
   const { t, locale } = useI18n()
   const shown = keys.filter((k) => context.metrics[k])
   if (shown.length === 0) return null
+  const label = (k: string) => tr(t, `${ns}.metric.${metricSuffix(k)}`, metricSuffix(k))
+  const cards = shown.filter((k) => metricNumber(context.metrics[k]) !== 0)
+  const zeros = shown.filter((k) => metricNumber(context.metrics[k]) === 0)
   return (
-    <Box
-      component="dl"
-      sx={{
-        m: 0,
-        display: 'grid',
-        gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(auto-fill, minmax(170px, 1fr))' },
-        gap: 1,
-      }}
-    >
-      {shown.map((k, i) => {
-        const metric = context.metrics[k]!
-        const tone = metricTone(k, metric.value, metric.kind, i)
-        const style = METRIC_STYLE[tone]
-        const hero = tone === 'hero'
-        return (
-          <Box
-            key={k}
-            sx={{
-              position: 'relative',
-              overflow: 'hidden',
-              minWidth: 0,
-              px: 1.5,
-              py: hero ? 1.5 : 1.1,
-              pl: 2,
-              borderRadius: 2,
-              bgcolor: style.bg,
-              border: '1px solid',
-              borderColor: tone === 'zero' ? 'var(--border)' : 'transparent',
-              borderStyle: tone === 'zero' ? 'dashed' : 'solid',
-              gridColumn: hero ? 'span 2' : undefined,
-              '&::before': {
-                content: '""',
-                position: 'absolute',
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: 4,
-                bgcolor: style.bar,
-              },
-            }}
-          >
-            <Typography
-              component="dt"
-              sx={{ fontSize: 11.5, fontWeight: 600, color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-            >
-              {tr(t, `${ns}.metric.${metricSuffix(k)}`, metricSuffix(k))}
-            </Typography>
-            <Typography
-              component="dd"
-              className="tnum"
-              sx={{
-                m: 0,
-                mt: 0.25,
-                fontSize: hero ? 26 : 18,
-                lineHeight: 1.2,
-                fontWeight: tone === 'zero' ? 600 : 800,
-                color: style.fg,
-                overflowWrap: 'anywhere',
-              }}
-            >
-              {formatMetric(metric, locale, { days: t('aiOrders.unit.days') })}
-            </Typography>
-          </Box>
-        )
-      })}
-    </Box>
+    <Stack spacing={1}>
+      {cards.length > 0 && (
+        <Box
+          component="dl"
+          sx={{
+            m: 0,
+            display: 'grid',
+            gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(auto-fit, minmax(180px, 1fr))' },
+            gap: 1,
+          }}
+        >
+          {cards.map((k, i) => {
+            const metric = context.metrics[k]!
+            const tone = metricTone(k, metric.value, metric.kind, i)
+            const style = METRIC_STYLE[tone]
+            const hero = tone === 'hero'
+            return (
+              <Box
+                key={k}
+                sx={{
+                  position: 'relative',
+                  overflow: 'hidden',
+                  minWidth: 0,
+                  px: 1.75,
+                  py: 1.25,
+                  pl: 2.25,
+                  borderRadius: 0.67,
+                  bgcolor: style.bg,
+                  border: '1px solid',
+                  borderColor: tone === 'plain' ? 'var(--border)' : 'transparent',
+                  '&::before': { content: '""', position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, bgcolor: style.bar },
+                }}
+              >
+                <Typography
+                  component="dt"
+                  title={label(k)}
+                  sx={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                >
+                  {label(k)}
+                </Typography>
+                <Typography
+                  component="dd"
+                  className="tnum"
+                  sx={{ m: 0, mt: 0.25, fontSize: hero ? 26 : 22, lineHeight: 1.15, fontWeight: 800, color: style.fg, overflowWrap: 'anywhere' }}
+                >
+                  {formatMetric(metric, locale, { days: t('aiOrders.unit.days') })}
+                </Typography>
+              </Box>
+            )
+          })}
+        </Box>
+      )}
+      {zeros.length > 0 && (
+        <Stack direction="row" spacing={0.75} sx={{ alignItems: 'flex-start', color: 'var(--muted)' }}>
+          <CheckCircleOutlineRoundedIcon sx={{ fontSize: 16, mt: '2px', color: 'var(--accent-deep)' }} />
+          <Typography sx={{ fontSize: 12.5, lineHeight: 1.5 }}>
+            <Box component="span" sx={{ fontWeight: 700, color: 'var(--text)' }}>
+              {t('aiExplain.system.zeroFigures')}
+            </Box>{' '}
+            {zeros.map(label).join(' · ')}
+          </Typography>
+        </Stack>
+      )}
+    </Stack>
   )
 }
 
+const SIGNAL_DOT: Record<'high' | 'medium' | 'low', string> = {
+  high: 'var(--red)',
+  medium: 'var(--amber)',
+  low: 'var(--blue)',
+}
+
+/** Señales como chips que se acomodan en una fila, no píldoras a todo el ancho. */
 function SignalList({
   signals,
   ns,
@@ -188,7 +226,7 @@ function SignalList({
       <Stack
         direction="row"
         spacing={1}
-        sx={{ alignItems: 'center', p: 1.25, borderRadius: 2, bgcolor: 'var(--accent-soft)', color: 'var(--accent-deep)' }}
+        sx={{ alignItems: 'center', px: 1.5, py: 1, borderRadius: 0.67, bgcolor: 'var(--accent-soft)', color: 'var(--accent-deep)' }}
       >
         <CheckCircleOutlineRoundedIcon fontSize="small" />
         <Typography sx={{ fontSize: 13, fontWeight: 600 }}>{t('aiExplain.system.noSignals')}</Typography>
@@ -196,141 +234,172 @@ function SignalList({
     )
   }
   return (
-    <Box
-      component="ul"
-      sx={{ m: 0, p: 0, listStyle: 'none', display: 'grid', gap: 0.75, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' } }}
-    >
+    <Stack component="ul" direction="row" useFlexGap spacing={0.75} sx={{ m: 0, p: 0, listStyle: 'none', flexWrap: 'wrap' }}>
       {signals.map((s) => (
-        <Stack
+        <Box
           component="li"
           key={`${s.code}-${s.ref ?? ''}`}
-          direction="row"
-          spacing={1.25}
-          sx={{ alignItems: 'center', p: 1, pr: 1.5, borderRadius: 2, bgcolor: SEVERITY_SOFT[s.severity].bg, minWidth: 0 }}
+          sx={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 0.75,
+            px: 1.25,
+            py: 0.6,
+            borderRadius: 0.67,
+            fontSize: 12.5,
+            fontWeight: 700,
+            bgcolor: SEVERITY_SOFT[s.severity].bg,
+            color: 'var(--text)',
+            maxWidth: '100%',
+          }}
         >
-          <SeverityIcon severity={s.severity} />
-          <Typography sx={{ fontSize: 13, fontWeight: 600, minWidth: 0 }}>
+          <Box component="span" aria-hidden sx={{ width: 8, height: 8, flexShrink: 0, borderRadius: '50%', bgcolor: SIGNAL_DOT[s.severity] }} />
+          <Box component="span" sx={{ minWidth: 0, overflowWrap: 'anywhere' }}>
             {tr(t, `${ns}.signal.${s.code}`, s.code)}
             {s.ref && context.entities[s.ref] ? (
               <Box component="span" sx={{ color: 'var(--muted)', fontWeight: 500 }}>{` · ${context.entities[s.ref]!.label}`}</Box>
             ) : null}
-          </Typography>
-        </Stack>
+          </Box>
+        </Box>
       ))}
+    </Stack>
+  )
+}
+
+/** Resumen de la cabecera: color solo decora, el texto dice lo mismo. */
+function SummaryPill({ tone, text }: { tone: 'warning' | 'ok' | 'neutral'; text: string }) {
+  const bg = tone === 'warning' ? 'var(--amber-soft)' : tone === 'ok' ? 'var(--accent-soft)' : 'var(--neutral-soft)'
+  const dot = tone === 'warning' ? 'var(--amber)' : tone === 'ok' ? 'var(--accent)' : 'var(--muted)'
+  return (
+    <Box
+      sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, px: 1.25, py: 0.5, borderRadius: 0.67, bgcolor: bg, fontSize: 12.5, fontWeight: 700 }}
+    >
+      <Box component="span" aria-hidden sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: dot }} />
+      <span className="tnum">{text}</span>
     </Box>
   )
 }
 
-function ItemList({
-  items,
+type SystemRow = ExplainSystem['rows'][number]
+
+/**
+ * Una fila de la lista a revisar. Junta lo que antes salía DOS veces: la
+ * tarjeta del ítem (gravedad, señales, «Analizar») y su línea de cifras
+ * (estado, importe, días…). Las cifras en cero no se pintan: «Intentos
+ * rechazados: 0» en cada fila es ruido.
+ */
+function ReviewRow({
+  label,
+  severity,
+  signals,
+  row,
+  system,
   ns,
-  onOpenItem,
+  first,
+  noteLabel,
+  onAnalyze,
 }: {
-  items: readonly ExplainItem[]
+  label: string
+  severity: 'high' | 'medium' | 'low' | null
+  signals: readonly string[]
+  row: SystemRow | undefined
+  system: ExplainSystem
   ns: ExplainNamespace
-  onOpenItem?: (item: ExplainItem) => void
+  first: boolean
+  noteLabel?: (note: string) => string
+  onAnalyze?: () => void
 }) {
-  const { t } = useI18n()
-  if (items.length === 0) return null
+  const { t, locale } = useI18n()
+  const figures = (row?.metrics ?? []).filter((k) => system.metrics[k] && metricNumber(system.metrics[k]) !== 0)
   return (
-    <AiBlock title={t(`${ns}.items` as MessageKey)}>
-      <Stack component="ul" spacing={0.75} sx={{ m: 0, p: 0, listStyle: 'none' }}>
-        {items.map((item) => (
-          <Stack
-            component="li"
-            key={item.ref}
-            direction={{ xs: 'column', sm: 'row' }}
-            spacing={1}
-            sx={{
-              alignItems: { sm: 'center' },
-              justifyContent: 'space-between',
-              p: 1.25,
-              pl: 1.5,
-              borderRadius: 2,
-              border: '1px solid var(--border)',
-              borderLeft: `4px solid ${SEVERITY_SOFT[item.severity].bar}`,
-              bgcolor: 'var(--card)',
-              transition: 'box-shadow .15s ease, border-color .15s ease',
-              '&:hover': { boxShadow: '0 2px 10px rgba(0,0,0,.06)' },
-            }}
-          >
-            <Stack direction="row" spacing={1.25} sx={{ alignItems: 'flex-start', minWidth: 0 }}>
-              <SeverityIcon severity={item.severity} />
-              <Stack spacing={0.5} sx={{ minWidth: 0 }}>
-                <Typography sx={{ fontSize: 13.5, fontWeight: 700 }}>{item.label}</Typography>
-                <Stack direction="row" useFlexGap spacing={0.5} sx={{ flexWrap: 'wrap' }}>
-                  {item.signals.map((code) => (
-                    <Chip
-                      key={code}
-                      size="small"
-                      label={tr(t, `${ns}.signal.${code}`, code)}
-                      sx={{ bgcolor: 'var(--neutral-soft)', color: 'var(--text)', fontWeight: 600, fontSize: 11.5, height: 22 }}
-                    />
-                  ))}
-                </Stack>
-              </Stack>
-            </Stack>
-            {onOpenItem && (
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<AutoAwesomeRoundedIcon />}
-                onClick={() => onOpenItem(item)}
-                sx={{ flexShrink: 0, alignSelf: { xs: 'flex-start', sm: 'center' }, borderRadius: 99 }}
-              >
-                {t('aiExplain.analyze')}
-              </Button>
+    <Box
+      component="li"
+      sx={{
+        position: 'relative',
+        display: 'grid',
+        gridTemplateColumns: { xs: 'auto minmax(0, 1fr)', md: 'auto minmax(0, 1fr) auto' },
+        columnGap: 1.5,
+        rowGap: 1,
+        alignItems: 'center',
+        px: 1.75,
+        py: 1.25,
+        borderTop: first ? 'none' : '1px solid var(--border)',
+        transition: 'background-color .15s ease',
+        '&:hover': { bgcolor: 'var(--neutral-soft)' },
+        '&::before': severity
+          ? { content: '""', position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, bgcolor: SEVERITY_SOFT[severity].bar }
+          : undefined,
+      }}
+    >
+      {severity ? (
+        <SeverityIcon severity={severity} />
+      ) : (
+        <Box aria-hidden sx={{ width: 8, height: 8, mx: '8px', borderRadius: '50%', bgcolor: 'var(--border)' }} />
+      )}
+      <Stack spacing={0.5} sx={{ minWidth: 0 }}>
+        <Stack direction="row" useFlexGap spacing={0.75} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+          <Typography className="tnum" sx={{ fontSize: 13.5, fontWeight: 700 }}>
+            {label}
+          </Typography>
+          {row?.status && (
+            <Chip
+              size="small"
+              variant="outlined"
+              label={tr(t, `${ns}.status.${row.status}`, row.status)}
+              sx={{ height: 20, fontSize: 11, fontWeight: 600 }}
+            />
+          )}
+          {signals.map((code) => (
+            <Chip
+              key={code}
+              size="small"
+              label={tr(t, `${ns}.signal.${code}`, code)}
+              sx={{ height: 20, fontSize: 11, fontWeight: 700, bgcolor: severity ? SEVERITY_SOFT[severity].bg : 'var(--neutral-soft)', color: 'var(--text)' }}
+            />
+          ))}
+        </Stack>
+        {(figures.length > 0 || row?.note) && (
+          <Stack direction="row" useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap', columnGap: 2, rowGap: 0.25 }}>
+            {figures.map((k) => (
+              <Typography key={k} component="span" sx={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                {tr(t, `${ns}.metric.${metricSuffix(k)}`, metricSuffix(k))}{' '}
+                <Box component="strong" className="tnum" sx={{ color: 'var(--text)' }}>
+                  {formatMetric(system.metrics[k]!, locale, { days: t('aiOrders.unit.days') })}
+                </Box>
+              </Typography>
+            ))}
+            {row?.note && (
+              <Typography component="span" sx={{ fontSize: 12, color: 'var(--muted)', fontStyle: 'italic', overflowWrap: 'anywhere' }}>
+                {noteLabel ? noteLabel(row.note) : row.note}
+              </Typography>
             )}
           </Stack>
-        ))}
+        )}
       </Stack>
-    </AiBlock>
+      {onAnalyze && (
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<AutoAwesomeRoundedIcon />}
+          onClick={onAnalyze}
+          sx={{ gridColumn: { xs: '2', md: 'auto' }, justifySelf: { xs: 'start', md: 'end' }, whiteSpace: 'nowrap' }}
+        >
+          {t('aiExplain.analyze')}
+        </Button>
+      )}
+    </Box>
   )
 }
 
-function Rows({ system, ns, noteLabel }: { system: ExplainSystem; ns: ExplainNamespace; noteLabel?: (note: string) => string }) {
-  const { t, locale } = useI18n()
-  const groups = [...new Set(system.rows.map((r) => r.group))]
-  if (groups.length === 0) return null
+/** Contenedor de una lista a revisar: un solo marco con separadores, no una tarjeta por fila. */
+function ReviewList({ id, title, children }: { id: string; title: string; children: ReactNode[] }) {
   return (
-    <Stack spacing={1.5}>
-      {groups.map((group) => (
-        <AiBlock key={group} title={tr(t, `${ns}.group.${group}`, group)}>
-          <Stack component="ul" spacing={0.75} sx={{ m: 0, p: 0, listStyle: 'none' }}>
-            {system.rows
-              .filter((r) => r.group === group)
-              .map((r, i) => (
-                <Stack
-                  component="li"
-                  key={`${group}-${i}`}
-                  direction="row"
-                  useFlexGap
-                  spacing={1}
-                  sx={{ flexWrap: 'wrap', alignItems: 'center', fontSize: 13 }}
-                >
-                  <Typography sx={{ fontSize: 13, fontWeight: 700 }}>{r.label}</Typography>
-                  {r.status && <Chip size="small" label={tr(t, `${ns}.status.${r.status}`, r.status)} />}
-                  {r.metrics.map((k) =>
-                    system.metrics[k] ? (
-                      <Typography key={k} component="span" sx={{ fontSize: 12.5, color: 'var(--muted)' }}>
-                        {tr(t, `${ns}.metric.${metricSuffix(k)}`, metricSuffix(k))}:{' '}
-                        <Box component="strong" className="tnum" sx={{ color: 'var(--text)' }}>
-                          {formatMetric(system.metrics[k]!, locale, { days: t('aiOrders.unit.days') })}
-                        </Box>
-                      </Typography>
-                    ) : null,
-                  )}
-                  {r.note && (
-                    <Typography component="span" sx={{ fontSize: 12, color: 'var(--muted)', fontStyle: 'italic', overflowWrap: 'anywhere' }}>
-                      {noteLabel ? noteLabel(r.note) : r.note}
-                    </Typography>
-                  )}
-                </Stack>
-              ))}
-          </Stack>
-        </AiBlock>
-      ))}
-    </Stack>
+    <Box component="section" aria-labelledby={id}>
+      <GroupTitle id={id} title={title} count={children.length} />
+      <Box component="ul" sx={{ m: 0, p: 0, listStyle: 'none', border: '1px solid var(--border)', borderRadius: 0.67, overflow: 'hidden', bgcolor: 'var(--card)' }}>
+        {children}
+      </Box>
+    </Box>
   )
 }
 
@@ -346,16 +415,59 @@ export function ExplainSystemBlock({
   noteLabel?: (note: string) => string
 }) {
   const { t } = useI18n()
+  const baseId = useId()
   // En la vista de conjunto, las señales por fila ya salen en su fila.
   const signals = system.items.length > 0 ? system.signals.filter((s) => s.ref === null) : system.signals
+  // Cada ítem se lleva SU fila (mismo `ref`); el resto se lista por grupo.
+  const rowByRef = new Map(system.rows.filter((r) => r.ref !== null).map((r) => [r.ref as string, r]))
+  const used = new Set(system.items.map((i) => i.ref))
+  const rest = system.rows.filter((r) => r.ref === null || !used.has(r.ref))
+  const groups = [...new Set(rest.map((r) => r.group))]
   return (
-    <Stack spacing={1.75}>
+    <Stack spacing={2.25}>
       <MetricGrid keys={system.highlights} context={system} ns={ns} />
-      <AiBlock title={t('aiExplain.system.signals')}>
+      <Box component="section" aria-labelledby={`${baseId}-signals`}>
+        <GroupTitle id={`${baseId}-signals`} title={t('aiExplain.system.signals')} count={signals.length || undefined} />
         <SignalList signals={signals} ns={ns} context={system} />
-      </AiBlock>
-      <ItemList items={system.items} ns={ns} onOpenItem={onOpenItem} />
-      <Rows system={system} ns={ns} noteLabel={noteLabel} />
+      </Box>
+      {system.items.length > 0 && (
+        <ReviewList id={`${baseId}-items`} title={t(`${ns}.items` as MessageKey)}>
+          {system.items.map((item, i) => (
+            <ReviewRow
+              key={item.ref}
+              label={item.label}
+              severity={item.severity}
+              signals={item.signals}
+              row={rowByRef.get(item.ref)}
+              system={system}
+              ns={ns}
+              first={i === 0}
+              noteLabel={noteLabel}
+              onAnalyze={onOpenItem ? () => onOpenItem(item) : undefined}
+            />
+          ))}
+        </ReviewList>
+      )}
+      {groups.map((group) => {
+        const rows = rest.filter((r) => r.group === group)
+        return (
+          <ReviewList key={group} id={`${baseId}-${group}`} title={tr(t, `${ns}.group.${group}`, group)}>
+            {rows.map((r, i) => (
+              <ReviewRow
+                key={`${group}-${r.ref ?? r.label}-${i}`}
+                label={r.label}
+                severity={null}
+                signals={[]}
+                row={r}
+                system={system}
+                ns={ns}
+                first={i === 0}
+                noteLabel={noteLabel}
+              />
+            ))}
+          </ReviewList>
+        )
+      })}
     </Stack>
   )
 }
@@ -445,7 +557,7 @@ function InsightView({
           <Box
             sx={{
               p: 1.75,
-              borderRadius: 2,
+              borderRadius: 0.67,
               bgcolor: 'var(--accent-soft)',
               borderLeft: '4px solid var(--accent)',
             }}
@@ -472,7 +584,7 @@ function InsightView({
                 key={`${f.signal}-${f.ref ?? ''}`}
                 direction="row"
                 spacing={1.25}
-                sx={{ alignItems: 'flex-start', p: 1.25, borderRadius: 2, bgcolor: SEVERITY_SOFT[f.severity].bg }}
+                sx={{ alignItems: 'flex-start', p: 1.25, borderRadius: 0.67, bgcolor: SEVERITY_SOFT[f.severity].bg }}
               >
                 <SeverityIcon severity={f.severity} />
                 <Stack spacing={0.25} sx={{ minWidth: 0 }}>
@@ -503,7 +615,7 @@ function InsightView({
                   counterIncrement: 'paso',
                   p: 1.25,
                   pl: 5.5,
-                  borderRadius: 2,
+                  borderRadius: 0.67,
                   border: '1px solid var(--border)',
                   '&::before': {
                     content: 'counter(paso)',
@@ -825,11 +937,27 @@ function ExplainPanelBody({
             {t(`${ns}.title` as MessageKey)}
           </Typography>
           <Chip size="small" label={t('aiOrders.badge')} color="primary" sx={{ fontWeight: 800, height: 22 }} />
+          {system && (
+            <Stack
+              direction="row"
+              useFlexGap
+              spacing={0.75}
+              sx={{ ml: 'auto !important', flexWrap: 'wrap', justifyContent: 'flex-end', display: { xs: 'none', sm: 'flex' } }}
+            >
+              <SummaryPill
+                tone={system.signals.length > 0 ? 'warning' : 'ok'}
+                text={t('aiExplain.summary.signals').replace('{n}', String(system.signals.length))}
+              />
+              {system.items.length > 0 && (
+                <SummaryPill tone="neutral" text={t('aiExplain.summary.items').replace('{n}', String(system.items.length))} />
+              )}
+            </Stack>
+          )}
         </Stack>
       )}
       {header}
 
-      <Card variant="outlined" component="section" aria-labelledby={systemId} sx={{ borderRadius: 3 }}>
+      <Card variant="outlined" component="section" aria-labelledby={systemId} sx={{ borderRadius: 1 }}>
         <CardContent sx={{ p: { xs: 2, sm: 2.5 }, '&:last-child': { pb: { xs: 2, sm: 2.5 } }, display: 'flex', flexDirection: 'column', gap: 1.75 }}>
           <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
             <AppIcon tone="neutral" size="sm">
@@ -875,7 +1003,7 @@ function ExplainPanelBody({
         aria-labelledby={aiId}
         sx={{
           p: { xs: 2, sm: 2.5 },
-          borderRadius: 3,
+          borderRadius: 1,
           border: '1px solid var(--border)',
           background: 'linear-gradient(135deg, var(--accent-soft) 0%, var(--card) 70%)',
           display: 'flex',
@@ -977,7 +1105,7 @@ function ExplainPanelBody({
             <MotivoNotice motivo={result.motivo} onRetry={asked ? () => run(asked.q) : undefined} />
           )}
           {!insight.isPending && !insight.isError && result?.data && (
-            <Card variant="outlined" sx={{ borderRadius: 3, boxShadow: '0 4px 18px rgba(0,0,0,.05)' }}>
+            <Card variant="outlined" sx={{ borderRadius: 1, boxShadow: '0 4px 18px rgba(0,0,0,.05)' }}>
               {asked?.q && (
                 <Stack
                   direction="row"

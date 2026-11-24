@@ -264,7 +264,7 @@ function SystemBlock({ system }: { system: ReviewsSystem }) {
               key={group.key}
               component="section"
               aria-label={title}
-              sx={{ border: '1px solid var(--border)', borderRadius: 2, px: 1.5, py: 1.25, minWidth: 0 }}
+              sx={{ border: '1px solid var(--border)', borderRadius: 0.67, px: 1.5, py: 1.25, minWidth: 0 }}
             >
               <Typography
                 sx={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', mb: 0.75 }}
@@ -416,7 +416,7 @@ function InsightView({
           <Typography sx={{ fontWeight: 700, fontSize: 13, mb: 0.5 }}>{t('aiReviews.section.themes')}</Typography>
           <Stack spacing={1}>
             {insight.themes.map((theme) => (
-              <Box key={theme.label} sx={{ border: '1px solid var(--border)', borderRadius: 1.5, p: 1.25 }}>
+              <Box key={theme.label} sx={{ border: '1px solid var(--border)', borderRadius: 0.67, p: 1.25 }}>
                 <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
                   <Typography sx={{ fontWeight: 700 }}>{theme.label}</Typography>
                   <Chip size="small" label={t(`aiReviews.sentiment.${theme.sentiment}` as MessageKey)} />
@@ -442,7 +442,7 @@ function InsightView({
                 key={a.ref}
                 direction={{ xs: 'column', sm: 'row' }}
                 spacing={1}
-                sx={{ border: '1px solid var(--border)', borderRadius: 1.5, p: 1.25, alignItems: { sm: 'center' } }}
+                sx={{ border: '1px solid var(--border)', borderRadius: 0.67, p: 1.25, alignItems: { sm: 'center' } }}
               >
                 <Box sx={{ flex: 1 }}>
                   <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>

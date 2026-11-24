@@ -243,7 +243,7 @@ function DraftCard({ draft, answer }: { draft: NonNullable<CopilotAnswer['draft'
   }
 
   return (
-    <Box data-copilot-draft sx={{ border: '1px dashed var(--border)', borderRadius: 2, p: 1.25 }}>
+    <Box data-copilot-draft sx={{ border: '1px dashed var(--border)', borderRadius: 0.67, p: 1.25 }}>
       <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: 'var(--muted)', mb: 0.5 }}>{t('copilot.draft.title')}</Typography>
       <Typography sx={{ fontSize: 13, fontWeight: 800, mb: 0.75 }}>
         <CopilotText text={draft.subject} answer={answer} />
@@ -273,7 +273,7 @@ function Bubble({ role, children }: { role: 'user' | 'assistant'; children: Reac
         maxWidth: mine ? '85%' : '100%',
         px: 1.5,
         py: 1.25,
-        borderRadius: 2,
+        borderRadius: 0.67,
         border: '1px solid var(--border)',
         bgcolor: mine ? 'var(--accent-soft)' : 'var(--card)',
         overflowWrap: 'anywhere',

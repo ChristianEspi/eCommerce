@@ -237,7 +237,7 @@ function SystemBlock({ system, storeId }: { system: InventorySystem; storeId: st
           </Stack>
           <Box
             component="ul"
-            sx={{ m: 0, p: 0, listStyle: 'none', border: '1px solid var(--border)', borderRadius: 2, overflow: 'hidden' }}
+            sx={{ m: 0, p: 0, listStyle: 'none', border: '1px solid var(--border)', borderRadius: 0.67, overflow: 'hidden' }}
           >
             {items.map((item, index) => {
               const target = { productId: item.product_id, sku: item.sku, name: item.name }

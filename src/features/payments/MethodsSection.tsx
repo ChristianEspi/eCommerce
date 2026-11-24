@@ -399,7 +399,7 @@ export function MethodsSection() {
               spacing={1.5}
               component="section"
               aria-label={t('payments.culqi.title')}
-              sx={{ p: 2, border: '1px solid var(--border)', borderRadius: 2 }}
+              sx={{ p: 2, border: '1px solid var(--border)', borderRadius: 0.67 }}
             >
               <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
                 <Typography sx={{ fontWeight: 800 }}>{t('payments.culqi.title')}</Typography>

@@ -133,7 +133,7 @@ export function OnboardingPage() {
           <BrandLockup size={30} />
         </Stack>
 
-        <Card sx={{ borderRadius: '22px' }}>
+        <Card>
           <CardContent sx={{ p: { xs: 3, md: 4 } }}>
             <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mb: 1 }}>
               <Box

@@ -242,7 +242,7 @@ function PublicationCard({
     <Box
       component="section"
       aria-labelledby={titleId}
-      sx={{ border: '1px solid var(--border)', borderRadius: 2, p: 2 }}
+      sx={{ border: '1px solid var(--border)', borderRadius: 0.67, p: 2 }}
     >
       <Stack
         direction={{ xs: 'column', sm: 'row' }}
