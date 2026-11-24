@@ -33,6 +33,7 @@ import {
   axisColumns,
   importCategories,
   importProducts,
+  importProductsWithKits,
   importVocabulary,
   rowReasonKey,
   type ImportResult,
@@ -41,6 +42,7 @@ import {
 } from './api'
 import {
   CATEGORIES_SHEET,
+  KITS_SHEET,
   PRODUCTS_SHEET,
   VOCABULARY_SHEETS,
   type AxisColumn,
@@ -75,9 +77,22 @@ interface SheetProblem {
   readonly issue: SheetIssue | { readonly kind: 'missingSheet' } | { readonly kind: 'unreadable' }
 }
 
-function specsOf(kind: CatalogImportKind): readonly SheetSpec[] {
+function specsOf(kind: CatalogImportKind, advanced: boolean): readonly SheetSpec[] {
   if (kind === 'vocabulary') return VOCABULARY_SHEETS
-  return kind === 'categories' ? [CATEGORIES_SHEET] : [PRODUCTS_SHEET]
+  if (kind === 'categories') return [CATEGORIES_SHEET]
+  // 2026-11-24 · Con catálogo avanzado, la plantilla de productos trae también
+  // la hoja «Kits» (opcional al subir).
+  return advanced ? [PRODUCTS_SHEET, KITS_SHEET] : [PRODUCTS_SHEET]
+}
+
+/** Productos y kits que se importan juntos, en una transacción. */
+interface ProductKitPayload {
+  readonly products: readonly ImportRow[]
+  readonly kits: readonly ImportRow[]
+}
+
+function isProductKit(payload: unknown): payload is ProductKitPayload {
+  return typeof payload === 'object' && payload !== null && 'kits' in payload && 'products' in payload
 }
 
 /**
@@ -137,7 +152,7 @@ export function CatalogImportDialog({
   const queryClient = useQueryClient()
   const { has } = useCapabilities()
   const inputRef = useRef<HTMLInputElement>(null)
-  const specs = specsOf(kind)
+  const specs = specsOf(kind, has('catalog.advanced'))
 
   // Los ejes (talla, color…) solo hacen falta para la hoja de productos.
   const wantsAxes = kind === 'products' && has('catalog.advanced')
@@ -149,29 +164,30 @@ export function CatalogImportDialog({
   )
 
   const [fileName, setFileName] = useState<string | null>(null)
-  const [pending, setPending] = useState<VocabularySheets | readonly ImportRow[] | null>(null)
+  const [pending, setPending] = useState<VocabularySheets | readonly ImportRow[] | ProductKitPayload | null>(null)
   const [problems, setProblems] = useState<SheetProblem[]>([])
   const [ignored, setIgnored] = useState<string[]>([])
   const [preview, setPreview] = useState<ImportResult | null>(null)
   const [applied, setApplied] = useState<ImportResult | null>(null)
   const [onlyErrors, setOnlyErrors] = useState(true)
 
-  const runImport = (payload: VocabularySheets | readonly ImportRow[], dryRun: boolean) => {
+  const runImport = (payload: VocabularySheets | readonly ImportRow[] | ProductKitPayload, dryRun: boolean) => {
     if (kind === 'vocabulary') return importVocabulary(payload as VocabularySheets, dryRun)
     if (!storeId) throw new UiError({ boundary: 'catalog', key: 'catalogImport.error.generic', code: 'SIN_TIENDA' })
+    if (isProductKit(payload)) return importProductsWithKits(storeId, payload.products, payload.kits, dryRun)
     const rows = payload as readonly ImportRow[]
     return kind === 'categories' ? importCategories(storeId, rows, dryRun) : importProducts(storeId, rows, dryRun)
   }
 
   const check = useMutation({
-    mutationFn: (payload: VocabularySheets | readonly ImportRow[]) => runImport(payload, true),
+    mutationFn: (payload: VocabularySheets | readonly ImportRow[] | ProductKitPayload) => runImport(payload, true),
     onSuccess: (result) => {
       setPreview(result)
       setOnlyErrors(result.errors > 0)
     },
   })
   const apply = useMutation({
-    mutationFn: (payload: VocabularySheets | readonly ImportRow[]) => runImport(payload, false),
+    mutationFn: (payload: VocabularySheets | readonly ImportRow[] | ProductKitPayload) => runImport(payload, false),
     onSuccess: (result) => {
       setApplied(result)
       if (result.applied) {
@@ -247,6 +263,31 @@ export function CatalogImportDialog({
       return
     }
 
+    // Kits (opcional): con su hoja, productos y kits van juntos. La hoja de
+    // productos ya no cae a «la primera del libro» si la primera es la de kits.
+    const kitsSheet = specs.includes(KITS_SHEET) ? findSheet(workbook, KITS_SHEET, false) : null
+    if (kitsSheet) {
+      const parsedKits = parseSheet(kitsSheet.data, KITS_SHEET)
+      const productSheet = findSheet(workbook, PRODUCTS_SHEET, false)
+      const parsedProducts = productSheet ? parseSheet(productSheet.data, PRODUCTS_SHEET, axes) : null
+      const issues: SheetProblem[] = []
+      if (parsedKits.issue) issues.push({ sheet: KITS_SHEET.name, issue: parsedKits.issue })
+      // Una hoja de productos vacía junto a una de kits no es un error: no se usa.
+      if (parsedProducts?.issue && parsedProducts.issue.kind !== 'empty') {
+        issues.push({ sheet: PRODUCTS_SHEET.name, issue: parsedProducts.issue })
+      }
+      setIgnored([...parsedKits.ignoredHeaders, ...(parsedProducts?.ignoredHeaders ?? [])])
+      setProblems(issues)
+      if (issues.length > 0) return
+      const payload: ProductKitPayload = {
+        products: parsedProducts && !parsedProducts.issue ? parsedProducts.rows : [],
+        kits: parsedKits.rows,
+      }
+      setPending(payload)
+      check.mutate(payload)
+      return
+    }
+
     const spec = specs[0] as SheetSpec
     const sheet = findSheet(workbook, spec, true)
     if (!sheet) {
@@ -294,6 +335,11 @@ export function CatalogImportDialog({
           <Typography variant="body2" color="text.secondary">
             {t(HELP[kind])}
           </Typography>
+          {specs.includes(KITS_SHEET) && (
+            <Typography variant="body2" color="text.secondary">
+              {t('catalogImport.help.kits')}
+            </Typography>
+          )}
 
           <Stack spacing={1}>
             <Typography sx={{ fontWeight: 700 }}>{t('catalogImport.step.template')}</Typography>

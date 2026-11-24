@@ -594,6 +594,8 @@ export const CHECK_MY_ORDER_SCHEDULE_LINES_RPC = 'check_my_order_schedule_lines'
 // ninguna manda organización ni sociedad. Red de seguridad:
 // `supabase/tests/store-management.test.ts`.
 export const CREATE_STORE_RPC = 'create_store'
+/** 2026-11-24 · Crear a partir de otra tienda (migración 20261124100000). Sin `satisfies` hasta regenerar tipos. */
+export const CLONE_STORE_RPC = 'clone_store'
 export const UPDATE_STORE_RPC = 'update_store'
 export const SET_STORE_STATUS_RPC = 'set_store_status'
 
@@ -623,6 +625,8 @@ export const DELETE_PRODUCT_MASTER_RPC = 'delete_product_master'
 export const IMPORT_CATALOG_VOCABULARY_RPC = 'import_catalog_vocabulary'
 export const IMPORT_CATALOG_CATEGORIES_RPC = 'import_catalog_categories'
 export const IMPORT_CATALOG_PRODUCTS_RPC = 'import_catalog_products'
+/** 2026-11-24 · Productos y kits en una transacción (migración 20261124110000). Sin `satisfies` hasta regenerar tipos. */
+export const IMPORT_CATALOG_WITH_KITS_RPC = 'import_catalog_with_kits'
 // Importación de clientes y de usuarios B2B desde Excel (20261113120000). Mismo
 // contrato: simulan con `p_dry_run = true` y aplican todo o nada. Red de
 // seguridad: `supabase/tests/customers-import.test.ts`.
