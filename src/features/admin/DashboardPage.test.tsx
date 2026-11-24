@@ -160,7 +160,9 @@ describe('ventas del periodo', () => {
     // (1200 - 1000) / 1000 = +20 %, con nombre accesible que dice contra qué.
     expect(within(hero).getByLabelText('+20.0 % frente al periodo anterior')).toBeInTheDocument()
     expect(within(hero).getByText(/vs\. .*1[.,]000[.,]00 en el periodo anterior/)).toBeInTheDocument()
-    expect(within(hero).getByText(/400[.,]00/)).toBeInTheDocument()
+    // Ticket medio 400 y promedio diario 1200 / 3 días = 400: dos cifras.
+    expect(within(hero).getAllByText(/400[.,]00/)).toHaveLength(2)
+    expect(within(hero).getByText('Promedio diario')).toBeInTheDocument()
   })
 
   it('el gráfico es una imagen con nombre: tipo de serie y mejor día', async () => {
@@ -209,7 +211,8 @@ describe('ventas del periodo', () => {
     render({ trend: () => trend({ currency: null, sales: null, previous_sales: null, avg_ticket: null, series: [], best: null }) })
 
     const hero = await section(/Ventas · últimos 30 días/)
-    expect(within(hero).getAllByText('—')).toHaveLength(3)
+    // Ticket, promedio diario y mejor día; y el importe principal.
+    expect(within(hero).getAllByText('—')).toHaveLength(4)
   })
 
   it('la tarjeta de ventas lleva su icono', async () => {
@@ -297,13 +300,16 @@ describe('flujo de pedidos', () => {
     render()
 
     const flujo = await section('Flujo de pedidos')
-    expect(within(flujo).getByText('Pendiente')).toBeInTheDocument()
-    expect(within(flujo).getByText('Pagado')).toBeInTheDocument()
-    expect(within(flujo).getByText('Entregado')).toBeInTheDocument()
+    expect(within(flujo).getAllByText('Pendiente').length).toBeGreaterThan(0)
+    expect(within(flujo).getAllByText('Pagado').length).toBeGreaterThan(0)
+    expect(within(flujo).getAllByText('Entregado').length).toBeGreaterThan(0)
     // El color acompaña: la barra dice qué es cada tramo.
     expect(within(flujo).getByRole('img', { name: 'Pendiente: 5, Pagado: 2, Cancelado: 1' })).toBeInTheDocument()
-    // Anulados fuera del flujo, pero contados.
-    expect(within(flujo).getByText(/Fuera del flujo: 1 cancelado/)).toBeInTheDocument()
+    // La leyenda dice cada tramo sin ratón, con su cifra y su peso; los
+    // anulados van al final, fuera del camino del pedido.
+    const leyenda = within(flujo).getByRole('list', { name: 'Reparto de los pedidos por estado' })
+    const items = within(leyenda).getAllByRole('listitem').map((li) => li.textContent)
+    expect(items).toEqual(['Pendiente563 %', 'Pagado225 %', 'Cancelado113 %'])
   })
 
   it('cada etapa lleva su cifra escrita, también el cero', async () => {
@@ -369,6 +375,14 @@ describe('lo que más vende', () => {
     expect(within(top).getByText(/1[.,]036[.,]00/)).toBeInTheDocument()
     // 1036 / 6334.24 = 16.4 %.
     expect(within(top).getByText('16.4 %')).toBeInTheDocument()
+  })
+
+  it('dice cuántas unidades se vendieron de cada uno, en singular y en plural', async () => {
+    render()
+
+    const top = await section('Productos que más venden')
+    expect(within(top).getByText('4 uds.')).toBeInTheDocument()
+    expect(within(top).getByText('1 ud.')).toBeInTheDocument()
   })
 
   it('con monedas mezcladas no escribe un % sin base', async () => {

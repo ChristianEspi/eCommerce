@@ -11,12 +11,17 @@ import type { DashboardKpis } from '../useDashboardKpis'
  * porcentaje escrito es sobre las ventas acumuladas (dice cuánto pesa en la
  * tienda). Son dos preguntas distintas y cada una tiene su forma. El % solo se
  * escribe si hay un total afirmable: con monedas mezcladas no hay base.
+ *
+ * 2026-11-24: también las unidades vendidas, en su propia columna. Con monedas
+ * mezcladas la cifra principal ya son las unidades y no se repiten.
  */
 export function TopProducts({ kpis }: { kpis: DashboardKpis }) {
   const { t, locale } = useI18n()
   const rows = kpis.top_products
   const top = Math.max(...rows.map((r) => Number(r.revenue)), 0)
   const total = kpis.sales !== null ? Number(kpis.sales) : null
+  const unitsText = (n: number) =>
+    t(n === 1 ? 'admin.dashboard.topProducts.units.one' : 'admin.dashboard.topProducts.units').replace('{n}', n.toLocaleString(locale))
 
   return (
     <Card component="section" aria-labelledby="top-products-title" sx={{ height: '100%' }}>
@@ -56,6 +61,11 @@ export function TopProducts({ kpis }: { kpis: DashboardKpis }) {
                       <Box aria-hidden sx={{ flex: 1, height: 5, borderRadius: 999, bgcolor: C.neutralSoft, overflow: 'hidden' }}>
                         <Box sx={{ width: `${width}%`, height: '100%', borderRadius: 999, bgcolor: index === 0 ? C.accentDeep : C.accent }} />
                       </Box>
+                      {kpis.currency && (
+                        <Typography className="tnum" sx={{ fontSize: 11, fontWeight: 700, color: C.ink, whiteSpace: 'nowrap' }}>
+                          {unitsText(row.units)}
+                        </Typography>
+                      )}
                       {share && (
                         <Typography className="tnum" sx={{ fontSize: 11, color: C.muted, width: 44, textAlign: 'right' }}>
                           {share}

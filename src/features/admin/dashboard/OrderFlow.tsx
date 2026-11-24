@@ -2,7 +2,7 @@ import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded'
 import CheckCircleOutlineRoundedIcon from '@mui/icons-material/CheckCircleOutlineRounded'
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded'
 import ScheduleRoundedIcon from '@mui/icons-material/ScheduleRounded'
-import { Box, Button, Card, CardContent, Stack, Typography } from '@mui/material'
+import { Box, Button, Card, CardContent, Stack, Tooltip, Typography } from '@mui/material'
 import { Fragment } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
 import { STATUS_COLOR, type StatusColor } from '@/features/orders/status'
@@ -13,22 +13,21 @@ import type { MessageKey } from '@/shared/i18n/messages'
 import { C, T } from '@/theme/tokens'
 import type { DashboardKpis } from '../useDashboardKpis'
 
+/**
+ * Color por RESULTADO, no por marca (2026-11-24): entregado en verde semántico
+ * aunque el acento del tenant sea rojo; si no, «entregado» y «reembolsado» se
+ * leían iguales en la barra.
+ */
 const STATUS_VAR: Record<StatusColor, { fg: string; soft: string }> = {
   default: { fg: C.muted, soft: C.neutralSoft },
   info: { fg: C.blue, soft: C.blueSoft },
-  success: { fg: C.accentDeep, soft: C.accentSoft },
+  success: { fg: C.green, soft: C.greenSoft },
   warning: { fg: C.amber, soft: C.amberSoft },
   error: { fg: C.red, soft: C.redSoft },
 }
 
-/** Relleno de la barra: el acento puro para «entregado», no su versión de texto. */
-const BAR_VAR: Record<StatusColor, string> = {
-  default: C.muted,
-  info: C.blue,
-  success: C.accent,
-  warning: C.amber,
-  error: C.red,
-}
+/** Orden de la barra: primero el camino del pedido, luego lo que salió de él. */
+const BAR_ORDER: readonly OrderStatus[] = ['pending', 'paid', 'fulfilled', 'cancelled', 'refunded']
 
 const isOrderStatus = (v: string): v is OrderStatus => (ORDER_STATUSES as readonly string[]).includes(v)
 
@@ -56,9 +55,18 @@ export function OrderFlow({ kpis, findings }: { kpis: DashboardKpis; findings: r
   const count = (status: string) => kpis.by_status.find((r) => r.status === status)?.count ?? 0
   const lateOf = (key: string | null) => (key ? findings.find((f) => f.key === key)?.count ?? 0 : 0)
 
-  const visibles = kpis.by_status.filter((r) => r.count > 0 && isOrderStatus(r.status))
-  const outOfFlow = visibles.filter((r) => r.status === 'cancelled' || r.status === 'refunded')
+  const visibles = BAR_ORDER.flatMap((status) => {
+    const n = kpis.by_status.find((r) => isOrderStatus(r.status) && r.status === status)?.count ?? 0
+    return n > 0 ? [{ status, count: n }] : []
+  })
+  const barTotal = visibles.reduce((sum, r) => sum + r.count, 0)
+  const pctOf = (n: number) => (barTotal > 0 ? Math.round((n / barTotal) * 100) : 0)
   const statusLabel = (status: string) => t(`orders.status.${status}` as MessageKey)
+  const segmentText = (status: string, n: number) =>
+    t('admin.dashboard.flow.segment')
+      .replace('{label}', statusLabel(status))
+      .replace('{n}', String(n))
+      .replace('{pct}', String(pctOf(n)))
 
   return (
     <Card component="section" aria-labelledby="order-flow-title" sx={{ height: '100%' }}>
@@ -129,7 +137,7 @@ export function OrderFlow({ kpis, findings }: { kpis: DashboardKpis; findings: r
                     </Typography>
                   </Stack>
                   {note && (
-                    <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', mt: 0.5, color: warn ? tone.fg : C.accentDeep }}>
+                    <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', mt: 0.5, color: warn ? tone.fg : C.green }}>
                       {warn ? (
                         <ScheduleRoundedIcon aria-hidden sx={{ fontSize: 14 }} />
                       ) : (
@@ -145,25 +153,49 @@ export function OrderFlow({ kpis, findings }: { kpis: DashboardKpis; findings: r
         </Stack>
 
         {kpis.orders > 0 && visibles.length > 0 && (
-          <Stack spacing={0.75} sx={{ mt: 'auto' }}>
+          <Stack spacing={1} sx={{ mt: 'auto' }}>
+            {/* Cada tramo dice qué es al pasar el ratón; la leyenda lo dice sin ratón. */}
             <Box
               role="img"
               aria-label={visibles.map((r) => `${statusLabel(r.status)}: ${r.count}`).join(', ')}
-              sx={{ display: 'flex', height: 10, borderRadius: 999, overflow: 'hidden', gap: '3px' }}
+              sx={{ display: 'flex', height: 12, gap: '2px' }}
             >
               {visibles.map((r) => (
-                <Box
-                  key={r.status}
-                  sx={{ flexGrow: r.count, flexBasis: 0, bgcolor: BAR_VAR[STATUS_COLOR[r.status as OrderStatus]] }}
-                />
+                <Tooltip key={r.status} title={segmentText(r.status, r.count)} placement="top" arrow disableInteractive>
+                  <Box
+                    sx={{
+                      flexGrow: r.count,
+                      flexBasis: 0,
+                      minWidth: 6,
+                      borderRadius: '3px',
+                      bgcolor: STATUS_VAR[STATUS_COLOR[r.status]].fg,
+                      transition: 'transform 120ms ease',
+                      '&:hover': { transform: 'scaleY(1.4)' },
+                      '@media (prefers-reduced-motion: reduce)': { transition: 'none', '&:hover': { transform: 'none' } },
+                    }}
+                  />
+                </Tooltip>
               ))}
             </Box>
-            {outOfFlow.length > 0 && (
-              <Typography sx={{ fontSize: 12, color: C.muted }}>
-                {t('admin.dashboard.flow.aside')}:{' '}
-                {outOfFlow.map((r) => `${r.count} ${statusLabel(r.status).toLowerCase()}`).join(' · ')}
-              </Typography>
-            )}
+            <Stack
+              component="ul"
+              direction="row"
+              aria-label={t('admin.dashboard.flow.legend')}
+              sx={{ listStyle: 'none', m: 0, p: 0, flexWrap: 'wrap', columnGap: 2, rowGap: 0.5 }}
+            >
+              {visibles.map((r) => (
+                <Stack component="li" key={r.status} direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+                  <Box aria-hidden sx={{ width: 8, height: 8, borderRadius: '2px', bgcolor: STATUS_VAR[STATUS_COLOR[r.status]].fg }} />
+                  <Typography sx={{ fontSize: 12, color: C.muted }}>{statusLabel(r.status)}</Typography>
+                  <Typography className="tnum" sx={{ fontSize: 12, fontWeight: 700 }}>
+                    {r.count}
+                  </Typography>
+                  <Typography className="tnum" sx={{ fontSize: 12, color: C.muted }}>
+                    {pctOf(r.count)} %
+                  </Typography>
+                </Stack>
+              ))}
+            </Stack>
           </Stack>
         )}
       </CardContent>

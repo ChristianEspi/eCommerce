@@ -25,6 +25,9 @@ export const C = {
   redSoft: 'var(--red-soft)',
   blue: 'var(--blue)',
   blueSoft: 'var(--blue-soft)',
+  /** Semántico de «resultado bueno» (entregado). Fijo: el acento del tenant no lo cambia. */
+  green: 'var(--green)',
+  greenSoft: 'var(--green-soft)',
   client: 'var(--client)',
   white: '#FFFFFF',
 } as const

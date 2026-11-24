@@ -26,6 +26,8 @@
   --red-soft: #fbe7e7;
   --blue: #1e5fb0;
   --blue-soft: #e7f0fb;
+  --green: #1f7a4d;
+  --green-soft: #e3f3e9;
   --hero-grad: linear-gradient(135deg, #0a5a52 0%, #2f8f6b 55%, #3f8a66 100%);
   --badge-grad: linear-gradient(135deg, #0a5a52, #3f8a66);
   --sidebar: linear-gradient(180deg, #0a5a52 0%, #2f7a63 55%, #3f8a66 100%);
@@ -54,6 +56,8 @@
   --red-soft: #3a1d1d;
   --blue: #7fb2ee;
   --blue-soft: #16263a;
+  --green: #7ed3a2;
+  --green-soft: #173024;
   --hero-grad: linear-gradient(135deg, #0a5a52 0%, #2f8f6b 55%, #3f8a66 100%);
   --badge-grad: linear-gradient(135deg, #0a5a52, #3f8a66);
   --sidebar: linear-gradient(180deg, #08433e 0%, #1f5648 55%, #2c5d47 100%);

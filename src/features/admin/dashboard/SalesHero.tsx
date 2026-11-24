@@ -9,8 +9,13 @@ import { C, SH, T } from '@/theme/tokens'
 import type { DashboardKpis } from '../useDashboardKpis'
 import { SALES_PERIODS, salesDelta, type SalesPeriod, type SalesTrend } from '../useSalesTrend'
 
-const WHITE_82 = `color-mix(in srgb, ${C.white} 82%, transparent)`
-const WHITE_64 = `color-mix(in srgb, ${C.white} 64%, transparent)`
+/**
+ * Tarjeta en pastel del acento del tenant (2026-11-24): combina con la marca sin
+ * teñirse entera de su color. Texto oscuro, barras y detalles en el acento.
+ */
+const TEXT_SOFT = C.muted
+const TINT = (pct: number) => `color-mix(in srgb, ${C.accent} ${pct}%, transparent)`
+const LINE = TINT(22)
 
 const bucketLabel = (date: string, unit: SalesTrend['unit'], locale: Locale) =>
   formatCalendarDate(date, unit === 'month' ? 'month' : 'day', locale)
@@ -24,6 +29,12 @@ const bucketLabel = (date: string, unit: SalesTrend['unit'], locale: Locale) =>
  * lector de pantalla recibe el resumen —tipo de serie y mejor punto—, y las
  * cifras exactas de cada barra van en su tooltip para quien pasa el ratón.
  * El último punto (hoy / este mes) se resalta: es el que todavía se mueve.
+ *
+ * 2026-11-24: el gráfico ocupa TODO el alto libre de la tarjeta (antes tenía
+ * alto fijo y, junto a la vigilancia, dejaba un hueco en blanco encima). Cada
+ * barra reparte su columna con `flex-grow` (vacío + relleno) en vez de un
+ * `height: %`, que no resuelve dentro de un flex de alto no fijo. Las guías
+ * horizontales y el tope escrito dan escala a las barras.
  */
 function TrendBars({ trend, label }: { trend: SalesTrend; label: string }) {
   const { t, locale } = useI18n()
@@ -31,44 +42,74 @@ function TrendBars({ trend, label }: { trend: SalesTrend; label: string }) {
   const currency = trend.currency ?? 'PEN'
   const last = trend.series.length - 1
   const middle = Math.floor(last / 2)
+  const guide = TINT(14)
 
   return (
-    <Stack spacing={0.75} sx={{ flex: 1, minHeight: 0, justifyContent: 'flex-end' }}>
+    <Stack spacing={0.75} sx={{ flex: 1, minHeight: 0 }}>
+      {max > 0 && (
+        <Typography aria-hidden className="tnum" sx={{ fontSize: 11, color: TEXT_SOFT, lineHeight: 1 }}>
+          {formatMoney(max, currency, locale)}
+        </Typography>
+      )}
       <Box
         role="img"
         aria-label={label}
-        sx={{ display: 'flex', alignItems: 'flex-end', gap: { xs: '3px', md: '5px' }, height: { xs: 96, md: 132 } }}
+        sx={{
+          flex: 1,
+          minHeight: { xs: 110, md: 150 },
+          display: 'flex',
+          alignItems: 'stretch',
+          gap: { xs: '3px', md: '5px' },
+          // Guías al 100 / 75 / 50 / 25 % y la base.
+          backgroundImage: `linear-gradient(to bottom, ${guide} 1px, transparent 1px)`,
+          backgroundSize: '100% 25%',
+          borderBottom: `1px solid ${TINT(35)}`,
+        }}
       >
         {trend.series.map((point, index) => {
           const value = Number(point.sales)
-          const pct = max > 0 ? (value / max) * 100 : 0
+          // Un día sin ventas se ve como una raya, no como un hueco: el hueco
+          // se lee como «falta el dato».
+          const pct = max > 0 ? Math.max((value / max) * 100, 1.5) : 1.5
           return (
             <Tooltip
               key={point.date}
               title={`${bucketLabel(point.date, trend.unit, locale)} · ${formatMoney(value, currency, locale)}`}
               placement="top"
+              arrow
               disableInteractive
             >
               <Box
                 sx={{
                   flex: 1,
                   minWidth: 0,
-                  // Un día sin ventas se ve como una raya, no como un hueco:
-                  // el hueco se lee como «falta el dato».
-                  height: `${Math.max(pct, 2)}%`,
-                  borderRadius: '4px 4px 1px 1px',
-                  bgcolor: index === last ? C.white : `color-mix(in srgb, ${C.white} 26%, transparent)`,
-                  transition: 'height 240ms ease',
-                  '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
+                  display: 'flex',
+                  flexDirection: 'column',
+                  cursor: 'default',
+                  '&:hover > .bar': { bgcolor: index === last ? C.accentDeep : TINT(70) },
                 }}
-              />
+              >
+                <Box sx={{ flexGrow: 100 - pct, flexBasis: 0 }} />
+                <Box
+                  className="bar"
+                  sx={{
+                    flexGrow: pct,
+                    flexBasis: 0,
+                    minHeight: 2,
+                    borderRadius: '3px 3px 0 0',
+                    bgcolor: index === last ? C.accent : TINT(42),
+                    transition: 'flex-grow 240ms ease, background-color 120ms ease',
+                    '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
+                  }}
+                />
+              </Box>
             </Tooltip>
           )
         })}
       </Box>
       <Stack direction="row" sx={{ justifyContent: 'space-between' }} aria-hidden>
         {[0, middle, last].map((index) => (
-          <Typography key={index} sx={{ fontSize: 11, color: WHITE_64 }}>
+          <Typography key={index} sx={{ fontSize: 11, color: TEXT_SOFT }}>
             {index === last
               ? t(trend.unit === 'month' ? 'admin.dashboard.sales.thisMonth' : 'admin.dashboard.sales.today')
               : bucketLabel(trend.series[index]?.date ?? '', trend.unit, locale)}
@@ -82,14 +123,14 @@ function TrendBars({ trend, label }: { trend: SalesTrend; label: string }) {
 function Stat({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
     <Stack spacing={0.25} sx={{ minWidth: 0 }}>
-      <Typography sx={{ fontSize: 12, fontWeight: 600, color: WHITE_82 }}>{label}</Typography>
+      <Typography sx={{ fontSize: 12, fontWeight: 600, color: TEXT_SOFT }}>{label}</Typography>
       <Typography
         className="tnum"
-        sx={{ fontSize: T.kpiCard, fontWeight: 800, color: C.white, lineHeight: 1.15, whiteSpace: 'nowrap' }}
+        sx={{ fontSize: T.kpiCard, fontWeight: 800, color: C.ink, lineHeight: 1.15, whiteSpace: 'nowrap' }}
       >
         {value}
       </Typography>
-      <Typography sx={{ fontSize: 12, color: WHITE_64 }}>{hint}</Typography>
+      <Typography sx={{ fontSize: 12, color: TEXT_SOFT }}>{hint}</Typography>
     </Stack>
   )
 }
@@ -147,11 +188,15 @@ export function SalesHero({
         position: 'relative',
         overflow: 'hidden',
         height: '100%',
-        border: 'none',
         borderRadius: 1.25,
-        background: C.heroGrad,
-        color: C.white,
-        boxShadow: SH.hero,
+        // 2026-11-24: pastel del acento, no su degradado saturado. Con un
+        // acento rojo la tarjeta entera parecía una alerta; la cifra de ventas
+        // no es buena ni mala por el color de la marca.
+        // Funciona en claro y oscuro: se mezcla con la superficie de tarjeta.
+        background: `linear-gradient(135deg, color-mix(in srgb, ${C.accent} 20%, ${C.card}) 0%, color-mix(in srgb, ${C.accent} 7%, ${C.card}) 100%)`,
+        color: C.ink,
+        border: `1px solid ${LINE}`,
+        boxShadow: SH.sm,
         p: { xs: 2.25, md: 3.5 },
         display: 'flex',
         flexDirection: { xs: 'column', md: 'row' },
@@ -165,7 +210,7 @@ export function SalesHero({
           width: 420,
           height: 420,
           borderRadius: '50%',
-          background: `radial-gradient(closest-side, color-mix(in srgb, ${C.white} 14%, transparent), transparent)`,
+          background: `radial-gradient(closest-side, color-mix(in srgb, ${C.card} 55%, transparent), transparent)`,
           pointerEvents: 'none',
         },
       }}
@@ -181,7 +226,8 @@ export function SalesHero({
                 borderRadius: '50%',
                 display: 'grid',
                 placeItems: 'center',
-                bgcolor: `color-mix(in srgb, ${C.white} 18%, transparent)`,
+                bgcolor: C.accent,
+                color: C.white,
                 '& .MuiSvgIcon-root': { fontSize: 17 },
               }}
             >
@@ -190,7 +236,7 @@ export function SalesHero({
             <Typography
               id="sales-hero-title"
               component="h2"
-              sx={{ fontSize: T.label, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: WHITE_82 }}
+              sx={{ fontSize: T.label, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: TEXT_SOFT }}
             >
               {title}
             </Typography>
@@ -204,7 +250,7 @@ export function SalesHero({
               aria-label={t('admin.dashboard.period.label')}
               onChange={(_, next: SalesPeriod | null) => next && onPeriodChange(next)}
               sx={{
-                bgcolor: `color-mix(in srgb, ${C.white} 12%, transparent)`,
+                bgcolor: TINT(12),
                 borderRadius: 999,
                 p: 0.4,
                 '& .MuiToggleButton-root': {
@@ -215,8 +261,8 @@ export function SalesHero({
                   fontSize: 12,
                   fontWeight: 700,
                   textTransform: 'none',
-                  color: WHITE_82,
-                  '&.Mui-selected, &.Mui-selected:hover': { bgcolor: C.white, color: C.accentDeep },
+                  color: TEXT_SOFT,
+                  '&.Mui-selected, &.Mui-selected:hover': { bgcolor: C.card, color: C.accentDeep, boxShadow: SH.sm },
                 },
               }}
             >
@@ -246,7 +292,8 @@ export function SalesHero({
                 px: 1.1,
                 py: 0.35,
                 borderRadius: 999,
-                bgcolor: `color-mix(in srgb, ${C.white} 18%, transparent)`,
+                bgcolor: C.card,
+                color: up ? C.green : C.red,
                 '& .MuiSvgIcon-root': { fontSize: 16 },
               }}
             >
@@ -258,7 +305,7 @@ export function SalesHero({
           )}
         </Stack>
 
-        <Typography sx={{ fontSize: 13, color: WHITE_82 }}>
+        <Typography sx={{ fontSize: 13, color: TEXT_SOFT }}>
           {fallback
             ? kpis.sales === null
               ? t('admin.kpi.sales.none')
@@ -277,12 +324,14 @@ export function SalesHero({
           zIndex: 1,
           width: { md: 230 },
           flexShrink: 0,
-          justifyContent: 'space-between',
+          // Las cifras se reparten todo el alto: arriba alineadas con el título,
+          // abajo con el eje del gráfico. Centradas dejaban huecos en los dos extremos.
+          justifyContent: { md: 'space-between' },
           gap: 2,
           pl: { md: 3.5 },
           pt: { xs: 2, md: 0 },
-          borderLeft: { md: `1px solid color-mix(in srgb, ${C.white} 18%, transparent)` },
-          borderTop: { xs: `1px solid color-mix(in srgb, ${C.white} 18%, transparent)`, md: 'none' },
+          borderLeft: { md: `1px solid ${LINE}` },
+          borderTop: { xs: `1px solid ${LINE}`, md: 'none' },
           display: { xs: 'grid', md: 'flex' },
           gridTemplateColumns: { xs: 'repeat(auto-fit, minmax(140px, 1fr))' },
         }}
@@ -297,6 +346,17 @@ export function SalesHero({
           value={String(fallback ? kpis.orders : trend.orders)}
           hint={fallback ? t('admin.dashboard.sales.allTime') : t('admin.dashboard.sales.ordersHint')}
         />
+        {!fallback && (
+          <Stat
+            label={t(trend.unit === 'month' ? 'admin.dashboard.sales.avg.month' : 'admin.dashboard.sales.avg.day')}
+            value={
+              trend.currency && trend.series.length > 0
+                ? formatMoney(Number(trend.sales) / trend.series.length, trend.currency, locale)
+                : '—'
+            }
+            hint={t('admin.dashboard.sales.avg.hint')}
+          />
+        )}
         {!fallback && (
           <Stat
             label={t(trend.unit === 'month' ? 'admin.dashboard.sales.best.month' : 'admin.dashboard.sales.best.day')}
