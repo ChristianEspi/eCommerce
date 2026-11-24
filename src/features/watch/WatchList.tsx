@@ -1,3 +1,4 @@
+import { watchActionHref } from './links'
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded'
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
@@ -158,7 +159,7 @@ export function WatchCard({
           <IconButton
             size="small"
             component={RouterLink}
-            to={finding.href}
+            to={watchActionHref(finding)}
             onClick={onNavigate}
             aria-label={`${t('watch.open')}: ${title}`}
             sx={{ color: 'var(--accent-deep)' }}

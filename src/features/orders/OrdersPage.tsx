@@ -106,8 +106,20 @@ export function OrdersPage() {
   const canWrite = can('orders.write')
   const canExport = can('orders.export')
 
-  const [search, setSearch] = useState('')
-  const [status, setStatus] = useState<OrderStatusFilter>('all')
+  // `?estado=<pestaña>&buscar=<número>` (2026-11-23): el centro de vigilancia
+  // abre la lista ya en la cola del aviso («Cobrar» → pendientes), no entera.
+  const [enlace] = useSearchParams()
+  const estadoEnlazado = enlace.get('estado')
+  const buscarEnlazado = enlace.get('buscar')
+  const [search, setSearch] = useState(buscarEnlazado ?? '')
+  const [status, setStatus] = useState<OrderStatusFilter>(
+    TABS.find((tab) => tab.value === estadoEnlazado)?.value ?? 'all',
+  )
+  useEffect(() => {
+    const tab = TABS.find((item) => item.value === estadoEnlazado)
+    if (tab) setStatus(tab.value)
+    if (buscarEnlazado !== null) setSearch(buscarEnlazado)
+  }, [estadoEnlazado, buscarEnlazado])
   const [range, setRange] = useState<OrderDateRange>('all')
   const [page, setPage] = useState(0)
   const [selected, setSelectedOrder] = useState<Order | null>(null)

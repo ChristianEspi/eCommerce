@@ -214,6 +214,18 @@ describe('Análisis IA de planificación', () => {
     expect(calls(client)).toEqual([{ mode: 'signals', store_id: STORE_A, locale: 'es' }])
   })
 
+  it('agrupa por lo que le pasa al producto, enlaza su ficha y «Ver previsión» abre esa pestaña filtrada', async () => {
+    window.location.hash = ''
+    renderIn(<PlanningAiSection />, {})
+    expect(await screen.findByRole('heading', { name: /Previsión desviada de la venta/ })).toBeInTheDocument()
+    // El modelo técnico ya no ocupa una línea propia.
+    expect(screen.queryByText(/Modelos de previsión/)).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Champú' })).toHaveAttribute('href', `/app/products?producto=${P1}`)
+    await userEvent.click(screen.getByRole('button', { name: 'Ver previsión' }))
+    expect(window.location.hash).toBe('#prevision')
+    window.location.hash = ''
+  })
+
   it('«Explica la previsión» pide la interpretación y pinta cifras de la base', async () => {
     const { client } = renderIn(<PlanningAiSection />, {})
     await screen.findByText('Confianza baja')

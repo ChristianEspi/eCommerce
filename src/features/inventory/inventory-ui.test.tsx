@@ -455,3 +455,26 @@ describe('Existencias desde un enlace (2026-11-22)', () => {
     expect(await screen.findByDisplayValue('SILLA-1')).toBeInTheDocument()
   })
 })
+
+describe('Reponer desde una alerta (2026-11-23)', () => {
+  it('el aviso de UN artículo abre solo sus alertas, y «Reponer» abre el ingreso ya rellenado', async () => {
+    const user = userEvent.setup()
+    window.location.hash = '#alertas'
+    renderInventory(backend(), '/app/inventory?alerta=below_reorder&buscar=A-JABON#alertas')
+
+    expect(await screen.findByText('Solo A-JABON')).toBeInTheDocument()
+    const rows = (await screen.findAllByRole('row')).slice(1)
+    expect(rows).toHaveLength(1)
+    // El nombre lleva a la ficha del producto.
+    expect(screen.getByRole('link', { name: 'Jabón' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('/app/products?producto='),
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Reponer: A-JABON · LIMA' }))
+    // El cajón llega con el artículo elegido: no hay que buscarlo.
+    expect(await screen.findByText('Registrar movimiento')).toBeInTheDocument()
+    expect(screen.getAllByText(/A-JABON/).length).toBeGreaterThan(1)
+    window.location.hash = ''
+  })
+})

@@ -1,3 +1,4 @@
+import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded'
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded'
 import SendRoundedIcon from '@mui/icons-material/SendRounded'
 import {
@@ -8,11 +9,13 @@ import {
   CardContent,
   Chip,
   Divider,
+  Link,
   Skeleton,
   Stack,
   Typography,
 } from '@mui/material'
 import { useState, type FormEvent, type ReactNode } from 'react'
+import { Link as RouterLink, useNavigate } from 'react-router-dom'
 import { formatMetric, type Metric } from '@/features/admin/dashboard/aiAnalyst'
 import { AiFeedbackButtons } from '@/features/ai/AiFeedbackButtons'
 import { useAiFeature } from '@/features/ai/hooks'
@@ -22,9 +25,12 @@ import { useI18n } from '@/shared/i18n/i18n-context'
 import type { MessageKey } from '@/shared/i18n/messages'
 import { AppIcon } from '@/shared/ui/AppIcon'
 import { Field } from '@/shared/ui/Field'
+import { StatusChip, type StatusTone } from '@/shared/ui/StatusChip'
 import { T } from '@/theme/tokens'
 import {
   MAX_PLANNING_QUESTION,
+  type PlanningAiSeverity,
+  type PlanningAiSignal,
   type ForecastInsight,
   type ForecastSystem,
   type PlanningAiContext,
@@ -52,8 +58,8 @@ function Cifra({ label, metric }: { label: string; metric: Metric | undefined })
   const { t, locale } = useI18n()
   if (!metric) return null
   return (
-    <Typography component="span" sx={{ fontSize: 12, color: 'var(--muted)' }}>
-      {label}:{' '}
+    <Typography component="span" sx={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+      {label}{' '}
       <Box component="strong" className="tnum" sx={{ color: 'var(--text)' }}>
         {formatMetric(metric, locale, { days: t('aiOrders.unit.days') })}
       </Box>
@@ -61,89 +67,209 @@ function Cifra({ label, metric }: { label: string; metric: Metric | undefined })
   )
 }
 
-/** CÁLCULO DEL SISTEMA: previsión existente frente a venta, por regla. */
+/** Tono de cada señal: el texto nombra, el color solo acompaña. */
+const SIGNAL_TONE: Readonly<Record<PlanningAiSignal, StatusTone>> = {
+  forecast_over: 'warning',
+  forecast_under: 'warning',
+  no_recent_sales: 'error',
+  trend_up: 'success',
+  trend_down: 'warning',
+  no_forecast: 'default',
+  seasonal_peak: 'info',
+  seasonal_low: 'info',
+  low_confidence: 'default',
+}
+
+/** Qué le pasa a cada producto: así se agrupa la lista del sistema. */
+const GROUPS = ['deviation', 'stalled', 'trend', 'coverage'] as const
+type Group = (typeof GROUPS)[number]
+function groupOf(signals: readonly PlanningAiSignal[]): Group {
+  if (signals.includes('forecast_over') || signals.includes('forecast_under')) return 'deviation'
+  if (signals.includes('no_recent_sales')) return 'stalled'
+  if (signals.some((s) => s === 'trend_up' || s === 'trend_down' || s === 'seasonal_peak' || s === 'seasonal_low')) {
+    return 'trend'
+  }
+  return 'coverage'
+}
+const SEVERITY_ORDER: Readonly<Record<PlanningAiSeverity, number>> = { high: 0, medium: 1, low: 2 }
+
+type SystemItem = ForecastSystem['items'][number]
+
+/** El nombre del producto, enlazado a su ficha en Catálogo. */
+function ProductName({ item }: { item: Pick<SystemItem, 'product_id' | 'name'> & { sku?: string | null } }) {
+  const { t } = useI18n()
+  return (
+    <Stack direction="row" useFlexGap spacing={0.75} sx={{ alignItems: 'baseline', flexWrap: 'wrap', minWidth: 0 }}>
+      <Link
+        component={RouterLink}
+        to={`/app/products?producto=${item.product_id}`}
+        title={t('aiPlanning.openProduct')}
+        underline="hover"
+        sx={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)', '&:hover': { color: 'var(--accent-deep)' } }}
+      >
+        {item.name}
+      </Link>
+      {item.sku && (
+        <Typography component="span" className="tnum" sx={{ fontSize: 11.5, color: 'var(--muted)' }}>
+          {item.sku}
+        </Typography>
+      )}
+    </Stack>
+  )
+}
+
+/**
+ * Lleva a la pestaña Previsión filtrada por ESE producto (2026-11-23). Solo
+ * aparece si el producto tiene previsión: sin ella no hay nada que abrir y el
+ * nombre ya lleva a la ficha.
+ */
+function ViewForecastButton({ item }: { item: SystemItem }) {
+  const { t } = useI18n()
+  const navigate = useNavigate()
+  if (!item.has_forecast) return null
+  return (
+    <Button
+      size="small"
+      variant="outlined"
+      endIcon={<ArrowForwardRoundedIcon />}
+      title={t('aiPlanning.viewForecastHint')}
+      sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+      onClick={() => {
+        // SectionTabs escucha `hashchange`: cambiar el hash ES cambiar de pestaña.
+        navigate({ search: `?buscar=${encodeURIComponent(item.name)}` })
+        window.location.hash = 'prevision'
+      }}
+    >
+      {t('aiPlanning.viewForecast')}
+    </Button>
+  )
+}
+
+/** Un periodo previsto: fechas, fase y previsto/real/desvío en una línea. */
+function PeriodRow({ forecast, system }: { forecast: SystemItem['forecasts'][number]; system: ForecastSystem }) {
+  const { t } = useI18n()
+  const m = system.metrics
+  return (
+    <Stack
+      component="li"
+      direction="row"
+      useFlexGap
+      spacing={1.25}
+      sx={{ alignItems: 'center', flexWrap: 'wrap', px: 1, py: 0.5, borderRadius: 1.5, bgcolor: 'var(--neutral-soft)' }}
+    >
+      <Typography component="span" className="tnum" sx={{ fontSize: 12, fontWeight: 700 }}>
+        {system.entities[forecast.ref]?.label ?? '—'}
+      </Typography>
+      <Typography component="span" sx={{ fontSize: 12, color: 'var(--muted)' }}>
+        {t(`aiPlanning.phase.${forecast.phase}` as MessageKey)}
+      </Typography>
+      <Cifra label={t('aiPlanning.figure.forecast')} metric={m[`${forecast.ref}_forecast`]} />
+      <Cifra label={t('aiPlanning.figure.actual')} metric={m[`${forecast.ref}_actual`]} />
+      <Cifra label={t('aiPlanning.figure.error')} metric={m[`${forecast.ref}_error_pct`]} />
+    </Stack>
+  )
+}
+
+/**
+ * CÁLCULO DEL SISTEMA: previsión existente frente a venta, por regla.
+ *
+ * 2026-11-23 · Agrupado por lo que le pasa al producto (previsión desviada,
+ * sin ventas, cambio de ritmo, sin previsión) y, dentro, de más a menos grave.
+ * Antes era una lista corrida con el modelo técnico arriba y los periodos en
+ * una viñeta ilegible. Cada fila: nombre enlazado a la ficha, señales en
+ * chips tonales, cifras en una línea y «Ver previsión» a la derecha.
+ */
 function SystemBlock({ system }: { system: ForecastSystem }) {
   const { t } = useI18n()
   if (system.items.length === 0) {
     return <Typography sx={{ fontSize: 13 }}>{t('aiPlanning.system.none')}</Typography>
   }
   const m = system.metrics
+  const grupos = GROUPS.map((g) => ({
+    group: g,
+    items: system.items
+      .filter((i) => groupOf(i.signals) === g)
+      .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]),
+  })).filter((g) => g.items.length > 0)
+
   return (
-    <Stack spacing={1.25}>
-      {system.models.length > 0 && (
-        <Typography sx={{ fontSize: 12.5 }}>
-          {t('aiPlanning.system.models')}:{' '}
-          <Box component="span" sx={{ fontFamily: 'monospace', fontSize: 12 }}>
-            {system.models.join(', ')}
-          </Box>
-        </Typography>
-      )}
-      <Stack component="ul" spacing={1.5} sx={{ m: 0, p: 0, listStyle: 'none' }}>
-        {system.items.map((item) => (
-          <Stack
-            component="li"
-            key={item.ref}
-            direction="row"
-            spacing={1.25}
-            sx={{ alignItems: 'flex-start', borderBottom: '1px solid var(--border)', pb: 1.25 }}
+    <Stack spacing={2.5}>
+      {grupos.map(({ group, items }) => (
+        <Box component="section" key={group} aria-labelledby={`ai-plan-group-${group}`}>
+          <Typography
+            id={`ai-plan-group-${group}`}
+            component="h4"
+            sx={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', mb: 1 }}
           >
-            <SeverityIcon severity={item.severity} />
-            <Stack spacing={0.5} sx={{ minWidth: 0, flex: 1 }}>
-              <Typography sx={{ fontSize: 13.5, fontWeight: 700 }}>
-                {item.name}{' '}
-                {item.sku && (
-                  <Box component="span" sx={{ fontSize: 11.5, color: 'var(--muted)', fontWeight: 400 }}>
-                    {item.sku}
-                  </Box>
-                )}
-              </Typography>
-              <Stack direction="row" useFlexGap spacing={0.5} sx={{ flexWrap: 'wrap' }}>
-                {item.signals.length === 0 ? (
-                  <Chip size="small" variant="outlined" label={t('aiPlanning.system.noSignals')} />
-                ) : (
-                  item.signals.map((s) => (
-                    <Chip key={s} size="small" variant="outlined" label={t(`aiPlanning.signal.${s}` as MessageKey)} />
-                  ))
-                )}
-              </Stack>
-              <Stack direction="row" useFlexGap spacing={1.5} sx={{ flexWrap: 'wrap' }}>
-                <Cifra label={t('aiPlanning.figure.sold_30d')} metric={m[`${item.ref}_sold_30d`]} />
-                <Cifra label={t('aiPlanning.figure.prev_30d')} metric={m[`${item.ref}_prev_30d`]} />
-                <Cifra label={t('aiPlanning.figure.trend')} metric={m[`${item.ref}_trend_pct`]} />
-                {item.seasonal.applied ? (
-                  <Cifra label={t('aiPlanning.figure.season')} metric={m[`${item.ref}_season_factor`]} />
-                ) : (
-                  item.seasonal.reason && (
-                    <Typography component="span" sx={{ fontSize: 12, color: 'var(--muted)' }}>
-                      {t('aiPlanning.figure.noSeason')}: {t(`planning.v2.seasonalWhy.${item.seasonal.reason}` as MessageKey)}
-                    </Typography>
-                  )
-                )}
-              </Stack>
-              {item.forecasts.length > 0 && (
-                <Stack component="ul" spacing={0.25} sx={{ m: 0, pl: 2 }} aria-label={t('aiPlanning.system.periods')}>
-                  {item.forecasts.map((f) => (
-                    <Typography component="li" key={f.ref} sx={{ fontSize: 12 }}>
-                      <Box component="span" className="tnum">
-                        {system.entities[f.ref]?.label ?? '—'}
-                      </Box>{' '}
-                      · {t(`aiPlanning.phase.${f.phase}` as MessageKey)} ·{' '}
-                      <Cifra label={t('aiPlanning.figure.forecast')} metric={m[`${f.ref}_forecast`]} />{' '}
-                      <Cifra label={t('aiPlanning.figure.actual')} metric={m[`${f.ref}_actual`]} />{' '}
-                      <Cifra label={t('aiPlanning.figure.error')} metric={m[`${f.ref}_error_pct`]} />
-                      {f.anomaly && (
-                        <Box component="strong" sx={{ ml: 0.75 }}>
-                          {t(`aiPlanning.signal.${f.anomaly}` as MessageKey)}
-                        </Box>
-                      )}
-                    </Typography>
-                  ))}
+            {t(`aiPlanning.group.${group}` as MessageKey)}{' '}
+            <Box component="span" className="tnum" sx={{ color: 'var(--text)' }}>
+              · {items.length}
+            </Box>
+          </Typography>
+          <Box
+            component="ul"
+            sx={{ m: 0, p: 0, listStyle: 'none', border: '1px solid var(--border)', borderRadius: 2, overflow: 'hidden' }}
+          >
+            {items.map((item, index) => (
+              <Box
+                component="li"
+                key={item.ref}
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: 'auto 1fr', sm: 'auto 1fr auto' },
+                  columnGap: 1.5,
+                  rowGap: 1,
+                  alignItems: 'center',
+                  px: 1.5,
+                  py: 1.25,
+                  borderTop: index === 0 ? 'none' : '1px solid var(--border)',
+                }}
+              >
+                <SeverityIcon severity={item.severity} />
+                <Stack spacing={0.75} sx={{ minWidth: 0 }}>
+                  <ProductName item={item} />
+                  <Stack direction="row" useFlexGap spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                    {item.signals.length === 0 ? (
+                      <StatusChip label={t('aiPlanning.system.noSignals')} />
+                    ) : (
+                      item.signals.map((s) => (
+                        <StatusChip key={s} tone={SIGNAL_TONE[s]} label={t(`aiPlanning.signal.${s}` as MessageKey)} />
+                      ))
+                    )}
+                    <Cifra label={t('aiPlanning.figure.sold_30d')} metric={m[`${item.ref}_sold_30d`]} />
+                    <Cifra label={t('aiPlanning.figure.prev_30d')} metric={m[`${item.ref}_prev_30d`]} />
+                    <Cifra label={t('aiPlanning.figure.trend')} metric={m[`${item.ref}_trend_pct`]} />
+                    {item.seasonal.applied ? (
+                      <Cifra label={t('aiPlanning.figure.season')} metric={m[`${item.ref}_season_factor`]} />
+                    ) : (
+                      item.seasonal.reason && (
+                        <Typography component="span" sx={{ fontSize: 12, color: 'var(--muted)' }}>
+                          {t('aiPlanning.figure.noSeason')}: {t(`planning.v2.seasonalWhy.${item.seasonal.reason}` as MessageKey)}
+                        </Typography>
+                      )
+                    )}
+                  </Stack>
+                  {item.forecasts.length > 0 && (
+                    <Stack
+                      component="ul"
+                      spacing={0.5}
+                      sx={{ m: 0, p: 0, listStyle: 'none' }}
+                      aria-label={t('aiPlanning.system.periods')}
+                    >
+                      {item.forecasts.map((f) => (
+                        <PeriodRow key={f.ref} forecast={f} system={system} />
+                      ))}
+                    </Stack>
+                  )}
                 </Stack>
-              )}
-            </Stack>
-          </Stack>
-        ))}
-      </Stack>
+                <Box sx={{ gridColumn: { xs: '2', sm: 'auto' }, justifySelf: { xs: 'start', sm: 'end' } }}>
+                  <ViewForecastButton item={item} />
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        </Box>
+      ))}
     </Stack>
   )
 }
@@ -175,9 +301,10 @@ function InsightView({ data, context }: { data: ForecastInsight; context: Planni
               <Stack component="li" key={`${a.ref}-${a.signal}`} direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
                 <SeverityIcon severity={a.severity} />
                 <Box sx={{ minWidth: 0 }}>
-                  <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
-                    {a.name} · {t(`aiPlanning.signal.${a.signal}` as MessageKey)}
-                  </Typography>
+                  <Stack direction="row" useFlexGap spacing={0.75} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                    <ProductName item={a} />
+                    <StatusChip tone={SIGNAL_TONE[a.signal]} label={t(`aiPlanning.signal.${a.signal}` as MessageKey)} />
+                  </Stack>
                   <Typography sx={{ fontSize: 13 }}>
                     <MarkerText text={a.explanation} context={context} />
                   </Typography>

@@ -3,6 +3,8 @@ import { useMemo, useState } from 'react'
 import { ExplainPanel } from '@/features/ai/explain/ExplainPanel'
 import { useI18n } from '@/shared/i18n/i18n-context'
 import { FormDrawer } from '@/shared/ui/FormDrawer'
+import type { ExplainItem } from '@/features/ai/explain/explainAi'
+import { OpsSystemView } from './OpsSystemView'
 import { OPS_COMPANY_QUESTIONS, OPS_INCIDENT_QUESTIONS, opsAi } from './opsAi'
 
 /** Panel IA de UN incidente (su hilo incluido). */
@@ -29,6 +31,7 @@ export function OpsAiSection() {
   const { t } = useI18n()
   const params = useMemo(() => ({}), [])
   const [open, setOpen] = useState<{ id: string; label: string } | null>(null)
+  const abrir = (item: ExplainItem) => setOpen({ id: item.id, label: item.label })
   return (
     <Stack spacing={2}>
       <ExplainPanel
@@ -37,7 +40,9 @@ export function OpsAiSection() {
         client={opsAi}
         params={params}
         questions={OPS_COMPANY_QUESTIONS}
-        onOpenItem={(item) => setOpen({ id: item.id, label: item.label })}
+        description={t('aiOps.description')}
+        onOpenItem={abrir}
+        renderSystem={(system) => <OpsSystemView system={system} onOpenItem={abrir} />}
       />
       <FormDrawer
         open={open !== null}

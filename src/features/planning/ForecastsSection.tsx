@@ -1,5 +1,6 @@
 import QueryStatsRoundedIcon from '@mui/icons-material/QueryStatsRounded'
 import {
+  Box,
   Card,
   Stack,
   Table,
@@ -9,6 +10,9 @@ import {
   TableRow,
   Typography,
 } from '@mui/material'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { SearchField } from '@/shared/ui/SearchField'
 import { TablePager } from '@/shared/ui/TablePager'
 import { TableSkeleton } from '@/shared/ui/TableSkeleton'
 import { usePagedRows } from '@/shared/ui/usePagedRows'
@@ -32,21 +36,46 @@ export function ForecastsSection() {
   const { t } = useI18n()
   const query = useForecasts()
 
-  const filas = query.data ?? []
+  // `?buscar=<producto>#prevision` (2026-11-23): el Análisis IA lleva a la
+  // previsión de ESE producto, no a la lista entera.
+  const [params] = useSearchParams()
+  const buscarPedido = params.get('buscar')
+  const [search, setSearch] = useState(buscarPedido ?? '')
+  useEffect(() => {
+    if (buscarPedido) setSearch(buscarPedido)
+  }, [buscarPedido])
+
+  const todas = query.data
+  const filas = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    const base = todas ?? []
+    if (!term) return base
+    return base.filter((row) => (row.product_name ?? '').toLowerCase().includes(term) || row.product_id === term)
+  }, [todas, search])
   const isEmpty = !query.isPending && !query.isError && filas.length === 0
   const pager = usePagedRows(filas)
 
   return (
     <Stack spacing={2}>
       <Typography sx={{ color: 'var(--muted)' }}>{t('planning.forecasts.help')}</Typography>
+      {((todas?.length ?? 0) > 0 || search) && (
+        <Box sx={{ minWidth: { xs: '100%', sm: 300 } }}>
+          <SearchField
+            value={search}
+            onChange={setSearch}
+            placeholder={t('planning.forecasts.search')}
+            ariaLabel={t('planning.forecasts.search')}
+          />
+        </Box>
+      )}
 
       <Card>
         {query.isPending && <TableSkeleton columns={5} />}
         {query.isError && <ErrorState error={query.error} onRetry={() => void query.refetch()} />}
         {isEmpty && (
           <EmptyState
-            title={t('planning.forecasts.empty')}
-            description={t('planning.forecasts.emptyBody')}
+            title={search.trim() ? t('planning.noResults') : t('planning.forecasts.empty')}
+            description={search.trim() ? undefined : t('planning.forecasts.emptyBody')}
             icon={<QueryStatsRoundedIcon fontSize="small" />}
           />
         )}

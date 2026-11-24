@@ -720,6 +720,13 @@ export interface ExplainPanelProps {
   readonly onNavigate?: () => void
   readonly noteLabel?: (note: string) => string
   readonly header?: ReactNode
+  /**
+   * Vista propia del CÁLCULO DEL SISTEMA (2026-11-23). Sin ella se pinta la
+   * genérica; Operaciones la usa para agrupar incidentes por gravedad.
+   */
+  readonly renderSystem?: (system: ExplainSystem) => ReactNode
+  /** Con descripción, la cabecera va compacta (título + línea de ayuda). */
+  readonly description?: string
 }
 
 /**
@@ -754,6 +761,8 @@ function ExplainPanelBody({
   onNavigate,
   noteLabel,
   header,
+  renderSystem,
+  description,
 }: ExplainPanelProps) {
   const { t } = useI18n()
   const { availability } = useAiFeature(feature)
@@ -792,15 +801,32 @@ function ExplainPanelBody({
 
   return (
     <Stack spacing={2.5}>
-      <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
-        <AppIcon tone="accent">
-          <AutoAwesomeRoundedIcon />
-        </AppIcon>
-        <Typography component="h3" sx={{ fontSize: 17, fontWeight: 800 }}>
-          {t(`${ns}.title` as MessageKey)}
-        </Typography>
-        <Chip size="small" label={t('aiOrders.badge')} color="primary" sx={{ fontWeight: 800, height: 22 }} />
-      </Stack>
+      {description ? (
+        <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+          <AppIcon tone="accent" size="sm">
+            <AutoAwesomeRoundedIcon fontSize="small" />
+          </AppIcon>
+          <Stack sx={{ minWidth: 0, flex: 1 }}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+              <Typography component="h3" sx={{ fontSize: 14, fontWeight: 800 }}>
+                {t(`${ns}.title` as MessageKey)}
+              </Typography>
+              <Chip size="small" label={t('aiOrders.badge')} color="primary" variant="outlined" />
+            </Stack>
+            <Typography sx={{ fontSize: 12.5, color: 'var(--muted)' }}>{description}</Typography>
+          </Stack>
+        </Stack>
+      ) : (
+        <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+          <AppIcon tone="accent">
+            <AutoAwesomeRoundedIcon />
+          </AppIcon>
+          <Typography component="h3" sx={{ fontSize: 17, fontWeight: 800 }}>
+            {t(`${ns}.title` as MessageKey)}
+          </Typography>
+          <Chip size="small" label={t('aiOrders.badge')} color="primary" sx={{ fontWeight: 800, height: 22 }} />
+        </Stack>
+      )}
       {header}
 
       <Card variant="outlined" component="section" aria-labelledby={systemId} sx={{ borderRadius: 3 }}>
@@ -837,7 +863,7 @@ function ExplainPanelBody({
               </Alert>
             )}
             {signals.isSuccess && system && (
-              <ExplainSystemBlock system={system} ns={ns} onOpenItem={onOpenItem} noteLabel={noteLabel} />
+              renderSystem ? renderSystem(system) : <ExplainSystemBlock system={system} ns={ns} onOpenItem={onOpenItem} noteLabel={noteLabel} />
             )}
             {signals.isSuccess && !system && <Alert severity="warning">{t('aiExplain.system.error')}</Alert>}
           </Box>
