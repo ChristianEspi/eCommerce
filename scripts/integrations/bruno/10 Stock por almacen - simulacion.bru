@@ -1,0 +1,39 @@
+meta {
+  name: 10 Stock por almacen - simulacion
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/v1/stock:batch?dry_run=true
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "items": [ { "sku": "{{sampleSku}}", "warehouse": "{{warehouse}}", "on_hand": 10 } ]
+  }
+}
+
+script:pre-request {
+  req.setHeader("Idempotency-Key", "bruno-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10));
+}
+
+docs {
+  Scope stock.write. warehouse = código de un almacén con origen ERP (si no, ALMACEN_NO_ERP).
+}
+
+tests {
+  test("responde", function () {
+    expect([200, 422]).to.include(res.status);
+  });
+}

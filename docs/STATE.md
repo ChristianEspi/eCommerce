@@ -11,6 +11,29 @@ el recorrido SaaS P00–P17 queda cerrado)
 > (`claude-saas-opus/config/phases.json`), que se identifica siempre como «P0x-SaaS». No son la misma
 > serie: el P12 histórico es el framework de integraciones; el P12-SaaS es fulfillment y devoluciones.
 
+## Contrato de integración ERP v1 (2026-11-24, a pedido del operador: «fase 1 y 2»)
+
+- **Fase 1 (estándar):** `docs/integrations/CONTRATO_INTEGRACION_v1.md`, con los modos push, pull y eventos, la matriz de
+  cobertura, los scopes, las reglas comunes, los errores, los webhooks y el plan de conformidad. Declaración al buzón en
+  `docs/propuestas/2026-11-24-contrato-integracion-erp.md` (to: all, no breaking). El OpenAPI suma los esquemas
+  `integrationSchemas.ts`.
+- **Fase 2 (huecos):** la migración `20261124120000_api_integration_standard.sql` agrega:
+  - `POST /v1/orders/{number}/status` (`order.update`);
+  - `POST /v1/customers:batch` (`customer.write`);
+  - `POST /v1/stock:batch` (`stock.write`, solo almacenes con origen ERP);
+  - `POST /v1/price-lists/{code}/items:batch` (`price.write`);
+  - `updated_since` + `server_time` en los GET de pedidos, productos y clientes.
+
+  Error nuevo: `409 ESTADO_EN_CONFLICTO`.
+- **Una lógica, dos puertas:**
+  - `order_transition` y `api_order_update` comparten `ebim.order_apply_transition`; el origen queda registrado como
+    `backoffice` o `api`.
+  - `import_customers` y `api_customers_upsert` comparten `ebim.import_customers_core`.
+- **Corrección:** `api_products_list` leía `products.store_id` (la tienda de origen). Ahora lee `store_products`.
+- Tests: `supabase/tests/api-integration-standard.test.ts`. Hay requests de Bruno 08–11.
+- **Pendiente:** aplicar la migración y desplegar la función `api` en QAS (solo con orden del operador). Los kits por
+  API y los lotes asíncronos quedan para después.
+
 ## eCommerce en el hub de la suite (2026-11-24, revisión de solo lectura del repo GMAO)
 
 **Corrige** las entradas antiguas que dicen «`ecommerce` no está dado de alta en el hub» (2026-09). En

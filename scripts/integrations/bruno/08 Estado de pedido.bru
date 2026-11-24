@@ -1,0 +1,41 @@
+meta {
+  name: 08 Estado de pedido
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/v1/orders/{{orderNumber}}/status?store={{store}}
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "payment_status": "paid",
+    "reason": "Facturado en el ERP",
+    "external_refs": [ { "system": "erp", "type": "invoice", "id": "F001-000123" } ]
+  }
+}
+
+script:pre-request {
+  req.setHeader("Idempotency-Key", "bruno-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10));
+}
+
+docs {
+  Scope order.update. Define orderNumber con el número de un pedido de la tienda. Repetirlo devuelve el eje en changes.unchanged.
+}
+
+tests {
+  test("responde", function () {
+    expect([200, 422]).to.include(res.status);
+  });
+}

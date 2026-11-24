@@ -54,10 +54,14 @@ export const API_VERSION = 'v1'
 export const API_SCOPES = [
   'order.read',
   'order.create',
+  'order.update',
   'product.read',
   'stock.read',
+  'stock.write',
   'customer.read',
+  'customer.write',
   'catalog.write',
+  'price.write',
 ] as const
 export type ApiScope = (typeof API_SCOPES)[number]
 
@@ -89,6 +93,7 @@ export const API_ERROR_CODES = [
   'VERSION_NO_SOPORTADA',
   'METODO_NO_PERMITIDO',
   'LOTE_DEMASIADO_GRANDE',
+  'ESTADO_EN_CONFLICTO',
   'ERROR_INTERNO',
 ] as const
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number]

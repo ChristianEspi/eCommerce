@@ -19,10 +19,14 @@ export const API_VERSION = 'v1'
 export const API_SCOPES = [
   'order.read',
   'order.create',
+  'order.update',
   'product.read',
   'stock.read',
+  'stock.write',
   'customer.read',
+  'customer.write',
   'catalog.write',
+  'price.write',
 ] as const
 export type ApiScope = (typeof API_SCOPES)[number]
 
@@ -40,6 +44,7 @@ export const API_ERROR_CODES = [
   'VERSION_NO_SOPORTADA',
   'METODO_NO_PERMITIDO',
   'LOTE_DEMASIADO_GRANDE',
+  'ESTADO_EN_CONFLICTO',
   'TENANT_SUSPENDED',
   'ERROR_INTERNO',
 ] as const
@@ -74,6 +79,10 @@ export const API_ERROR_STATUS: Record<ApiErrorCode, number> = {
   VERSION_NO_SOPORTADA: 400,
   METODO_NO_PERMITIDO: 405,
   LOTE_DEMASIADO_GRANDE: 413,
+  // El recurso existe y la petición está bien formada, pero su estado actual no
+  // admite el cambio (cancelar un pedido entregado). Reintentar igual no sirve:
+  // hay que mirar el estado y decidir.
+  ESTADO_EN_CONFLICTO: 409,
   // lifecycle.v1: la cuenta está suspendida. Leer sigue funcionando; escribir
   // no, y reintentar no lo arregla hasta que la cuenta se reactive.
   TENANT_SUSPENDED: 423,
@@ -113,6 +122,20 @@ export const DB_CODE_TO_API: Record<string, ApiErrorCode> = {
   LOTE_INVALIDO: 'PETICION_INVALIDA',
   LOTE_EXCESIVO: 'LOTE_DEMASIADO_GRANDE',
   TENANT_SUSPENDED: 'TENANT_SUSPENDED',
+  // Contrato de integración v1 (2026-11-24): estado del pedido, clientes,
+  // stock por almacén y listas de precios.
+  LISTA_NO_ENCONTRADA: 'RECURSO_NO_ENCONTRADO',
+  EJE_NO_VALIDO: 'PETICION_INVALIDA',
+  ESTADO_NO_VALIDO: 'PETICION_INVALIDA',
+  CAMBIOS_REQUERIDOS: 'PETICION_INVALIDA',
+  REFERENCIA_INVALIDA: 'PETICION_INVALIDA',
+  TRANSICION_SIN_CAMBIO: 'ESTADO_EN_CONFLICTO',
+  PAGO_TRANSICION_INVALIDA: 'ESTADO_EN_CONFLICTO',
+  ENTREGA_TRANSICION_INVALIDA: 'ESTADO_EN_CONFLICTO',
+  ENTREGA_CERRADA: 'ESTADO_EN_CONFLICTO',
+  PEDIDO_CANCELADO: 'ESTADO_EN_CONFLICTO',
+  PEDIDO_PENDIENTE_APROBACION: 'ESTADO_EN_CONFLICTO',
+  PAGO_PENDIENTE: 'ESTADO_EN_CONFLICTO',
 }
 
 export interface ApiErrorBody {
