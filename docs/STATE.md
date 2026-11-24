@@ -3,7 +3,7 @@
 GUIDELINES_STATUS: VERIFIED (**por lectura directa** en la 2ª pasada de P00-SaaS: contrato v1.15,
 `PROTOCOLO.md`, `BANDEJA.md` y `EBIM-CREW-ROSTER.md`). La unidad montada es `G:`, no `H:`.
 Fuentes: ver `docs/EBIM_GUIDELINES_TRACE.md`.
-Última actualización: 2026-11-23 (Complementos IA). Antes: 2026-11-22 (reposición predictiva y fichas en lote). Antes: 2026-11-22 (IA visible: chat, copiloto y sustitutos). Antes: 2026-11-20 (correo por MailHub y textos por tienda). Antes: 2026-11-19 (IA diferenciadora, 8 frentes). Antes: 2026-09-26 (Resumen v2 · vitrina B2B). Antes: 2026-08-30 (**P17-SaaS terminada — quality gate final y línea base releaseable**;
+Última actualización: 2026-11-24 (contrato de integración ERP v1, aplicado en QAS). Antes: 2026-11-23 (Complementos IA). Antes: 2026-11-22 (reposición predictiva y fichas en lote). Antes: 2026-11-22 (IA visible: chat, copiloto y sustitutos). Antes: 2026-11-20 (correo por MailHub y textos por tienda). Antes: 2026-11-19 (IA diferenciadora, 8 frentes). Antes: 2026-09-26 (Resumen v2 · vitrina B2B). Antes: 2026-08-30 (**P17-SaaS terminada — quality gate final y línea base releaseable**;
 el recorrido SaaS P00–P17 queda cerrado)
 
 > **Dos numeraciones de fase.** Lo que sigue como «P00…P12» es el trabajo histórico de este repo. A
@@ -31,8 +31,10 @@ el recorrido SaaS P00–P17 queda cerrado)
   - `import_customers` y `api_customers_upsert` comparten `ebim.import_customers_core`.
 - **Corrección:** `api_products_list` leía `products.store_id` (la tienda de origen). Ahora lee `store_products`.
 - Tests: `supabase/tests/api-integration-standard.test.ts`. Hay requests de Bruno 08–11.
-- **Pendiente:** aplicar la migración y desplegar la función `api` en QAS (solo con orden del operador). Los kits por
-  API y los lotes asíncronos quedan para después.
+- **Aplicado en QAS** (verificado el 2026-11-24 contra la base): las 12 funciones de la migración son idénticas a las del
+  repo, las firmas viejas de los listados ya no existen y `order.update` está en `ebim.api_scope_catalog()`. La función
+  `api` está desplegada (v18, 2026-11-24 11:41 -05). Promovido a `qas` en `b6319b5`.
+- **Pendiente:** los kits por API y los lotes asíncronos.
 
 ## eCommerce en el hub de la suite (2026-11-24, revisión de solo lectura del repo GMAO)
 
@@ -71,7 +73,8 @@ A/B incluido) y `src/features/ai/addons/AiAddons.test.tsx`.
 **Pendiente (decisión del operador / hub):** el COBRO. Propuesta discutida: planes con cupo incluido +
 recargas prepago (Culqi de EBIM, tarjeta y Yape) + factura Nubefact de EBIM; saldo único de suite en el
 hub/MasterAdmin y peso por modelo en vez de «1 consulta = 1». Va al buzón antes de codificar.
-**Migración NO aplicada en QAS** al cerrar esta entrada.
+**Migración aplicada en QAS** (verificado el 2026-11-24: las 5 funciones son idénticas a las del repo,
+`ai_feature_settings` con RLS forzada y `anon` sin EXECUTE sobre `ai_feature_set`).
 
 ## IA: lo pendiente, completo (2026-11-22, a pedido del operador)
 
