@@ -155,7 +155,7 @@ function PeriodRow({ forecast, system }: { forecast: SystemItem['forecasts'][num
       direction="row"
       useFlexGap
       spacing={1.25}
-      sx={{ alignItems: 'center', flexWrap: 'wrap', px: 1, py: 0.5, borderRadius: 1.5, bgcolor: 'var(--neutral-soft)' }}
+      sx={{ alignItems: 'center', flexWrap: 'wrap', px: 1, py: 0.5, borderRadius: 0.67, bgcolor: 'var(--neutral-soft)' }}
     >
       <Typography component="span" className="tnum" sx={{ fontSize: 12, fontWeight: 700 }}>
         {system.entities[forecast.ref]?.label ?? '—'}
@@ -208,7 +208,7 @@ function SystemBlock({ system }: { system: ForecastSystem }) {
           </Typography>
           <Box
             component="ul"
-            sx={{ m: 0, p: 0, listStyle: 'none', border: '1px solid var(--border)', borderRadius: 2, overflow: 'hidden' }}
+            sx={{ m: 0, p: 0, listStyle: 'none', border: '1px solid var(--border)', borderRadius: 0.67, overflow: 'hidden' }}
           >
             {items.map((item, index) => (
               <Box

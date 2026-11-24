@@ -65,7 +65,7 @@ function WatchRow({ finding, why, last }: { finding: WatchFinding; why: string |
           width: 36,
           height: 36,
           flexShrink: 0,
-          borderRadius: 2.5,
+          borderRadius: 0.67,
           display: 'grid',
           placeItems: 'center',
           bgcolor: critica ? 'var(--red-soft)' : 'var(--amber-soft)',
@@ -117,7 +117,7 @@ function WatchRow({ finding, why, last }: { finding: WatchFinding; why: string |
           size="small"
           variant={critica ? 'contained' : 'outlined'}
           aria-label={`${cta}: ${title}`}
-          sx={{ borderRadius: 999, px: 1.5, minWidth: 0, whiteSpace: 'nowrap' }}
+          sx={{ px: 1.5, minWidth: 0, whiteSpace: 'nowrap' }}
         >
           {cta}
         </Button>
@@ -285,7 +285,6 @@ export function WatchSection({ onSeeMore }: { onSeeMore?: () => void } = {}) {
             startIcon={<AutoAwesomeRoundedIcon fontSize="small" />}
             disabled={analysis.isPending || availability !== 'available'}
             onClick={() => analysis.mutate({ locale })}
-            sx={{ borderRadius: 999 }}
           >
             {analysis.isPending ? t('watch.analyzing') : t('watch.analyze')}
           </Button>

@@ -1,0 +1,40 @@
+meta {
+  name: 09 Clientes - simulacion
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/v1/customers:batch?dry_run=true
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "system": "erp",
+    "customers": [ { "code": "C-0001", "kind": "company", "name": "Cliente de prueba", "external_id": "100045" } ]
+  }
+}
+
+script:pre-request {
+  req.setHeader("Idempotency-Key", "bruno-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10));
+}
+
+docs {
+  Scope customer.write. Simula; quita dry_run para aplicar.
+}
+
+tests {
+  test("responde", function () {
+    expect([200, 422]).to.include(res.status);
+  });
+}

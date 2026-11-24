@@ -75,6 +75,26 @@ const STORE: ApiParam = {
   arg: 'p_store',
 }
 
+/**
+ * Lectura incremental (contrato de integración v1). Filtro, no orden: el ERP
+ * guarda el `server_time` de la respuesta y lo manda la próxima vez; pagina con
+ * el cursor de siempre hasta que `next_cursor` sea null.
+ */
+const UPDATED_SINCE: ApiParam = {
+  name: 'updated_since',
+  kind: 'timestamp',
+  description:
+    'Solo lo modificado desde esta marca (ISO 8601). Usa el `server_time` de tu sincronía anterior, no tu reloj.',
+  arg: 'p_updated_since',
+}
+
+const DRY_RUN: ApiParam = {
+  name: 'dry_run',
+  kind: 'boolean',
+  description: 'Simula: valida y devuelve el informe sin escribir nada.',
+  arg: 'p_dry_run',
+}
+
 export const API_ROUTES: readonly ApiRoute[] = [
   {
     method: 'GET',
@@ -99,6 +119,7 @@ export const API_ROUTES: readonly ApiRoute[] = [
         arg: 'p_status',
       },
       STORE,
+      UPDATED_SINCE,
     ],
   },
   {
@@ -144,6 +165,7 @@ export const API_ROUTES: readonly ApiRoute[] = [
         arg: 'p_cursor',
       },
       STORE,
+      UPDATED_SINCE,
     ],
   },
   {
@@ -174,6 +196,7 @@ export const API_ROUTES: readonly ApiRoute[] = [
         description: 'Cursor de la página siguiente.',
         arg: 'p_cursor',
       },
+      UPDATED_SINCE,
     ],
   },
   {
@@ -184,14 +207,7 @@ export const API_ROUTES: readonly ApiRoute[] = [
       'Crea o actualiza productos en lote: upsert por SKU en el maestro de la sociedad, publicación por tienda y precio de variante por tienda. Todo o nada; con `dry_run=true` valida sin escribir.',
     scope: 'catalog.write',
     rpc: 'api_catalog_upsert',
-    query: [
-      {
-        name: 'dry_run',
-        kind: 'boolean',
-        description: 'Simula: valida y devuelve el informe sin escribir nada.',
-        arg: 'p_dry_run',
-      },
-    ],
+    query: [DRY_RUN],
     requiresIdempotencyKey: true,
     successStatus: 200,
     batchReport: true,
@@ -209,6 +225,108 @@ export const API_ROUTES: readonly ApiRoute[] = [
           custom_fields: { codigo_qs: '514574' },
           publications: [{ store: 'mi-tienda', status: 'published', price: '111.29' }],
         },
+      ],
+    },
+  },
+  {
+    method: 'POST',
+    path: '/v1/orders/{number}/status',
+    operationId: 'updateOrderStatus',
+    summary:
+      'El ERP devuelve el ciclo del pedido: estado, pago y entrega, más sus referencias (su número de pedido, su factura, su guía). Un eje que ya está en ese valor se informa como `unchanged`, no como error.',
+    scope: 'order.update',
+    rpc: 'api_order_update',
+    pathParams: [
+      { name: 'number', kind: 'string', required: true, description: 'Número de pedido.', arg: 'p_number' },
+    ],
+    query: [STORE],
+    requiresIdempotencyKey: true,
+    successStatus: 200,
+    requestSchema: 'OrderStatusUpdate',
+    requestExample: {
+      status: 'confirmed',
+      payment_status: 'paid',
+      fulfillment_status: 'shipped',
+      reason: 'Facturado en el ERP',
+      external_refs: [
+        { system: 'sap', type: 'order', id: '4500012345' },
+        { system: 'sap', type: 'invoice', id: 'F001-000123' },
+      ],
+    },
+  },
+  {
+    method: 'POST',
+    path: '/v1/customers:batch',
+    operationId: 'upsertCustomers',
+    summary:
+      'Crea o actualiza clientes por CÓDIGO. Las mismas reglas que la importación por Excel: una celda vacía no borra; todo o nada; `external_id` es el código del cliente en el ERP.',
+    scope: 'customer.write',
+    rpc: 'api_customers_upsert',
+    query: [DRY_RUN],
+    requiresIdempotencyKey: true,
+    successStatus: 200,
+    batchReport: true,
+    maxBodyBytes: 2_000_000,
+    requestSchema: 'CustomerBatchRequest',
+    responseSchema: 'RowBatchReport',
+    requestExample: {
+      system: 'sap',
+      customers: [
+        {
+          code: 'C-0001',
+          kind: 'company',
+          name: 'Clínica San Pablo',
+          tax_id: '20100000001',
+          email: 'compras@clinica.test',
+          external_id: '100045',
+        },
+      ],
+    },
+  },
+  {
+    method: 'POST',
+    path: '/v1/stock:batch',
+    operationId: 'setStock',
+    summary:
+      'Saldo ABSOLUTO por almacén y SKU. Solo almacenes cuyo sistema de registro es el ERP: el stock que lleva la tienda no lo pisa una integración. Todo o nada.',
+    scope: 'stock.write',
+    rpc: 'api_stock_set',
+    query: [DRY_RUN],
+    requiresIdempotencyKey: true,
+    successStatus: 200,
+    batchReport: true,
+    maxBodyBytes: 2_000_000,
+    requestSchema: 'StockBatchRequest',
+    responseSchema: 'RowBatchReport',
+    requestExample: {
+      items: [
+        { sku: 'QS-514574', warehouse: 'ALM-LIMA', on_hand: 181 },
+        { sku: 'QS-514575', warehouse: 'ALM-LIMA', on_hand: 0 },
+      ],
+    },
+  },
+  {
+    method: 'POST',
+    path: '/v1/price-lists/{code}/items:batch',
+    operationId: 'upsertPriceListItems',
+    summary:
+      'Precios de una lista de la tienda, por SKU y cantidad mínima. `active: false` quita el precio. La lista se crea en el backoffice (Precios); la API la llena. Todo o nada.',
+    scope: 'price.write',
+    rpc: 'api_price_list_upsert',
+    pathParams: [
+      { name: 'code', kind: 'string', required: true, description: 'Código de la lista de precios.', arg: 'p_code' },
+    ],
+    query: [STORE, DRY_RUN],
+    requiresIdempotencyKey: true,
+    successStatus: 200,
+    batchReport: true,
+    maxBodyBytes: 2_000_000,
+    requestSchema: 'PriceListBatchRequest',
+    responseSchema: 'RowBatchReport',
+    requestExample: {
+      items: [
+        { sku: 'QS-514574', price: '99.90', compare_at_price: '111.29' },
+        { sku: 'QS-514574', price: '95.00', min_quantity: 12 },
       ],
     },
   },

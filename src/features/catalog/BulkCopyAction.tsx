@@ -339,7 +339,7 @@ function FilaRevision({
   return (
     <Box
       data-bulk-copy-row={fila.producto.sku}
-      sx={{ border: '1px solid var(--border)', borderRadius: 2, p: 1.5 }}
+      sx={{ border: '1px solid var(--border)', borderRadius: 0.67, p: 1.5 }}
     >
       <Stack direction="row" sx={{ justifyContent: 'space-between', gap: 1, alignItems: 'baseline', flexWrap: 'wrap' }}>
         <Typography sx={{ fontWeight: 700, overflowWrap: 'anywhere' }}>{fila.producto.name}</Typography>

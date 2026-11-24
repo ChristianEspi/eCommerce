@@ -1,0 +1,39 @@
+meta {
+  name: 11 Lista de precios - simulacion
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/v1/price-lists/{{priceList}}/items:batch?store={{store}}&dry_run=true
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "items": [ { "sku": "{{sampleSku}}", "price": "99.90" } ]
+  }
+}
+
+script:pre-request {
+  req.setHeader("Idempotency-Key", "bruno-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10));
+}
+
+docs {
+  Scope price.write. priceList = código de una lista creada en Precios.
+}
+
+tests {
+  test("responde", function () {
+    expect([200, 422]).to.include(res.status);
+  });
+}

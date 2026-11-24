@@ -15,6 +15,7 @@
 import { API_ERROR_CODES, API_ERROR_STATUS, API_SCOPES, API_VERSION, IDEMPOTENCY_HEADER, CORRELATION_HEADER } from './contract.ts'
 import { API_ROUTES, type ApiParam, type ApiRoute } from './routes.ts'
 import { CATALOG_SCHEMAS } from './catalogSchemas.ts'
+import { INTEGRATION_SCHEMAS } from './integrationSchemas.ts'
 
 const TYPE_BY_KIND: Record<ApiParam['kind'], Record<string, unknown>> = {
   string: { type: 'string' },
@@ -193,6 +194,7 @@ export function buildOpenApiDocument(serverUrl = '/'): Record<string, unknown> {
       },
       schemas: {
         ...CATALOG_SCHEMAS,
+        ...INTEGRATION_SCHEMAS,
         Error: {
           type: 'object',
           required: ['error'],

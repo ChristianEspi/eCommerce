@@ -90,7 +90,7 @@ export function CatalogCleanupAction({
   const grupos = (lista: readonly GrupoLimpieza[]) => (
     <Stack sx={{ gap: 1.5 }}>
       {lista.slice(0, MAX_FILAS).map((g) => (
-        <Box key={g.clave} sx={{ p: 1.25, border: '1px solid var(--border)', borderRadius: 2 }} data-cleanup-group>
+        <Box key={g.clave} sx={{ p: 1.25, border: '1px solid var(--border)', borderRadius: 0.67 }} data-cleanup-group>
           <Stack sx={{ gap: 0.75 }}>{g.productos.map((p) => fila(p))}</Stack>
         </Box>
       ))}

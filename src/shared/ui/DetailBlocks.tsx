@@ -67,7 +67,7 @@ export function DetailFacts({ facts }: { facts: readonly DetailFact[] }) {
         gap: 1.5,
         gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
         p: 2,
-        borderRadius: 2,
+        borderRadius: 0.67,
         border: '1px solid var(--border)',
         bgcolor: 'var(--bg)',
       }}

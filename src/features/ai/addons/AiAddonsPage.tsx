@@ -223,7 +223,7 @@ function AddonCard({ feature, state, canChange }: { feature: AiFeature; state: A
       variant="outlined"
       data-ai-addon={feature}
       sx={{
-        borderRadius: 3,
+        borderRadius: 1,
         borderTop: '3px solid',
         borderTopColor: state === 'on' ? 'var(--accent)' : 'var(--border)',
         opacity: disponible ? 1 : 0.85,

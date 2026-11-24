@@ -243,7 +243,7 @@ export function TrendChart({
               pointerEvents: 'none',
               bgcolor: 'var(--card)',
               border: '1px solid var(--border)',
-              borderRadius: 1.5,
+              borderRadius: 0.67,
               boxShadow: 'var(--shadow-md)',
               px: 1.25,
               py: 0.75,

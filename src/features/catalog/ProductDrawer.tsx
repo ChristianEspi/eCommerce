@@ -576,7 +576,7 @@ export function ProductDrawer({
           {product === null && (
             <Box
               component="fieldset"
-              sx={{ border: '1px solid var(--border)', borderRadius: 2, p: 2, m: 0 }}
+              sx={{ border: '1px solid var(--border)', borderRadius: 0.67, p: 2, m: 0 }}
             >
               <Typography component="legend" sx={{ px: 0.5, fontWeight: 700, fontSize: 14 }}>
                 {t('catalog.master.initialPublication')}

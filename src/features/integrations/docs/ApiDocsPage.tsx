@@ -140,7 +140,7 @@ function CodeBlock({ code, title }: { code: string; title?: string }) {
           position: 'relative',
           bgcolor: '#0f1d1a',
           color: '#dbe9e3',
-          borderRadius: 2,
+          borderRadius: 0.67,
           '& pre': { m: 0, p: 2, pr: 5, overflowX: 'auto', fontFamily: MONO, fontSize: 12.5, lineHeight: 1.6 },
         }}
       >
@@ -230,7 +230,7 @@ function EndpointCard({ route }: { route: DocRoute }) {
       {route.params.length > 0 && (
         <Box sx={{ mt: 2 }}>
           <Eyebrow>{t('apiDocs.params')}</Eyebrow>
-          <Box sx={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 2 }}>
+          <Box sx={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 0.67 }}>
             <Table size="small">
               <TableBody>
                 {route.params.map((param) => (
@@ -347,7 +347,7 @@ export function ApiDocsPage() {
             maxHeight: { md: 'calc(100dvh - 48px)' },
             overflowY: { md: 'auto' },
             border: { xs: '1px solid var(--border)', md: 0 },
-            borderRadius: 2,
+            borderRadius: 0.67,
             p: { xs: 1.5, md: 0 },
             bgcolor: { xs: 'var(--card)', md: 'transparent' },
           }}
@@ -423,7 +423,7 @@ export function ApiDocsPage() {
             <Typography component="h3" sx={{ fontWeight: 800, fontSize: TS.cardTitle + 1, mb: 1 }}>
               {t('apiDocs.concepts.scopes.title')}
             </Typography>
-            <Box sx={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 2, bgcolor: 'var(--card)' }}>
+            <Box sx={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 0.67, bgcolor: 'var(--card)' }}>
               <Table size="small">
                 <TableBody>
                   {API_SCOPES.map((scope) => (
@@ -462,7 +462,7 @@ export function ApiDocsPage() {
             <CodeBlock
               code={json({ error: { code: 'SCOPE_INSUFICIENTE', message: '…', status: 403, correlation_id: 'ec-…', request_id: 'req-…' } })}
             />
-            <Box sx={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 2, bgcolor: 'var(--card)', mt: 2 }}>
+            <Box sx={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 0.67, bgcolor: 'var(--card)', mt: 2 }}>
               <Table size="small">
                 <TableHead>
                   <TableRow>
@@ -507,7 +507,7 @@ export function ApiDocsPage() {
             <Typography component="h3" sx={{ fontWeight: 800, fontSize: TS.cardTitle + 1, mt: 3, mb: 1 }}>
               {t('apiDocs.webhooks.events')}
             </Typography>
-            <Box sx={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 2, bgcolor: 'var(--card)' }}>
+            <Box sx={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 0.67, bgcolor: 'var(--card)' }}>
               <Table size="small">
                 <TableBody>
                   {WEBHOOK_EVENT_TYPES.map((eventType) => (

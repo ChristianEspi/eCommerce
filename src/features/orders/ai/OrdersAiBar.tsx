@@ -232,7 +232,7 @@ function SearchResults({
             <Box
               component="li"
               key={row.id}
-              sx={{ border: '1px solid var(--border)', borderRadius: 1.5, px: 1.5, py: 1 }}
+              sx={{ border: '1px solid var(--border)', borderRadius: 0.67, px: 1.5, py: 1 }}
             >
               <Stack
                 direction={{ xs: 'column', sm: 'row' }}
@@ -300,7 +300,7 @@ function AttentionItem({
   const action =
     'suggested_action' in item ? item.suggested_action : suggestedActionFor(item.next_action, item.order_id)
   return (
-    <Box component="li" sx={{ border: '1px solid var(--border)', borderRadius: 1.5, px: 1.5, py: 1.25 }}>
+    <Box component="li" sx={{ border: '1px solid var(--border)', borderRadius: 0.67, px: 1.5, py: 1.25 }}>
       <Stack direction="row" spacing={1.25} sx={{ alignItems: 'flex-start' }}>
         <SeverityIcon severity={item.severity} />
         <Stack spacing={0.5} sx={{ minWidth: 0, flex: 1 }}>

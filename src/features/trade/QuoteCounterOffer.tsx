@@ -75,7 +75,7 @@ export function QuoteCounterOffer({ quote, items }: { quote: Quote; items: reado
   const dinero = (n: number | null) => (n === null ? '—' : formatMoney(n, quote.currency, locale))
 
   return (
-    <Box sx={{ mt: 2.5, p: 1.5, border: '1px solid var(--border)', borderRadius: 2 }} data-quote-counter>
+    <Box sx={{ mt: 2.5, p: 1.5, border: '1px solid var(--border)', borderRadius: 0.67 }} data-quote-counter>
       <Typography sx={{ fontWeight: 800 }}>{t('trade.counter.title')}</Typography>
       <Typography variant="body2" sx={{ color: 'var(--muted)', mb: 1.5 }}>
         {t('trade.counter.intro')}

@@ -23,7 +23,7 @@ export function PromotionImpact({ promotionId, currency }: { promotionId: string
   const cambio = d.units_change_pct
 
   return (
-    <Box sx={{ border: '1px solid var(--border)', borderRadius: 2, p: 1.5 }}>
+    <Box sx={{ border: '1px solid var(--border)', borderRadius: 0.67, p: 1.5 }}>
       <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
         <InsightsRoundedIcon fontSize="small" sx={{ color: 'var(--accent-deep)' }} aria-hidden />
         <Typography sx={{ fontWeight: 700 }}>{t('promotions.impact.title')}</Typography>

@@ -58,7 +58,7 @@ export function ContentAiAssistant({
   if (availability === 'forbidden' || availability === 'loading') return null
 
   return (
-    <Box sx={{ border: '1px solid var(--border)', borderRadius: 2, p: 1.5 }}>
+    <Box sx={{ border: '1px solid var(--border)', borderRadius: 0.67, p: 1.5 }}>
       <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
         <AutoAwesomeRoundedIcon fontSize="small" sx={{ color: 'var(--accent-deep)' }} aria-hidden />
         <Typography sx={{ fontWeight: 700, flex: 1 }}>{t('aiCms.title')}</Typography>

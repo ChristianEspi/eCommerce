@@ -439,7 +439,7 @@ export function MovementDrawer({
     return (
       <Box
         data-stock-panel={codigo(id)}
-        sx={{ border: '1px solid var(--border)', borderRadius: 2, p: 1.5, bgcolor: 'var(--bg)' }}
+        sx={{ border: '1px solid var(--border)', borderRadius: 0.67, p: 1.5, bgcolor: 'var(--bg)' }}
       >
         <Typography sx={{ fontSize: 12, fontWeight: 800, color: 'var(--muted)', mb: 0.5 }}>
           {t('inventory.stock.title').replace('{warehouse}', codigo(id))}

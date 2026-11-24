@@ -271,7 +271,7 @@ export function EmailTemplatesSection({
             {t('emailTemplates.preview')}
           </Typography>
           {preview && (
-            <Box sx={{ border: '1px solid var(--line)', borderRadius: 2, overflow: 'hidden', bgcolor: 'background.paper' }}>
+            <Box sx={{ border: '1px solid var(--line)', borderRadius: 0.67, overflow: 'hidden', bgcolor: 'background.paper' }}>
               <Box sx={{ px: 1.5, py: 1, borderBottom: '1px solid var(--line)' }}>
                 <Typography variant="caption" sx={{ color: 'var(--muted)' }}>
                   {t('emailTemplates.field.subject')}
