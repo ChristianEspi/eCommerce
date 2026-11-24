@@ -39,6 +39,7 @@ import {
   TableRow,
   Typography,
 } from '@mui/material'
+import { visuallyHidden } from '@mui/utils'
 import { useMemo, type ReactNode } from 'react'
 import { useTenant } from '@/features/tenant/tenant-context'
 import { useI18n } from '@/shared/i18n/i18n-context'
@@ -257,7 +258,10 @@ function AddonCard({ feature, state, canChange }: { feature: AiFeature; state: A
           <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start', mb: 1 }}>
             <StorageRoundedIcon sx={{ fontSize: 16, color: 'var(--muted)', mt: '2px' }} aria-hidden />
             <Typography sx={{ fontSize: 12.5, color: 'var(--muted)' }}>
-              <Box component="span" sx={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
+              {/* `visuallyHidden` y no `width: 1`: en `sx`, un número ≤ 1 es un
+                  PORCENTAJE (100 %), y este span absoluto ensanchaba la página
+                  entera con una barra horizontal (2026-11-24). */}
+              <Box component="span" sx={visuallyHidden}>
                 {t('aiAddons.data')}:{' '}
               </Box>
               {t(`aiAddons.f.${feature}.data` as MessageKey)}

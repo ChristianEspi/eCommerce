@@ -1,4 +1,5 @@
 import { Box, Card, Skeleton, Stack } from '@mui/material'
+import { visuallyHidden } from '@mui/utils'
 import { useT } from '@/shared/i18n/i18n-context'
 import { R } from '@/theme/tokens'
 
@@ -22,7 +23,8 @@ export function ProductPageSkeleton() {
 
   return (
     <Stack sx={{ gap: { xs: 2.5, md: 4 } }} aria-busy data-testid="product-skeleton">
-      <Box sx={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
+      {/* `visuallyHidden`: en `sx`, `width: 1` es 100 %, no 1 px (2026-11-24). */}
+      <Box sx={visuallyHidden}>
         <span role="status" aria-live="polite">
           {t('common.loading')}
         </span>
