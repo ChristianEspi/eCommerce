@@ -11,6 +11,23 @@ el recorrido SaaS P00–P17 queda cerrado)
 > (`claude-saas-opus/config/phases.json`), que se identifica siempre como «P0x-SaaS». No son la misma
 > serie: el P12 histórico es el framework de integraciones; el P12-SaaS es fulfillment y devoluciones.
 
+## eCommerce en el hub de la suite (2026-11-24, revisión de solo lectura del repo GMAO)
+
+**Corrige** las entradas antiguas que dicen «`ecommerce` no está dado de alta en el hub» (2026-09). En
+`D:\IA_EBIM\GMAO`, la migración `20260915120000_hub_alta_ecommerce_catalogo_y_miquimica.sql` (commit
+`bbb5600`) da de alta la app `ecommerce` en `platform.apps`, sus 24 `catalog_items` (precio 0,
+`available=false`) y MiQuímica (Demo) con la app activa y 22 addons. Según la documentación de GMAO está
+aplicada en vivo; no verificado contra la base.
+
+Lo que sigue faltando del lado del hub (lo hace una sesión en GMAO, no este repo):
+- `base_url` de eCommerce vacía a propósito: se carga en la consola (Pagos → «Apps de la plataforma»).
+- Precios y `available=true` de los addons de eCommerce.
+- «Provisionar» de la consola solo marca la app activa; no llama a eCommerce. El tenant real lo crea
+  EBIM MasterAdmin por el contrato GENERIC (repo y proyecto aparte, `jivgwrczgdpsuvqcwqku`, no presente en
+  esta PC) o, en DEV/QAS, `scripts/alta-negocio.mjs`.
+- Bug del hub: «Nuevo tenant» ignora el plan elegido (`tenant-provision` no usa `plan_code`).
+- Cuerpos de `provision_or_attach_tenant`, `provision_app`, `create_organization` y facturación fuera de git.
+
 ## Complementos IA (2026-11-23, a pedido del operador)
 
 Pantalla `/app/ai` (menú Sistema, permiso `tenant.manage`) con cuatro pestañas:

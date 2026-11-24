@@ -1,4 +1,7 @@
 import { Box, Stack, Typography } from '@mui/material'
+// Fuera de la vista, dentro del árbol de accesibilidad. El de MUI y no uno
+// propio: en `sx`, `width: 1` es 100 %, no 1 px (2026-11-24).
+import { visuallyHidden } from '@mui/utils'
 import { useT } from '@/shared/i18n/i18n-context'
 import { EbimMark } from '@/shared/ui/EbimMark'
 import { useLoaderMark } from '@/shared/ui/loaderMark'
@@ -88,15 +91,3 @@ export function BrandLoader({
   )
 }
 
-/** Fuera de la vista, dentro del árbol de accesibilidad. */
-const visuallyHidden = {
-  position: 'absolute',
-  width: 1,
-  height: 1,
-  padding: 0,
-  margin: -1,
-  overflow: 'hidden',
-  clip: 'rect(0 0 0 0)',
-  whiteSpace: 'nowrap',
-  border: 0,
-} as const

@@ -31,6 +31,7 @@ export type SheetId =
   | 'attribute_values'
   | 'categories'
   | 'products'
+  | 'kits'
   // Clientes y usuarios B2B (`features/customers/import`) usan la misma lectura.
   | 'customers'
   | 'account_users'
@@ -185,6 +186,33 @@ export const PRODUCTS_SHEET: SheetSpec = {
     { sku: 'BIE-GOR-0001', name: 'Gorra Trucker lavada', category_slug: 'accesorios', price: 59.9, status: 'publicado', stock: 25 },
     { sku: 'BIE-VES-0001', name: 'Vestido Dalia midi', category_slug: 'mujer-vestidos', price: 189.9, compare_at_price: 229.9, status: 'publicado', variant_sku: 'BIE-VES-0001-S', variant_stock: 8 },
     { sku: 'BIE-VES-0001', variant_sku: 'BIE-VES-0001-M', variant_stock: 12 },
+  ],
+}
+
+/**
+ * Kits (2026-11-24): una fila por COMPONENTE, como las variantes en la hoja de
+ * productos. Los datos del kit (nombre, precio, categoría, estado) se repiten o
+ * se dejan vacíos en las filas siguientes. La receta de la hoja reemplaza la
+ * del kit. Opcional: un libro sin esta hoja importa solo productos.
+ */
+export const KITS_SHEET: SheetSpec = {
+  id: 'kits',
+  name: 'Kits',
+  maxRows: 2000,
+  requiredHeaders: [['kit_sku'], ['component_sku']],
+  columns: [
+    text('kit_sku', 'SKU del kit', true),
+    text('kit_name', 'Nombre del kit'),
+    number('price', 'Precio del kit'),
+    text('category_slug', 'Categoría'),
+    text('status', 'Estado'),
+    text('component_sku', 'SKU del componente', true),
+    text('component_variant_sku', 'SKU de variante del componente'),
+    number('quantity', 'Cantidad', true),
+  ],
+  examples: [
+    { kit_sku: 'BIE-KIT-0001', kit_name: 'Kit verano', price: 229.9, category_slug: 'accesorios', status: 'publicado', component_sku: 'BIE-GOR-0001', quantity: 1 },
+    { kit_sku: 'BIE-KIT-0001', component_sku: 'BIE-VES-0001', component_variant_sku: 'BIE-VES-0001-M', quantity: 1 },
   ],
 }
 

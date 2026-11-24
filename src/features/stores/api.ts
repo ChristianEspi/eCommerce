@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
+  CLONE_STORE_RPC,
   CREATE_STORE_RPC,
   SET_STORE_STATUS_RPC,
   STORES_TABLE,
@@ -65,6 +66,44 @@ export async function updateStore(input: { store: ManagedStore; values: StoreFor
   })
   if (error) throw storeErrorFromDb(error)
   return managedStoreSchema.parse(data)
+}
+
+/** Secciones que se pueden copiar de una tienda a otra (`ebim.clone_store_sections`). */
+export const CLONE_SECTIONS = [
+  'design',
+  'categories',
+  'catalog',
+  'payments_delivery',
+  'supply',
+  'content',
+  'emails',
+  'synonyms',
+] as const
+export type CloneSection = (typeof CLONE_SECTIONS)[number]
+
+/**
+ * Crea una tienda a partir de otra de la misma sociedad (2026-11-24). Copia la
+ * configuración de las secciones elegidas; la moneda es la de origen y la nueva
+ * nace en borrador. Los secretos de pago no viajan.
+ */
+export async function cloneStore(input: {
+  sourceStoreId: string
+  name: string
+  slug: string
+  sections: readonly CloneSection[]
+}): Promise<{ store: ManagedStore; counts: Record<string, number> }> {
+  const { data, error } = await client().rpc(CLONE_STORE_RPC, {
+    p_source_store_id: input.sourceStoreId,
+    p_slug: input.slug,
+    p_name: input.name,
+    p_sections: [...input.sections],
+  })
+  if (error) throw storeErrorFromDb(error)
+  const counts = (data as { counts?: unknown } | null)?.counts
+  return {
+    store: managedStoreSchema.parse(data),
+    counts: counts && typeof counts === 'object' ? (counts as Record<string, number>) : {},
+  }
 }
 
 export async function setStoreStatus(input: { storeId: string; status: StoreStatus }): Promise<ManagedStore> {

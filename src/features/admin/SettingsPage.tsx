@@ -1012,34 +1012,47 @@ export function SettingsPage() {
                     </SectionCard>
                   </CardContent>
                 </Card>
-                {/* Cierre 8. Va con el correo porque ES correo: sale por la misma
-                    cola y sin el envío configurado no sale nada. */}
-                <Card sx={{ mt: 2.5 }}>
-                  <CardContent>
-                    <SectionCard
-                      icon={<RemoveShoppingCartRoundedIcon />}
-                      title={t('cartRecovery.title')}
-                      subtitle={t('cartRecovery.subtitle')}
-                      padded
-                    >
-                      <CartRecoverySection storeId={storeId} />
-                    </SectionCard>
-                  </CardContent>
-                </Card>
-                {/* 2026-11-19 · Resumen diario: también es correo y sale por la
-                    misma cola. Cifras de la base, nunca de un modelo. */}
-                <Card sx={{ mt: 2.5 }}>
-                  <CardContent>
-                    <SectionCard
-                      icon={<AutoAwesomeRoundedIcon />}
-                      title={t('aiDigest.title')}
-                      subtitle={t('aiDigest.subtitle')}
-                      padded
-                    >
-                      <AiDigestSection storeId={storeId} />
-                    </SectionCard>
-                  </CardContent>
-                </Card>
+                {/* 2026-11-24 · Recordatorio de carrito y resumen diario en la
+                    misma fila: los dos son correos automáticos de la misma cola.
+                    Desde `lg`; en pantallas angostas, uno debajo del otro. */}
+                <Box
+                  sx={{
+                    mt: 2.5,
+                    display: 'grid',
+                    gap: 2.5,
+                    gridTemplateColumns: { xs: '1fr', lg: 'repeat(2, minmax(0, 1fr))' },
+                    alignItems: 'stretch',
+                  }}
+                >
+                  {/* Cierre 8. Va con el correo porque ES correo: sale por la misma
+                      cola y sin el envío configurado no sale nada. */}
+                  <Card sx={{ height: '100%' }}>
+                    <CardContent>
+                      <SectionCard
+                        icon={<RemoveShoppingCartRoundedIcon />}
+                        title={t('cartRecovery.title')}
+                        subtitle={t('cartRecovery.subtitle')}
+                        padded
+                      >
+                        <CartRecoverySection storeId={storeId} />
+                      </SectionCard>
+                    </CardContent>
+                  </Card>
+                  {/* 2026-11-19 · Resumen diario: también es correo y sale por la
+                      misma cola. Cifras de la base, nunca de un modelo. */}
+                  <Card sx={{ height: '100%' }}>
+                    <CardContent>
+                      <SectionCard
+                        icon={<AutoAwesomeRoundedIcon />}
+                        title={t('aiDigest.title')}
+                        subtitle={t('aiDigest.subtitle')}
+                        padded
+                      >
+                        <AiDigestSection storeId={storeId} />
+                      </SectionCard>
+                    </CardContent>
+                  </Card>
+                </Box>
               </ManagedSection>
             ),
           },

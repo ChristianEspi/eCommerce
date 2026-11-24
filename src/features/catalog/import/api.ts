@@ -4,6 +4,7 @@ import { codeFromDbError } from '@/shared/lib/appError'
 import {
   IMPORT_CATALOG_CATEGORIES_RPC,
   IMPORT_CATALOG_PRODUCTS_RPC,
+  IMPORT_CATALOG_WITH_KITS_RPC,
   IMPORT_CATALOG_VOCABULARY_RPC,
 } from '@/shared/lib/db-schema'
 import { catalogClient } from '../api/client'
@@ -76,6 +77,14 @@ export const ROW_REASONS = [
   'CATEGORIA_PROFUNDIDAD',
   'CATEGORIA_CICLO',
   'MODULO_NO_CONTRATADO',
+  // Kits (2026-11-24)
+  'COMPONENTE_NO_ENCONTRADO',
+  'COMPONENTE_REPETIDO',
+  'KIT_DENTRO_DE_KIT',
+  'KIT_EN_SI_MISMO',
+  'VARIANTE_REQUERIDA',
+  'VARIANTE_NO_ENCONTRADA',
+  'VARIANTE_NO_APLICA',
 ] as const
 
 export type RowReason = (typeof ROW_REASONS)[number]
@@ -129,6 +138,24 @@ export function importCategories(storeId: string, rows: readonly ImportRow[], dr
 
 export function importProducts(storeId: string, rows: readonly ImportRow[], dryRun: boolean): Promise<ImportResult> {
   return run(IMPORT_CATALOG_PRODUCTS_RPC, { p_store_id: storeId, p_rows: rows, p_dry_run: dryRun })
+}
+
+/**
+ * Productos y kits en UNA transacción (2026-11-24): un kit puede usar
+ * componentes que el mismo archivo crea, y simular o un error deshace todo.
+ */
+export function importProductsWithKits(
+  storeId: string,
+  productRows: readonly ImportRow[],
+  kitRows: readonly ImportRow[],
+  dryRun: boolean,
+): Promise<ImportResult> {
+  return run(IMPORT_CATALOG_WITH_KITS_RPC, {
+    p_store_id: storeId,
+    p_product_rows: productRows,
+    p_kit_rows: kitRows,
+    p_dry_run: dryRun,
+  })
 }
 
 /**
