@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import { WORKSPACE_KEY_ROOT } from '@/features/tenant/workspace'
-import { createStore, fetchCompanyStores, setStoreStatus, updateStore } from './api'
+import { cloneStore, createStore, fetchCompanyStores, setStoreStatus, updateStore } from './api'
 import type { ManagedStore } from './types'
 
 /**
@@ -34,6 +34,11 @@ export function useCompanyStores(companyId: string | null): UseQueryResult<Manag
 export function useCreateStore() {
   const invalidate = useInvalidateStores()
   return useMutation({ mutationFn: createStore, onSuccess: invalidate })
+}
+
+export function useCloneStore() {
+  const invalidate = useInvalidateStores()
+  return useMutation({ mutationFn: cloneStore, onSuccess: invalidate })
 }
 
 export function useUpdateStore() {

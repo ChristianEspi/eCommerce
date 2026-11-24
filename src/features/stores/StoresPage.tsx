@@ -1,5 +1,6 @@
 import BlockRoundedIcon from '@mui/icons-material/BlockRounded'
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
+import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded'
 import EditRoundedIcon from '@mui/icons-material/EditRounded'
 import LoginRoundedIcon from '@mui/icons-material/LoginRounded'
 import LockRoundedIcon from '@mui/icons-material/LockRounded'
@@ -37,6 +38,7 @@ import { useFeedback } from '@/shared/ui/feedback-context'
 import { EmptyState, ErrorState } from '@/shared/ui/states'
 import { StoreAdminError } from './errors'
 import { useCompanyStores, useSetStoreStatus } from './hooks'
+import { CloneStoreDialog } from './CloneStoreDialog'
 import { StoreFormDrawer } from './StoreFormDrawer'
 import type { ManagedStore, StoreStatus } from './types'
 
@@ -77,6 +79,7 @@ export function StoresPage() {
   const [editing, setEditing] = useState<ManagedStore | null>(null)
   const [creating, setCreating] = useState(false)
   const [toSuspend, setToSuspend] = useState<ManagedStore | null>(null)
+  const [toClone, setToClone] = useState<ManagedStore | null>(null)
   const [serverError, setServerError] = useState<MessageKey | null>(null)
 
   const stores = useCompanyStores(canManage ? activeCompanyId : null)
@@ -172,6 +175,14 @@ export function StoresPage() {
           setCreating(false)
           setEditing(row)
         },
+      },
+      {
+        // 2026-11-24 · Crear una tienda nueva copiando la configuración de esta.
+        id: 'clone',
+        icon: <ContentCopyRoundedIcon fontSize="small" />,
+        label: `${t('storesAdmin.action.clone')}: ${row.name}`,
+        tone: 'neutral',
+        onClick: () => setToClone(row),
       },
       row.status === 'active'
         ? {
@@ -278,6 +289,8 @@ export function StoresPage() {
           setEditing(null)
         }}
       />
+
+      <CloneStoreDialog source={toClone} onClose={() => setToClone(null)} />
 
       <Dialog open={toSuspend !== null} onClose={() => setToSuspend(null)} maxWidth="xs" fullWidth>
         <DialogTitle>{t('storesAdmin.confirmSuspend.title').replace('{store}', toSuspend?.name ?? '')}</DialogTitle>
